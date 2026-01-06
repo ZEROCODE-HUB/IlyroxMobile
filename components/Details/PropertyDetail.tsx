@@ -234,9 +234,8 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
               />
               <Text style={styles.locationText}>
                 {propertyDetails.calle
-                  ? `${propertyDetails.calle} ${
-                      propertyDetails.numero_exterior || ""
-                    }, `
+                  ? `${propertyDetails.calle} ${propertyDetails.numero_exterior || ""
+                  }, `
                   : ""}
                 {propertyDetails.colonia}, {propertyDetails.municipio},
                 {propertyDetails.ciudad}
@@ -450,8 +449,8 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                         {op.porcentaje_comision_compartida
                           ? `${op.porcentaje_comision_compartida}%`
                           : op.monto_comision_compartida
-                          ? `$${op.monto_comision_compartida.toLocaleString()}`
-                          : "No especificado"}
+                            ? `$${op.monto_comision_compartida.toLocaleString()}`
+                            : "No especificado"}
                       </Text>
                     </View>
                     {op.condiciones_comision_compartida && (
@@ -486,16 +485,21 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                 <Text style={styles.profileName}>{profile.nombre}</Text>
                 <Text style={styles.profileRole}>Agente Inmobiliario</Text>
               </View>
-              <TouchableOpacity
-                style={styles.contactIconBtn}
-                onPress={() => onContact?.(profile.id, propertyDetails.id)}
-              >
-                <Ionicons
-                  name="chatbubble-ellipses"
-                  size={24}
-                  color={COLORS.primary}
-                />
-              </TouchableOpacity>
+
+              {user.id === profile.id ? (
+                <View></View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.contactIconBtn}
+                  onPress={() => onContact?.(profile.id, propertyDetails.id)}
+                >
+                  <Ionicons
+                    name="chatbubble-ellipses"
+                    size={24}
+                    color={COLORS.primary}
+                  />
+                </TouchableOpacity>
+              )}
             </View>
           )}
 

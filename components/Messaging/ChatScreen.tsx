@@ -44,6 +44,16 @@ interface ChatScreenProps {
   onViewPropertyDetails?: (propertyId: string) => void;
 }
 
+const SafeAreaContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { bottom } = useStableSafeInsets();
+
+  return (
+    <View style={{ flex: 1, paddingBottom: bottom }}>
+      {children}
+    </View>
+  );
+};
+
 export default function ChatScreen({
   conversationId,
   userId,
@@ -266,146 +276,141 @@ export default function ChatScreen({
   const fullName = `${otherUser.nombre} ${otherUser.apellido_paterno}`;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-    >
-      <View style={[styles.header, { paddingTop: top }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Ionicons
-            name="chevron-back"
-            size={28}
-            color={COLORS.textPrimary}
-          />
-        </TouchableOpacity>
+    <SafeAreaContent>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      >
+        <View style={[styles.header, { paddingTop: top }]}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Ionicons
+              name="chevron-back"
+              size={28}
+              color={COLORS.textPrimary}
+            />
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.headerUser}>
-          <Avatar uri={otherUser.foto} name={otherUser.nombre} size={40} />
-          <View style={styles.headerInfo}>
-            <Text style={styles.headerName} numberOfLines={1}>
-              {fullName}
-            </Text>
-            {propertyId && (
-              <Text style={styles.headerSubtitle}>Chat de propiedad</Text>
-            )}
-            {conversationTags.length > 0 && (
-              <View style={styles.headerTagsContainer}>
-                {conversationTags.slice(0, 2).map((tag) => (
-                  <View 
-                    key={tag.id} 
-                    style={[styles.headerTagBadge, { backgroundColor: tag.color }]}
-                  >
-                    <Text style={styles.headerTagText}>{tag.nombre}</Text>
-                  </View>
-                ))}
-                {conversationTags.length > 2 && (
-                  <Text style={styles.moreTagsText}>
-                    +{conversationTags.length - 2}
-                  </Text>
-                )}
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.headerUser}>
+            <Avatar uri={otherUser.foto} name={otherUser.nombre} size={40} />
+            <View style={styles.headerInfo}>
+              <Text style={styles.headerName} numberOfLines={1}>
+                {fullName}
+              </Text>
+              {propertyId && (
+                <Text style={styles.headerSubtitle}>Chat de propiedad</Text>
+              )}
+              {conversationTags.length > 0 && (
+                <View style={styles.headerTagsContainer}>
+                  {conversationTags.slice(0, 2).map((tag) => (
+                    <View 
+                      key={tag.id} 
+                      style={[styles.headerTagBadge, { backgroundColor: tag.color }]}
+                    >
+                      <Text style={styles.headerTagText}>{tag.nombre}</Text>
+                    </View>
+                  ))}
+                  {conversationTags.length > 2 && (
+                    <Text style={styles.moreTagsText}>
+                      +{conversationTags.length - 2}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
 
-        {/* Botón de etiquetas */}
-        <TouchableOpacity
-          onPress={() => setShowTagsModal(true)}
-          style={styles.headerButton}
-        >
-          <Ionicons
-            name="pricetag"
-            size={22}
-            color={conversationTags.length > 0 ? COLORS.primary : COLORS.textSecondary}
-          />
-        </TouchableOpacity>
-
-        {/* Botón de calendario (solo para chats de propiedad) */}
-        {propertyId && (
           <TouchableOpacity
-            onPress={() => setShowAppointmentModal(true)}
+            onPress={() => setShowTagsModal(true)}
             style={styles.headerButton}
           >
             <Ionicons
-              name="calendar-outline"
+              name="pricetag"
               size={22}
-              color={COLORS.textSecondary}
+              color={conversationTags.length > 0 ? COLORS.primary : COLORS.textSecondary}
             />
           </TouchableOpacity>
-        )}
-      </View>
 
-      {/* Messages List */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        renderItem={renderMessage}
-        contentContainerStyle={styles.messagesContent}
-        ListHeaderComponent={renderHeader}
-        ListFooterComponent={renderFooter}
-        ListEmptyComponent={
-          !loading ? (
-            <View style={styles.emptyContainer}>
+          {propertyId && (
+            <TouchableOpacity
+              onPress={() => setShowAppointmentModal(true)}
+              style={styles.headerButton}
+            >
               <Ionicons
-                name="chatbubble-outline"
-                size={64}
-                color={COLORS.cardBorder}
+                name="calendar-outline"
+                size={22}
+                color={COLORS.textSecondary}
               />
-              <Text style={styles.emptyText}>No hay mensajes aún</Text>
-              <Text style={styles.emptySubtext}>
-                Envía un mensaje para iniciar la conversación
-              </Text>
-            </View>
-          ) : null
-        }
-        onContentSizeChange={() => {
-          if (messages.length > 0) {
-            flatListRef.current?.scrollToEnd({ animated: false });
-          }
-        }}
-      />
-
-      {/* Input */}
-      <MessageInput
-        onSendText={(text) => sendMessage(text, messageMetadata)}
-        onSendImage={async (uri) => { await sendImage(uri, messageMetadata); }}
-        onSendFile={async (uri, name) => { await sendFile(uri, name, messageMetadata); }}
-        onSendProperty={handleSendProperty}
-        sending={sending}
-      />
-
-      {/* Error Display */}
-      {error && (
-        <View style={styles.errorBanner}>
-          <Ionicons name="alert-circle" size={16} color={COLORS.error} />
-          <Text style={styles.errorText}>{error}</Text>
+            </TouchableOpacity>
+          )}
         </View>
-      )}
 
-      {/* Tags Modal */}
-      <TagsModal
-        visible={showTagsModal}
-        onClose={() => setShowTagsModal(false)}
-        availableTags={tags}
-        assignedTags={conversationTags}
-        onAssignTag={handleAssignTag}
-        onRemoveTag={handleRemoveTag}
-        onCreateTag={createTag}
-      />
-
-      {/* Appointment Modal */}
-      {propertyId && (
-        <CreateAppointmentModal
-          visible={showAppointmentModal}
-          onClose={() => setShowAppointmentModal(false)}
-          propertyId={propertyId}
-          otherUserId={otherUser.id}
-          currentUserId={userId}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMessage}
+          contentContainerStyle={styles.messagesContent}
+          ListHeaderComponent={renderHeader}
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={
+            !loading ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={64}
+                  color={COLORS.cardBorder}
+                />
+                <Text style={styles.emptyText}>No hay mensajes aún</Text>
+                <Text style={styles.emptySubtext}>
+                  Envía un mensaje para iniciar la conversación
+                </Text>
+              </View>
+            ) : null
+          }
+          onContentSizeChange={() => {
+            if (messages.length > 0) {
+              flatListRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
         />
-      )}
-    </KeyboardAvoidingView>
+
+        <MessageInput
+          onSendText={(text) => sendMessage(text, messageMetadata)}
+          onSendImage={async (uri) => { await sendImage(uri, messageMetadata); }}
+          onSendFile={async (uri, name) => { await sendFile(uri, name, messageMetadata); }}
+          onSendProperty={handleSendProperty}
+          sending={sending}
+        />
+
+        {error && (
+          <View style={styles.errorBanner}>
+            <Ionicons name="alert-circle" size={16} color={COLORS.error} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        <TagsModal
+          visible={showTagsModal}
+          onClose={() => setShowTagsModal(false)}
+          availableTags={tags}
+          assignedTags={conversationTags}
+          onAssignTag={handleAssignTag}
+          onRemoveTag={handleRemoveTag}
+          onCreateTag={createTag}
+        />
+
+        {propertyId && (
+          <CreateAppointmentModal
+            visible={showAppointmentModal}
+            onClose={() => setShowAppointmentModal(false)}
+            propertyId={propertyId}
+            otherUserId={otherUser.id}
+            currentUserId={userId}
+          />
+        )}
+      </KeyboardAvoidingView>
+    </SafeAreaContent>
   );
 }
 

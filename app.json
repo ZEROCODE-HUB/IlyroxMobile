@@ -72,15 +72,15 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "extra": {
-      "eas": {
-        "projectId": "667baa32-5533-40c3-8cb5-43bd9dd22661"
-      }
-    },
-    "owner": "fabyyannm",
+    "owner": "beymarvc501",
     "plugins": [
       "expo-video",
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "36234a46-bf9b-4182-bad5-ebcdb96feaf6"
+      }
+    }
   }
 }

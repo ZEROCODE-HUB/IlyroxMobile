@@ -9,7 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
 import { FeedItem, User } from "../../types";
-import { useFeedInteractions, useViewTracking } from "../../hooks";
+import { useCurrentUserId, useFeedInteractions, useViewTracking } from "../../hooks";
 import { DIMENSIONS, COLORS } from "../../constants";
 import { commonStyles } from "../../styles";
 import { UserHeader, ImageGallery, ReportModal } from "../shared";
@@ -40,7 +40,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     setShowReportModal,
     handleReport,
   } = useFeedInteractions();
-
+  const userId = currentUserId ?? useCurrentUserId();
   const { trackInteraction } = useViewTracking({
     feedItemId: item.id,
     userId: currentUserId,
@@ -54,15 +54,15 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
   const handleContactPress = () => {
     if (!currentUserId) return;
-    
-    navigation.navigate("Messages", { 
+
+    navigation.navigate("Messages", {
       initialUser: {
         id: item.user.id,
         nombre: item.user.name?.split(" ")[0] || "",
         apellido_paterno: item.user.name?.split(" ")[1] || "",
         foto: item.user.avatar || null,
       },
-      initialPropertyId: property.id 
+      initialPropertyId: property.id
     });
   };
 
@@ -110,9 +110,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             }}
             onTrackInteraction={trackInteraction}
             shareTitle={property.title}
-            shareDescription={`${
-              property.operation
-            } - $${property.price.toLocaleString()} ${property.currency}`}
+            shareDescription={`${property.operation
+              } - $${property.price.toLocaleString()} ${property.currency}`}
             shareImageUrl={images[0]}
             showContactButton={false}
             orientation="vertical"
@@ -126,7 +125,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         <Text style={commonStyles.title} numberOfLines={1}>
           {
             property.title.charAt(0).toUpperCase() +
-              property.title.slice(1)
+            property.title.slice(1)
           }
         </Text>
 
@@ -152,7 +151,9 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             ) : null}
           </View>
 
-          {showContactButton && (
+          {userId === item.user.id ? (
+            <View></View>
+          ) : (
             <TouchableOpacity
               style={styles.smallContactBtn}
               accessibilityLabel="Contactar asesor"

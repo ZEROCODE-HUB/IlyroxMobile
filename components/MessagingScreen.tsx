@@ -13,12 +13,23 @@ import { useConversations } from "../hooks/messaging/useConversations";
 import { AppHeader } from "./AppHeader";
 import { User } from "../types";
 import { COLORS } from "../constants";
+import { useStableSafeInsets } from "../context/SafeInsetsContext";
 
 interface MessagingScreenProps {
   initialUser?: User;
   initialPropertyId?: string;
   onBack?: () => void;
 }
+
+const SafeAreaContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { top, bottom } = useStableSafeInsets();
+
+  return (
+    <View style={{ flex: 1, paddingTop: top, paddingBottom: bottom }}>
+      {children}
+    </View>
+  );
+};
 
 export default function MessagingScreen({
   initialUser,
@@ -149,16 +160,18 @@ export default function MessagingScreen({
 
   if (!profile?.id) {
     return (
-      <View style={styles.container}>
-        <AppHeader
-          title="Mensajes"
-          showBackButton
-          onBack={handleNavigationBack}
-        />
-        <View style={styles.content}>
-          <Text style={styles.subtitle}>Cargando...</Text>
+      <SafeAreaContent>
+        <View style={styles.container}>
+          <AppHeader
+            title="Mensajes"
+            showBackButton
+            onBack={handleNavigationBack}
+          />
+          <View style={styles.content}>
+            <Text style={styles.subtitle}>Cargando...</Text>
+          </View>
         </View>
-      </View>
+      </SafeAreaContent>
     );
   }
 
@@ -169,16 +182,18 @@ export default function MessagingScreen({
     console.log("otherUser:", otherUser);
     console.log("activePropertyId:", activePropertyId);
     return (
-      <View style={styles.container}>
-        <ChatScreen
-          conversationId={activeConversationId}
-          userId={profile.id}
-          otherUser={otherUser}
-          propertyId={activePropertyId}
-          onBack={handleBack}
-          onViewPropertyDetails={handleViewPropertyDetails}
-        />
-      </View>
+      <SafeAreaContent>
+        <View style={styles.container}>
+          <ChatScreen
+            conversationId={activeConversationId}
+            userId={profile.id}
+            otherUser={otherUser}
+            propertyId={activePropertyId}
+            onBack={handleBack}
+            onViewPropertyDetails={handleViewPropertyDetails}
+          />
+        </View>
+      </SafeAreaContent>
     );
   }
 
@@ -186,17 +201,19 @@ export default function MessagingScreen({
 
   // Mostrar lista de conversaciones
   return (
-    <View style={styles.container}>
-      <AppHeader
-        title="Mensajes"
-        showBackButton
-        onBack={handleNavigationBack}
-      />
-      <ConversationsList
-        userId={profile.id}
-        onSelectConversation={handleSelectConversation}
-      />
-    </View>
+    <SafeAreaContent>
+      <View style={styles.container}>
+        <AppHeader
+          title="Mensajes"
+          showBackButton
+          onBack={handleNavigationBack}
+        />
+        <ConversationsList
+          userId={profile.id}
+          onSelectConversation={handleSelectConversation}
+        />
+      </View>
+    </SafeAreaContent>
   );
 }
 
