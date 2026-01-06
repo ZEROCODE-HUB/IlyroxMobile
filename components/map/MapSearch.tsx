@@ -9,8 +9,9 @@ import { SearchFiltersBar } from "./SearchFiltersBar";
 import { PropertyMap } from "./PropertyMap";
 import { PropertyMapCard } from "./PropertyMapCard";
 import { SearchFiltersModal } from "./SearchFiltersModal";
-import { usePropertyFilters } from "../../hooks/usePropertyFilters";
+import { usePropertyFilters, GeofenceBounds } from "../../hooks/usePropertyFilters";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useStableSafeInsets } from "../../context/SafeInsetsContext";
 
 interface MapSearchProps {
   properties: Property[];
@@ -22,6 +23,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   const { selectedLocation, setSelectedLocation } = useApp();
   const navigation = useNavigation<any>();
   const scrollViewRef = useRef<ScrollView>(null);
+  const { bottom: safeBottom } = useStableSafeInsets();
 
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [highlightedPropertyId, setHighlightedPropertyId] = useState<
@@ -33,6 +35,14 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
 
   const googleApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
+  const [geoBounds, setGeoBounds] = useState<GeofenceBounds | null>(null);
+  const [focusRegion, setFocusRegion] = useState<{
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+  } | null>(null);
+
   const {
     filters,
     filteredProperties,
@@ -40,7 +50,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     updateLocationFilter,
     clearFilters,
     hasActiveFilters,
-  } = usePropertyFilters(properties);
+  } = usePropertyFilters(properties, geoBounds);
 
   // LOG INICIAL - Ver propiedades recibidas
   useEffect(() => {
@@ -103,9 +113,63 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
 
       console.log("Aplicando filtro de ubicación:", newLocationFilter);
       updateLocationFilter(newLocationFilter);
+
+      // Geocodificar ubicación para centrar y definir límites
+      const geocode = async () => {
+        try {
+          if (!googleApiKey) return;
+          const q = encodeURIComponent(`${selectedLocation.name}, Mexico`);
+          const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${q}&region=mx&key=${googleApiKey}`;
+          const res = await fetch(url);
+          const json = await res.json();
+          const result = json.results?.[0];
+          if (result?.geometry) {
+            const { location, bounds, viewport } = result.geometry;
+            const b = bounds || viewport;
+            if (b) {
+              const minLat = Math.min(b.southwest.lat, b.northeast.lat);
+              const maxLat = Math.max(b.southwest.lat, b.northeast.lat);
+              const minLng = Math.min(b.southwest.lng, b.northeast.lng);
+              const maxLng = Math.max(b.southwest.lng, b.northeast.lng);
+              setGeoBounds({ minLat, maxLat, minLng, maxLng });
+              const latSpan = Math.max(maxLat - minLat, 0);
+              const lngSpan = Math.max(maxLng - minLng, 0);
+              const type = selectedLocation.type;
+              const MIN_DELTA =
+                type === "colonia" ? 0.02 : type === "municipio" ? 0.04 : 0.03;
+              const MAX_DELTA =
+                type === "colonia" ? 0.06 : type === "municipio" ? 0.12 : 0.10;
+              const latDelta = Math.min(Math.max(latSpan * 1.2 || MIN_DELTA, MIN_DELTA), MAX_DELTA);
+              const lngDelta = Math.min(Math.max(lngSpan * 1.2 || MIN_DELTA, MIN_DELTA), MAX_DELTA);
+              setFocusRegion({
+                latitude: (minLat + maxLat) / 2,
+                longitude: (minLng + maxLng) / 2,
+                latitudeDelta: latDelta,
+                longitudeDelta: lngDelta,
+              });
+            } else if (location) {
+              setGeoBounds(null);
+              const type = selectedLocation.type;
+              const fallbackDelta =
+                type === "colonia" ? 0.03 : type === "municipio" ? 0.06 : 0.05;
+              setFocusRegion({
+                latitude: location.lat,
+                longitude: location.lng,
+                latitudeDelta: fallbackDelta,
+                longitudeDelta: fallbackDelta,
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("Error geocoding location", e);
+        }
+      };
+      geocode();
     } else {
       console.log("=== NO HAY UBICACIÓN SELECCIONADA ===");
       console.log("Mostrando todas las propiedades sin filtro de ubicación");
+      setGeoBounds(null);
+      setFocusRegion(null);
     }
   }, [selectedLocation]);
 
@@ -196,6 +260,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           onMarkerPress={handleMarkerPress}
           googleApiKey={googleApiKey}
           highlightedPropertyId={highlightedPropertyId}
+          focusRegion={focusRegion}
         />
       </View>
 
@@ -205,7 +270,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           ref={scrollViewRef}
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.cardsContent}
+          contentContainerStyle={[styles.cardsContent, { paddingBottom: 16 + safeBottom }]}
           decelerationRate="fast"
           snapToInterval={212} // 200 + 12 margin
         >

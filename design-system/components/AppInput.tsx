@@ -118,6 +118,7 @@ export const AppInput: React.FC<AppInputProps> = ({
               fontSize: theme.typography.fontSizes.md,
               color: theme.colors.text,
             },
+            inputStyle,
           ]}
           onFocus={handleFocus}
           onBlur={handleBlur}

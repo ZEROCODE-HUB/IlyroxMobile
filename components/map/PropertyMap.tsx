@@ -8,12 +8,19 @@ import MapView, {
 } from "../shared/MapComponents";
 import { Property } from "../../types";
 import { COLORS } from "../../constants/colors";
+import { useStableSafeInsets } from "../../context/SafeInsetsContext";
 
 interface PropertyMapProps {
   properties: Property[];
   onMarkerPress: (propertyId: string, property: Property) => void;
   googleApiKey?: string;
   highlightedPropertyId?: string | null;
+  focusRegion?: {
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+  } | null;
 }
 
 export const PropertyMap: React.FC<PropertyMapProps> = ({
@@ -21,7 +28,9 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   onMarkerPress,
   googleApiKey,
   highlightedPropertyId,
+  focusRegion,
 }) => {
+  const { bottom } = useStableSafeInsets();
   const mapRef = useRef<any>(null);
   const nativeMapRef = useRef<MapView>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -124,6 +133,11 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
   useEffect(() => {
     if (Platform.OS === "web" || !nativeMapRef.current || !mapReady) return;
+    // Priorizar enfoque explícito si está definido
+    if (focusRegion) {
+      nativeMapRef.current?.animateToRegion(focusRegion, 700);
+      return;
+    }
     if (properties.length === 0) return;
 
     const region = calculateRegionWithPadding();
@@ -133,10 +147,23 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         nativeMapRef.current?.animateToRegion(region, 1000);
       }, 700);
     }
-  }, [properties, mapReady]);
+  }, [properties, mapReady, focusRegion]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || !mapInstanceRef.current) return;
+    if (focusRegion) {
+      const gmaps = (window as any).google?.maps;
+      if (!gmaps) return;
+      mapInstanceRef.current.setCenter({
+        lat: focusRegion.latitude,
+        lng: focusRegion.longitude,
+      });
+      const d = focusRegion.latitudeDelta;
+      const zoom =
+        d <= 0.02 ? 13 : d <= 0.04 ? 12 : d <= 0.06 ? 11 : d <= 0.1 ? 10 : 9;
+      mapInstanceRef.current.setZoom(zoom);
+      return;
+    }
     if (properties.length === 0) return;
 
     const bounds = new (window as any).google.maps.LatLngBounds();
@@ -300,7 +327,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         onMapReady={() => setMapReady(true)}
         onRegionChange={updateOverlayPositions}
         onRegionChangeComplete={updateOverlayPositions}
-        mapPadding={{ top: 160, right: 30, bottom: 220, left: 30 }}
+        mapPadding={{ top: 160, right: 30, bottom: 220 + bottom, left: 30 }}
         moveOnMarkerPress={false}
       >
         {properties.map((p) => {
@@ -335,18 +362,18 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
             const priceText = formatPrice(p.price || 0);
             const bgColor = isHighlighted ? COLORS.warning : COLORS.primary;
 
-            return (
+          return (
+            <View
+              key={`price-${p.id}`}
+              style={{
+                position: "absolute",
+                left: Math.max(6, pos.x - 35),
+                top: Math.max(6, pos.y - 35),
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
               <View
-                key={`price-${p.id}`}
-                style={{
-                  position: "absolute",
-                  left: pos.x - 35, // Centrado aproximado
-                  top: pos.y - 35, // Posicionado arriba del punto
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <View
                   style={{
                     backgroundColor: bgColor,
                     paddingVertical: 5,
@@ -403,6 +430,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     position: "relative",
+    overflow: "hidden",
   },
   markerWrapper: {
     display: "none",

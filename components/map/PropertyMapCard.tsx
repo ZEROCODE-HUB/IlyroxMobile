@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 
@@ -35,19 +35,25 @@ export const PropertyMapCard: React.FC<PropertyMapCardProps> = ({
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <Image source={{ uri: image }} style={styles.image} resizeMode="cover" />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Image source={{ uri: image }} style={styles.image} resizeMode="cover" />
 
-      <View style={styles.priceTag}>
-        <Text style={styles.priceText}>
-          ${formatPrice()} {currency}
-        </Text>
-      </View>
+        <View style={styles.priceTag}>
+          <Text style={styles.priceText}>
+            ${formatPrice()} {currency}
+          </Text>
+        </View>
 
-      <View style={styles.info}>
-        <Text style={styles.title} numberOfLines={2}>
-          {title}
-        </Text>
-      </View>
+        <View style={styles.info}>
+          <Text style={styles.title}>
+            {title}
+          </Text>
+        </View>
+      </ScrollView>
 
       {isHighlighted && (
         <View style={styles.highlightIndicator}>

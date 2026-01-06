@@ -24,6 +24,7 @@ import SelectionModal from "../components/modals/SelectionModal";
 import { COLORS } from "../constants/colors";
 import { LinearGradient } from "expo-linear-gradient";
 import { useImageUpload } from "../hooks/useImageUpload";
+import { useStableSafeInsets } from "../context/SafeInsetsContext";
 
 export default function AuthScreen() {
   const [modalVisible, setModalVisible] = useState(false);
@@ -56,6 +57,7 @@ export default function AuthScreen() {
 
   const { setCurrentUser } = useApp();
   const { uploadImage } = useImageUpload();
+  const { bottom } = useStableSafeInsets();
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -335,7 +337,7 @@ export default function AuthScreen() {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { paddingBottom: bottom }]}
         >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>

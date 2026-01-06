@@ -22,6 +22,7 @@ import { COLORS } from "../../constants";
 import { Avatar } from "../shared";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ViewImage } from "./ViewImage";
+import { useStableSafeInsets } from "../../context/SafeInsetsContext";
 
 interface CommentsModalProps {
   visible: boolean;
@@ -48,6 +49,7 @@ export default function CommentsModal({
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
   const insets = useSafeAreaInsets();
+  const { bottom: stableBottom } = useStableSafeInsets();
 
   const translateY = React.useRef(new Animated.Value(0)).current;
 
@@ -169,7 +171,9 @@ export default function CommentsModal({
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={{ flex: 1 }}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+            keyboardVerticalOffset={
+              Platform.OS === "ios" ? stableBottom : 20
+            }
           >
             <View style={styles.dragHandle} />
             <View style={styles.commentsHeader}>
@@ -316,13 +320,21 @@ export default function CommentsModal({
               </View>
             )}
 
-            <View style={styles.commentInputContainer}>
+            <View
+              style={[
+                styles.commentInputContainer,
+                { paddingBottom: Math.max(16, 12 + stableBottom) },
+              ]}
+            >
               <AppInput
                 containerStyle={styles.flex1}
                 placeholder="Escribe un comentario..."
                 value={commentText}
                 onChangeText={setCommentText}
                 multiline
+                numberOfLines={3}
+                scrollEnabled
+                inputStyle={{ minHeight: 40, maxHeight: 120, paddingVertical: 12, textAlignVertical: "top" }}
                 maxLength={500}
                 editable={!posting}
               />
@@ -362,7 +374,12 @@ export default function CommentsModal({
             </View>
 
             {!!imageUri && (
-              <View style={styles.imagePreviewBar}>
+              <View
+                style={[
+                  styles.imagePreviewBar,
+                  { paddingBottom: Math.max(16, 12 + stableBottom) },
+                ]}
+              >
                 <Image source={{ uri: imageUri }} style={styles.previewImage} />
                 <TouchableOpacity
                   style={styles.removeImageButton}

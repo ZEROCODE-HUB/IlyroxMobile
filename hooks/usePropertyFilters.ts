@@ -25,7 +25,17 @@ export interface PropertyFilters {
 
 const EXCHANGE_RATE = 20;
 
-export const usePropertyFilters = (properties: Property[]) => {
+export interface GeofenceBounds {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}
+
+export const usePropertyFilters = (
+  properties: Property[],
+  geofenceBounds?: GeofenceBounds | null
+) => {
   const [filters, setFilters] = useState<PropertyFilters>({
     tipoPropiedad: "",
     subtipo: "",
@@ -81,12 +91,47 @@ export const usePropertyFilters = (properties: Property[]) => {
         });
       }
 
+      // Siempre excluir no publicadas si existe el campo
+      if ((p as any).status && (p as any).status !== "Publicada") {
+        if (index < 3) console.log(`  ❌ Rechazada por estado no publicado`);
+        return false;
+      }
+
+      // Geocerca por coordenadas si está definida
+      if (geofenceBounds) {
+        const lat = p.coordinates?.lat ?? anyP.latitud;
+        const lng = p.coordinates?.lng ?? anyP.longitud;
+        const valid =
+          lat != null &&
+          lng != null &&
+          !isNaN(lat) &&
+          !isNaN(lng) &&
+          lat >= geofenceBounds.minLat &&
+          lat <= geofenceBounds.maxLat &&
+          lng >= geofenceBounds.minLng &&
+          lng <= geofenceBounds.maxLng;
+        if (!valid) {
+          if (index < 3)
+            console.log(
+              `  ❌ Fuera de geocerca: (${lat}, ${lng}) no dentro de`,
+              geofenceBounds
+            );
+          return false;
+        }
+      }
+
       // FILTRO DE OPERACIÓN - Solo aplicar si hay filtro
       if (filters.operacion) {
-        const pOperacion =
+        const rawOperacion =
           anyP.operacion ||
           anyP.operation ||
           (anyP.operaciones && anyP.operaciones[0]?.tipo_operacion);
+        const pOperacion =
+          rawOperacion &&
+          String(rawOperacion)
+            .toLowerCase()
+            .replace("sale", "venta")
+            .replace("rent", "renta");
 
         if (
           pOperacion &&
@@ -106,8 +151,12 @@ export const usePropertyFilters = (properties: Property[]) => {
 
       // Filtro de estado
       if (filters.locationFilter.estado) {
-        const pEstado = anyP.estado || p.location?.state;
-        if (pEstado !== filters.locationFilter.estado) {
+        const pEstado = (anyP.estado || p.location?.state || "")
+          .toString()
+          .trim()
+          .toLowerCase();
+        const fEstado = filters.locationFilter.estado.toString().trim().toLowerCase();
+        if (pEstado !== fEstado) {
           if (index < 3)
             console.log(
               `  ❌ Rechazada por estado: ${pEstado} !== ${filters.locationFilter.estado}`
@@ -118,8 +167,12 @@ export const usePropertyFilters = (properties: Property[]) => {
 
       // Filtro de ciudad
       if (filters.locationFilter.ciudad) {
-        const pCiudad = anyP.ciudad || p.location?.city;
-        if (pCiudad !== filters.locationFilter.ciudad) {
+        const pCiudad = (anyP.ciudad || p.location?.city || "")
+          .toString()
+          .trim()
+          .toLowerCase();
+        const fCiudad = filters.locationFilter.ciudad.toString().trim().toLowerCase();
+        if (pCiudad !== fCiudad) {
           if (index < 3)
             console.log(
               `  ❌ Rechazada por ciudad: ${pCiudad} !== ${filters.locationFilter.ciudad}`
@@ -129,10 +182,13 @@ export const usePropertyFilters = (properties: Property[]) => {
       }
 
       // Filtro de municipio
-      const pMunicipio = anyP.municipio || p.location?.municipio;
+      const pMunicipio = (anyP.municipio || p.location?.municipio || "")
+        .toString()
+        .trim()
+        .toLowerCase();
       if (
         filters.locationFilter.municipio &&
-        pMunicipio !== filters.locationFilter.municipio
+        pMunicipio !== filters.locationFilter.municipio.toString().trim().toLowerCase()
       ) {
         if (index < 3)
           console.log(
@@ -143,8 +199,12 @@ export const usePropertyFilters = (properties: Property[]) => {
 
       // Filtro de colonia
       if (filters.locationFilter.colonia) {
-        const pColonia = anyP.colonia || p.location?.colony;
-        if (pColonia !== filters.locationFilter.colonia) {
+        const pColonia = (anyP.colonia || p.location?.colony || "")
+          .toString()
+          .trim()
+          .toLowerCase();
+        const fColonia = filters.locationFilter.colonia.toString().trim().toLowerCase();
+        if (pColonia !== fColonia) {
           if (index < 3)
             console.log(
               `  ❌ Rechazada por colonia: ${pColonia} !== ${filters.locationFilter.colonia}`
@@ -268,7 +328,7 @@ export const usePropertyFilters = (properties: Property[]) => {
     console.log("=========================\n");
 
     setFilteredProperties(filtered);
-  }, [properties, filters]);
+  }, [properties, filters, geofenceBounds]);
 
   const updateFilter = <K extends keyof PropertyFilters>(
     key: K,
@@ -290,7 +350,7 @@ export const usePropertyFilters = (properties: Property[]) => {
       precioMin: "",
       precioMax: "",
       moneda: "MXN",
-      operacion: "venta",
+      operacion: "",
       locationFilter: {
         estado: "",
         ciudad: "",
@@ -309,10 +369,23 @@ export const usePropertyFilters = (properties: Property[]) => {
 
   const hasActiveFilters =
     filters.tipoPropiedad !== "" ||
+    filters.subtipo !== "" ||
     filters.precioMin !== "" ||
     filters.precioMax !== "" ||
     filters.habitaciones !== "" ||
-    filters.banos !== "";
+    filters.banos !== "" ||
+    filters.estacionamientos !== "" ||
+    filters.antiguedad !== "" ||
+    filters.niveles !== "" ||
+    filters.m2TerrenoMin !== "" ||
+    filters.m2ConstruccionMin !== "" ||
+    filters.operacion !== "" ||
+    !!(
+      filters.locationFilter.estado ||
+      filters.locationFilter.ciudad ||
+      filters.locationFilter.municipio ||
+      filters.locationFilter.colonia
+    );
 
   return {
     filters,
