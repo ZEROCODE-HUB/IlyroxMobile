@@ -21,12 +21,13 @@ import { useConversations } from "../../hooks/messaging/useConversations";
 import { useTags } from "../../hooks/messaging/useTags";
 import { COLORS } from "../../constants";
 import { Avatar } from "../shared";
+import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
 interface ConversationsListProps {
   userId: string;
   onSelectConversation: (
-    conversationId: string, 
-    otherUser: any, 
+    conversationId: string,
+    otherUser: any,
     propertyId?: string | null
   ) => void;
 }
@@ -42,18 +43,10 @@ export default function ConversationsList({
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [showTagsManager, setShowTagsManager] = useState(false);
 
-  const {
-    conversations,
-    loading,
-    getConversationsForUser,
-    refresh,
-  } = useConversations(userId);
+  const { conversations, loading, getConversationsForUser, refresh } =
+    useConversations(userId);
 
-  const {
-    tags,
-    createTag,
-    deleteTag,
-  } = useTags(userId);
+  const { tags, createTag, deleteTag } = useTags(userId);
 
   // Filtrar conversaciones por búsqueda y etiquetas
   const filteredConversations = React.useMemo(() => {
@@ -80,7 +73,7 @@ export default function ConversationsList({
         // Cada agrupación tiene múltiples conversaciones
         // Necesitamos verificar si alguna de sus conversaciones tiene las etiquetas
         const convTags = conv.etiquetas || [];
-        return selectedTagIds.some(tagId => 
+        return selectedTagIds.some((tagId) =>
           convTags.some((tag: any) => tag.id === tagId)
         );
       });
@@ -95,16 +88,16 @@ export default function ConversationsList({
 
     // Obtener las conversaciones específicas con este usuario
     const specificConvs = await getConversationsForUser(otherUserId);
-    
+
     setSpecificConversations(specificConvs);
     setSelectedGroupingUser(grouping.other_user);
     setShowSelectionModal(true);
   };
 
   const handleToggleTag = (tagId: string) => {
-    setSelectedTagIds(prev => 
-      prev.includes(tagId) 
-        ? prev.filter(id => id !== tagId)
+    setSelectedTagIds((prev) =>
+      prev.includes(tagId)
+        ? prev.filter((id) => id !== tagId)
         : [...prev, tagId]
     );
   };
@@ -165,13 +158,13 @@ export default function ConversationsList({
               <Text style={styles.lastMessage} numberOfLines={1}>
                 {item.ultimo_mensaje_preview || "Sin mensajes"}
               </Text>
-              
+
               {/* Tags badges */}
               {conversationTags.length > 0 && (
                 <View style={styles.tagsContainer}>
                   {conversationTags.slice(0, 3).map((tag: any) => (
-                    <View 
-                      key={tag.id} 
+                    <View
+                      key={tag.id}
                       style={[styles.tagBadge, { backgroundColor: tag.color }]}
                     >
                       <Text style={styles.tagBadgeText}>{tag.nombre}</Text>
@@ -184,14 +177,15 @@ export default function ConversationsList({
                   )}
                 </View>
               )}
-              
+
               {totalConvs > 0 && (
                 <Text style={styles.propertiesCount}>
-                  {totalConvs} {totalConvs === 1 ? "conversación" : "conversaciones"}
+                  {totalConvs}{" "}
+                  {totalConvs === 1 ? "conversación" : "conversaciones"}
                 </Text>
               )}
             </View>
-            
+
             {unreadCount > 0 && (
               <View style={styles.unreadBadge}>
                 <Text style={styles.unreadText}>{unreadCount}</Text>
@@ -259,8 +253,8 @@ export default function ConversationsList({
               color={COLORS.cardBorder}
             />
             <Text style={styles.emptyTitle}>
-              {selectedTagIds.length > 0 
-                ? "No hay conversaciones con estas etiquetas" 
+              {selectedTagIds.length > 0
+                ? "No hay conversaciones con estas etiquetas"
                 : "No hay conversaciones"}
             </Text>
             <Text style={styles.emptySubtitle}>
@@ -287,8 +281,8 @@ export default function ConversationsList({
           onSelectConversation={(conv) => {
             setShowSelectionModal(false);
             onSelectConversation(
-              conv.id, 
-              selectedGroupingUser, 
+              conv.id,
+              selectedGroupingUser,
               conv.propiedad?.id || null
             );
           }}

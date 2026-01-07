@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, forwardRef } from "react"; // 1. Agregamos forwardRef
 import {
   View,
   TextInput,
@@ -20,162 +20,133 @@ interface AppInputProps extends TextInputProps {
   inputStyle?: object;
 }
 
-export const AppInput: React.FC<AppInputProps> = ({
-  label,
-  error,
-  helperText,
-  containerStyle,
-  leftIcon,
-  rightIcon,
-  onFocus,
-  onBlur,
-  style,
-  inputStyle,
-  ...props
-}) => {
-  const [isFocused, setIsFocused] = useState(false);
-  const theme = useAppTheme();
-
-  const handleFocus = (e: any) => {
-    setIsFocused(true);
-    if (onFocus) onFocus(e);
-  };
-
-  const handleBlur = (e: any) => {
-    setIsFocused(false);
-    if (onBlur) onBlur(e);
-  };
-
-  const inputContainerStyles = [
-    styles.inputContainer,
+// 2. Envolvemos el componente en forwardRef
+export const AppInput = forwardRef<TextInput, AppInputProps>(
+  (
     {
-      backgroundColor: theme.colors.inputBackground,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.lg,
-      paddingHorizontal: theme.spacing.md,
+      label,
+      error,
+      helperText,
+      containerStyle,
+      leftIcon,
+      rightIcon,
+      onFocus,
+      onBlur,
+      style,
+      inputStyle,
+      ...props
     },
-    isFocused && {
-      borderColor: theme.colors.primary,
-      backgroundColor: theme.isDark ? theme.colors.surface : COLORS.white,
-      ...Platform.select({
-        ios: {
-          shadowColor: theme.colors.primary,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-        },
-        android: {
-          elevation: 2,
-        },
-        web: {
-          boxShadow: `0 0 0 2px ${theme.colors.primary}20`,
-        },
-      }),
-    },
-    !!error && { borderColor: theme.colors.error },
-    style,
-  ];
+    ref // 3. Recibimos la referencia
+  ) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const theme = useAppTheme();
 
-  return (
-    <View
-      style={[
-        styles.container,
-        { marginBottom: theme.spacing.md },
-        containerStyle,
-      ]}
-    >
-      {label && (
-        <Text
-          style={[
-            styles.label,
-            {
-              fontSize: theme.typography.fontSizes.sm,
-              fontWeight: theme.typography.fontWeights.medium,
-              color: theme.colors.textSecondary,
-              marginBottom: theme.spacing.xs,
-            },
-          ]}
-        >
-          {label}
-        </Text>
-      )}
-      <View style={inputContainerStyles}>
-        {leftIcon && (
-          <View
+    const handleFocus = (e: any) => {
+      setIsFocused(true);
+      if (onFocus) onFocus(e);
+    };
+
+    const handleBlur = (e: any) => {
+      setIsFocused(false);
+      if (onBlur) onBlur(e);
+    };
+
+    const inputContainerStyles = [
+      styles.inputContainer,
+      {
+        backgroundColor: theme.colors.inputBackground,
+        borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.lg,
+        paddingHorizontal: theme.spacing.md,
+      },
+      isFocused && {
+        borderColor: theme.colors.primary,
+        // Estabilizamos el fondo para evitar parpadeos
+        backgroundColor: theme.isDark ? theme.colors.surface : COLORS.white,
+        // 4. Reducimos la intensidad del shadow/elevation para evitar saltos de layout
+        ...Platform.select({
+          ios: {
+            shadowColor: theme.colors.primary,
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.1,
+            shadowRadius: 2,
+          },
+          android: {
+            elevation: isFocused ? 1 : 0, // Solo elevación mínima si está enfocado
+          },
+        }),
+      },
+      !!error && { borderColor: theme.colors.error },
+      style,
+    ];
+
+    return (
+      <View
+        style={[
+          styles.container,
+          // 5. El margen ahora es opcional. Si pasas containerStyle, este manda.
+          { marginBottom: containerStyle ? 0 : theme.spacing.md },
+          containerStyle,
+        ]}
+      >
+        {label && (
+          <Text
             style={[
-              styles.leftIconContainer,
-              { marginRight: theme.spacing.sm },
+              styles.label,
+              {
+                fontSize: theme.typography.fontSizes.sm,
+                fontWeight: theme.typography.fontWeights.medium,
+                color: theme.colors.textSecondary,
+                marginBottom: theme.spacing.xs,
+              },
             ]}
           >
-            {leftIcon}
-          </View>
+            {label}
+          </Text>
         )}
-        <TextInput
-          style={[
-            styles.input,
-            {
-              paddingVertical: theme.spacing.md,
-              fontSize: theme.typography.fontSizes.md,
-              color: theme.colors.text,
-            },
-            inputStyle,
-          ]}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          placeholderTextColor={theme.colors.placeholder}
-          selectionColor={theme.colors.primary}
-          accessibilityLabel={label || props.placeholder}
-          accessibilityHint={helperText}
-          accessibilityState={{ disabled: props.editable === false }}
-          {...Platform.select({
-            web: {
-              outlineStyle: "none",
-            } as any,
-            default: {},
-          })}
-          {...props}
-        />
-        {rightIcon && (
-          <View
+        <View style={inputContainerStyles}>
+          {leftIcon && (
+            <View
+              style={[
+                styles.leftIconContainer,
+                { marginRight: theme.spacing.sm },
+              ]}
+            >
+              {leftIcon}
+            </View>
+          )}
+          <TextInput
+            ref={ref} // 6. Pasamos la ref al input real
             style={[
-              styles.rightIconContainer,
-              { marginLeft: theme.spacing.sm },
+              styles.input,
+              {
+                paddingVertical: Platform.OS === "ios" ? theme.spacing.md : 8, // Ajuste para Android
+                fontSize: theme.typography.fontSizes.md,
+                color: theme.colors.text,
+              },
+              inputStyle,
             ]}
-          >
-            {rightIcon}
-          </View>
-        )}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            placeholderTextColor={theme.colors.placeholder}
+            selectionColor={theme.colors.primary}
+            {...props}
+          />
+          {rightIcon && (
+            <View
+              style={[
+                styles.rightIconContainer,
+                { marginLeft: theme.spacing.sm },
+              ]}
+            >
+              {rightIcon}
+            </View>
+          )}
+        </View>
       </View>
-      {error ? (
-        <Text
-          style={[
-            styles.errorText,
-            {
-              color: theme.colors.error,
-              fontSize: theme.typography.fontSizes.xs,
-              marginTop: theme.spacing.xs,
-            },
-          ]}
-        >
-          {error}
-        </Text>
-      ) : helperText ? (
-        <Text
-          style={[
-            styles.helperText,
-            {
-              color: theme.colors.textSecondary,
-              fontSize: theme.typography.fontSizes.xs,
-              marginTop: theme.spacing.xs,
-            },
-          ]}
-        >
-          {helperText}
-        </Text>
-      ) : null}
-    </View>
-  );
-};
+    );
+  }
+);
 
 const styles = StyleSheet.create({
   container: {

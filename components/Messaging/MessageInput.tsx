@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { COLORS } from "../../constants";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface MessageInputProps {
   onSendText: (text: string) => Promise<void>;
@@ -31,6 +32,7 @@ export default function MessageInput({
   onSendFile,
   sending = false,
 }: MessageInputProps) {
+  const insets = useSafeAreaInsets();
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
 
@@ -39,7 +41,7 @@ export default function MessageInput({
 
     const messageText = text.trim();
     setText("");
-    
+
     try {
       await onSendText(messageText);
     } catch (error) {
@@ -51,8 +53,9 @@ export default function MessageInput({
 
   const handlePickImage = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
       if (status !== "granted") {
         Alert.alert(
           "Permiso denegado",
@@ -102,7 +105,7 @@ export default function MessageInput({
   const isDisabled = sending || uploading;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       {/* Botón de imagen */}
       <TouchableOpacity
         onPress={handlePickImage}
@@ -153,11 +156,7 @@ export default function MessageInput({
         {sending || uploading ? (
           <ActivityIndicator size="small" color={COLORS.white} />
         ) : (
-          <Ionicons
-            name="send"
-            size={20}
-            color={COLORS.white}
-          />
+          <Ionicons name="send" size={20} color={COLORS.white} />
         )}
       </TouchableOpacity>
     </View>

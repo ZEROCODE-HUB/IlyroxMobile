@@ -1,6 +1,7 @@
 /**
  * ChatScreen.tsx
  * Pantalla de chat con soporte para metadata (destinatario_id y propiedad_id)
+ * FIX: KeyboardAvoidingView mejorado para no afectar el header
  */
 
 import React, { useRef, useEffect, useState } from "react";
@@ -16,6 +17,7 @@ import {
   Alert,
   AppState,
   StatusBar,
+  Keyboard,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import MessageBubble from "./MessageBubble";
@@ -39,20 +41,12 @@ interface ChatScreenProps {
     apellido_paterno: string;
     foto: string | null;
   };
-  propertyId?: string | null; // ID de la propiedad si es un chat específico
+  propertyId?: string | null;
   onBack?: () => void;
   onViewPropertyDetails?: (propertyId: string) => void;
+  onConversationCreated?: (id: string) => void;
+  keyboardOffset?: number;
 }
-
-const SafeAreaContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { bottom } = useStableSafeInsets();
-
-  return (
-    <View style={{ flex: 1, paddingBottom: bottom }}>
-      {children}
-    </View>
-  );
-};
 
 export default function ChatScreen({
   conversationId,
@@ -61,23 +55,15 @@ export default function ChatScreen({
   propertyId = null,
   onBack,
   onViewPropertyDetails,
+  onConversationCreated,
+  keyboardOffset = 0,
 }: ChatScreenProps) {
   const flatListRef = useRef<FlatList>(null);
-  const { top } = useStableSafeInsets();
-  const [actualConversationId, setActualConversationId] = useState<string | null>(
-    conversationId === "new" ? null : conversationId
-  );
-  const [showTagsModal, setShowTagsModal] = useState(false);
-  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
-  const [conversationTags, setConversationTags] = useState<any[]>([]);
-
-  const {
-    tags,
-    assignTag,
-    removeTag,
-    getConversationTags,
-    createTag,
-  } = useTags(userId);
+  const { bottom } = useStableSafeInsets();
+  const [actualConversationId, setActualConversationId] = useState<
+    string | null
+  >(conversationId === "new" ? null : conversationId);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const {
     messages,
@@ -97,64 +83,99 @@ export default function ChatScreen({
     propiedad_id: propertyId,
   };
 
+  // Listener del teclado para Android
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      const keyboardDidShowListener = Keyboard.addListener(
+        "keyboardDidShow",
+        (e) => {
+          setKeyboardHeight(e.endCoordinates.height);
+        }
+      );
+      const keyboardDidHideListener = Keyboard.addListener(
+        "keyboardDidHide",
+        () => {
+          setKeyboardHeight(0);
+        }
+      );
+
+      return () => {
+        keyboardDidShowListener.remove();
+        keyboardDidHideListener.remove();
+      };
+    }
+  }, []);
+
   // Wrapper para sendMessage que actualiza el conversationId después de crear
   const sendMessage = async (text: string, metadata: any) => {
     const result = await originalSendMessage(text, metadata);
-    
-    // Si era una conversación nueva, el trigger habrá creado el ID
-    // Necesitamos obtenerlo
+
     if (conversationId === "new" && !actualConversationId) {
-      // Buscar la conversación recién creada
       const { data } = await supabase
-        .from('conversaciones')
-        .select('id')
-        .or(`and(usuario1_id.eq.${userId},usuario2_id.eq.${otherUser.id}),and(usuario1_id.eq.${otherUser.id},usuario2_id.eq.${userId})`)
-        .is('propiedad_id', null)
+        .from("conversaciones")
+        .select("id")
+        .or(
+          `and(usuario1_id.eq.${userId},usuario2_id.eq.${otherUser.id}),and(usuario1_id.eq.${otherUser.id},usuario2_id.eq.${userId})`
+        )
+        .is("propiedad_id", null)
         .single();
-      
+
       if (data) {
         setActualConversationId(data.id);
+        if (onConversationCreated) {
+          onConversationCreated(data.id);
+        }
       }
     }
-    
+
     return result;
   };
 
   const sendImage = async (uri: string, metadata: any) => {
     const result = await originalSendImage(uri, metadata);
-    
+
     if (conversationId === "new" && !actualConversationId) {
       const { data } = await supabase
-        .from('conversaciones')
-        .select('id')
-        .or(`and(usuario1_id.eq.${userId},usuario2_id.eq.${otherUser.id}),and(usuario1_id.eq.${otherUser.id},usuario2_id.eq.${userId})`)
-        .is('propiedad_id', null)
+        .from("conversaciones")
+        .select("id")
+        .or(
+          `and(usuario1_id.eq.${userId},usuario2_id.eq.${otherUser.id}),and(usuario1_id.eq.${otherUser.id},usuario2_id.eq.${userId})`
+        )
+        .is("propiedad_id", null)
         .single();
-      
+
       if (data) {
         setActualConversationId(data.id);
+        if (onConversationCreated) {
+          onConversationCreated(data.id);
+        }
       }
     }
-    
+
     return result;
   };
 
   const sendFile = async (uri: string, name: string, metadata: any) => {
     const result = await originalSendFile(uri, name, metadata);
-    
+
     if (conversationId === "new" && !actualConversationId) {
       const { data } = await supabase
-        .from('conversaciones')
-        .select('id')
-        .or(`and(usuario1_id.eq.${userId},usuario2_id.eq.${otherUser.id}),and(usuario1_id.eq.${otherUser.id},usuario2_id.eq.${userId})`)
-        .is('propiedad_id', null)
+        .from("conversaciones")
+        .select("id")
+        .or(
+          `and(usuario1_id.eq.${userId},usuario2_id.eq.${otherUser.id}),and(usuario1_id.eq.${otherUser.id},usuario2_id.eq.${userId})`
+        )
+        .is("propiedad_id", null)
         .single();
-      
+
       if (data) {
         setActualConversationId(data.id);
+        if (onConversationCreated) {
+          onConversationCreated(data.id);
+        }
       }
     }
-    
+
     return result;
   };
 
@@ -162,17 +183,17 @@ export default function ChatScreen({
   useEffect(() => {
     const restoreStatusBar = () => {
       StatusBar.setHidden(false);
-      if (Platform.OS === 'android') {
+      if (Platform.OS === "android") {
         StatusBar.setTranslucent(false);
-        StatusBar.setBackgroundColor('#06D5B4');
+        StatusBar.setBackgroundColor("#06D5B4");
       }
-      StatusBar.setBarStyle('light-content');
+      StatusBar.setBarStyle("light-content");
     };
 
     restoreStatusBar();
 
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") {
         setTimeout(() => {
           restoreStatusBar();
         }, 100);
@@ -183,17 +204,6 @@ export default function ChatScreen({
       subscription.remove();
     };
   }, []);
-
-  // Cargar etiquetas de la conversación
-  useEffect(() => {
-    const loadTags = async () => {
-      if (actualConversationId) {
-        const tags = await getConversationTags(actualConversationId);
-        setConversationTags(tags);
-      }
-    };
-    loadTags();
-  }, [actualConversationId]);
 
   // Auto-scroll al recibir nuevos mensajes
   useEffect(() => {
@@ -210,31 +220,6 @@ export default function ChatScreen({
       "Esta función abrirá un selector de propiedades en la versión completa.",
       [{ text: "OK" }]
     );
-  };
-
-  const handleAssignTag = async (tagId: string) => {
-    if (!actualConversationId) {
-      Alert.alert("Error", "Envía un mensaje primero para poder asignar etiquetas");
-      return false;
-    }
-
-    const success = await assignTag(actualConversationId, tagId);
-    if (success) {
-      const updatedTags = await getConversationTags(actualConversationId);
-      setConversationTags(updatedTags);
-    }
-    return success;
-  };
-
-  const handleRemoveTag = async (tagId: string) => {
-    if (!actualConversationId) return false;
-
-    const success = await removeTag(actualConversationId, tagId);
-    if (success) {
-      const updatedTags = await getConversationTags(actualConversationId);
-      setConversationTags(updatedTags);
-    }
-    return success;
   };
 
   const renderMessage = ({ item }: { item: any }) => {
@@ -273,84 +258,25 @@ export default function ChatScreen({
     );
   };
 
-  const fullName = `${otherUser.nombre} ${otherUser.apellido_paterno}`;
+  // Calcular el offset para iOS
+  const iosKeyboardOffset = Platform.OS === "ios" ? keyboardOffset : 0;
 
   return (
-    <SafeAreaContent>
+    <View style={styles.container}>
       <KeyboardAvoidingView
-        style={styles.container}
+        style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+        keyboardVerticalOffset={iosKeyboardOffset}
       >
-        <View style={[styles.header, { paddingTop: top }]}>
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Ionicons
-              name="chevron-back"
-              size={28}
-              color={COLORS.textPrimary}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.headerUser}>
-            <Avatar uri={otherUser.foto} name={otherUser.nombre} size={40} />
-            <View style={styles.headerInfo}>
-              <Text style={styles.headerName} numberOfLines={1}>
-                {fullName}
-              </Text>
-              {propertyId && (
-                <Text style={styles.headerSubtitle}>Chat de propiedad</Text>
-              )}
-              {conversationTags.length > 0 && (
-                <View style={styles.headerTagsContainer}>
-                  {conversationTags.slice(0, 2).map((tag) => (
-                    <View 
-                      key={tag.id} 
-                      style={[styles.headerTagBadge, { backgroundColor: tag.color }]}
-                    >
-                      <Text style={styles.headerTagText}>{tag.nombre}</Text>
-                    </View>
-                  ))}
-                  {conversationTags.length > 2 && (
-                    <Text style={styles.moreTagsText}>
-                      +{conversationTags.length - 2}
-                    </Text>
-                  )}
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setShowTagsModal(true)}
-            style={styles.headerButton}
-          >
-            <Ionicons
-              name="pricetag"
-              size={22}
-              color={conversationTags.length > 0 ? COLORS.primary : COLORS.textSecondary}
-            />
-          </TouchableOpacity>
-
-          {propertyId && (
-            <TouchableOpacity
-              onPress={() => setShowAppointmentModal(true)}
-              style={styles.headerButton}
-            >
-              <Ionicons
-                name="calendar-outline"
-                size={22}
-                color={COLORS.textSecondary}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
-
         <FlatList
           ref={flatListRef}
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
-          contentContainerStyle={styles.messagesContent}
+          contentContainerStyle={[
+            styles.messagesContent,
+            Platform.OS === "android" && { paddingBottom: keyboardHeight },
+          ]}
           ListHeaderComponent={renderHeader}
           ListFooterComponent={renderFooter}
           ListEmptyComponent={
@@ -373,44 +299,36 @@ export default function ChatScreen({
               flatListRef.current?.scrollToEnd({ animated: false });
             }
           }}
+          onLayout={() => {
+            // Scroll inicial después de layout
+            if (messages.length > 0) {
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: false });
+              }, 100);
+            }
+          }}
         />
 
         <MessageInput
           onSendText={(text) => sendMessage(text, messageMetadata)}
-          onSendImage={async (uri) => { await sendImage(uri, messageMetadata); }}
-          onSendFile={async (uri, name) => { await sendFile(uri, name, messageMetadata); }}
+          onSendImage={async (uri) => {
+            await sendImage(uri, messageMetadata);
+          }}
+          onSendFile={async (uri, name) => {
+            await sendFile(uri, name, messageMetadata);
+          }}
           onSendProperty={handleSendProperty}
           sending={sending}
         />
-
-        {error && (
-          <View style={styles.errorBanner}>
-            <Ionicons name="alert-circle" size={16} color={COLORS.error} />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        <TagsModal
-          visible={showTagsModal}
-          onClose={() => setShowTagsModal(false)}
-          availableTags={tags}
-          assignedTags={conversationTags}
-          onAssignTag={handleAssignTag}
-          onRemoveTag={handleRemoveTag}
-          onCreateTag={createTag}
-        />
-
-        {propertyId && (
-          <CreateAppointmentModal
-            visible={showAppointmentModal}
-            onClose={() => setShowAppointmentModal(false)}
-            propertyId={propertyId}
-            otherUserId={otherUser.id}
-            currentUserId={userId}
-          />
-        )}
       </KeyboardAvoidingView>
-    </SafeAreaContent>
+
+      {error && (
+        <View style={styles.errorBanner}>
+          <Ionicons name="alert-circle" size={16} color={COLORS.error} />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -419,67 +337,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
-    gap: 8,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerUser: {
+  keyboardView: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  headerInfo: {
-    flex: 1,
-  },
-  headerName: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTagsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-    marginTop: 4,
-  },
-  headerTagBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  headerTagText: {
-    fontSize: 9,
-    fontWeight: "600",
-    color: COLORS.white,
-  },
-  moreTagsText: {
-    fontSize: 9,
-    color: COLORS.textTertiary,
-    alignSelf: "center",
   },
   messagesContent: {
     paddingHorizontal: 12,

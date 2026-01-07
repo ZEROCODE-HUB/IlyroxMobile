@@ -1,6 +1,7 @@
 /**
  * MessagingScreen.tsx
  * Pantalla principal de mensajería integrada con Supabase
+ * FIX: Header posicionado correctamente fuera del KeyboardAvoidingView
  */
 
 import React, { useState, useEffect, useRef } from "react";
@@ -14,6 +15,8 @@ import { AppHeader } from "./AppHeader";
 import { User } from "../types";
 import { COLORS } from "../constants";
 import { useStableSafeInsets } from "../context/SafeInsetsContext";
+import { ScreenWrapper } from "../screens/ScreenWrapper";
+import HeaderChat from "./Messaging/HeaderChat";
 
 interface MessagingScreenProps {
   initialUser?: User;
@@ -21,27 +24,23 @@ interface MessagingScreenProps {
   onBack?: () => void;
 }
 
-const SafeAreaContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { top, bottom } = useStableSafeInsets();
-
-  return (
-    <View style={{ flex: 1, paddingTop: top, paddingBottom: bottom }}>
-      {children}
-    </View>
-  );
-};
-
 export default function MessagingScreen({
   initialUser,
   initialPropertyId,
   onBack,
 }: MessagingScreenProps) {
+  const { top } = useStableSafeInsets();
   const { profile } = useAuth();
   const navigation = useNavigation<any>();
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<
+    string | null
+  >(null);
   const [activePropertyId, setActivePropertyId] = useState<string | null>(null);
   const [otherUser, setOtherUser] = useState<any>(null);
-  const { conversations, getConversationsForUser } = useConversations(profile?.id);
+  const [headerHeight, setHeaderHeight] = useState<number>(64);
+  const { conversations, getConversationsForUser } = useConversations(
+    profile?.id
+  );
   const lastProcessedUserId = useRef<string | null>(null);
 
   // Función de navegación hacia atrás
@@ -55,7 +54,11 @@ export default function MessagingScreen({
 
   // Manejar initialUser
   useEffect(() => {
-    if (initialUser && profile?.id && lastProcessedUserId.current !== initialUser.id) {
+    if (
+      initialUser &&
+      profile?.id &&
+      lastProcessedUserId.current !== initialUser.id
+    ) {
       lastProcessedUserId.current = initialUser.id;
       handleInitialUser(initialUser);
     }
@@ -75,13 +78,13 @@ export default function MessagingScreen({
     if (existingGrouping) {
       // Si existe agrupación, obtener las conversaciones específicas
       const specificConvs = await getConversationsForUser(user.id);
-      
+
       // 🏠 Si viene de una PROPIEDAD, buscar chat de esa propiedad
       if (initialPropertyId) {
         const propertyChat = specificConvs.find(
-          conv => conv.propiedad?.id === initialPropertyId
+          (conv) => conv.propiedad?.id === initialPropertyId
         );
-        
+
         if (propertyChat) {
           // ✅ Existe chat de esta propiedad, abrirlo
           console.log("✅ Chat de propiedad encontrado:", propertyChat.id);
@@ -99,8 +102,8 @@ export default function MessagingScreen({
         }
       } else {
         // 💬 Si NO viene de propiedad, buscar chat GENERAL
-        const generalChat = specificConvs.find(conv => !conv.propiedad?.id);
-        
+        const generalChat = specificConvs.find((conv) => !conv.propiedad?.id);
+
         if (generalChat) {
           // ✅ Existe chat general, abrirlo
           console.log("✅ Chat general encontrado:", generalChat.id);
@@ -160,20 +163,24 @@ export default function MessagingScreen({
 
   if (!profile?.id) {
     return (
-      <SafeAreaContent>
-        <View style={styles.container}>
-          <AppHeader
-            title="Mensajes"
-            showBackButton
-            onBack={handleNavigationBack}
-          />
-          <View style={styles.content}>
-            <Text style={styles.subtitle}>Cargando...</Text>
-          </View>
+      <View style={[styles.container, { paddingTop: top }]}>
+        <AppHeader
+          title="Mensajes"
+          showBackButton
+          onBack={handleNavigationBack}
+        />
+        <View style={styles.content}>
+          <Text style={styles.subtitle}>Cargando...</Text>
         </View>
-      </SafeAreaContent>
+      </View>
     );
   }
+
+  const handleConversationCreated = (id: string) => {
+    setActiveConversationId(id);
+    // Refresh conversation list in background if needed
+    // refresh();
+  };
 
   // Mostrar chat si hay conversación activa
   if (activeConversationId && otherUser) {
@@ -181,9 +188,28 @@ export default function MessagingScreen({
     console.log("activeConversationId:", activeConversationId);
     console.log("otherUser:", otherUser);
     console.log("activePropertyId:", activePropertyId);
+
     return (
-      <SafeAreaContent>
-        <View style={styles.container}>
+      <View style={styles.container}>
+        {/* Header fijo fuera del área de contenido */}
+        <View
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            if (h && h !== headerHeight) setHeaderHeight(h);
+          }}
+          style={styles.headerFixed}
+        >
+          <HeaderChat
+            onBack={handleBack}
+            otherUser={otherUser}
+            userId={profile.id}
+            propertyId={activePropertyId}
+            conversationId={activeConversationId}
+          />
+        </View>
+
+        {/* Contenido del chat con margen superior igual a la altura del header */}
+        <View style={[styles.chatContent, { marginTop: headerHeight }]}>
           <ChatScreen
             conversationId={activeConversationId}
             userId={profile.id}
@@ -191,9 +217,11 @@ export default function MessagingScreen({
             propertyId={activePropertyId}
             onBack={handleBack}
             onViewPropertyDetails={handleViewPropertyDetails}
+            onConversationCreated={handleConversationCreated}
+            keyboardOffset={headerHeight + top}
           />
         </View>
-      </SafeAreaContent>
+      </View>
     );
   }
 
@@ -201,7 +229,7 @@ export default function MessagingScreen({
 
   // Mostrar lista de conversaciones
   return (
-    <SafeAreaContent>
+    <ScreenWrapper withHeader={false}>
       <View style={styles.container}>
         <AppHeader
           title="Mensajes"
@@ -213,7 +241,7 @@ export default function MessagingScreen({
           onSelectConversation={handleSelectConversation}
         />
       </View>
-    </SafeAreaContent>
+    </ScreenWrapper>
   );
 }
 
@@ -232,5 +260,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textSecondary,
     marginBottom: 20,
+  },
+  headerFixed: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000, // Aumentado para asegurar que esté encima
+    elevation: 5, // Para Android
+    backgroundColor: COLORS.white, // Asegurar fondo sólido
+  },
+  chatContent: {
+    flex: 1,
   },
 });

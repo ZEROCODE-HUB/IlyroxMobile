@@ -13,7 +13,7 @@ import CreatePost from "./CreatePost";
 import CreateReel from "./CreateReel";
 import CreateProperty from "./CreateProperty";
 import { COLORS } from "../../constants/colors";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
 type ContentType = "post" | "reel" | "property" | null;
 
@@ -36,7 +36,7 @@ export default function CreateContent() {
 
   // Pantalla de selección
   return (
-    <View style={styles.container}>
+    <ScreenWrapper withHeader={false} style={styles.container}>
       <AppHeader
         title="Crear contenido"
         showBackButton
@@ -134,7 +134,7 @@ export default function CreateContent() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </ScreenWrapper>
   );
 }
 
@@ -142,6 +142,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  header: {
+    height: 60,
+    backgroundColor: COLORS.white,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
   },
   scrollView: {
     flex: 1,

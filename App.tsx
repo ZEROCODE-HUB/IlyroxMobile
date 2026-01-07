@@ -67,17 +67,17 @@ function AppContent() {
   // Asegurar que el StatusBar se mantenga visible siempre
   useEffect(() => {
     StatusBar.setHidden(false);
-    if (Platform.OS === 'android') {
+    if (Platform.OS === "android") {
       StatusBar.setBackgroundColor(COLORS.primary);
       StatusBar.setTranslucent(false);
     }
-    StatusBar.setBarStyle('light-content');
+    StatusBar.setBarStyle("light-content");
   }, []);
 
   // Restaurar StatusBar cuando cambia la ruta (por si el picker lo alteró)
   useEffect(() => {
     StatusBar.setHidden(false);
-    if (Platform.OS === 'android') {
+    if (Platform.OS === "android") {
       StatusBar.setTranslucent(false);
     }
   }, [currentRouteName]);
@@ -168,8 +168,8 @@ function AppContent() {
           ]}
         >
           <View style={styles.headerTopRow}>
-            <Image 
-              source={require('./assets/Logo.jpeg')} 
+            <Image
+              source={require("./assets/Logo.jpeg")}
               style={styles.headerLogo}
               resizeMode="cover"
             />
@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: "rgba(255,255,255,0.3)",
   },
   headerIcons: {
     flexDirection: "row",

@@ -7,12 +7,12 @@ import {
   StyleSheet,
   ScrollView,
   Image,
-  KeyboardAvoidingView,
   Platform,
   Animated,
   PanResponder,
   Dimensions,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
@@ -60,10 +60,10 @@ export default function CommentsModal({
       userId: currentUserId,
       userProfile: currentUserId
         ? {
-          id: currentUserId,
-          nombre: "Tú",
-          foto: null,
-        }
+            id: currentUserId,
+            nombre: "Tú",
+            foto: null,
+          }
         : undefined,
     });
   const panResponder = React.useRef(
@@ -123,7 +123,7 @@ export default function CommentsModal({
         const uri = (result as any).assets?.[0]?.uri || (result as any).uri;
         if (uri) setImageUri(uri);
       }
-    } catch { }
+    } catch {}
   };
 
   const handleLikeComment = async (commentId: string) => {
@@ -163,7 +163,6 @@ export default function CommentsModal({
             styles.commentsModal,
             {
               transform: [{ translateY }],
-              // Ajustamos la altura para que no choque con el notch si crece mucho
               maxHeight: screenH - insets.top - 20,
             },
           ]}
@@ -171,24 +170,25 @@ export default function CommentsModal({
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={{ flex: 1 }}
-            keyboardVerticalOffset={
-              Platform.OS === "ios" ? stableBottom : 20
-            }
+            keyboardVerticalOffset={0}
           >
-            <View style={styles.dragHandle} />
-            <View style={styles.commentsHeader}>
-              <Text style={styles.commentsTitle}>
-                Comentarios ({comments.length})
-              </Text>
-              <TouchableOpacity onPress={onClose}>
-                <Ionicons name="close" size={24} color={COLORS.textPrimary} />
-              </TouchableOpacity>
+            <View {...panResponder.panHandlers}>
+              <View style={styles.dragHandle} />
+              <View style={styles.commentsHeader}>
+                <Text style={styles.commentsTitle}>
+                  Comentarios ({comments.length})
+                </Text>
+                <TouchableOpacity onPress={onClose}>
+                  <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <ScrollView
               style={styles.commentsContent}
               keyboardShouldPersistTaps="handled"
               scrollEnabled={!isDragging}
+              contentContainerStyle={{ paddingBottom: 20 }}
             >
               {loading ? (
                 <View style={styles.loadingContainer}>
@@ -233,7 +233,15 @@ export default function CommentsModal({
                                 </Text>
                               )}
                               {comment.imageUrl && (
-                                <ViewImage src={comment.imageUrl} containerStyle={{ width: '100%', height: 250, marginVertical: 10 }} imageStyle={styles.imagePreviewBar} />
+                                <ViewImage
+                                  src={comment.imageUrl}
+                                  containerStyle={{
+                                    width: "100%",
+                                    height: 250,
+                                    marginVertical: 10,
+                                  }}
+                                  imageStyle={styles.imagePreviewBar}
+                                />
                               )}
                             </View>
                             <View style={styles.commentActionsRow}>
@@ -289,110 +297,120 @@ export default function CommentsModal({
                                   </Text>
                                 )}
                                 {reply.imageUrl && (
-                                  <ViewImage src={reply.imageUrl} containerStyle={{ width: '100%', height: 250, marginVertical: 10 }} imageStyle={styles.imagePreviewBar} />
+                                  <ViewImage
+                                    src={reply.imageUrl}
+                                    containerStyle={{
+                                      width: "100%",
+                                      height: 250,
+                                      marginVertical: 10,
+                                    }}
+                                    imageStyle={styles.imagePreviewBar}
+                                  />
                                 )}
                               </View>
                             </View>
                           </View>
                         ))}
                       </View>
-                      //  <Image
-                      //               source={{ uri: reply.imageUrl }}
-                      //               style={styles.commentImage}
-                      //             />
                     );
                   })
               )}
             </ScrollView>
-
-            {replyTo && (
-              <View style={styles.replyLabel}>
-                <Text style={styles.replyLabelText}>
-                  Respondiendo a {replyToUser || "usuario"}
-                </Text>
-                <TouchableOpacity onPress={() => setReplyTo(null)}>
-                  <Ionicons
-                    name="close"
-                    size={16}
-                    color={COLORS.textTertiary}
+            <View style={styles.footerContainer}>
+              {/* 1. Previsualización de Imagen AHORA ARRIBA del input */}
+              {!!imageUri && (
+                <View style={styles.imagePreviewWrapper}>
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={styles.previewImageMini}
                   />
-                </TouchableOpacity>
-              </View>
-            )}
+                  <TouchableOpacity
+                    style={styles.removeImageButtonMini}
+                    onPress={() => setImageUri("")}
+                  >
+                    <Ionicons
+                      name="close-circle"
+                      size={24}
+                      color={COLORS.error}
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
 
-            <View
-              style={[
-                styles.commentInputContainer,
-                { paddingBottom: Math.max(16, 12 + stableBottom) },
-              ]}
-            >
-              <AppInput
-                containerStyle={styles.flex1}
-                placeholder="Escribe un comentario..."
-                value={commentText}
-                onChangeText={setCommentText}
-                multiline
-                numberOfLines={3}
-                scrollEnabled
-                inputStyle={{ minHeight: 40, maxHeight: 120, paddingVertical: 12, textAlignVertical: "top" }}
-                maxLength={500}
-                editable={!posting}
-              />
-              <TouchableOpacity
-                style={styles.attachButton}
-                onPress={handlePickImage}
-                disabled={posting}
-              >
-                <Ionicons
-                  name="images"
-                  size={18}
-                  color={imageUri ? COLORS.primary : COLORS.textTertiary}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  !commentText.trim() && !imageUri && styles.sendButtonDisabled,
-                ]}
-                onPress={handlePostComment}
-                disabled={(!commentText.trim() && !imageUri) || posting}
-              >
-                {posting ? (
-                  <ActivityIndicator size="small" color={COLORS.primary} />
-                ) : (
-                  <Ionicons
-                    name="send"
-                    size={20}
-                    color={
-                      commentText.trim() || imageUri
-                        ? COLORS.primary
-                        : COLORS.textDisabled
-                    }
-                  />
-                )}
-              </TouchableOpacity>
-            </View>
+              {/* 2. Etiqueta de respuesta */}
+              {replyTo && (
+                <View style={styles.replyLabel}>
+                  <Text style={styles.replyLabelText}>
+                    Respondiendo a {replyToUser || "usuario"}
+                  </Text>
+                  <TouchableOpacity onPress={() => setReplyTo(null)}>
+                    <Ionicons
+                      name="close"
+                      size={16}
+                      color={COLORS.textTertiary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
 
-            {!!imageUri && (
+              {/* 3. Input de texto y botones */}
               <View
                 style={[
-                  styles.imagePreviewBar,
+                  styles.commentInputRow,
                   { paddingBottom: Math.max(16, 12 + stableBottom) },
                 ]}
               >
-                <Image source={{ uri: imageUri }} style={styles.previewImage} />
-                <TouchableOpacity
-                  style={styles.removeImageButton}
-                  onPress={() => setImageUri("")}
-                >
-                  <Ionicons
-                    name="close-circle"
-                    size={24}
-                    color={COLORS.error}
-                  />
-                </TouchableOpacity>
+                <AppInput
+                  containerStyle={styles.flex1}
+                  placeholder="Escribe un comentario..."
+                  value={commentText}
+                  onChangeText={setCommentText}
+                  multiline
+                  inputStyle={styles.inputStyleAdjust}
+                  maxLength={500}
+                  editable={!posting}
+                />
+
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity
+                    style={styles.iconAction}
+                    onPress={handlePickImage}
+                    disabled={posting}
+                  >
+                    <Ionicons
+                      name="images-outline"
+                      size={24}
+                      color={imageUri ? COLORS.primary : COLORS.textTertiary}
+                    />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.sendButton,
+                      !commentText.trim() &&
+                        !imageUri &&
+                        styles.sendButtonDisabled,
+                    ]}
+                    onPress={handlePostComment}
+                    disabled={(!commentText.trim() && !imageUri) || posting}
+                  >
+                    {posting ? (
+                      <ActivityIndicator size="small" color={COLORS.primary} />
+                    ) : (
+                      <Ionicons
+                        name="send"
+                        size={22}
+                        color={
+                          commentText.trim() || imageUri
+                            ? COLORS.primary
+                            : COLORS.textDisabled
+                        }
+                      />
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
-            )}
+            </View>
           </KeyboardAvoidingView>
         </Animated.View>
       </View>
@@ -502,7 +520,6 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: COLORS.white,
   },
-  flex1: { flex: 1, marginBottom: 0 },
   replyLabel: {
     flexDirection: "row",
     alignItems: "center",
@@ -547,4 +564,48 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderTopLeftRadius: 4,
   },
+  footerContainer: {
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.cardBorder,
+  },
+  imagePreviewWrapper: {
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+  },
+  previewImageMini: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  removeImageButtonMini: {
+    position: "absolute",
+    top: 4,
+    left: 72,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+  },
+  commentInputRow: {
+    flexDirection: "row",
+    alignItems: "flex-end", // Alinea al fondo para que crezca hacia arriba
+    padding: 10,
+    gap: 8,
+  },
+  actionButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingBottom: 4,
+  },
+  iconAction: {
+    padding: 8,
+  },
+  inputStyleAdjust: {
+    minHeight: 40,
+    maxHeight: 120,
+    paddingVertical: 10,
+    textAlignVertical: "top",
+  },
+  flex1: { flex: 1, marginBottom: 0 },
 });

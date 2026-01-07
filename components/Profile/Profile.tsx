@@ -21,6 +21,7 @@ import { Avatar } from "../shared";
 import { ProfileHeader } from "./ProfileHeader";
 import SelectionModal from "../modals/SelectionModal";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
 const { width } = Dimensions.get("window");
 
@@ -56,8 +57,11 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(
     null
   );
-  const [userRecommendation, setUserRecommendation] = useState<boolean | null>(null);
-  const [submittingRecommendation, setSubmittingRecommendation] = useState(false);
+  const [userRecommendation, setUserRecommendation] = useState<boolean | null>(
+    null
+  );
+  const [submittingRecommendation, setSubmittingRecommendation] =
+    useState(false);
 
   // Determine if viewing own profile
   const targetUserId = userId || authUser?.id;
@@ -104,7 +108,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   };
 
   const handleRecommendation = async (recomienda: boolean) => {
-    if (!authUser?.id || !targetUserId || isMe || submittingRecommendation) return;
+    if (!authUser?.id || !targetUserId || isMe || submittingRecommendation)
+      return;
 
     try {
       setSubmittingRecommendation(true);
@@ -256,7 +261,12 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             const operation = p.operaciones_propiedad?.[0];
 
             // Mapear el estado de activo a un estado en español
-            let status: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida" = "Publicada";
+            let status:
+              | "Publicada"
+              | "Suspendida"
+              | "Rentada"
+              | "Reservada"
+              | "Vendida" = "Publicada";
             if (!p.activo) {
               status = "Suspendida";
             }
@@ -344,7 +354,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper withHeader={false} style={styles.container}>
       <ProfileHeader
         isOwnProfile={isMe}
         onBack={onBack}
@@ -384,31 +394,31 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
           {!isMe && (
             <View style={styles.actionButtons}>
-<TouchableOpacity
-  style={styles.messageBtn}
-  onPress={() => {
-    console.log("🚀 Navegando a Messages con initialUser:", {
-      id: targetUserId,
-      nombre: profile?.nombre,
-      apellido_paterno: profile?.apellido_paterno || "",
-    });
-    navigation.navigate("Messages", {
-      initialUser: {
-        id: targetUserId,
-        nombre: profile?.nombre,
-        apellido_paterno: profile?.apellido_paterno || "",
-        foto: profile?.foto || null,
-      },
-    });
-  }}
->
-  <Ionicons
-    name="chatbubble-outline"
-    size={16}
-    color={COLORS.textPrimary}
-  />
-  <Text style={styles.messageBtnText}>Mensaje</Text>
-</TouchableOpacity>
+              <TouchableOpacity
+                style={styles.messageBtn}
+                onPress={() => {
+                  console.log("🚀 Navegando a Messages con initialUser:", {
+                    id: targetUserId,
+                    nombre: profile?.nombre,
+                    apellido_paterno: profile?.apellido_paterno || "",
+                  });
+                  navigation.navigate("Messages", {
+                    initialUser: {
+                      id: targetUserId,
+                      nombre: profile?.nombre,
+                      apellido_paterno: profile?.apellido_paterno || "",
+                      foto: profile?.foto || null,
+                    },
+                  });
+                }}
+              >
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={16}
+                  color={COLORS.textPrimary}
+                />
+                <Text style={styles.messageBtnText}>Mensaje</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -467,9 +477,17 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                   disabled={isMe || submittingRecommendation}
                 >
                   <Ionicons
-                    name={userRecommendation === true ? "thumbs-up" : "thumbs-up-outline"}
+                    name={
+                      userRecommendation === true
+                        ? "thumbs-up"
+                        : "thumbs-up-outline"
+                    }
                     size={16}
-                    color={userRecommendation === true ? COLORS.success : COLORS.textSecondary}
+                    color={
+                      userRecommendation === true
+                        ? COLORS.success
+                        : COLORS.textSecondary
+                    }
                   />
                   <Text style={styles.recVal}>
                     {profileData.positiveRecommendations}
@@ -486,9 +504,17 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                   disabled={isMe || submittingRecommendation}
                 >
                   <Ionicons
-                    name={userRecommendation === false ? "thumbs-down" : "thumbs-down-outline"}
+                    name={
+                      userRecommendation === false
+                        ? "thumbs-down"
+                        : "thumbs-down-outline"
+                    }
                     size={16}
-                    color={userRecommendation === false ? COLORS.error : COLORS.textSecondary}
+                    color={
+                      userRecommendation === false
+                        ? COLORS.error
+                        : COLORS.textSecondary
+                    }
                   />
                   <Text style={styles.recVal}>
                     {profileData.negativeRecommendations}
@@ -510,11 +536,14 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
                   const count = starCounts[stars as keyof typeof starCounts];
                   const totalReviews = reviewStats?.total_resenas || 0;
-                  const percentage = totalReviews > 0 ? (count / totalReviews) * 100 : 0;
+                  const percentage =
+                    totalReviews > 0 ? (count / totalReviews) * 100 : 0;
 
                   return (
                     <View key={stars} style={styles.progressRow}>
-                      <Text style={styles.progressLabel}>{stars} estrellas</Text>
+                      <Text style={styles.progressLabel}>
+                        {stars} estrellas
+                      </Text>
                       <View style={styles.progressBar}>
                         <View
                           style={[
@@ -628,7 +657,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                   style={styles.editIconOverlay}
                   onPress={(e) => {
                     e.stopPropagation();
-                    navigation.navigate("EditProperty", { propertyId: property.id });
+                    navigation.navigate("EditProperty", {
+                      propertyId: property.id,
+                    });
                   }}
                 >
                   <Ionicons name="pencil" size={14} color={COLORS.white} />
@@ -721,7 +752,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
           />
         </Modal>
       )}
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 };
 

@@ -1,9 +1,3 @@
-/**
- * CreateProperty.tsx - VERSIÓN CORREGIDA
- * Formulario completo para crear propiedades inmobiliarias
- * CORREGIDO - Solo campos que existen en la BD
- */
-
 import React, { useState } from "react";
 import {
   View,
@@ -59,12 +53,15 @@ import {
   getLabelRecamaras,
   getCamposVisibles,
 } from "../../constants/propertyData";
+import { useStableSafeInsets } from "../../context/SafeInsetsContext";
+import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
 interface CreatePropertyProps {
   onBack: () => void;
 }
 
 export default function CreateProperty({ onBack }: CreatePropertyProps) {
+  const { top } = useStableSafeInsets();
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -307,11 +304,13 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
     // Validación de m² según tipo de propiedad
     if (esTerreno(subtipo)) {
       if (!m2Terreno) {
-        newErrors.m2Terreno = "Los m² de terreno son obligatorios para terrenos";
+        newErrors.m2Terreno =
+          "Los m² de terreno son obligatorios para terrenos";
       }
     } else {
       if (!m2Construccion && !m2Terreno) {
-        newErrors.m2 = "Debes especificar al menos m² de construcción o terreno";
+        newErrors.m2 =
+          "Debes especificar al menos m² de construcción o terreno";
       }
     }
 
@@ -414,19 +413,19 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
               : null,
           comision_porcentaje:
             comparteComision === "Sí" && comisionTipo === "porcentaje"
-              ? parseFloat(comisionValor)
+              ? parseFloat(comisionValor.replace(/,/g, ""))
               : null,
           comision_monto_fijo:
             comparteComision === "Sí" && comisionTipo === "monto"
-              ? parseFloat(comisionValor)
+              ? parseFloat(comisionValor.replace(/,/g, ""))
               : null,
           porcentaje_comision_compartida:
             comparteComision === "Sí" && comisionCompartidaTipo === "porcentaje"
-              ? parseFloat(comisionCompartidaValor)
+              ? parseFloat(comisionCompartidaValor.replace(/,/g, ""))
               : null,
           monto_comision_compartida:
             comparteComision === "Sí" && comisionCompartidaTipo === "monto"
-              ? parseFloat(comisionCompartidaValor)
+              ? parseFloat(comisionCompartidaValor.replace(/,/g, ""))
               : null,
           condiciones_comision_compartida:
             comparteComision === "Sí" && condicionesComision
@@ -463,17 +462,19 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
             comparte === "Sí" ? (tipo === "monto" ? "monto_fijo" : tipo) : null,
           comision_porcentaje:
             comparte === "Sí" && tipo === "porcentaje"
-              ? parseFloat(valor)
+              ? parseFloat(valor.replace(/,/g, ""))
               : null,
           comision_monto_fijo:
-            comparte === "Sí" && tipo === "monto" ? parseFloat(valor) : null,
+            comparte === "Sí" && tipo === "monto"
+              ? parseFloat(valor.replace(/,/g, ""))
+              : null,
           porcentaje_comision_compartida:
             comparte === "Sí" && compartidaTipo === "porcentaje"
-              ? parseFloat(compartidaValor)
+              ? parseFloat(compartidaValor.replace(/,/g, ""))
               : null,
           monto_comision_compartida:
             comparte === "Sí" && compartidaTipo === "monto"
-              ? parseFloat(compartidaValor)
+              ? parseFloat(compartidaValor.replace(/,/g, ""))
               : null,
           condiciones_comision_compartida:
             comparte === "Sí" && condiciones ? condiciones : null,
@@ -597,6 +598,25 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
   };
 
   /**
+   * Formatear input de moneda con comas
+   */
+  const handleCurrencyChange = (
+    text: string,
+    setter: (val: string) => void
+  ) => {
+    // Eliminar comas para obtener el valor numérico crudo
+    const rawValue = text.replace(/,/g, "");
+
+    // Validar formato numérico (acepta decimales)
+    if (/^\d*\.?\d*$/.test(rawValue)) {
+      const parts = rawValue.split(".");
+      // Formatear parte entera con comas
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      setter(parts.join("."));
+    }
+  };
+
+  /**
    * Renderizador del formulario de comisión
    */
   const renderCommissionForm = (
@@ -681,7 +701,9 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
               placeholder="0.00"
               keyboardType="numeric"
               value={values.valor}
-              onChangeText={setters.setValor}
+              onChangeText={(text) =>
+                handleCurrencyChange(text, setters.setValor)
+              }
               leftIcon={
                 <TouchableOpacity
                   style={styles.currencySelector}
@@ -730,7 +752,9 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
               placeholder="0.00"
               keyboardType="numeric"
               value={values.compartidaValor}
-              onChangeText={setters.setCompartidaValor}
+              onChangeText={(text) =>
+                handleCurrencyChange(text, setters.setCompartidaValor)
+              }
               leftIcon={
                 <TouchableOpacity
                   style={styles.currencySelector}
@@ -762,7 +786,7 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
   );
 
   return (
-    <View style={styles.container}>
+    <ScreenWrapper withHeader={false} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
@@ -859,7 +883,9 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
               placeholder="0.00"
               keyboardType="numeric"
               value={precioVenta}
-              onChangeText={setPrecioVenta}
+              onChangeText={(text) =>
+                handleCurrencyChange(text, setPrecioVenta)
+              }
               error={errors.precioVenta}
               leftIcon={
                 <TouchableOpacity
@@ -883,7 +909,9 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
               placeholder="0.00"
               keyboardType="numeric"
               value={precioRenta}
-              onChangeText={setPrecioRenta}
+              onChangeText={(text) =>
+                handleCurrencyChange(text, setPrecioRenta)
+              }
               error={errors.precioRenta}
               leftIcon={
                 <TouchableOpacity
@@ -1561,7 +1589,7 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
         maxValue={999}
         minValue={0}
       />
-    </View>
+    </ScreenWrapper>
   );
 }
 
@@ -1571,11 +1599,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
+    height: 60,
+    backgroundColor: COLORS.white,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 16,
-    backgroundColor: COLORS.white,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
   },
