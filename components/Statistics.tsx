@@ -20,6 +20,7 @@ import Chart11_TopAmenities from "./charts/Chart11_TopAmenities";
 import Chart12_SurfaceVsSaleTime from "./charts/Chart12_SurfaceVsSaleTime";
 import Chart13_PriceByRooms from "./charts/Chart13_PriceByRooms";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ScreenWrapper } from "../screens/ScreenWrapper";
 
 const Statistics = () => {
   const navigation = useNavigation<any>();
@@ -30,7 +31,7 @@ const Statistics = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <ScreenWrapper withHeader={false} style={styles.container}>
       <AppHeader
         title="Dashboard I360"
         showBackButton
@@ -84,7 +85,7 @@ const Statistics = () => {
         />
         <Chart13_PriceByRooms onPress={handlePress} activePoint={activePoint} />
       </ScrollView>
-    </View>
+    </ScreenWrapper>
   );
 };
 

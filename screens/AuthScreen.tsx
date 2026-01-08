@@ -339,7 +339,12 @@ export default function AuthScreen() {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={[styles.modalOverlay, { paddingBottom: bottom }]}
         >
-          <View style={styles.modalContent}>
+          <View
+            style={[
+              styles.modalContent,
+              { paddingBottom: Math.max(24, bottom) },
+            ]}
+          >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
                 {mode === "login" ? "Bienvenido de nuevo" : "Crear cuenta"}
