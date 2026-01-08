@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Dimensions,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Keyboard,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
@@ -48,10 +49,33 @@ export default function CommentsModal({
   const [imageUri, setImageUri] = useState<string>("");
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const insets = useSafeAreaInsets();
   const { bottom: stableBottom } = useStableSafeInsets();
+  const scrollViewRef = React.useRef<ScrollView>(null);
 
   const translateY = React.useRef(new Animated.Value(0)).current;
+
+  // Detectar cuando el teclado aparece/desaparece
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, []);
 
   // Hook de comentarios real
   const { comments, loading, posting, addComment, toggleCommentLike } =
@@ -164,31 +188,38 @@ export default function CommentsModal({
             {
               transform: [{ translateY }],
               maxHeight: screenH - insets.top - 20,
+              height:
+                keyboardHeight > 0
+                  ? screenH - keyboardHeight - insets.top - 20
+                  : screenH * 0.8,
             },
           ]}
         >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{ flex: 1 }}
-            keyboardVerticalOffset={0}
-          >
-            <View {...panResponder.panHandlers}>
-              <View style={styles.dragHandle} />
-              <View style={styles.commentsHeader}>
-                <Text style={styles.commentsTitle}>
-                  Comentarios ({comments.length})
-                </Text>
-                <TouchableOpacity onPress={onClose}>
-                  <Ionicons name="close" size={24} color={COLORS.textPrimary} />
-                </TouchableOpacity>
-              </View>
+          <View {...panResponder.panHandlers}>
+            <View style={styles.dragHandle} />
+            <View style={styles.commentsHeader}>
+              <Text style={styles.commentsTitle}>
+                Comentarios ({comments.length})
+              </Text>
+              <TouchableOpacity onPress={onClose}>
+                <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+              </TouchableOpacity>
             </View>
+          </View>
 
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={styles.keyboardAvoidingView}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+          >
             <ScrollView
+              ref={scrollViewRef}
               style={styles.commentsContent}
+              contentContainerStyle={styles.commentsContentContainer}
               keyboardShouldPersistTaps="handled"
               scrollEnabled={!isDragging}
-              contentContainerStyle={{ paddingBottom: 20 }}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
             >
               {loading ? (
                 <View style={styles.loadingContainer}>
@@ -316,7 +347,13 @@ export default function CommentsModal({
                   })
               )}
             </ScrollView>
-            <View style={styles.footerContainer}>
+
+            <View
+              style={[
+                styles.footerContainer,
+                { paddingBottom: Math.max(16, stableBottom) },
+              ]}
+            >
               {/* 1. Previsualización de Imagen AHORA ARRIBA del input */}
               {!!imageUri && (
                 <View style={styles.imagePreviewWrapper}>
@@ -354,12 +391,7 @@ export default function CommentsModal({
               )}
 
               {/* 3. Input de texto y botones */}
-              <View
-                style={[
-                  styles.commentInputRow,
-                  { paddingBottom: Math.max(16, 12 + stableBottom) },
-                ]}
-              >
+              <View style={styles.commentInputRow}>
                 <AppInput
                   containerStyle={styles.flex1}
                   placeholder="Escribe un comentario..."
@@ -369,6 +401,12 @@ export default function CommentsModal({
                   inputStyle={styles.inputStyleAdjust}
                   maxLength={500}
                   editable={!posting}
+                  onFocus={() => {
+                    // Scroll al final cuando se enfoca el input
+                    setTimeout(() => {
+                      scrollViewRef.current?.scrollToEnd({ animated: true });
+                    }, 100);
+                  }}
                 />
 
                 <View style={styles.actionButtons}>
@@ -436,7 +474,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    height: "80%",
+    overflow: "hidden",
   },
   dragHandle: {
     alignSelf: "center",
@@ -459,7 +497,17 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: COLORS.textPrimary,
   },
-  commentsContent: { flex: 1, padding: 16 },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  commentsContent: {
+    flex: 1,
+    padding: 16,
+  },
+  commentsContentContainer: {
+    flexGrow: 1,
+    paddingBottom: 20,
+  },
   loadingContainer: { padding: 40, alignItems: "center" },
   loadingText: { marginTop: 12, color: COLORS.textSecondary, fontSize: 14 },
   emptyState: { padding: 40, alignItems: "center" },
@@ -477,6 +525,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderTopLeftRadius: 4,
+    minWidth: 0, // Permite que el flex funcione correctamente
   },
   commentHeader: {
     flexDirection: "row",
@@ -485,7 +534,12 @@ const styles = StyleSheet.create({
   },
   commentUser: { fontWeight: "600", fontSize: 13, color: COLORS.textPrimary },
   commentTime: { fontSize: 10, color: COLORS.textTertiary },
-  commentText: { fontSize: 14, color: COLORS.textPrimary, lineHeight: 20 },
+  commentText: {
+    fontSize: 14,
+    color: COLORS.textPrimary,
+    lineHeight: 20,
+    flexShrink: 1,
+  },
   commentContent: { flex: 1 },
   likeButton: {
     flexDirection: "row",
@@ -563,11 +617,13 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 10,
     borderTopLeftRadius: 4,
+    minWidth: 0, // Permite que el flex funcione correctamente
   },
   footerContainer: {
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
+    width: "100%",
   },
   imagePreviewWrapper: {
     padding: 12,
@@ -589,9 +645,11 @@ const styles = StyleSheet.create({
   },
   commentInputRow: {
     flexDirection: "row",
-    alignItems: "flex-end", // Alinea al fondo para que crezca hacia arriba
-    padding: 10,
+    alignItems: "flex-end",
+    paddingHorizontal: 10,
+    paddingTop: 10,
     gap: 8,
+    width: "100%",
   },
   actionButtons: {
     flexDirection: "row",
