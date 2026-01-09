@@ -5,9 +5,9 @@
  * consistencia visual en toda la aplicación.
  */
 
-import { Dimensions } from 'react-native';
+import { Dimensions } from "react-native";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export const DIMENSIONS = {
   // Dimensiones de pantalla
@@ -15,8 +15,9 @@ export const DIMENSIONS = {
   SCREEN_HEIGHT,
 
   // Alturas de cards en el feed
-  // CAMBIO CRÍTICO: Reels ahora son cuadrados (1.0 en lugar de 1.1)
-  REEL_HEIGHT: SCREEN_WIDTH * 1.0,
+  // CAMBIO CRÍTICO: Reels ahora son verticales (9:16)
+  REEL_HEIGHT: SCREEN_WIDTH * (4 / 3),
+  REEL_ASPECT_RATIO: 3 / 4,
 
   // CAMBIO CRÍTICO: Propiedades ahora son cuadradas (1.0 en lugar de 0.75)
   PROPERTY_HEIGHT: SCREEN_WIDTH * 1.0,

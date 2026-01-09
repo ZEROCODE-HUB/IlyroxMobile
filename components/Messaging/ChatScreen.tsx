@@ -1,7 +1,7 @@
 /**
  * ChatScreen.tsx
  * Pantalla de chat con soporte para metadata (destinatario_id y propiedad_id)
- * FIX: KeyboardAvoidingView mejorado para no afectar el header
+ * FIX: KeyboardAvoidingView para elevar el input con el teclado
  */
 
 import React, { useRef, useEffect, useState } from "react";
@@ -11,13 +11,12 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
   Alert,
   AppState,
   StatusBar,
-  Keyboard,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import MessageBubble from "./MessageBubble";
@@ -63,7 +62,6 @@ export default function ChatScreen({
   const [actualConversationId, setActualConversationId] = useState<
     string | null
   >(conversationId === "new" ? null : conversationId);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const {
     messages,
@@ -82,29 +80,6 @@ export default function ChatScreen({
     destinatario_id: otherUser.id,
     propiedad_id: propertyId,
   };
-
-  // Listener del teclado para Android
-  useEffect(() => {
-    if (Platform.OS === "android") {
-      const keyboardDidShowListener = Keyboard.addListener(
-        "keyboardDidShow",
-        (e) => {
-          setKeyboardHeight(e.endCoordinates.height);
-        }
-      );
-      const keyboardDidHideListener = Keyboard.addListener(
-        "keyboardDidHide",
-        () => {
-          setKeyboardHeight(0);
-        }
-      );
-
-      return () => {
-        keyboardDidShowListener.remove();
-        keyboardDidHideListener.remove();
-      };
-    }
-  }, []);
 
   // Wrapper para sendMessage que actualiza el conversationId después de crear
   const sendMessage = async (text: string, metadata: any) => {
@@ -258,25 +233,19 @@ export default function ChatScreen({
     );
   };
 
-  // Calcular el offset para iOS
-  const iosKeyboardOffset = Platform.OS === "ios" ? keyboardOffset : 0;
-
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={iosKeyboardOffset}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={keyboardOffset}
       >
         <FlatList
           ref={flatListRef}
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
-          contentContainerStyle={[
-            styles.messagesContent,
-            Platform.OS === "android" && { paddingBottom: keyboardHeight },
-          ]}
+          contentContainerStyle={styles.messagesContent}
           ListHeaderComponent={renderHeader}
           ListFooterComponent={renderFooter}
           ListEmptyComponent={
@@ -299,14 +268,7 @@ export default function ChatScreen({
               flatListRef.current?.scrollToEnd({ animated: false });
             }
           }}
-          onLayout={() => {
-            // Scroll inicial después de layout
-            if (messages.length > 0) {
-              setTimeout(() => {
-                flatListRef.current?.scrollToEnd({ animated: false });
-              }, 100);
-            }
-          }}
+          keyboardShouldPersistTaps="handled"
         />
 
         <MessageInput
@@ -335,10 +297,12 @@ export default function ChatScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   },
   keyboardView: {
     flex: 1,
+    paddingBottom: 10,
+    backgroundColor: COLORS.white,
   },
   messagesContent: {
     paddingHorizontal: 12,

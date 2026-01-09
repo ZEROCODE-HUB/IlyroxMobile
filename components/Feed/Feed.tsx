@@ -16,9 +16,10 @@ import { ReelCard, PropertyCard, PostCard } from "../cards";
 import ReelDetail from "../Reel/ReelDetail";
 import FeedDetail from "./FeedDetail";
 import { useFeed, useUserApprovals } from "../../hooks";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { COLORS } from "../../constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 
 interface FeedProps {
   currentUserId?: string;
@@ -43,11 +44,25 @@ const Feed: React.FC<FeedProps> = ({
   const flatListRef = useRef<FlatList>(null);
 
   // Hooks de datos reales
-  const { items, loading, refreshing, hasMore, loadMore, refresh } = useFeed({
+  const {
+    items,
+    loading,
+    refreshing,
+    hasMore,
+    loadMore,
+    refresh,
+    refreshUserStats,
+  } = useFeed({
     userId: currentUserId,
     pageSize: 20,
     enableAutoRefresh: true,
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshUserStats();
+    }, [refreshUserStats])
+  );
 
   const dynamicPaddingTop = useMemo(() => {
     return Platform.OS === "ios" ? insets.top + 140 : insets.top + 130;
@@ -319,7 +334,7 @@ const Feed: React.FC<FeedProps> = ({
 
       {/* Modal de comentarios */}
       {activeCommentItem && (
-        <CommentsModal
+        <CommentsBottomSheet
           visible={activeCommentItem !== null}
           onClose={handleCloseComments}
           feedItemId={activeCommentItem.id}

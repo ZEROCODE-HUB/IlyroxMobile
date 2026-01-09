@@ -55,6 +55,7 @@ import {
 } from "../../constants/propertyData";
 import { useStableSafeInsets } from "../../context/SafeInsetsContext";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
+import { ViewImage } from "../modals/ViewImage";
 
 interface CreatePropertyProps {
   onBack: () => void;
@@ -202,6 +203,57 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
   // Errores
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Limpieza de errores
+  const clearError = (key: string) => {
+    if (errors[key]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[key];
+        return newErrors;
+      });
+    }
+  };
+
+  React.useEffect(() => {
+    if (ubicacionData.estado) clearError("estado");
+    if (ubicacionData.ciudad) clearError("ciudad");
+    if (ubicacionData.municipio) clearError("municipio");
+  }, [ubicacionData]);
+
+  React.useEffect(() => {
+    if (images.length > 0) clearError("images");
+  }, [images]);
+
+  React.useEffect(() => {
+    if (descripcion.trim()) clearError("descripcion");
+  }, [descripcion]);
+
+  React.useEffect(() => {
+    if (subtipo) clearError("subtipo");
+  }, [subtipo]);
+
+  React.useEffect(() => {
+    if (precioVenta.trim()) clearError("precioVenta");
+  }, [precioVenta]);
+
+  React.useEffect(() => {
+    if (precioRenta.trim()) clearError("precioRenta");
+  }, [precioRenta]);
+
+  // Se movió la limpieza de errores a los onChangeText para evitar re-renders innecesarios
+  // React.useEffect(() => {
+  //   if (m2Construccion.trim() || m2Terreno.trim()) {
+  //     clearError("m2");
+  //     clearError("m2Construccion");
+  //     clearError("m2Terreno");
+  //   }
+  // }, [m2Construccion, m2Terreno]);
+
+  React.useEffect(() => {
+    if (location.latitude !== 0 && location.longitude !== 0)
+      clearError("location");
+  }, [location]);
+
   // ============================================
   // HELPERS
   // ============================================
@@ -282,48 +334,61 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
     if (!descripcion.trim()) {
       newErrors.descripcion = "La descripción es requerida";
     }
-    if (tipoOperacion === "venta" && !precioVenta) {
-      newErrors.precioVenta = "El precio de venta es requerido";
-    }
-    if (tipoOperacion === "renta" && !precioRenta) {
-      newErrors.precioRenta = "El precio de renta es requerido";
-    }
-    if (tipoOperacion === "ambas" && (!precioVenta || !precioRenta)) {
-      newErrors.precios = "Ambos precios son requeridos";
-    }
-    if (!ubicacionData.estado) {
-      newErrors.estado = "El estado es requerido";
-    }
-    if (!ubicacionData.ciudad) {
-      newErrors.ciudad = "La ciudad es requerida";
-    }
-    if (!ubicacionData.municipio) {
-      newErrors.municipio = "El municipio es requerido";
+
+    if (!subtipo) {
+      newErrors.subtipo = "Debes seleccionar un subtipo de propiedad";
     }
 
-    // Validación de m² según tipo de propiedad
+    if (tipoOperacion === "venta" && !precioVenta.trim()) {
+      newErrors.precioVenta = "El precio de venta es requerido";
+    }
+    if (tipoOperacion === "renta" && !precioRenta.trim()) {
+      newErrors.precioRenta = "El precio de renta es requerido";
+    }
+    if (tipoOperacion === "ambas") {
+      if (!precioVenta.trim())
+        newErrors.precioVenta = "El precio de venta es requerido";
+      if (!precioRenta.trim())
+        newErrors.precioRenta = "El precio de renta es requerido";
+    }
+
+    if (!ubicacionData.estado) newErrors.estado = "El estado es requerido";
+    if (!ubicacionData.ciudad) newErrors.ciudad = "La ciudad es requerida";
+    if (!ubicacionData.municipio)
+      newErrors.municipio = "El municipio es requerido";
+
+    // Validación de m²
     if (esTerreno(subtipo)) {
-      if (!m2Terreno) {
+      if (!m2Terreno.trim()) {
         newErrors.m2Terreno =
           "Los m² de terreno son obligatorios para terrenos";
       }
     } else {
-      if (!m2Construccion && !m2Terreno) {
+      if (!m2Construccion.trim() && !m2Terreno.trim()) {
         newErrors.m2 =
           "Debes especificar al menos m² de construcción o terreno";
       }
     }
 
+    // Opcional: validar que haya coordenadas en el mapa
+    if (location.latitude === 0 && location.longitude === 0) {
+      newErrors.location = "Debes seleccionar la ubicación en el mapa";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
   /**
    * Publicar propiedad - CORREGIDO
    */
   const handlePublish = async () => {
     if (!validate()) {
-      Alert.alert("Error", "Por favor completa todos los campos requeridos");
+      const errorMessages = Object.values(errors).join("\n• ");
+      Alert.alert(
+        "Faltan datos requeridos",
+        errorMessages || "Por favor revisa los campos marcados en rojo",
+        [{ text: "OK" }]
+      );
       return;
     }
 
@@ -800,6 +865,7 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="always"
       >
         {/* ============================================ */}
         {/* 1. GALERÍA DE IMÁGENES */}
@@ -816,7 +882,7 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
           <View style={styles.imagesGrid}>
             {images.map((uri, index) => (
               <View key={index} style={styles.imageBox}>
-                <Image source={{ uri }} style={styles.previewImage} />
+                <ViewImage src={uri} imageStyle={styles.previewImage} />
                 <TouchableOpacity
                   onPress={() => handleRemoveImage(index)}
                   style={styles.removeBtn}
@@ -969,6 +1035,10 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
             ]}
             currentValue={tipoPrincipal}
           />
+          {/* Después del SelectionModal del subtipo */}
+          {errors.subtipo && (
+            <Text style={styles.errorText}>{errors.subtipo}</Text>
+          )}
 
           <Text style={styles.label}>Subtipo *</Text>
           <TouchableOpacity
@@ -1014,6 +1084,15 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
             onChange={setUbicacionData}
             showColonia={true}
           />
+          {errors.estado && (
+            <Text style={styles.errorText}>{errors.estado}</Text>
+          )}
+          {errors.ciudad && (
+            <Text style={styles.errorText}>{errors.ciudad}</Text>
+          )}
+          {errors.municipio && (
+            <Text style={styles.errorText}>{errors.municipio}</Text>
+          )}
 
           <AppInput
             label="Calle"
@@ -1295,9 +1374,15 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
             <AppInput
               label="m² de Construcción *"
               placeholder="120.5"
-              keyboardType="numeric"
-              value={m2Construccion}
-              onChangeText={setM2Construccion}
+              keyboardType="decimal-pad"
+              value={m2Construccion || ""}
+              onChangeText={(text) => {
+                setM2Construccion(text);
+                if (text) {
+                  clearError("m2");
+                  clearError("m2Construccion");
+                }
+              }}
               error={errors.m2}
             />
           )}
@@ -1307,9 +1392,15 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
             <AppInput
               label={`m² de Terreno ${esTerreno(subtipo) ? "*" : ""}`}
               placeholder="200.0"
-              keyboardType="numeric"
-              value={m2Terreno}
-              onChangeText={setM2Terreno}
+              keyboardType="decimal-pad"
+              value={m2Terreno || ""}
+              onChangeText={(text) => {
+                setM2Terreno(text);
+                if (text) {
+                  clearError("m2");
+                  clearError("m2Terreno");
+                }
+              }}
               error={errors.m2 || errors.m2Terreno}
             />
           )}
@@ -1532,6 +1623,9 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
         {/* ============================================ */}
         <View style={styles.section}>
           <LocationPicker onLocationSelected={setLocation} />
+          {errors.location && (
+            <Text style={styles.errorText}>{errors.location}</Text>
+          )}
         </View>
       </ScrollView>
 
@@ -1690,6 +1784,7 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: COLORS.error,
     borderWidth: 2,
+    borderRadius: 12,
   },
   textArea: {
     height: 100,
@@ -1705,7 +1800,7 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 12,
     color: COLORS.error,
-    marginTop: -8,
+    marginTop: 5,
     marginBottom: 12,
   },
   imagesGrid: {

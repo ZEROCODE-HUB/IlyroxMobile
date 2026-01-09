@@ -320,6 +320,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       <MapView
         ref={nativeMapRef}
         style={styles.mapNative}
+        mapType={"hybrid"}
         provider={
           Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
         }
@@ -362,18 +363,18 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
             const priceText = formatPrice(p.price || 0);
             const bgColor = isHighlighted ? COLORS.warning : COLORS.primary;
 
-          return (
-            <View
-              key={`price-${p.id}`}
-              style={{
-                position: "absolute",
-                left: Math.max(6, pos.x - 35),
-                top: Math.max(6, pos.y - 35),
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+            return (
               <View
+                key={`price-${p.id}`}
+                style={{
+                  position: "absolute",
+                  left: Math.max(6, pos.x - 35),
+                  top: Math.max(6, pos.y - 35),
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <View
                   style={{
                     backgroundColor: bgColor,
                     paddingVertical: 5,

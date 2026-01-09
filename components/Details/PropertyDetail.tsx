@@ -19,7 +19,7 @@ import { ActionButtons, Avatar } from "../shared";
 
 import { useViewTracking } from "../../hooks";
 import usePropertyDetails from "../../hooks/usePropertyDetails";
-import { CommentsModal } from "../modals";
+import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MapDetails } from "./MapDetails";
 
@@ -234,8 +234,9 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
               />
               <Text style={styles.locationText}>
                 {propertyDetails.calle
-                  ? `${propertyDetails.calle} ${propertyDetails.numero_exterior || ""
-                  }, `
+                  ? `${propertyDetails.calle} ${
+                      propertyDetails.numero_exterior || ""
+                    }, `
                   : ""}
                 {propertyDetails.colonia}, {propertyDetails.municipio},
                 {propertyDetails.ciudad}
@@ -449,8 +450,8 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                         {op.porcentaje_comision_compartida
                           ? `${op.porcentaje_comision_compartida}%`
                           : op.monto_comision_compartida
-                            ? `$${op.monto_comision_compartida.toLocaleString()}`
-                            : "No especificado"}
+                          ? `$${op.monto_comision_compartida.toLocaleString()}`
+                          : "No especificado"}
                       </Text>
                     </View>
                     {op.condiciones_comision_compartida && (
@@ -508,7 +509,9 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
             <TouchableOpacity
               style={[styles.mainContactBtn, { backgroundColor: COLORS.info }]}
               onPress={() => {
-                navigation.navigate("EditProperty", { propertyId: propertyDetails.id });
+                navigation.navigate("EditProperty", {
+                  propertyId: propertyDetails.id,
+                });
               }}
             >
               <Ionicons
@@ -537,7 +540,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
       </ScrollView>
 
       {/* Modal de comentarios */}
-      <CommentsModal
+      <CommentsBottomSheet
         visible={showComments}
         onClose={() => setShowComments(false)}
         feedItemId={propertyDetails.feed_items.id}
@@ -932,6 +935,12 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: "bold",
+  },
+  bottomContainer: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: COLORS.white,
+    marginBottom: 25,
   },
 });
 

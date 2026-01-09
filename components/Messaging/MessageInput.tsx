@@ -16,7 +16,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { COLORS } from "../../constants";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useStableSafeInsets } from "../../context/SafeInsetsContext";
+import { Platform } from "react-native";
 
 interface MessageInputProps {
   onSendText: (text: string) => Promise<void>;
@@ -32,7 +33,7 @@ export default function MessageInput({
   onSendFile,
   sending = false,
 }: MessageInputProps) {
-  const insets = useSafeAreaInsets();
+  const { bottom } = useStableSafeInsets();
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
 
@@ -104,8 +105,24 @@ export default function MessageInput({
 
   const isDisabled = sending || uploading;
 
+  // En Android APK, el bottom inset puede ser muy grande, limitamos a un máximo razonable
+  // Cuando el teclado está visible, no necesitamos padding extra
+  const paddingBottom =
+    Platform.OS === "android" ? Math.min(bottom, 8) : bottom;
+
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+    <View
+      style={[
+        styles.container,
+        { paddingBottom },
+        // En Android APK, asegurar que el input esté siempre visible
+        Platform.OS === "android" && {
+          backgroundColor: COLORS.white,
+
+          zIndex: 1000,
+        },
+      ]}
+    >
       {/* Botón de imagen */}
       <TouchableOpacity
         onPress={handlePickImage}
@@ -168,7 +185,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 20,
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,

@@ -3,7 +3,7 @@
  * Modal para gestionar etiquetas de conversaciones
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,10 +13,10 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { AppInput } from '../../design-system/components/AppInput';
-import { COLORS } from '../../constants';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { AppInput } from "../../design-system/components/AppInput";
+import { COLORS } from "../../constants";
 
 interface Tag {
   id: string;
@@ -32,10 +32,15 @@ interface TagsModalProps {
   onAssignTag?: (tagId: string) => Promise<boolean>;
   onRemoveTag?: (tagId: string) => Promise<boolean>;
   onCreateTag?: (name: string, color: string) => Promise<Tag | null>;
+  onUpdateTag?: (
+    tagId: string,
+    name: string,
+    color: string
+  ) => Promise<boolean>;
   onDeleteTag?: (tagId: string) => Promise<boolean>;
 }
 
-const PRESET_COLORS = [
+const PRESET_COLORS: string[] = [
   COLORS.error,
   COLORS.warning,
   COLORS.success,
@@ -54,13 +59,15 @@ export default function TagsModal({
   onAssignTag,
   onRemoveTag,
   onCreateTag,
+  onUpdateTag,
   onDeleteTag,
 }: TagsModalProps) {
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newTagName, setNewTagName] = useState('');
-  const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[0]);
+  const [newTagName, setNewTagName] = useState("");
+  const [selectedColor, setSelectedColor] = useState<string>(PRESET_COLORS[0]);
   const [isCreating, setIsCreating] = useState(false);
   const [togglingTagId, setTogglingTagId] = useState<string | null>(null);
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
 
   const isAssigned = (tagId: string) =>
     assignedTags.some((tag) => tag.id === tagId);
@@ -80,34 +87,57 @@ export default function TagsModal({
     }
   };
 
-  const handleCreateTag = async () => {
-    if (!newTagName.trim() || !onCreateTag || isCreating) return;
+  const handleSaveTag = async () => {
+    if (!newTagName.trim() || isCreating) return;
 
     try {
       setIsCreating(true);
-      const newTag = await onCreateTag(newTagName.trim(), selectedColor);
 
-      if (newTag) {
-        setNewTagName('');
-        setSelectedColor(PRESET_COLORS[0]);
-        setShowCreateForm(false);
+      if (editingTagId && onUpdateTag) {
+        const success = await onUpdateTag(
+          editingTagId,
+          newTagName.trim(),
+          selectedColor
+        );
+        if (success) {
+          resetForm();
+        }
+      } else if (onCreateTag) {
+        const newTag = await onCreateTag(newTagName.trim(), selectedColor);
+        if (newTag) {
+          resetForm();
+        }
       }
     } finally {
       setIsCreating(false);
     }
   };
 
+  const resetForm = () => {
+    setNewTagName("");
+    setSelectedColor(PRESET_COLORS[0]);
+    setShowCreateForm(false);
+    setEditingTagId(null);
+  };
+
+  const handleEditClick = (tag: Tag) => {
+    setEditingTagId(tag.id);
+    setNewTagName(tag.nombre);
+    setSelectedColor(tag.color);
+    setShowCreateForm(true);
+  };
+
   const handleDeleteTag = async (tagId: string) => {
     if (!onDeleteTag) return;
 
     Alert.alert(
-      'Eliminar etiqueta',
-      '¿Estás seguro? Se eliminará de todas las conversaciones.',
+      "Eliminar etiqueta",
+      "¿Estás seguro? Se eliminará de todas las conversaciones.",
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: "Cancelar", style: "cancel" },
         {
-          text: 'Eliminar',
-          style: 'destructive',
+          text: "Eliminar",
+          style: "destructive",
           onPress: async () => {
             await onDeleteTag(tagId);
           },
@@ -129,32 +159,62 @@ export default function TagsModal({
           </View>
 
           {/* Content */}
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
             {/* Etiquetas disponibles - Solo mostrar si onAssignTag existe */}
             {onAssignTag && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Asignar etiquetas</Text>
                 {availableTags.length === 0 ? (
-                  <Text style={styles.emptyText}>No hay etiquetas disponibles</Text>
+                  <Text style={styles.emptyText}>
+                    No hay etiquetas disponibles
+                  </Text>
                 ) : (
                   availableTags.map((tag) => (
                     <View key={tag.id} style={styles.tagRow}>
                       <TouchableOpacity
                         style={[
                           styles.tagItem,
-                          togglingTagId === tag.id && styles.tagItemDisabled
+                          togglingTagId === tag.id && styles.tagItemDisabled,
                         ]}
                         onPress={() => handleToggleTag(tag)}
                         disabled={togglingTagId !== null}
                       >
-                        <View style={[styles.colorDot, { backgroundColor: tag.color }]} />
+                        <View
+                          style={[
+                            styles.colorDot,
+                            { backgroundColor: tag.color },
+                          ]}
+                        />
                         <Text style={styles.tagName}>{tag.nombre}</Text>
                         {togglingTagId === tag.id ? (
-                          <ActivityIndicator size="small" color={COLORS.primary} />
+                          <ActivityIndicator
+                            size="small"
+                            color={COLORS.primary}
+                          />
                         ) : isAssigned(tag.id) ? (
-                          <Ionicons name="checkmark-circle" size={20} color={COLORS.primary} />
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={20}
+                            color={COLORS.primary}
+                          />
                         ) : null}
                       </TouchableOpacity>
+
+                      {onUpdateTag && (
+                        <TouchableOpacity
+                          onPress={() => handleEditClick(tag)}
+                          style={styles.actionButton}
+                        >
+                          <Ionicons
+                            name="pencil-outline"
+                            size={18}
+                            color={COLORS.textSecondary}
+                          />
+                        </TouchableOpacity>
+                      )}
                     </View>
                   ))
                 )}
@@ -171,16 +231,38 @@ export default function TagsModal({
                   availableTags.map((tag) => (
                     <View key={tag.id} style={styles.tagRow}>
                       <View style={styles.tagItem}>
-                        <View style={[styles.colorDot, { backgroundColor: tag.color }]} />
+                        <View
+                          style={[
+                            styles.colorDot,
+                            { backgroundColor: tag.color },
+                          ]}
+                        />
                         <Text style={styles.tagName}>{tag.nombre}</Text>
                       </View>
+
+                      {onUpdateTag && (
+                        <TouchableOpacity
+                          onPress={() => handleEditClick(tag)}
+                          style={styles.actionButton}
+                        >
+                          <Ionicons
+                            name="pencil-outline"
+                            size={18}
+                            color={COLORS.textSecondary}
+                          />
+                        </TouchableOpacity>
+                      )}
 
                       {onDeleteTag && (
                         <TouchableOpacity
                           onPress={() => handleDeleteTag(tag.id)}
-                          style={styles.deleteButton}
+                          style={styles.actionButton}
                         >
-                          <Ionicons name="trash-outline" size={18} color={COLORS.error} />
+                          <Ionicons
+                            name="trash-outline"
+                            size={18}
+                            color={COLORS.error}
+                          />
                         </TouchableOpacity>
                       )}
                     </View>
@@ -189,19 +271,28 @@ export default function TagsModal({
               </View>
             )}
 
-            {/* Crear nueva etiqueta */}
-            {onCreateTag && (
+            {/* Crear/Editar nueva etiqueta */}
+            {(onCreateTag || editingTagId) && (
               <View style={styles.section}>
                 {!showCreateForm ? (
                   <TouchableOpacity
                     style={styles.createButton}
                     onPress={() => setShowCreateForm(true)}
                   >
-                    <Ionicons name="add-circle-outline" size={20} color={COLORS.primary} />
-                    <Text style={styles.createButtonText}>Crear nueva etiqueta</Text>
+                    <Ionicons
+                      name="add-circle-outline"
+                      size={20}
+                      color={COLORS.primary}
+                    />
+                    <Text style={styles.createButtonText}>
+                      Crear nueva etiqueta
+                    </Text>
                   </TouchableOpacity>
                 ) : (
                   <View style={styles.createForm}>
+                    <Text style={styles.formTitle}>
+                      {editingTagId ? "Editar etiqueta" : "Nueva etiqueta"}
+                    </Text>
                     <AppInput
                       label="Nombre de la etiqueta"
                       placeholder="Ej: Urgente, Importante..."
@@ -218,12 +309,17 @@ export default function TagsModal({
                           style={[
                             styles.colorOption,
                             { backgroundColor: color },
-                            selectedColor === color && styles.colorOptionSelected,
+                            selectedColor === color &&
+                              styles.colorOptionSelected,
                           ]}
                           onPress={() => setSelectedColor(color)}
                         >
                           {selectedColor === color && (
-                            <Ionicons name="checkmark" size={20} color={COLORS.white} />
+                            <Ionicons
+                              name="checkmark"
+                              size={20}
+                              color={COLORS.white}
+                            />
                           )}
                         </TouchableOpacity>
                       ))}
@@ -234,12 +330,12 @@ export default function TagsModal({
                         style={[
                           styles.button,
                           styles.buttonSecondary,
-                          isCreating && styles.buttonDisabled
+                          isCreating && styles.buttonDisabled,
                         ]}
                         onPress={() => {
                           if (!isCreating) {
                             setShowCreateForm(false);
-                            setNewTagName('');
+                            setNewTagName("");
                             setSelectedColor(PRESET_COLORS[0]);
                           }
                         }}
@@ -252,15 +348,26 @@ export default function TagsModal({
                         style={[
                           styles.button,
                           styles.buttonPrimary,
-                          (isCreating || !newTagName.trim()) && styles.buttonDisabled
+                          (isCreating || !newTagName.trim()) &&
+                            styles.buttonDisabled,
                         ]}
-                        onPress={handleCreateTag}
+                        onPress={handleSaveTag}
                         disabled={isCreating || !newTagName.trim()}
                       >
                         {isCreating ? (
                           <>
-                            <ActivityIndicator size="small" color={COLORS.white} />
-                            <Text style={[styles.buttonPrimaryText, { marginLeft: 8 }]}>Creando...</Text>
+                            <ActivityIndicator
+                              size="small"
+                              color={COLORS.white}
+                            />
+                            <Text
+                              style={[
+                                styles.buttonPrimaryText,
+                                { marginLeft: 8 },
+                              ]}
+                            >
+                              Creando...
+                            </Text>
                           </>
                         ) : (
                           <Text style={styles.buttonPrimaryText}>Crear</Text>
@@ -282,25 +389,25 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: COLORS.overlay,
-    justifyContent: 'center',
+    justifyContent: "center",
     padding: 20,
   },
   container: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
-    maxHeight: '80%',
-    height: '80%',
+    maxHeight: "80%",
+    height: "80%",
     padding: 20,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 20,
   },
   title: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.textPrimary,
   },
   content: {
@@ -311,33 +418,39 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.textSecondary,
     marginBottom: 12,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
+  },
+  formTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+    marginBottom: 12,
   },
   formLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.textPrimary,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
     color: COLORS.textTertiary,
-    fontStyle: 'italic',
-    textAlign: 'center',
+    fontStyle: "italic",
+    textAlign: "center",
     paddingVertical: 16,
   },
   tagRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
   },
   tagItem: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 12,
     backgroundColor: COLORS.background,
     borderRadius: 8,
@@ -356,14 +469,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.textPrimary,
   },
-  deleteButton: {
+  actionButton: {
     padding: 8,
     marginLeft: 8,
   },
   createButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     padding: 12,
     backgroundColor: COLORS.primaryTransparent,
     borderRadius: 8,
@@ -371,7 +484,7 @@ const styles = StyleSheet.create({
   },
   createButtonText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.primary,
   },
   createForm: {
@@ -380,8 +493,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   colorGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
     marginBottom: 16,
   },
@@ -389,39 +502,39 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   colorOptionSelected: {
     borderWidth: 3,
     borderColor: COLORS.textPrimary,
   },
   formButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   button: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   buttonSecondary: {
     backgroundColor: COLORS.cardBorder,
   },
   buttonSecondaryText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.textSecondary,
   },
   buttonPrimary: {
     backgroundColor: COLORS.primary,
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
   },
   buttonPrimaryText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.white,
   },
   buttonDisabled: {

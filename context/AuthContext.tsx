@@ -209,20 +209,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     let profileSubscription: any = null;
 
     const initAuth = async () => {
-      // Timeout de emergencia si todo falla
+      // Timeout de emergencia más corto para evitar carga infinita
       const emergencyTimeoutId = setTimeout(() => {
         if (mounted && loading) {
-          console.warn("⏰ Auth init emergency timeout (60s), forcing loading false");
+          console.warn("⏰ Auth init emergency timeout (15s), forcing loading false");
           setLoading(false);
         }
-      }, 60000); // 1 minuto de emergencia
+      }, 15000); // 15 segundos de emergencia
+
+      // Timeout para getSession específicamente
+      const sessionTimeoutId = setTimeout(() => {
+        if (mounted && loading) {
+          console.warn("⏰ getSession timeout (10s), clearing session and stopping");
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+        }
+      }, 10000); // 10 segundos para getSession
 
       try {
-        // Obtener sesión inicial
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Obtener sesión inicial con timeout
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Session timeout")), 8000);
+        });
+
+        const result = await Promise.race([
+          sessionPromise,
+          timeoutPromise,
+        ]);
+        
+        const { data: { session }, error } = result;
+
+        clearTimeout(sessionTimeoutId);
 
         if (error) {
           console.error("❌ Error getting session:", error);
+          // Si es un error de sesión inválida/expirada, limpiar estado
+          if (error.message?.includes("expired") || error.message?.includes("invalid")) {
+            console.log("🔄 Session expired/invalid, clearing auth state");
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+          }
         }
 
         if (!mounted) {
@@ -230,19 +260,65 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return;
         }
 
+        // Verificar si la sesión está expirada
+        if (session?.expires_at) {
+          const expiresAt = session.expires_at * 1000; // Convertir a milisegundos
+          const now = Date.now();
+          if (now >= expiresAt) {
+            console.log("🔄 Session expired, clearing auth state");
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+            if (mounted) {
+              setLoading(false);
+            }
+            clearTimeout(emergencyTimeoutId);
+            return;
+          }
+        }
+
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          const profileData = await loadProfile(session.user.id);
-          if (mounted) {
-            setProfile(profileData);
+            // Cargar perfil con timeout
+            try {
+              const profilePromise = loadProfile(session.user.id);
+              const profileTimeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error("Profile load timeout")), 8000);
+              });
+
+              const profileData = await Promise.race([
+                profilePromise,
+                profileTimeoutPromise,
+              ]) as perfiles | null;
+
+            if (mounted) {
+              setProfile(profileData);
+            }
+          } catch (profileErr) {
+            console.error("❌ Error loading profile:", profileErr);
+            // Continuar sin perfil si falla la carga
+            if (mounted) {
+              setProfile(null);
+            }
           }
+        } else {
+          // No hay sesión, asegurar que el estado esté limpio
+          setProfile(null);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("❌ Unexpected error during auth init:", err);
+        // Si es timeout o error de red, limpiar estado
+        if (err.message?.includes("timeout") || err.message?.includes("Network")) {
+          console.log("🔄 Network/timeout error, clearing auth state");
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+        }
       } finally {
         clearTimeout(emergencyTimeoutId);
+        clearTimeout(sessionTimeoutId);
         if (mounted) {
           setLoading(false);
         }
@@ -287,39 +363,73 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (!mounted) return;
 
+        // Verificar si la sesión está expirada
+        if (session?.expires_at) {
+          const expiresAt = session.expires_at * 1000;
+          const now = Date.now();
+          if (now >= expiresAt) {
+            console.log("🔄 Session expired in onAuthStateChange, clearing");
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+            if (mounted) {
+              setLoading(false);
+            }
+            return;
+          }
+        }
+
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          const profileData = await loadProfile(session.user.id);
-          if (mounted) {
-            setProfile(profileData);
+          try {
+            // Cargar perfil con timeout
+            const profilePromise = loadProfile(session.user.id);
+            const profileTimeoutPromise = new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error("Profile load timeout")), 8000);
+            });
 
-            // Configurar Realtime para este usuario
-            if (profileSubscription) {
-              profileSubscription.unsubscribe();
+            const profileData = await Promise.race([
+              profilePromise,
+              profileTimeoutPromise,
+            ]) as perfiles | null;
+
+            if (mounted) {
+              setProfile(profileData);
+
+              // Configurar Realtime para este usuario
+              if (profileSubscription) {
+                profileSubscription.unsubscribe();
+              }
+
+              profileSubscription = supabase
+                .channel(`public:perfiles:id=eq.${session.user.id}`)
+                .on(
+                  "postgres_changes",
+                  {
+                    event: "UPDATE",
+                    schema: "public",
+                    table: "perfiles",
+                    filter: `id=eq.${session.user.id}`,
+                  },
+                  (payload) => {
+                    console.log("🔄 Profile updated via Realtime:", payload.new);
+                    const updatedProfile = payload.new as perfiles;
+                    
+                    // Actualizar cache
+                    profileCacheRef.current[session.user.id] = updatedProfile;
+                    setProfile(updatedProfile);
+                  }
+                )
+                .subscribe();
             }
-
-            profileSubscription = supabase
-              .channel(`public:perfiles:id=eq.${session.user.id}`)
-              .on(
-                "postgres_changes",
-                {
-                  event: "UPDATE",
-                  schema: "public",
-                  table: "perfiles",
-                  filter: `id=eq.${session.user.id}`,
-                },
-                (payload) => {
-                  console.log("🔄 Profile updated via Realtime:", payload.new);
-                  const updatedProfile = payload.new as perfiles;
-                  
-                  // Actualizar cache
-                  profileCacheRef.current[session.user.id] = updatedProfile;
-                  setProfile(updatedProfile);
-                }
-              )
-              .subscribe();
+          } catch (profileErr) {
+            console.error("❌ Error loading profile in onAuthStateChange:", profileErr);
+            // Continuar sin perfil si falla
+            if (mounted) {
+              setProfile(null);
+            }
           }
         } else {
           if (mounted) {

@@ -197,7 +197,7 @@ export default function MessagingScreen({
             const h = e.nativeEvent.layout.height;
             if (h && h !== headerHeight) setHeaderHeight(h);
           }}
-          style={styles.headerFixed}
+          style={[styles.headerFixed, { paddingTop: top }]}
         >
           <HeaderChat
             onBack={handleBack}

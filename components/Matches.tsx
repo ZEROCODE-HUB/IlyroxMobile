@@ -20,6 +20,7 @@ import { LeadMatchCard } from "./LeadMatchCard";
 import { LeadPropertiesModal } from "./LeadPropertiesModal";
 import { AppHeader } from "./AppHeader";
 import { COLORS } from "../constants";
+import { ScreenWrapper } from "../screens/ScreenWrapper";
 
 type MatchType = "coincidencia" | "similar";
 
@@ -375,7 +376,7 @@ const Matches: React.FC = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <ScreenWrapper withHeader={false} style={styles.container}>
       {/* Header */}
       <AppHeader
         title="Matches"
@@ -477,12 +478,12 @@ const Matches: React.FC = () => {
           <PropertyDetail
             propertyId={selectedPropertyId}
             navigation={{
-    goBack: () => setSelectedPropertyId(null),
-  }}
+              goBack: () => setSelectedPropertyId(null),
+            }}
           />
         </Modal>
       )}
-    </View>
+    </ScreenWrapper>
   );
 };
 

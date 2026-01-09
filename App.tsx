@@ -1,3 +1,4 @@
+import "react-native-reanimated";
 import React, { useRef, useState, useEffect } from "react";
 import {
   View,
@@ -31,19 +32,25 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LocationSearchBar } from "./components/LocationSearchBar";
 import { COLORS } from "./constants";
 import { SafeInsetsProvider } from "./context/SafeInsetsContext";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 
 export const navigationRef = createNavigationContainerRef<RootTabParamList>();
 const queryClient = new QueryClient();
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <SafeInsetsProvider>
-        <QueryClientProvider client={queryClient}>
-          <AppContent />
-        </QueryClientProvider>
-      </SafeInsetsProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={styles.container}>
+      <SafeAreaProvider>
+        <SafeInsetsProvider>
+          <BottomSheetModalProvider>
+            <QueryClientProvider client={queryClient}>
+              <AppContent />
+            </QueryClientProvider>
+          </BottomSheetModalProvider>
+        </SafeInsetsProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

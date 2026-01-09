@@ -23,7 +23,10 @@ import EasyBrokerSettingsScreen from "../screens/EasyBrokerSettingsScreen";
 import { User } from "../types";
 import { useApp } from "../context/AppContext";
 import { useAuth } from "../context/AuthContext"; // ← AGREGAR ESTO
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 export type RootTabParamList = {
   Feed: undefined;
@@ -101,7 +104,10 @@ export default function BottomTabNavigator({
       <Tab.Screen name="PropertyDetail" component={PropertyDetailWrapper} />
       <Tab.Screen name="SavedSearches" component={SavedSearches} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
-      <Tab.Screen name="EasyBrokerSettings" component={EasyBrokerSettingsScreen} />
+      <Tab.Screen
+        name="EasyBrokerSettings"
+        component={EasyBrokerSettingsScreen}
+      />
     </Tab.Navigator>
   );
 }
@@ -123,11 +129,13 @@ const UserProfileWrapper = ({ route, navigation }: any) => {
 // Wrapper for Messages to accept params and pass to component
 const MessagesWrapper = ({ route }: any) => {
   const initialUser = route.params?.initialUser as User | undefined;
-  const initialPropertyId = route.params?.initialPropertyId as string | undefined;
-  
+  const initialPropertyId = route.params?.initialPropertyId as
+    | string
+    | undefined;
+
   return (
-    <MessagingScreen 
-      initialUser={initialUser} 
+    <MessagingScreen
+      initialUser={initialUser}
       initialPropertyId={initialPropertyId}
     />
   );
@@ -138,12 +146,12 @@ const PropertyDetailWrapper = ({ route, navigation }: any) => {
     <PropertyDetail
       propertyId={propertyId}
       navigation={navigation} // ← Pasar navigation directamente
-onContact={(ownerId, propId) => {
-  navigation.navigate("Messages", { 
-    initialUser: { id: ownerId },  // ✅ Cambiar de "user" a "initialUser"
-    initialPropertyId: propId 
-  });
-}}
+      onContact={(ownerId, propId) => {
+        navigation.navigate("Messages", {
+          initialUser: { id: ownerId }, // ✅ Cambiar de "user" a "initialUser"
+          initialPropertyId: propId,
+        });
+      }}
     />
   );
 };
@@ -173,7 +181,7 @@ const EditPropertyWrapper = ({ route, navigation }: any) => {
 // Custom Tab Bar to match the original design and only show specific tabs
 const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   const visibleRoutes = ["Feed", "Stats", "Create", "Profile"];
-
+  const insets = useSafeAreaInsets();
   // Hide navbar when viewing other user's profile, property detail or settings
   const currentRoute = state.routes[state.index]?.name;
   if (
@@ -201,7 +209,13 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   };
 
   return (
-    <SafeAreaView edges={["bottom"]} style={styles.bottomNavSafeArea}>
+    /* 2. Cambiamos SafeAreaView por un View normal y aplicamos el padding dinámico */
+    <View
+      style={[
+        styles.bottomNavSafeArea,
+        { paddingBottom: Math.max(insets.bottom, 10) }, // Asegura un mínimo de 10 o el valor del sistema
+      ]}
+    >
       <View style={styles.bottomNav}>
         {visibleRoutes.map((routeName) => {
           const routeIndex = state.routes.findIndex(
@@ -257,19 +271,20 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
           );
         })}
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
-
 const styles = StyleSheet.create({
   bottomNavSafeArea: {
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
+    // Eliminamos elevación o sombras que puedan interferir en el posicionamiento base
+    elevation: 8,
   },
   bottomNav: {
     flexDirection: "row",
-    height: 65,
+    height: 60, // Ajustado ligeramente para balancear el padding inferior
     backgroundColor: COLORS.white,
     alignItems: "center",
   },

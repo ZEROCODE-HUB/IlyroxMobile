@@ -21,6 +21,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useCreateContent } from "../../hooks/useCreateContent";
 import { useAuth } from "../../context/AuthContext";
 import { COLORS } from "../../constants/colors";
+import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
 interface CreatePostProps {
   onBack: () => void;
@@ -121,7 +122,7 @@ export default function CreatePost({ onBack }: CreatePostProps) {
   };
 
   return (
-    <View style={styles.container}>
+    <ScreenWrapper withHeader={false} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
@@ -198,7 +199,11 @@ export default function CreatePost({ onBack }: CreatePostProps) {
             </>
           ) : (
             <>
-              <Ionicons name="checkmark-circle" size={24} color={COLORS.white} />
+              <Ionicons
+                name="checkmark-circle"
+                size={24}
+                color={COLORS.white}
+              />
               <Text style={styles.publishText}>Publicar Post</Text>
             </>
           )}
@@ -222,7 +227,7 @@ export default function CreatePost({ onBack }: CreatePostProps) {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScreenWrapper>
   );
 }
 

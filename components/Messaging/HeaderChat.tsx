@@ -25,8 +25,14 @@ export default function HeaderChat({
   const [showTagsModal, setShowTagsModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
 
-  const { tags, assignTag, removeTag, getConversationTags, createTag } =
-    useTags(userId);
+  const {
+    tags,
+    assignTag,
+    removeTag,
+    getConversationTags,
+    createTag,
+    updateTag,
+  } = useTags(userId);
 
   // Load tags when conversationId changes and is not "new"
   const loadTags = async () => {
@@ -63,6 +69,12 @@ export default function HeaderChat({
     if (success) {
       loadTags();
     }
+    return success;
+  };
+
+  const handleUpdateTag = async (id: string, name: string, color: string) => {
+    const success = await updateTag(id, name, color);
+    if (success) loadTags();
     return success;
   };
 
@@ -139,6 +151,7 @@ export default function HeaderChat({
           onAssignTag={handleAssignTag}
           onRemoveTag={handleRemoveTag}
           onCreateTag={createTag}
+          onUpdateTag={handleUpdateTag}
         />
       )}
 

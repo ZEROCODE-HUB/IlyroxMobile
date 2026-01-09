@@ -16,6 +16,7 @@ import { COLORS } from "../constants/colors";
 import { AppHeader } from "../components/AppHeader";
 import EditProfile from "../components/Profile/EditProfile";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ScreenWrapper } from "./ScreenWrapper";
 
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -100,7 +101,7 @@ const SettingsScreen: React.FC = () => {
   ];
 
   return (
-    <View style={styles.container}>
+    <ScreenWrapper withHeader={false} style={styles.container}>
       <AppHeader
         title="Configuración"
         showBackButton={true}
@@ -170,7 +171,7 @@ const SettingsScreen: React.FC = () => {
       >
         <EditProfile onBack={() => setShowEditProfile(false)} />
       </Modal>
-    </View>
+    </ScreenWrapper>
   );
 };
 

@@ -1,8 +1,3 @@
-/**
- * CreateContent/CreateReel.tsx
- * Formulario para crear reels
- */
-
 import React, { useState } from "react";
 import {
   View,
@@ -18,8 +13,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
 import * as ImagePicker from "expo-image-picker";
 import { useCreateContent } from "../../hooks/useCreateContent";
+import { useVideoUpload } from "../../hooks/useVideoUpload";
 import { useAuth } from "../../context/AuthContext";
 import { COLORS } from "../../constants/colors";
+import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
 interface CreateReelProps {
   onBack: () => void;
@@ -27,12 +24,18 @@ interface CreateReelProps {
 
 export default function CreateReel({ onBack }: CreateReelProps) {
   const { user } = useAuth();
-  const { createReel, uploading } = useCreateContent(user?.id);
+  const { createReel, uploading: creatingReel } = useCreateContent(user?.id);
+  const {
+    uploadVideo,
+    uploading: uploadingVideo,
+    uploadProgress,
+  } = useVideoUpload();
 
   const [description, setDescription] = useState("");
   const [videoUri, setVideoUri] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const uploading = uploadingVideo || creatingReel;
 
   /**
    * Seleccionar video de la galería
@@ -88,44 +91,34 @@ export default function CreateReel({ onBack }: CreateReelProps) {
       return;
     }
 
-    // Simular progreso de subida
-    setUploadProgress(0);
-    const progressInterval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + 10;
-      });
-    }, 200);
+    try {
+      // 1. Subir video a Supabase Storage
+      const videoUrl = await uploadVideo(videoUri, "feed-images", "reels");
 
-    // TODO: Subir video a storage primero
-    // Por ahora usamos una URL de ejemplo
-    const success = await createReel(
-      description,
-      videoUri ||
-        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-    );
+      if (!videoUrl) {
+        Alert.alert("Error", "No se pudo subir el video. Intenta de nuevo.");
+        return;
+      }
 
-    clearInterval(progressInterval);
-    setUploadProgress(100);
+      // 2. Crear el reel con la URL pública del video
+      const success = await createReel(description, videoUrl);
 
-    if (success) {
-      // Esperar un momento para mostrar 100% antes de limpiar
-      setTimeout(() => {
-        setDescription("");
-        setVideoUri("");
-        setUploadProgress(0);
-        onBack();
-      }, 500);
-    } else {
-      setUploadProgress(0);
+      if (success) {
+        // Limpiar formulario y volver
+        setTimeout(() => {
+          setDescription("");
+          setVideoUri("");
+          onBack();
+        }, 500);
+      }
+    } catch (error) {
+      console.error("Error publishing reel:", error);
+      Alert.alert("Error", "Hubo un problema al publicar el reel");
     }
   };
 
   return (
-    <View style={styles.container}>
+    <ScreenWrapper withHeader={false} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
@@ -170,7 +163,11 @@ export default function CreateReel({ onBack }: CreateReelProps) {
                   errors.video && styles.inputError,
                 ]}
               >
-                <Ionicons name="videocam-outline" size={56} color={COLORS.textTertiary} />
+                <Ionicons
+                  name="videocam-outline"
+                  size={56}
+                  color={COLORS.textTertiary}
+                />
                 <Text style={styles.uploadText}>Seleccionar video</Text>
               </TouchableOpacity>
               {errors.video && (
@@ -214,7 +211,11 @@ export default function CreateReel({ onBack }: CreateReelProps) {
             </>
           ) : (
             <>
-              <Ionicons name="checkmark-circle" size={24} color={COLORS.white} />
+              <Ionicons
+                name="checkmark-circle"
+                size={24}
+                color={COLORS.white}
+              />
               <Text style={styles.publishText}>Publicar Reel</Text>
             </>
           )}
@@ -238,7 +239,7 @@ export default function CreateReel({ onBack }: CreateReelProps) {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScreenWrapper>
   );
 }
 

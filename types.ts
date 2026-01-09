@@ -7,10 +7,19 @@ export type User = {
   role: "Agente" | "Cliente" | "Admin" | "Agent" | "User";
   rating?: number;
   totalRatings?: number;
+  positiveRecommendations?: number;
+  negativeRecommendations?: number;
+  recommendedByPreview?: RecommendedByPreviewUser[];
   location?: string;
   phone?: string;
   aprobaciones_recibidas?: number;
   aprobaciones_requeridas?: number;
+};
+
+export type RecommendedByPreviewUser = {
+  id: string;
+  name: string;
+  avatar?: string | null;
 };
 
 export type PropertyType =
@@ -32,8 +41,10 @@ export type LegalDetails = {
 
 export type Property = {
   id: string;
+  code?: string;
   title: string;
   description?: string;
+  createdAt?: string;
   price: number;
   currency: "USD" | "MXN";
   location: {

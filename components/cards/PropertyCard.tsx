@@ -4,15 +4,28 @@
  */
 
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  ActivityIndicator,
+  FlatList,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { supabase } from "../../lib/supabase";
 
 import { FeedItem, User } from "../../types";
-import { useCurrentUserId, useFeedInteractions, useViewTracking } from "../../hooks";
+import {
+  useCurrentUserId,
+  useFeedInteractions,
+  useViewTracking,
+} from "../../hooks";
 import { DIMENSIONS, COLORS } from "../../constants";
 import { commonStyles } from "../../styles";
-import { UserHeader, ImageGallery, ReportModal } from "../shared";
+import { UserHeader, ImageGallery, ReportModal, Avatar } from "../shared";
 import ActionButtons from "../ActionButtons";
 import { Bath } from "lucide-react-native";
 
@@ -62,8 +75,63 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         apellido_paterno: item.user.name?.split(" ")[1] || "",
         foto: item.user.avatar || null,
       },
-      initialPropertyId: property.id
+      initialPropertyId: property.id,
     });
+  };
+
+  const positiveRecommendations = item.user.positiveRecommendations ?? 0;
+  const recommendedByPreview = item.user.recommendedByPreview ?? [];
+  const firstRecommender = recommendedByPreview[0];
+  const recommendedText =
+    positiveRecommendations > 0 && firstRecommender
+      ? `${firstRecommender.name}${
+          positiveRecommendations > 1
+            ? ` y ${positiveRecommendations - 1} más`
+            : ""
+        }`
+      : `Recomendado por ${positiveRecommendations} usuarios`;
+  const [showRecommendedModal, setShowRecommendedModal] = React.useState(false);
+  const [recommendedList, setRecommendedList] = React.useState<
+    { id: string; name: string; role?: string; avatar?: string | null }[]
+  >([]);
+  const [loadingRecommended, setLoadingRecommended] = React.useState(false);
+
+  const openRecommendedModal = async () => {
+    const userIdToQuery = item.user.id;
+    if (!userIdToQuery) return;
+    setShowRecommendedModal(true);
+    setLoadingRecommended(true);
+    setRecommendedList([]);
+    const { data: recs } = await supabase
+      .from("recomendaciones_usuarios")
+      .select("recomendado_por")
+      .eq("usuario_recomendado_id", userIdToQuery)
+      .eq("recomienda", true)
+      .range(0, 49);
+    const ids = (recs || [])
+      .map((r: any) => r?.recomendado_por)
+      .filter(Boolean) as string[];
+    if (ids.length > 0) {
+      const { data: profiles } = await supabase
+        .from("perfiles")
+        .select("id,nombre,apellido_paterno,apellido_materno,foto,rol")
+        .in("id", ids);
+      const mapped =
+        (profiles || []).map((p: any) => {
+          const name = [p?.nombre, p?.apellido_paterno, p?.apellido_materno]
+            .filter(Boolean)
+            .join(" ")
+            .trim();
+          return {
+            id: p.id,
+            name: name || "Usuario",
+            role: p.rol,
+            avatar: p.foto ?? null,
+          };
+        }) || [];
+      setRecommendedList(mapped);
+    }
+    setLoadingRecommended(false);
   };
 
   return (
@@ -80,6 +148,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         setShowOptions={setShowOptions}
         onReport={() => setShowReportModal(true)}
         totalRatings={item.user.totalRatings}
+        showRecommendedPreview={false}
       />
 
       {/* Galería de imágenes con botones flotantes */}
@@ -110,8 +179,9 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             }}
             onTrackInteraction={trackInteraction}
             shareTitle={property.title}
-            shareDescription={`${property.operation
-              } - $${property.price.toLocaleString()} ${property.currency}`}
+            shareDescription={`${
+              property.operation
+            } - $${property.price.toLocaleString()} ${property.currency}`}
             shareImageUrl={images[0]}
             showContactButton={false}
             orientation="vertical"
@@ -120,13 +190,53 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         </View>
       </View>
 
+      <View style={styles.metaRow}>
+        <Text style={styles.metaText}>
+          ID: {property.code ?? property.id} •{" "}
+          {property.createdAt
+            ? new Date(property.createdAt).toLocaleDateString("es-MX", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })
+            : item.timestamp}
+        </Text>
+      </View>
+
+      {positiveRecommendations > 0 && (
+        <TouchableOpacity
+          style={styles.recommendedRow}
+          onPress={openRecommendedModal}
+          activeOpacity={0.85}
+        >
+          <View style={styles.recommendedAvatars}>
+            {recommendedByPreview.slice(0, 2).map((u, idx) => (
+              <View
+                key={u.id}
+                style={[
+                  styles.recommendedAvatarWrapper,
+                  idx > 0 && styles.recommendedAvatarOverlap,
+                ]}
+              >
+                <Avatar
+                  uri={u.avatar || undefined}
+                  name={u.name}
+                  size={18}
+                  style={{ borderWidth: 1, borderColor: COLORS.white }}
+                />
+              </View>
+            ))}
+          </View>
+          <Text style={styles.recommendedText} numberOfLines={1}>
+            {recommendedText}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {/* Información de la propiedad */}
-      <View style={commonStyles.cardContent}>
+      <View style={[commonStyles.cardContent, styles.compactContent]}>
         <Text style={commonStyles.title} numberOfLines={1}>
-          {
-            property.title.charAt(0).toUpperCase() +
-            property.title.slice(1)
-          }
+          {property.title.charAt(0).toUpperCase() + property.title.slice(1)}
         </Text>
 
         <View style={styles.priceRow}>
@@ -160,7 +270,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               accessibilityRole="button"
               onPress={handleContactPress}
             >
-              <Ionicons name="call" size={14} color={COLORS.white} />
+              <Ionicons
+                name="chatbubble-outline"
+                size={14}
+                color={COLORS.white}
+              />
               <Text style={styles.smallContactText}>Contactar</Text>
             </TouchableOpacity>
           )}
@@ -216,6 +330,67 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         onClose={() => setShowReportModal(false)}
         onReport={handleReport}
       />
+      {showRecommendedModal && (
+        <Modal visible transparent animationType="fade">
+          <TouchableOpacity
+            style={commonStyles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowRecommendedModal(false)}
+          >
+            <View style={styles.recommendedModal}>
+              <View style={styles.recommendedModalHeader}>
+                <Text style={styles.recommendedModalTitle}>
+                  Recomendado por
+                </Text>
+                <Text style={styles.recommendedModalSubtitle}>
+                  {positiveRecommendations} usuarios
+                </Text>
+              </View>
+              {loadingRecommended ? (
+                <View style={styles.recommendedModalLoading}>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                </View>
+              ) : (
+                <FlatList
+                  data={recommendedList}
+                  keyExtractor={(u) => u.id}
+                  contentContainerStyle={styles.recommendedModalList}
+                  renderItem={({ item }) => (
+                    <View style={styles.recommendedModalItem}>
+                      <Avatar
+                        uri={item.avatar || undefined}
+                        name={item.name}
+                        size={40}
+                      />
+                      <View style={styles.recommendedModalInfo}>
+                        <Text
+                          style={styles.recommendedModalName}
+                          numberOfLines={1}
+                        >
+                          {item.name}
+                        </Text>
+                        <Text
+                          style={styles.recommendedModalRole}
+                          numberOfLines={1}
+                        >
+                          {item.role === "agente" ? "Agente" : "Cliente"}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                  ListEmptyComponent={
+                    <View style={styles.recommendedModalEmpty}>
+                      <Text style={styles.recommendedModalEmptyText}>
+                        Aún no hay recomendaciones
+                      </Text>
+                    </View>
+                  }
+                />
+              )}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
     </TouchableOpacity>
   );
 };
@@ -248,6 +423,98 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
     textTransform: "uppercase",
+  },
+  metaRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: COLORS.white,
+  },
+  metaText: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    fontWeight: "600",
+  },
+  compactContent: {
+    paddingTop: 8,
+  },
+  recommendedRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: COLORS.white,
+  },
+  recommendedAvatars: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  recommendedAvatarWrapper: {
+    borderRadius: 999,
+    backgroundColor: COLORS.white,
+  },
+  recommendedAvatarOverlap: {
+    marginLeft: -8,
+  },
+  recommendedText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: "600",
+    maxWidth: 220,
+  },
+  recommendedModal: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    width: 320,
+    maxHeight: 420,
+  },
+  recommendedModalHeader: {
+    alignItems: "center",
+    paddingBottom: 8,
+  },
+  recommendedModalTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+  },
+  recommendedModalSubtitle: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  recommendedModalLoading: {
+    padding: 16,
+    alignItems: "center",
+  },
+  recommendedModalList: {
+    paddingVertical: 6,
+  },
+  recommendedModalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8,
+  },
+  recommendedModalInfo: {
+    flex: 1,
+  },
+  recommendedModalName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+  },
+  recommendedModalRole: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  recommendedModalEmpty: {
+    padding: 16,
+    alignItems: "center",
+  },
+  recommendedModalEmptyText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
   },
   descriptionRow: {
     flexDirection: "row",

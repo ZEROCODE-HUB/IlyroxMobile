@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, memo } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,30 @@ import { COLORS } from "../constants/colors";
 import { LinearGradient } from "expo-linear-gradient";
 import { useImageUpload } from "../hooks/useImageUpload";
 import { useStableSafeInsets } from "../context/SafeInsetsContext";
+
+const SubmitButton = memo(
+  ({
+    loading,
+    onPress,
+    text,
+  }: {
+    loading: boolean;
+    onPress: () => void;
+    text: string;
+  }) => (
+    <TouchableOpacity
+      style={styles.submitButton}
+      onPress={onPress}
+      disabled={loading}
+    >
+      {loading ? (
+        <ActivityIndicator color={COLORS.white} />
+      ) : (
+        <Text style={styles.submitButtonText}>{text}</Text>
+      )}
+    </TouchableOpacity>
+  )
+);
 
 export default function AuthScreen() {
   const [modalVisible, setModalVisible] = useState(false);
@@ -121,12 +145,12 @@ export default function AuthScreen() {
     return true;
   };
 
-  const handleOpenModal = (selectedMode: "login" | "register") => {
+  const handleOpenModal = useCallback((selectedMode: "login" | "register") => {
     setMode(selectedMode);
     setStep(1);
     setAuthMethod("none"); // Reset to selection
     setModalVisible(true);
-  };
+  }, []);
 
   /*
    * FIX: Hooks can be sensitive to conditional rendering if components are defined inside.
@@ -141,20 +165,37 @@ export default function AuthScreen() {
     }
 
     setLoading(true);
-    const timeoutId = setTimeout(() => {
-      setLoading(false);
-      Alert.alert(
-        "Error de conexión",
-        "El proceso está tardando demasiado. Por favor, verifica tu conexión e intenta de nuevo."
-      );
-    }, 20000); // 20 segundos para el flujo completo
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    // Timeout más corto y con limpieza adecuada
+    timeoutId = setTimeout(() => {
+      if (timeoutId) {
+        setLoading(false);
+        Alert.alert(
+          "Error de conexión",
+          "El proceso está tardando demasiado. Por favor, verifica tu conexión e intenta de nuevo."
+        );
+      }
+    }, 15000); // 15 segundos para el flujo completo
 
     try {
       if (mode === "login") {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        // Agregar timeout específico para signInWithPassword
+        const loginPromise = supabase.auth.signInWithPassword({
           email,
           password,
         });
+        
+        const loginTimeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Login timeout")), 12000);
+        });
+
+        const result = await Promise.race([
+          loginPromise,
+          loginTimeoutPromise,
+        ]);
+        
+        const { data, error } = result;
 
         if (error) throw error;
       } else {
@@ -165,10 +206,22 @@ export default function AuthScreen() {
           return;
         }
 
-        const { data, error } = await supabase.auth.signUp({
+        // Agregar timeout específico para signUp
+        const signUpPromise = supabase.auth.signUp({
           email,
           password,
         });
+        
+        const signUpTimeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Sign up timeout")), 12000);
+        });
+
+        const result = await Promise.race([
+          signUpPromise,
+          signUpTimeoutPromise,
+        ]);
+        
+        const { data, error } = result;
 
         if (error) throw error;
 
@@ -225,16 +278,26 @@ export default function AuthScreen() {
           }
         }
       }
-      clearTimeout(timeoutId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
     } catch (error: any) {
-      clearTimeout(timeoutId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
       console.error("Auth Error Details:", error);
-      let msg = error.message;
+      let msg = error.message || "Error desconocido";
       if (
         error.message === "Network request failed" ||
+        error.message === "Login timeout" ||
+        error.message === "Sign up timeout" ||
         error instanceof TypeError
       ) {
-        msg = "Error de conexión. Verifica tu internet.";
+        msg = "Error de conexión. Verifica tu internet e intenta de nuevo.";
+      } else if (error.message?.includes("timeout")) {
+        msg = "La solicitud tardó demasiado. Por favor, intenta de nuevo.";
       }
       Alert.alert("Error", msg);
     } finally {
@@ -336,7 +399,7 @@ export default function AuthScreen() {
         onRequestClose={() => setModalVisible(false)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior={Platform.OS === "ios" ? "padding" : "padding"}
           style={[styles.modalOverlay, { paddingBottom: bottom }]}
         >
           <View
@@ -474,12 +537,11 @@ export default function AuthScreen() {
                         onChangeText={setConfirmPassword}
                       />
 
-                      <TouchableOpacity
-                        style={styles.submitButton}
+                      <SubmitButton
+                        loading={false}
                         onPress={() => validateStep1() && setStep(2)}
-                      >
-                        <Text style={styles.submitButtonText}>Siguiente</Text>
-                      </TouchableOpacity>
+                        text="Siguiente"
+                      />
                     </>
                   ) : (
                     <>
@@ -613,19 +675,11 @@ export default function AuthScreen() {
                         currentValue={anosExperiencia}
                       />
 
-                      <TouchableOpacity
-                        style={styles.submitButton}
+                      <SubmitButton
+                        loading={loading}
                         onPress={handleAuth}
-                        disabled={loading}
-                      >
-                        {loading ? (
-                          <ActivityIndicator color={COLORS.white} />
-                        ) : (
-                          <Text style={styles.submitButtonText}>
-                            Finalizar Registro
-                          </Text>
-                        )}
-                      </TouchableOpacity>
+                        text="Finalizar Registro"
+                      />
 
                       <TouchableOpacity
                         style={styles.backButton}
@@ -652,17 +706,11 @@ export default function AuthScreen() {
                       value={password}
                       onChangeText={setPassword}
                     />
-                    <TouchableOpacity
-                      style={styles.submitButton}
+                    <SubmitButton
+                      loading={loading}
                       onPress={handleAuth}
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <ActivityIndicator color={COLORS.white} />
-                      ) : (
-                        <Text style={styles.submitButtonText}>Entrar</Text>
-                      )}
-                    </TouchableOpacity>
+                      text="Entrar"
+                    />
                   </>
                 )}
 

@@ -12,4 +12,5 @@ export { useFeedInteractions } from "./useFeedInteractions";
 export { useImageGallery } from "./useImageGallery";
 export { useVideoPlayer } from "./useVideoPlayer";
 export { useImageUpload } from "./useImageUpload";
+export { useVideoUpload } from "./useVideoUpload";
 export { useCurrentUserId } from "./useCurrentUserId";

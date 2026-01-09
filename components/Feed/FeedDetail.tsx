@@ -14,7 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 import { FeedItem, User } from "../../types";
 import LazyImage from "../LazyImage";
-import { CommentsModal } from "../modals";
+import { CommentsModalV2 as CommentsModal } from "../modals";
 import UserHeader from "../UserHeader";
 import ActionButtons from "../ActionButtons";
 import { useImageGallery } from "../../hooks";

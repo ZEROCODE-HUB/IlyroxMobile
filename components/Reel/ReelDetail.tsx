@@ -36,9 +36,10 @@ import {
 import { VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { FeedItem, User } from "../../types";
-import { CommentsModal } from "../modals";
+import { CommentsModalV2 as CommentsModal } from "../modals";
 import { useVideoPlayer, useLikes, useShare } from "../../hooks";
 import { COLORS } from "../../constants";
+import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 
 interface ReelDetailProps {
   item: FeedItem;
@@ -62,15 +63,11 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
   const [showComments, setShowComments] = useState(false);
 
   // Video de fallback si no hay URL
-  const videoSource = item.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
+  const videoSource =
+    item.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
 
   // Hook de video player con auto-play
-  const {
-    player,
-    isPlaying,
-    progress,
-    togglePlayPause,
-  } = useVideoPlayer({
+  const { player, isPlaying, progress, togglePlayPause } = useVideoPlayer({
     videoSource,
     isVisible: true,
     autoPlay: true,
@@ -125,7 +122,7 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
   const handleShare = useCallback(async () => {
     try {
       await Share.share({
-        message: `Check out this reel: ${item.content}`
+        message: `Check out this reel: ${item.content}`,
       });
     } catch (error) {
       console.warn("Error sharing:", error);
@@ -173,120 +170,112 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
 
         {/* OVERLAY - UI Elements al estilo TikTok */}
         <View style={styles.overlay} pointerEvents="box-none">
-            {/* Botón cerrar (top left) */}
+          {/* Botón cerrar (top left) */}
+          <TouchableOpacity
+            onPress={onClose}
+            style={[
+              styles.backButton,
+              { top: Platform.OS === "ios" ? 54 : 40 },
+            ]}
+          >
+            <Ionicons name="chevron-back" size={28} color={COLORS.white} />
+          </TouchableOpacity>
+
+          {/* Play indicator (center) */}
+          {!isPlaying && (
+            <View style={styles.playIndicator} pointerEvents="none">
+              <View style={styles.playIconContainer}>
+                <View style={styles.playIcon} />
+              </View>
+            </View>
+          )}
+
+          {/* Bottom UI - Información del usuario (estilo TikTok) */}
+          <View style={[styles.bottomUI, { bottom: SAFE_BOTTOM }]}>
+            {/* Timeline de progreso */}
+            <View style={styles.timelineTrack}>
+              <View
+                style={[
+                  styles.timelineFill,
+                  { width: `${Math.round(progress * 100)}%` },
+                ]}
+              />
+            </View>
+
+            {/* User info - Bottom left (estilo TikTok) */}
             <TouchableOpacity
-              onPress={onClose}
-              style={[
-                styles.backButton,
-                { top: Platform.OS === "ios" ? 54 : 40 },
-              ]}
+              style={styles.userInfo}
+              onPress={() => onUserClick?.(item.user)}
             >
-              <Ionicons name="chevron-back" size={28} color={COLORS.white} />
-            </TouchableOpacity>
-
-            {/* Play indicator (center) */}
-            {!isPlaying && (
-              <View style={styles.playIndicator} pointerEvents="none">
-                <View style={styles.playIconContainer}>
-                  <View style={styles.playIcon} />
-                </View>
-              </View>
-            )}
-
-            {/* Bottom UI - Información del usuario (estilo TikTok) */}
-            <View style={[styles.bottomUI, { bottom: SAFE_BOTTOM }]}>
-              {/* Timeline de progreso */}
-              <View style={styles.timelineTrack}>
-                <View
-                  style={[
-                    styles.timelineFill,
-                    { width: `${Math.round(progress * 100)}%` },
-                  ]}
-                />
-              </View>
-
-              {/* User info - Bottom left (estilo TikTok) */}
-              <TouchableOpacity
-                style={styles.userInfo}
-                onPress={() => onUserClick?.(item.user)}
-              >
-                <Image
-                  source={{ uri: item.user.avatar }}
-                  style={styles.avatar}
-                />
-                <View style={styles.userTextContainer}>
-                  <Text style={styles.userName}>{item.user.name || item.user.nombre || "Usuario"}</Text>
-                  {item.content && (
-                    <Text style={styles.content} numberOfLines={3}>
-                      {item.content}
-                    </Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-            </View>
-
-            {/* Actions - Botones verticales derecha (estilo TikTok) */}
-            <View
-              style={[styles.actionsContainer, { bottom: SAFE_BOTTOM + 60 }]}
-            >
-              {/* Like button */}
-              <TouchableOpacity
-                style={styles.actionButton}
-onPress={toggleLike}
-disabled={!currentUserId}
-              >
-                <View style={styles.actionIconContainer}>
-                  <Ionicons
-                    name={isLiked ? "heart" : "heart-outline"}
-                    size={32}
-                    color={isLiked ? COLORS.error : COLORS.white}
-                  />
-                </View>
-                <Text style={styles.actionText}>
-{likes}
+              <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
+              <View style={styles.userTextContainer}>
+                <Text style={styles.userName}>
+                  {item.user.name || item.user.nombre || "Usuario"}
                 </Text>
-              </TouchableOpacity>
-
-              {/* Comment button */}
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => setShowComments(true)}
-              >
-                <View style={styles.actionIconContainer}>
-                  <Ionicons
-                    name="chatbubble-outline"
-                    size={30}
-                    color={COLORS.white}
-                  />
-                </View>
-                <Text style={styles.actionText}>{item.comments}</Text>
-              </TouchableOpacity>
-
-              {/* Share button */}
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleShare}
-              >
-                <View style={styles.actionIconContainer}>
-                  <Ionicons
-                    name="share-social-outline"
-                    size={28}
-                    color={COLORS.white}
-                  />
-                </View>
-                <Text style={styles.actionText}>Share</Text>
-              </TouchableOpacity>
-            </View>
+                {item.content && (
+                  <Text style={styles.content} numberOfLines={3}>
+                    {item.content}
+                  </Text>
+                )}
+              </View>
+            </TouchableOpacity>
           </View>
 
-          {/* Comments Modal */}
-          <CommentsModal
-            visible={showComments}
-            onClose={() => setShowComments(false)}
-            feedItemId={item.id}
-            currentUserId={currentUserId}
-          />
-        </Animated.View>
+          {/* Actions - Botones verticales derecha (estilo TikTok) */}
+          <View style={[styles.actionsContainer, { bottom: SAFE_BOTTOM + 60 }]}>
+            {/* Like button */}
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={toggleLike}
+              disabled={!currentUserId}
+            >
+              <View style={styles.actionIconContainer}>
+                <Ionicons
+                  name={isLiked ? "heart" : "heart-outline"}
+                  size={32}
+                  color={isLiked ? COLORS.error : COLORS.white}
+                />
+              </View>
+              <Text style={styles.actionText}>{likes}</Text>
+            </TouchableOpacity>
+
+            {/* Comment button */}
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => setShowComments(true)}
+            >
+              <View style={styles.actionIconContainer}>
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={30}
+                  color={COLORS.white}
+                />
+              </View>
+              <Text style={styles.actionText}>{item.comments}</Text>
+            </TouchableOpacity>
+
+            {/* Share button */}
+            <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
+              <View style={styles.actionIconContainer}>
+                <Ionicons
+                  name="share-social-outline"
+                  size={28}
+                  color={COLORS.white}
+                />
+              </View>
+              <Text style={styles.actionText}>Share</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Comments Modal */}
+        <CommentsBottomSheet
+          visible={showComments}
+          onClose={() => setShowComments(false)}
+          feedItemId={item.id}
+          currentUserId={currentUserId}
+        />
+      </Animated.View>
     </Modal>
   );
 };
@@ -296,7 +285,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.black,
   },
   video: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     bottom: 0,

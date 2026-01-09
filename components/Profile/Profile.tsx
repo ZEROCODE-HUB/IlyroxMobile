@@ -4,6 +4,7 @@ import {
   Text,
   Image,
   TouchableOpacity,
+  FlatList,
   ScrollView,
   StyleSheet,
   Modal,
@@ -29,6 +30,15 @@ interface ProfileProps {
   userId?: string | null;
   onBack?: () => void;
 }
+
+type RecommendedByUser = {
+  id: string;
+  nombre: string;
+  apellido_paterno: string;
+  apellido_materno: string;
+  foto: string | null;
+  rol: "admin" | "agente" | "cliente";
+};
 
 // Estados disponibles para filtrar
 const FILTER_OPTIONS = [
@@ -62,6 +72,16 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   );
   const [submittingRecommendation, setSubmittingRecommendation] =
     useState(false);
+  const [recommendedByUsers, setRecommendedByUsers] = useState<
+    RecommendedByUser[]
+  >([]);
+  const [loadingRecommendedBy, setLoadingRecommendedBy] = useState(false);
+  const [recommendedByError, setRecommendedByError] = useState<string | null>(
+    null
+  );
+  const [showRecommendedByModal, setShowRecommendedByModal] = useState(false);
+  const [recommendedByHasMore, setRecommendedByHasMore] = useState(false);
+  const [recommendedByPage, setRecommendedByPage] = useState(0);
 
   // Determine if viewing own profile
   const targetUserId = userId || authUser?.id;
@@ -106,6 +126,94 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     };
     return roleMap[rol] || rol;
   };
+
+  const loadRecommendedByUsers = async (options?: { reset?: boolean }) => {
+    if (!targetUserId) return;
+
+    try {
+      const reset = options?.reset === true;
+      setLoadingRecommendedBy(true);
+      setRecommendedByError(null);
+
+      const pageSize = 30;
+      const nextPage = reset ? 0 : recommendedByPage;
+      const from = nextPage * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data: recsData, error: recsError } = await supabase
+        .from("recomendaciones_usuarios")
+        .select("recomendado_por")
+        .eq("usuario_recomendado_id", targetUserId)
+        .eq("recomienda", true)
+        .range(from, to);
+
+      if (recsError) throw recsError;
+
+      const recommendedByIds = (recsData || [])
+        .map((r: any) => r?.recomendado_por)
+        .filter(Boolean) as string[];
+      const recommendedByIdsUnique = Array.from(new Set(recommendedByIds));
+
+      if (recommendedByIdsUnique.length === 0 && reset) {
+        setRecommendedByUsers([]);
+        setRecommendedByHasMore(false);
+        setRecommendedByPage(0);
+        return;
+      }
+
+      if (recommendedByIdsUnique.length === 0) {
+        setRecommendedByHasMore(false);
+        return;
+      }
+
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("perfiles")
+        .select("id,nombre,apellido_paterno,apellido_materno,foto,rol")
+        .in("id", recommendedByIdsUnique);
+
+      if (profilesError) throw profilesError;
+
+      const profiles = (profilesData || []) as RecommendedByUser[];
+      const profilesById = new Map(profiles.map((p) => [p.id, p]));
+      const ordered = recommendedByIdsUnique
+        .map((id) => profilesById.get(id))
+        .filter(Boolean) as RecommendedByUser[];
+
+      setRecommendedByUsers((prev) =>
+        reset ? ordered : [...prev, ...ordered]
+      );
+      setRecommendedByHasMore(recommendedByIdsUnique.length === pageSize);
+      setRecommendedByPage(nextPage + 1);
+    } catch (error: any) {
+      if (options?.reset) {
+        setRecommendedByUsers([]);
+      }
+      setRecommendedByHasMore(false);
+      setRecommendedByError(
+        error?.message || "Error al cargar recomendaciones"
+      );
+    } finally {
+      setLoadingRecommendedBy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showRatingDetails) return;
+    setRecommendedByUsers([]);
+    setRecommendedByHasMore(false);
+    setRecommendedByPage(0);
+    loadRecommendedByUsers({ reset: true });
+  }, [showRatingDetails, targetUserId]);
+
+  useEffect(() => {
+    if (!showRecommendedByModal) return;
+    if (recommendedByUsers.length > 0 || loadingRecommendedBy) return;
+    if ((reviewStats?.total_recomiendan || 0) <= 0) return;
+    setRecommendedByUsers([]);
+    setRecommendedByHasMore(false);
+    setRecommendedByPage(0);
+    loadRecommendedByUsers({ reset: true });
+  }, [showRecommendedByModal]);
 
   const handleRecommendation = async (recomienda: boolean) => {
     if (!authUser?.id || !targetUserId || isMe || submittingRecommendation)
@@ -159,6 +267,13 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
       if (statsData) {
         setReviewStats(statsData);
+      }
+
+      if (showRatingDetails || showRecommendedByModal) {
+        setRecommendedByUsers([]);
+        setRecommendedByHasMore(false);
+        setRecommendedByPage(0);
+        await loadRecommendedByUsers({ reset: true });
       }
     } catch (error: any) {
       console.error("Error updating recommendation:", error);
@@ -224,6 +339,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             setUserRecommendation(recData?.recomienda ?? null);
           }
         }
+
+        setRecommendedByUsers([]);
+        setRecommendedByError(null);
 
         // Fetch user's properties
         const { data: propsData, error: propsError } = await supabase
@@ -523,6 +641,85 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                 </TouchableOpacity>
               </View>
 
+              <View style={styles.recommendedBySection}>
+                <View style={styles.recommendedByHeader}>
+                  <Text style={styles.recommendedByTitle}>Recomendado por</Text>
+                  <Text style={styles.recommendedByCount}>
+                    {profileData.positiveRecommendations} usuarios
+                  </Text>
+                </View>
+
+                {loadingRecommendedBy ? (
+                  <View style={styles.recommendedByLoading}>
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                  </View>
+                ) : recommendedByError ? (
+                  <Text style={styles.recommendedByEmptyText}>
+                    {recommendedByError}
+                  </Text>
+                ) : recommendedByUsers.length === 0 ? (
+                  <Text style={styles.recommendedByEmptyText}>
+                    Aún no hay recomendaciones
+                  </Text>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.recommendedByPreviewRow}
+                    onPress={() => setShowRecommendedByModal(true)}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.recommendedByAvatars}>
+                      {recommendedByUsers.slice(0, 2).map((u, idx) => {
+                        const fullName = [
+                          u.nombre,
+                          u.apellido_paterno,
+                          u.apellido_materno,
+                        ]
+                          .filter(Boolean)
+                          .join(" ")
+                          .trim();
+
+                        return (
+                          <View
+                            key={u.id}
+                            style={[
+                              styles.recommendedByAvatarWrap,
+                              idx === 1 && styles.recommendedByAvatarWrapSecond,
+                            ]}
+                          >
+                            <Avatar
+                              uri={u.foto || undefined}
+                              name={fullName || "Usuario"}
+                              size={26}
+                              style={styles.recommendedByAvatarSmall}
+                            />
+                          </View>
+                        );
+                      })}
+                    </View>
+
+                    <Text
+                      style={styles.recommendedByPreviewText}
+                      numberOfLines={1}
+                    >
+                      {(() => {
+                        const first = recommendedByUsers[0];
+                        const firstName = first
+                          ? [first.nombre, first.apellido_paterno]
+                              .filter(Boolean)
+                              .join(" ")
+                              .trim()
+                          : "Usuario";
+                        const total = profileData.positiveRecommendations || 0;
+                        const rest = Math.max(0, total - 1);
+                        return rest > 0
+                          ? `${firstName} y ${rest} más`
+                          : firstName;
+                      })()}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
               <View style={styles.progressSection}>
                 {[5, 4, 3, 2, 1].map((stars) => {
                   // Obtener el total de reseñas para este nivel de estrellas
@@ -603,6 +800,134 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             </View>
           )}
         </View>
+
+        <Modal
+          visible={showRecommendedByModal}
+          animationType="slide"
+          onRequestClose={() => setShowRecommendedByModal(false)}
+        >
+          <SafeAreaView style={styles.recommendedByModalContainer}>
+            <View style={styles.recommendedByModalHeader}>
+              <TouchableOpacity
+                onPress={() => setShowRecommendedByModal(false)}
+                style={styles.recommendedByModalBackBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar"
+              >
+                <Ionicons
+                  name="chevron-back"
+                  size={22}
+                  color={COLORS.textPrimary}
+                />
+              </TouchableOpacity>
+
+              <View style={styles.recommendedByModalTitleWrap}>
+                <Text style={styles.recommendedByModalTitle}>
+                  Recomendado por
+                </Text>
+                <Text style={styles.recommendedByModalSubtitle}>
+                  {profileData.positiveRecommendations} usuarios
+                </Text>
+              </View>
+              <View style={styles.recommendedByModalBackBtn} />
+            </View>
+
+            {recommendedByError ? (
+              <View style={styles.recommendedByModalEmpty}>
+                <Text style={styles.recommendedByEmptyText}>
+                  {recommendedByError}
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={recommendedByUsers}
+                keyExtractor={(u) => u.id}
+                contentContainerStyle={styles.recommendedByModalList}
+                onEndReached={() => {
+                  if (loadingRecommendedBy || !recommendedByHasMore) return;
+                  loadRecommendedByUsers();
+                }}
+                onEndReachedThreshold={0.6}
+                ListEmptyComponent={
+                  loadingRecommendedBy ? (
+                    <View style={styles.recommendedByLoading}>
+                      <ActivityIndicator size="small" color={COLORS.primary} />
+                    </View>
+                  ) : (
+                    <View style={styles.recommendedByModalEmpty}>
+                      <Text style={styles.recommendedByEmptyText}>
+                        Aún no hay recomendaciones
+                      </Text>
+                    </View>
+                  )
+                }
+                renderItem={({ item: u }) => {
+                  const fullName = [
+                    u.nombre,
+                    u.apellido_paterno,
+                    u.apellido_materno,
+                  ]
+                    .filter(Boolean)
+                    .join(" ")
+                    .trim();
+
+                  return (
+                    <TouchableOpacity
+                      style={styles.recommendedByModalItem}
+                      onPress={() => {
+                        setShowRecommendedByModal(false);
+                        navigation.navigate("UserProfile", { userId: u.id });
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Avatar
+                        uri={u.foto || undefined}
+                        name={fullName || "Usuario"}
+                        size={44}
+                        style={styles.recommendedByAvatar}
+                      />
+                      <View style={styles.recommendedByInfo}>
+                        <Text
+                          style={styles.recommendedByName}
+                          numberOfLines={1}
+                        >
+                          {fullName || "Usuario"}
+                        </Text>
+                        <Text
+                          style={styles.recommendedByRole}
+                          numberOfLines={1}
+                        >
+                          {formatRole(u.rol)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
+                ListFooterComponent={
+                  loadingRecommendedBy ? (
+                    <View style={styles.recommendedByModalFooter}>
+                      <ActivityIndicator size="small" color={COLORS.primary} />
+                    </View>
+                  ) : recommendedByHasMore ? (
+                    <View style={styles.recommendedByModalFooter}>
+                      <TouchableOpacity
+                        style={styles.recommendedByLoadMoreBtn}
+                        onPress={() => loadRecommendedByUsers()}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.recommendedByLoadMoreText}>
+                          Cargar más
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.recommendedByModalFooter} />
+                  )
+                }
+              />
+            )}
+          </SafeAreaView>
+        </Modal>
 
         {/* Toolbar de filtros */}
         <View style={styles.toolbar}>
@@ -915,6 +1240,161 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
+  },
+  recommendedBySection: {
+    paddingTop: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
+  },
+  recommendedByHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  recommendedByTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+  },
+  recommendedByCount: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
+  recommendedByLoading: {
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recommendedByEmptyText: {
+    fontSize: 12,
+    color: COLORS.textTertiary,
+  },
+  recommendedByList: {
+    gap: 12,
+  },
+  recommendedByPreviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  recommendedByAvatars: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: 46,
+  },
+  recommendedByAvatarWrap: {
+    borderRadius: 999,
+    backgroundColor: COLORS.white,
+  },
+  recommendedByAvatarWrapSecond: {
+    marginLeft: -10,
+  },
+  recommendedByAvatarSmall: {
+    borderWidth: 1,
+    borderColor: COLORS.white,
+  },
+  recommendedByPreviewText: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: "600",
+  },
+  recommendedByItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  recommendedByAvatar: {
+    borderWidth: 1,
+    borderColor: COLORS.white,
+  },
+  recommendedByInfo: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  recommendedByName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+  },
+  recommendedByRole: {
+    marginTop: 2,
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  recommendedByMoreText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: "600",
+  },
+  recommendedByModalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+  },
+  recommendedByModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
+  },
+  recommendedByModalBackBtn: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recommendedByModalTitleWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recommendedByModalTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: COLORS.textPrimary,
+  },
+  recommendedByModalSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
+  recommendedByModalList: {
+    padding: 16,
+    paddingBottom: 30,
+  },
+  recommendedByModalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+  },
+  recommendedByModalFooter: {
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recommendedByLoadMoreBtn: {
+    backgroundColor: COLORS.background,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  recommendedByLoadMoreText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+  },
+  recommendedByModalEmpty: {
+    padding: 20,
+    alignItems: "center",
   },
   recItem: {
     alignItems: "center",

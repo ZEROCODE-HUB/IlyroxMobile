@@ -46,7 +46,7 @@ export default function ConversationsList({
   const { conversations, loading, getConversationsForUser, refresh } =
     useConversations(userId);
 
-  const { tags, createTag, deleteTag } = useTags(userId);
+  const { tags, createTag, deleteTag, updateTag } = useTags(userId);
 
   // Filtrar conversaciones por búsqueda y etiquetas
   const filteredConversations = React.useMemo(() => {
@@ -100,6 +100,22 @@ export default function ConversationsList({
         ? prev.filter((id) => id !== tagId)
         : [...prev, tagId]
     );
+  };
+
+  const handleUpdateTag = async (id: string, name: string, color: string) => {
+    const success = await updateTag(id, name, color);
+    if (success) {
+      refresh();
+    }
+    return success;
+  };
+
+  const handleDeleteTag = async (tagId: string) => {
+    const success = await deleteTag(tagId);
+    if (success) {
+      refresh();
+    }
+    return success;
   };
 
   const formatTime = (dateString: string | null) => {
@@ -296,7 +312,8 @@ export default function ConversationsList({
         availableTags={tags}
         assignedTags={[]}
         onCreateTag={createTag}
-        onDeleteTag={deleteTag}
+        onDeleteTag={handleDeleteTag}
+        onUpdateTag={handleUpdateTag}
       />
     </View>
   );

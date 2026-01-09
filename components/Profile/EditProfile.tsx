@@ -20,6 +20,7 @@ import { perfiles } from "../../types";
 import * as ImagePicker from "expo-image-picker";
 import { decode } from "base64-arraybuffer";
 import CascadeLocationSelector from "../common/CascadeLocationSelector";
+import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
 interface EditProfileProps {
   onBack: () => void;
@@ -193,174 +194,176 @@ const EditProfile: React.FC<EditProfileProps> = ({
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Editar Perfil</Text>
-        <TouchableOpacity
-          onPress={handleSave}
-          disabled={loading}
-          style={styles.saveButton}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color={COLORS.primary} />
-          ) : (
-            <Text style={styles.saveButtonText}>Guardar</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Photo Section */}
-        <View style={styles.photoContainer}>
-          <TouchableOpacity
-            onPress={handleImagePick}
-            style={styles.avatarWrapper}
-          >
-            {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                <Text style={styles.avatarInitials}>
-                  {formData.nombre?.charAt(0) ||
-                    user?.email?.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )}
-            <View style={styles.cameraIcon}>
-              <Ionicons name="camera" size={20} color={COLORS.white} />
-            </View>
+    <ScreenWrapper withHeader={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.photoHint}>Toca para cambiar la foto</Text>
+          <Text style={styles.headerTitle}>Editar Perfil</Text>
+          <TouchableOpacity
+            onPress={handleSave}
+            disabled={loading}
+            style={styles.saveButton}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            ) : (
+              <Text style={styles.saveButtonText}>Guardar</Text>
+            )}
+          </TouchableOpacity>
         </View>
 
-        {/* Personal Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Información Personal</Text>
+        <ScrollView contentContainerStyle={styles.content}>
+          {/* Photo Section */}
+          <View style={styles.photoContainer}>
+            <TouchableOpacity
+              onPress={handleImagePick}
+              style={styles.avatarWrapper}
+            >
+              {imageUri ? (
+                <Image source={{ uri: imageUri }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                  <Text style={styles.avatarInitials}>
+                    {formData.nombre?.charAt(0) ||
+                      user?.email?.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.cameraIcon}>
+                <Ionicons name="camera" size={20} color={COLORS.white} />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.photoHint}>Toca para cambiar la foto</Text>
+          </View>
 
-          <AppInput
-            label="Nombre *"
-            value={formData.nombre}
-            onChangeText={(t) => handleInputChange("nombre", t)}
-            placeholder="Tu nombre"
-          />
+          {/* Personal Info */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Información Personal</Text>
 
-          <AppInput
-            label="Apellido Paterno *"
-            value={formData.apellido_paterno}
-            onChangeText={(t) => handleInputChange("apellido_paterno", t)}
-            placeholder="Primer apellido"
-          />
+            <AppInput
+              label="Nombre *"
+              value={formData.nombre}
+              onChangeText={(t) => handleInputChange("nombre", t)}
+              placeholder="Tu nombre"
+            />
 
-          <AppInput
-            label="Apellido Materno"
-            value={formData.apellido_materno}
-            onChangeText={(t) => handleInputChange("apellido_materno", t)}
-            placeholder="Segundo apellido"
-          />
+            <AppInput
+              label="Apellido Paterno *"
+              value={formData.apellido_paterno}
+              onChangeText={(t) => handleInputChange("apellido_paterno", t)}
+              placeholder="Primer apellido"
+            />
 
-          <AppInput
-            label="Biografía"
-            value={formData.biografia}
-            onChangeText={(t) => handleInputChange("biografia", t)}
-            placeholder="Cuéntanos un poco sobre ti..."
-            multiline
-            numberOfLines={4}
-            inputStyle={{ height: 100 }}
-          />
-        </View>
+            <AppInput
+              label="Apellido Materno"
+              value={formData.apellido_materno}
+              onChangeText={(t) => handleInputChange("apellido_materno", t)}
+              placeholder="Segundo apellido"
+            />
 
-        {/* Contact Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contacto</Text>
+            <AppInput
+              label="Biografía"
+              value={formData.biografia}
+              onChangeText={(t) => handleInputChange("biografia", t)}
+              placeholder="Cuéntanos un poco sobre ti..."
+              multiline
+              numberOfLines={4}
+              inputStyle={{ height: 100 }}
+            />
+          </View>
 
-          <AppInput
-            label="Teléfono Celular"
-            value={formData.celular}
-            onChangeText={(t) => handleInputChange("celular", t)}
-            placeholder="1234567890"
-            keyboardType="phone-pad"
-            leftIcon={
-              <Text style={{ color: COLORS.textSecondary }}>
-                {formData.prefijo_celular}
-              </Text>
-            }
-          />
+          {/* Contact Info */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Contacto</Text>
 
-          <AppInput
-            label="Sitio Web"
-            value={formData.sitio_web}
-            onChangeText={(t) => handleInputChange("sitio_web", t)}
-            placeholder="https://tu-sitio.com"
-            autoCapitalize="none"
-            keyboardType="url"
-          />
-        </View>
+            <AppInput
+              label="Teléfono Celular"
+              value={formData.celular}
+              onChangeText={(t) => handleInputChange("celular", t)}
+              placeholder="1234567890"
+              keyboardType="phone-pad"
+              leftIcon={
+                <Text style={{ color: COLORS.textSecondary }}>
+                  {formData.prefijo_celular}
+                </Text>
+              }
+            />
 
-        {/* Professional Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Información Profesional</Text>
+            <AppInput
+              label="Sitio Web"
+              value={formData.sitio_web}
+              onChangeText={(t) => handleInputChange("sitio_web", t)}
+              placeholder="https://tu-sitio.com"
+              autoCapitalize="none"
+              keyboardType="url"
+            />
+          </View>
 
-          <AppInput
-            label="Ocupación"
-            value={formData.ocupacion}
-            onChangeText={(t) => handleInputChange("ocupacion", t)}
-            placeholder="Ej. Agente Inmobiliario, Arquitecto..."
-          />
+          {/* Professional Info */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Información Profesional</Text>
 
-          <AppInput
-            label="Empresa / Inmobiliaria"
-            value={formData.nombre_inmobiliaria}
-            onChangeText={(t) => handleInputChange("nombre_inmobiliaria", t)}
-            placeholder="Nombre de tu empresa"
-          />
+            <AppInput
+              label="Ocupación"
+              value={formData.ocupacion}
+              onChangeText={(t) => handleInputChange("ocupacion", t)}
+              placeholder="Ej. Agente Inmobiliario, Arquitecto..."
+            />
 
-          <AppInput
-            label="Modalidad"
-            value={formData.modalidad}
-            onChangeText={(t) => handleInputChange("modalidad", t)}
-            placeholder="Ej. Independiente, Inmobiliaria"
-          />
+            <AppInput
+              label="Empresa / Inmobiliaria"
+              value={formData.nombre_inmobiliaria}
+              onChangeText={(t) => handleInputChange("nombre_inmobiliaria", t)}
+              placeholder="Nombre de tu empresa"
+            />
 
-          <AppInput
-            label="Años de experiencia"
-            value={formData.anos_experiencia}
-            onChangeText={(t) => handleInputChange("anos_experiencia", t)}
-            placeholder="Ej. 5 años"
-            keyboardType="numeric"
-          />
-        </View>
+            <AppInput
+              label="Modalidad"
+              value={formData.modalidad}
+              onChangeText={(t) => handleInputChange("modalidad", t)}
+              placeholder="Ej. Independiente, Inmobiliaria"
+            />
 
-        {/* Location - Using a simplified approach or reusable component if valid */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Ubicación</Text>
-          {/* Note: CascadeLocationSelector handles state internally mostly, 
+            <AppInput
+              label="Años de experiencia"
+              value={formData.anos_experiencia}
+              onChangeText={(t) => handleInputChange("anos_experiencia", t)}
+              placeholder="Ej. 5 años"
+              keyboardType="numeric"
+            />
+          </View>
+
+          {/* Location - Using a simplified approach or reusable component if valid */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Ubicación</Text>
+            {/* Note: CascadeLocationSelector handles state internally mostly, 
                  we might need to adapt it or just use simple inputs if keeping context simple.
                  Given CascadeLocationSelector expects a specific state structure, let's try to reuse it
                  or just use text inputs if it's too coupled to creating properties.
                  
                  Looking at CreateProperty.tsx, it uses setUbicacionData and passes initialData.
              */}
-          <CascadeLocationSelector
-            initialData={{
-              estado: formData.estado || "",
-            }}
-            onChange={(data) => {
-              handleInputChange("estado", data.estado);
-              // We might not be saving city/municipality in profile according to type 'perfiles'
-              // Type has 'pais', 'estado', but not 'ciudad' explicitly unless it's just missing from type def but in DB.
-              // The type definition shows: pais: string; estado: string;
-            }}
-            showColonia={false}
-          />
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <CascadeLocationSelector
+              initialData={{
+                estado: formData.estado || "",
+              }}
+              onChange={(data) => {
+                handleInputChange("estado", data.estado);
+                // We might not be saving city/municipality in profile according to type 'perfiles'
+                // Type has 'pais', 'estado', but not 'ciudad' explicitly unless it's just missing from type def but in DB.
+                // The type definition shows: pais: string; estado: string;
+              }}
+              showColonia={false}
+            />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ScreenWrapper>
   );
 };
 

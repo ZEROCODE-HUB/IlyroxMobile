@@ -12,7 +12,6 @@ import {
   PanResponder,
   Dimensions,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Keyboard,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
@@ -188,8 +187,11 @@ export default function CommentsModal({
             {
               transform: [{ translateY }],
               maxHeight: screenH - insets.top - 20,
+              // En Android APK, ajustar altura cuando el teclado está visible
               height:
-                keyboardHeight > 0
+                Platform.OS === "android" && keyboardHeight > 0
+                  ? screenH - keyboardHeight - insets.top
+                  : keyboardHeight > 0
                   ? screenH - keyboardHeight - insets.top - 20
                   : screenH * 0.8,
             },
@@ -207,14 +209,21 @@ export default function CommentsModal({
             </View>
           </View>
 
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            style={styles.keyboardAvoidingView}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-          >
+          <View style={styles.keyboardAvoidingView}>
             <ScrollView
               ref={scrollViewRef}
-              style={styles.commentsContent}
+              style={[
+                styles.commentsContent,
+                // En Android, ajustar el ScrollView cuando el teclado está visible
+                Platform.OS === "android" &&
+                  keyboardHeight > 0 && {
+                    maxHeight:
+                      screenH -
+                      keyboardHeight -
+                      insets.top -
+                      200, // 200px para header + input
+                  },
+              ]}
               contentContainerStyle={styles.commentsContentContainer}
               keyboardShouldPersistTaps="handled"
               scrollEnabled={!isDragging}
@@ -351,7 +360,17 @@ export default function CommentsModal({
             <View
               style={[
                 styles.footerContainer,
-                { paddingBottom: Math.max(16, stableBottom) },
+                {
+                  // En Android, cuando el teclado NO está visible, usar el valor completo de insets.bottom
+                  // para respetar los botones táctiles del sistema
+                  // Cuando el teclado SÍ está visible, usar un valor menor ya que el teclado ocupa espacio
+                  paddingBottom:
+                    Platform.OS === "android"
+                      ? keyboardHeight > 0
+                        ? Math.max(8, Math.min(insets.bottom, 16)) // Con teclado: mínimo 8px, máximo 16px o el inset
+                        : Math.max(insets.bottom, 16) // Sin teclado: respetar el área de navegación completa
+                      : Math.max(16, stableBottom),
+                },
               ]}
             >
               {/* 1. Previsualización de Imagen AHORA ARRIBA del input */}
@@ -449,7 +468,7 @@ export default function CommentsModal({
                 </View>
               </View>
             </View>
-          </KeyboardAvoidingView>
+          </View>
         </Animated.View>
       </View>
     </Modal>
@@ -624,6 +643,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
     width: "100%",
+    // En Android APK, asegurar que el footer esté siempre visible sobre el teclado
+    ...(Platform.OS === "android" && {
+      elevation: 8,
+      zIndex: 1000,
+    }),
   },
   imagePreviewWrapper: {
     padding: 12,

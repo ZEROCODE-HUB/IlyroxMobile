@@ -11,7 +11,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
-import { FeedItem, User } from "../types";
+import { FeedItem, RecommendedByPreviewUser, User } from "../types";
+
+type ReviewStatsRow = {
+  profesional_id: string;
+  calificacion_promedio: number | null;
+  total_resenas: number | null;
+  total_recomiendan: number | null;
+  total_no_recomiendan: number | null;
+};
 
 interface UseFeedOptions {
   userId?: string;
@@ -28,6 +36,218 @@ export function useFeed(options: UseFeedOptions = {}) {
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [recommendedByPreviewByUserId, setRecommendedByPreviewByUserId] =
+    useState<Record<string, RecommendedByPreviewUser[] | undefined>>({});
+
+  const refreshStatsForUsers = useCallback(async (profesionalIds: string[]) => {
+    const ids = Array.from(new Set(profesionalIds.filter(Boolean)));
+    if (ids.length === 0) return;
+
+    const { data, error: statsError } = await supabase
+      .from("vw_estadisticas_resenas")
+      .select(
+        "profesional_id,calificacion_promedio,total_resenas,total_recomiendan,total_no_recomiendan"
+      )
+      .in("profesional_id", ids);
+
+    if (statsError) return;
+
+    const rows = ((data || []) as unknown as ReviewStatsRow[]) || [];
+    const byId = new Map(rows.map((r) => [r.profesional_id, r]));
+
+    setItems((prev) =>
+      prev.map((it) => {
+        const stats = byId.get(it.user.id);
+        if (!stats) return it;
+
+        return {
+          ...it,
+          user: {
+            ...it.user,
+            rating:
+              typeof stats.calificacion_promedio === "number"
+                ? stats.calificacion_promedio
+                : 0,
+            totalRatings:
+              typeof stats.total_resenas === "number" ? stats.total_resenas : 0,
+            positiveRecommendations:
+              typeof stats.total_recomiendan === "number"
+                ? stats.total_recomiendan
+                : 0,
+            negativeRecommendations:
+              typeof stats.total_no_recomiendan === "number"
+                ? stats.total_no_recomiendan
+                : 0,
+          },
+        };
+      })
+    );
+  }, []);
+
+  const fetchRecommendedByPreviewForUsers = useCallback(
+    async (
+      profesionalIds: string[],
+      options?: {
+        force?: boolean;
+      }
+    ) => {
+      const ids = Array.from(new Set(profesionalIds.filter(Boolean)));
+      if (ids.length === 0) return;
+
+      const targetIds = options?.force
+        ? ids
+        : ids.filter((id) => recommendedByPreviewByUserId[id] === undefined);
+
+      if (targetIds.length === 0) return;
+
+      const recIdsByUserId = new Map<string, string[]>();
+
+      let i = 0;
+      const concurrency = Math.min(5, targetIds.length);
+      const workers = Array.from({ length: concurrency }, () =>
+        (async () => {
+          while (i < targetIds.length) {
+            const current = targetIds[i];
+            i += 1;
+
+            const { data, error: recError } = await supabase
+              .from("recomendaciones_usuarios")
+              .select("recomendado_por")
+              .eq("usuario_recomendado_id", current)
+              .eq("recomienda", true)
+              .range(0, 1);
+
+            if (recError) {
+              recIdsByUserId.set(current, []);
+              continue;
+            }
+
+            const idsForUser = (data || [])
+              .map((r: any) => r?.recomendado_por)
+              .filter(Boolean) as string[];
+            recIdsByUserId.set(current, Array.from(new Set(idsForUser)));
+          }
+        })()
+      );
+
+      await Promise.all(workers);
+
+      const allRecommenderIds = Array.from(
+        new Set(Array.from(recIdsByUserId.values()).flat())
+      );
+
+      const profilesById = new Map<
+        string,
+        { name: string; avatar: string | null }
+      >();
+
+      if (allRecommenderIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("perfiles")
+          .select("id,nombre,apellido_paterno,apellido_materno,foto")
+          .in("id", allRecommenderIds);
+
+        if (!profilesError) {
+          (profilesData || []).forEach((p: any) => {
+            const name = [p?.nombre, p?.apellido_paterno, p?.apellido_materno]
+              .filter(Boolean)
+              .join(" ")
+              .trim();
+            profilesById.set(p.id, {
+              name: name || "Usuario",
+              avatar: p?.foto ?? null,
+            });
+          });
+        }
+      }
+
+      setRecommendedByPreviewByUserId((prev) => {
+        const next = { ...prev };
+        targetIds.forEach((id) => {
+          const recommenderIds = recIdsByUserId.get(id) || [];
+          next[id] = recommenderIds
+            .map((rid) => {
+              const info = profilesById.get(rid);
+              if (!info) return null;
+              return {
+                id: rid,
+                name: info.name,
+                avatar: info.avatar,
+              } satisfies RecommendedByPreviewUser;
+            })
+            .filter(Boolean) as RecommendedByPreviewUser[];
+        });
+        return next;
+      });
+    },
+    [recommendedByPreviewByUserId]
+  );
+
+  useEffect(() => {
+    if (items.length === 0) return;
+    const ids = items.map((it) => it.user?.id).filter(Boolean) as string[];
+    fetchRecommendedByPreviewForUsers(ids);
+  }, [items, fetchRecommendedByPreviewForUsers]);
+
+  useEffect(() => {
+    setItems((prev) =>
+      prev.map((it) => {
+        const preview = recommendedByPreviewByUserId[it.user.id];
+        if (preview === undefined) return it;
+        return {
+          ...it,
+          user: {
+            ...it.user,
+            recommendedByPreview: preview,
+          },
+        };
+      })
+    );
+  }, [recommendedByPreviewByUserId]);
+
+  useEffect(() => {
+    const pending = new Set<string>();
+    let timer: any = null;
+
+    const schedule = (id: string | null | undefined) => {
+      if (!id) return;
+      pending.add(id);
+
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        const ids = Array.from(pending);
+        pending.clear();
+        refreshStatsForUsers(ids);
+        fetchRecommendedByPreviewForUsers(ids, { force: true });
+      }, 250);
+    };
+
+    const channel = supabase
+      .channel("feed-user-stats")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "recomendaciones_usuarios" },
+        (payload: any) => {
+          const record = payload?.new || payload?.old;
+          schedule(record?.usuario_recomendado_id);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "resenas" },
+        (payload: any) => {
+          const record = payload?.new || payload?.old;
+          schedule(record?.profesional_id);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [refreshStatsForUsers]);
 
   /**
    * Calcular factor de decaimiento temporal
@@ -93,6 +313,24 @@ export function useFeed(options: UseFeedOptions = {}) {
           return;
         }
 
+        const perfilIds = Array.from(
+          new Set(
+            (feedData || [])
+              .map((item: any) => (item.perfiles as any)?.id)
+              .filter(Boolean) as string[]
+          )
+        );
+
+        const statsPromise =
+          perfilIds.length > 0
+            ? supabase
+                .from("vw_estadisticas_resenas")
+                .select(
+                  "profesional_id,calificacion_promedio,total_resenas,total_recomiendan,total_no_recomiendan"
+                )
+                .in("profesional_id", perfilIds)
+            : Promise.resolve({ data: [], error: null } as any);
+
         // 2. Separar por tipo de contenido
         const postIds = feedData
           .filter((item) => item.tipo_contenido === "post")
@@ -107,19 +345,22 @@ export function useFeed(options: UseFeedOptions = {}) {
           .map((item) => item.contenido_id);
 
         // 3. Cargar contenido de cada tipo
-        const [postsData, reelsData, propertiesData] = await Promise.all([
-          postIds.length > 0
-            ? supabase.from("posts").select("*").in("id", postIds)
-            : { data: [], error: null },
-          reelIds.length > 0
-            ? supabase.from("reels").select("*").in("id", reelIds)
-            : { data: [], error: null },
-          propertyIds.length > 0
-            ? supabase
-                .from("propiedades")
-                .select(
-                  `
+        const [postsData, reelsData, propertiesData, statsData] =
+          await Promise.all([
+            postIds.length > 0
+              ? supabase.from("posts").select("*").in("id", postIds)
+              : { data: [], error: null },
+            reelIds.length > 0
+              ? supabase.from("reels").select("*").in("id", reelIds)
+              : { data: [], error: null },
+            propertyIds.length > 0
+              ? supabase
+                  .from("propiedades")
+                  .select(
+                    `
                 id,
+                created_at,
+                codigo_propiedad,
                 tipo,
                 subtipo,
                 ciudad,
@@ -137,10 +378,11 @@ export function useFeed(options: UseFeedOptions = {}) {
                   moneda
                 )
               `
-                )
-                .in("id", propertyIds)
-            : { data: [], error: null },
-        ]);
+                  )
+                  .in("id", propertyIds)
+              : { data: [], error: null },
+            statsPromise,
+          ]);
 
         // 4. Crear mapas para lookup rápido
         const postsMap = new Map(postsData.data?.map((p) => [p.id, p]) || []);
@@ -149,12 +391,22 @@ export function useFeed(options: UseFeedOptions = {}) {
           (propertiesData.data?.map((p) => [p.id, p] as [string, any]) ||
             []) as Iterable<[string, any]>
         );
+        const statsRows =
+          ((statsData?.data || []) as unknown as ReviewStatsRow[]) || [];
+        const statsByUserId = new Map<string, ReviewStatsRow>(
+          statsRows.map((s) => [s.profesional_id, s])
+        );
 
         // 5. Combinar todo en FeedItems
         const feedItems = feedData
           .map((item) => {
             // Extraer perfil con optional chaining para evitar errores
             const perfil = item.perfiles as any;
+
+            const stats = perfil?.id ? statsByUserId.get(perfil.id) : null;
+            const recommendedByPreview = perfil?.id
+              ? recommendedByPreviewByUserId[perfil.id]
+              : undefined;
 
             const user: User = {
               id: perfil?.id || "",
@@ -163,6 +415,23 @@ export function useFeed(options: UseFeedOptions = {}) {
               avatar: perfil?.foto || "https://placehold.co/100x100",
               isFollowing: false,
               role: (perfil?.rol === "agente" ? "Agent" : "User") as any,
+              rating:
+                typeof stats?.calificacion_promedio === "number"
+                  ? stats.calificacion_promedio
+                  : 0,
+              totalRatings:
+                typeof stats?.total_resenas === "number"
+                  ? stats.total_resenas
+                  : 0,
+              positiveRecommendations:
+                typeof stats?.total_recomiendan === "number"
+                  ? stats.total_recomiendan
+                  : 0,
+              negativeRecommendations:
+                typeof stats?.total_no_recomiendan === "number"
+                  ? stats.total_no_recomiendan
+                  : 0,
+              recommendedByPreview,
             };
 
             // Calcular score final con decaimiento temporal
@@ -226,10 +495,12 @@ export function useFeed(options: UseFeedOptions = {}) {
                 commentsList: [],
                 propertyDetails: {
                   id: property.id,
+                  code: property.codigo_propiedad || undefined,
                   title: `${property.tipo} en ${property.ciudad}`,
                   description: property.descripcion,
                   price: operation?.precio || 0,
                   currency: (operation?.moneda || "MXN") as "USD" | "MXN",
+                  createdAt: property.created_at,
                   location: {
                     address: `${property.municipio}, ${property.ciudad}`,
                     country: "México",
@@ -279,7 +550,7 @@ export function useFeed(options: UseFeedOptions = {}) {
         setRefreshing(false);
       }
     },
-    [pageSize]
+    [pageSize, recommendedByPreviewByUserId]
   );
 
   /**
@@ -299,6 +570,12 @@ export function useFeed(options: UseFeedOptions = {}) {
   const refresh = useCallback(() => {
     loadFeed(0, true);
   }, [loadFeed]);
+
+  const refreshUserStats = useCallback(() => {
+    const ids = items.map((it) => it.user?.id).filter(Boolean) as string[];
+    refreshStatsForUsers(ids);
+    fetchRecommendedByPreviewForUsers(ids, { force: true });
+  }, [items, refreshStatsForUsers, fetchRecommendedByPreviewForUsers]);
 
   /**
    * Cargar inicial
@@ -328,6 +605,7 @@ export function useFeed(options: UseFeedOptions = {}) {
     error,
     loadMore,
     refresh,
+    refreshUserStats,
   };
 }
 

@@ -72,14 +72,13 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "owner": "beymarvc501",
     "plugins": [
       "expo-video",
       "@react-native-community/datetimepicker"
     ],
     "extra": {
       "eas": {
-        "projectId": "36234a46-bf9b-4182-bad5-ebcdb96feaf6"
+        "projectId": "bff7f096-fd09-4de5-aec8-914b045bf350"
       }
     }
   }
