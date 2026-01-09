@@ -92,10 +92,11 @@ const Statistics = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   },
   scrollView: {
     flex: 1,
+    backgroundColor: COLORS.background,
   },
   contentContainer: {
     padding: 16,

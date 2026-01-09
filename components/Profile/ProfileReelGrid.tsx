@@ -13,26 +13,27 @@ import {
   StyleSheet,
   Dimensions,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
-import { Reel } from "../../types";
+import { FeedItem, Reel } from "../../types";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
-import { supabase } from "../../lib/supabase";
+import { useGridProfile } from "../../hooks/profile/useGridProfile";
 
 const { width } = Dimensions.get("window");
 const ITEM_SIZE = (width - 24) / 3; // 3 items per row with padding
 
 interface ProfileReelGridProps {
-  reels: Reel[];
-  onReelPress: (reel: Reel) => void;
+  userId: string;
+  onReelPress: (reel: FeedItem | Reel) => void;
   isOwnProfile?: boolean;
   onDelete?: () => void;
 }
 
 const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
-  reels,
+  userId,
   onReelPress,
   isOwnProfile = false,
   onDelete,
@@ -40,24 +41,29 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
   const [reelToDelete, setReelToDelete] = useState<Reel | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const { reels, getReels, deleteReel, loading } = useGridProfile();
+
+  React.useEffect(() => {
+    if (userId) {
+      getReels(userId);
+    }
+  }, [userId]);
+
   const handleDelete = async (reel: Reel) => {
     try {
       setDeleting(true);
+      await deleteReel(reel);
 
-      // Soft delete: set deleted_at timestamp
-      const { error } = await supabase
-        .from("reels")
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", reel.id);
-
-      if (error) throw error;
-
-      Alert.alert("Éxito", "Reel eliminado correctamente");
       setReelToDelete(null);
-      
+
       // Trigger refresh
       if (onDelete) {
         onDelete();
+      }
+
+      // Also refresh local list
+      if (userId) {
+        getReels(userId);
       }
     } catch (error: any) {
       console.error("Error deleting reel:", error);
@@ -92,11 +98,15 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
         activeOpacity={0.8}
       >
         <Image
-          source={{ uri: item.thumbnail_url || "https://placehold.co/400x600/45a0a5/white?text=Video" }}
+          source={{
+            uri:
+              item.thumbnail_url ||
+              "https://placehold.co/400x600/45a0a5/white?text=Video",
+          }}
           style={styles.gridImage}
           resizeMode="cover"
         />
-        
+
         {/* Play Icon Overlay */}
         <View style={styles.playOverlay}>
           <Ionicons name="play" size={32} color={COLORS.white} />
@@ -121,6 +131,14 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
     );
   };
 
+  if (loading && reels.length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
   return (
     <>
       <FlatList
@@ -132,7 +150,11 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
         scrollEnabled={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="film-outline" size={48} color={COLORS.textTertiary} />
+            <Ionicons
+              name="film-outline"
+              size={48}
+              color={COLORS.textTertiary}
+            />
             <Text style={styles.emptyText}>No hay reels aún</Text>
           </View>
         }

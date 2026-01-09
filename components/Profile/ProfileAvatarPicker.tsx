@@ -11,6 +11,7 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -18,6 +19,7 @@ import { decode } from "base64-arraybuffer";
 import { supabase } from "../../lib/supabase";
 import { COLORS } from "../../constants/colors";
 import { Avatar } from "../shared";
+import { ViewImage } from "../modals/ViewImage";
 
 interface ProfileAvatarPickerProps {
   uri?: string;
@@ -38,12 +40,15 @@ const ProfileAvatarPicker: React.FC<ProfileAvatarPickerProps> = ({
 }) => {
   const [uploading, setUploading] = useState(false);
 
+  const [openModal, setOpenModal] = useState(false);
+
   const handleImagePick = async () => {
     if (!isOwnProfile) return;
 
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
       if (status !== "granted") {
         Alert.alert(
           "Permiso denegado",
@@ -83,7 +88,9 @@ const ProfileAvatarPicker: React.FC<ProfileAvatarPickerProps> = ({
         fileBody = await response.blob();
       } else {
         const { readAsStringAsync } = require("expo-file-system/legacy");
-        const base64 = await readAsStringAsync(imageUri, { encoding: "base64" });
+        const base64 = await readAsStringAsync(imageUri, {
+          encoding: "base64",
+        });
         fileBody = decode(base64);
       }
 
@@ -127,31 +134,42 @@ const ProfileAvatarPicker: React.FC<ProfileAvatarPickerProps> = ({
   };
 
   return (
-    <View style={styles.container}>
-      <Avatar
-        uri={uri}
-        name={name}
-        size={size}
-        style={styles.avatar}
+    <View style={[styles.container, { width: size, height: size }]}>
+      <TouchableOpacity
+        onPress={handleImagePick}
+        disabled={uploading || !isOwnProfile}
+        activeOpacity={isOwnProfile ? 0.8 : 1}
+        onLongPress={() => setOpenModal(true)}
+        style={{ width: size, height: size }}
+      >
+        <Avatar uri={uri} name={name} size={size} style={styles.avatar} />
+
+        {isOwnProfile && (
+          <View
+            style={[
+              styles.editBadge,
+              {
+                width: size * 0.32,
+                height: size * 0.32,
+                borderRadius: 50,
+              },
+            ]}
+          >
+            {uploading ? (
+              <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+              <Ionicons name="camera" size={size * 0.16} color={COLORS.white} />
+            )}
+          </View>
+        )}
+      </TouchableOpacity>
+
+      <ViewImage
+        src={uri}
+        isVisibleAuto={openModal}
+        onClose={() => setOpenModal(false)}
+        showThumbnail={false}
       />
-      
-      {isOwnProfile && (
-        <TouchableOpacity
-          style={[
-            styles.editButton,
-            { width: size * 0.3, height: size * 0.3, borderRadius: size * 0.15 },
-          ]}
-          onPress={handleImagePick}
-          disabled={uploading}
-          activeOpacity={0.7}
-        >
-          {uploading ? (
-            <ActivityIndicator size="small" color={COLORS.white} />
-          ) : (
-            <Ionicons name="camera" size={size * 0.15} color={COLORS.white} />
-          )}
-        </TouchableOpacity>
-      )}
     </View>
   );
 };
@@ -159,29 +177,31 @@ const ProfileAvatarPicker: React.FC<ProfileAvatarPickerProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
   },
   avatar: {
-    elevation: 3,
+    elevation: 4,
     shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
     borderWidth: 3,
     borderColor: COLORS.white,
   },
-  editButton: {
+  editBadge: {
     position: "absolute",
-    bottom: 0,
-    right: 0,
+    bottom: 2,
+    right: 2,
     backgroundColor: COLORS.primary,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
     borderColor: COLORS.white,
-    elevation: 4,
+    elevation: 5,
     shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 3,
   },
 });

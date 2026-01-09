@@ -9,9 +9,10 @@
  * - Combina posts, reels y propiedades
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { FeedItem, RecommendedByPreviewUser, User } from "../types";
+import { profileService } from "../services/profileService";
 
 type ReviewStatsRow = {
   profesional_id: string;
@@ -38,6 +39,12 @@ export function useFeed(options: UseFeedOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const [recommendedByPreviewByUserId, setRecommendedByPreviewByUserId] =
     useState<Record<string, RecommendedByPreviewUser[] | undefined>>({});
+
+  // Ref para evitar loops en refreshUserStats
+  const itemsRef = useRef<FeedItem[]>([]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   const refreshStatsForUsers = useCallback(async (profesionalIds: string[]) => {
     const ids = Array.from(new Set(profesionalIds.filter(Boolean)));
@@ -100,85 +107,20 @@ export function useFeed(options: UseFeedOptions = {}) {
 
       if (targetIds.length === 0) return;
 
-      const recIdsByUserId = new Map<string, string[]>();
+      try {
+        const previewsMap =
+          await profileService.getRecommendationPreviewsForUsers(targetIds);
 
-      let i = 0;
-      const concurrency = Math.min(5, targetIds.length);
-      const workers = Array.from({ length: concurrency }, () =>
-        (async () => {
-          while (i < targetIds.length) {
-            const current = targetIds[i];
-            i += 1;
-
-            const { data, error: recError } = await supabase
-              .from("recomendaciones_usuarios")
-              .select("recomendado_por")
-              .eq("usuario_recomendado_id", current)
-              .eq("recomienda", true)
-              .range(0, 1);
-
-            if (recError) {
-              recIdsByUserId.set(current, []);
-              continue;
-            }
-
-            const idsForUser = (data || [])
-              .map((r: any) => r?.recomendado_por)
-              .filter(Boolean) as string[];
-            recIdsByUserId.set(current, Array.from(new Set(idsForUser)));
-          }
-        })()
-      );
-
-      await Promise.all(workers);
-
-      const allRecommenderIds = Array.from(
-        new Set(Array.from(recIdsByUserId.values()).flat())
-      );
-
-      const profilesById = new Map<
-        string,
-        { name: string; avatar: string | null }
-      >();
-
-      if (allRecommenderIds.length > 0) {
-        const { data: profilesData, error: profilesError } = await supabase
-          .from("perfiles")
-          .select("id,nombre,apellido_paterno,apellido_materno,foto")
-          .in("id", allRecommenderIds);
-
-        if (!profilesError) {
-          (profilesData || []).forEach((p: any) => {
-            const name = [p?.nombre, p?.apellido_paterno, p?.apellido_materno]
-              .filter(Boolean)
-              .join(" ")
-              .trim();
-            profilesById.set(p.id, {
-              name: name || "Usuario",
-              avatar: p?.foto ?? null,
-            });
+        setRecommendedByPreviewByUserId((prev) => {
+          const next = { ...prev };
+          Object.entries(previewsMap).forEach(([userId, previews]) => {
+            next[userId] = previews as RecommendedByPreviewUser[];
           });
-        }
-      }
-
-      setRecommendedByPreviewByUserId((prev) => {
-        const next = { ...prev };
-        targetIds.forEach((id) => {
-          const recommenderIds = recIdsByUserId.get(id) || [];
-          next[id] = recommenderIds
-            .map((rid) => {
-              const info = profilesById.get(rid);
-              if (!info) return null;
-              return {
-                id: rid,
-                name: info.name,
-                avatar: info.avatar,
-              } satisfies RecommendedByPreviewUser;
-            })
-            .filter(Boolean) as RecommendedByPreviewUser[];
+          return next;
         });
-        return next;
-      });
+      } catch (error) {
+        console.error("Error fetching recommendation previews:", error);
+      }
     },
     [recommendedByPreviewByUserId]
   );
@@ -189,7 +131,10 @@ export function useFeed(options: UseFeedOptions = {}) {
    */
   useEffect(() => {
     // Solo actualizar si hay items y previews cargados
-    if (items.length === 0 || Object.keys(recommendedByPreviewByUserId).length === 0) {
+    if (
+      items.length === 0 ||
+      Object.keys(recommendedByPreviewByUserId).length === 0
+    ) {
       return;
     }
 
@@ -379,10 +324,18 @@ export function useFeed(options: UseFeedOptions = {}) {
         const [postsData, reelsData, propertiesData, statsData] =
           await Promise.all([
             postIds.length > 0
-              ? supabase.from("posts").select("*").in("id", postIds)
+              ? supabase
+                  .from("posts")
+                  .select("*")
+                  .in("id", postIds)
+                  .is("deleted_at", null)
               : { data: [], error: null },
             reelIds.length > 0
-              ? supabase.from("reels").select("*").in("id", reelIds)
+              ? supabase
+                  .from("reels")
+                  .select("*")
+                  .in("id", reelIds)
+                  .is("deleted_at", null)
               : { data: [], error: null },
             propertyIds.length > 0
               ? supabase
@@ -411,6 +364,7 @@ export function useFeed(options: UseFeedOptions = {}) {
               `
                   )
                   .in("id", propertyIds)
+                  .is("deleted_at", null)
               : { data: [], error: null },
             statsPromise,
           ]);
@@ -570,10 +524,12 @@ export function useFeed(options: UseFeedOptions = {}) {
         } else {
           setItems((prev) => [...prev, ...feedItems]);
         }
-const userIds = feedItems.map((it) => it.user?.id).filter(Boolean) as string[];
-if (userIds.length > 0) {
-  fetchRecommendedByPreviewForUsers(userIds);
-}
+        const userIds = feedItems
+          .map((it) => it.user?.id)
+          .filter(Boolean) as string[];
+        if (userIds.length > 0) {
+          fetchRecommendedByPreviewForUsers(userIds);
+        }
 
         setHasMore(feedData.length === pageSize);
         setError(null);
@@ -607,10 +563,16 @@ if (userIds.length > 0) {
   }, [loadFeed]);
 
   const refreshUserStats = useCallback(() => {
-    const ids = items.map((it) => it.user?.id).filter(Boolean) as string[];
+    // Usar itemsRef para no depender de 'items' y evitar ciclos infinitos en useFocusEffect
+    const currentItems = itemsRef.current;
+    if (currentItems.length === 0) return;
+
+    const ids = currentItems
+      .map((it) => it.user?.id)
+      .filter(Boolean) as string[];
     refreshStatsForUsers(ids);
     fetchRecommendedByPreviewForUsers(ids, { force: true });
-  }, [items, refreshStatsForUsers, fetchRecommendedByPreviewForUsers]);
+  }, [refreshStatsForUsers, fetchRecommendedByPreviewForUsers]);
 
   /**
    * Cargar inicial

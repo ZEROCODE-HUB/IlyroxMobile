@@ -1690,7 +1690,7 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   },
   header: {
     height: 60,
@@ -1712,6 +1712,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: COLORS.background,
   },
   scrollContent: {
     padding: 16,

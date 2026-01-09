@@ -188,6 +188,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 2,
     paddingVertical: 4,
+    paddingHorizontal: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.02)",
+    borderRadius: 50,
   },
   iconCountText: {
     fontSize: 12,

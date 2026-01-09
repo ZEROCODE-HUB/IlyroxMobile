@@ -53,6 +53,7 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
   onUserClick,
   currentUserId,
 }) => {
+  console.log(item);
   const { width, height } = useWindowDimensions();
   const { likes, isLiked, toggleLike } = useLikes({
     feedItemId: item.id,
@@ -145,16 +146,16 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
       />
 
       <Animated.View
-            style={[
-              styles.container,
-              {
-                width,
-                height,
-                transform: [{ translateY: panY }],
-              },
-            ]}
-            {...panResponder.panHandlers}
-          >
+        style={[
+          styles.container,
+          {
+            width,
+            height,
+            transform: [{ translateY: panY }],
+          },
+        ]}
+        {...panResponder.panHandlers}
+      >
         <TouchableWithoutFeedback onPress={togglePlayPause}>
           <View style={[styles.video, { width, height }]}>
             {/* VIDEO - Pantalla completa manteniendo aspect ratio */}

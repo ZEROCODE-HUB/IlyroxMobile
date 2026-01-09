@@ -13,26 +13,27 @@ import {
   StyleSheet,
   Dimensions,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 import { Post } from "../../types";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
-import { supabase } from "../../lib/supabase";
+import { useGridProfile } from "../../hooks/profile/useGridProfile";
 
 const { width } = Dimensions.get("window");
 const ITEM_SIZE = (width - 24) / 3; // 3 items per row with padding
 
 interface ProfilePostGridProps {
-  posts: Post[];
+  userId: string;
   onPostPress: (post: Post) => void;
   isOwnProfile?: boolean;
   onDelete?: () => void;
 }
 
 const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
-  posts,
+  userId,
   onPostPress,
   isOwnProfile = false,
   onDelete,
@@ -40,24 +41,30 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const { posts, getPosts, deletePost, loading } = useGridProfile();
+
+  React.useEffect(() => {
+    if (userId) {
+      getPosts(userId);
+    }
+  }, [userId]);
+
   const handleDelete = async (post: Post) => {
     try {
       setDeleting(true);
 
-      // Soft delete: set deleted_at timestamp
-      const { error } = await supabase
-        .from("posts")
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", post.id);
+      await deletePost(post);
 
-      if (error) throw error;
-
-      Alert.alert("Éxito", "Post eliminado correctamente");
       setPostToDelete(null);
-      
+
       // Trigger refresh
       if (onDelete) {
         onDelete();
+      }
+
+      // Refresh local list
+      if (userId) {
+        getPosts(userId);
       }
     } catch (error: any) {
       console.error("Error deleting post:", error);
@@ -125,6 +132,14 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
     );
   };
 
+  if (loading && posts.length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
   return (
     <>
       <FlatList
@@ -136,7 +151,11 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
         scrollEnabled={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="images-outline" size={48} color={COLORS.textTertiary} />
+            <Ionicons
+              name="images-outline"
+              size={48}
+              color={COLORS.textTertiary}
+            />
             <Text style={styles.emptyText}>No hay posts aún</Text>
           </View>
         }

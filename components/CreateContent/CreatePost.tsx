@@ -22,6 +22,7 @@ import { useCreateContent } from "../../hooks/useCreateContent";
 import { useAuth } from "../../context/AuthContext";
 import { COLORS } from "../../constants/colors";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
+import { ViewImage } from "../modals/ViewImage";
 
 interface CreatePostProps {
   onBack: () => void;
@@ -139,7 +140,7 @@ export default function CreatePost({ onBack }: CreatePostProps) {
         {/* Contenido */}
         <View style={styles.card}>
           <AppInput
-            label="Contenido *"
+            label="Nueva Publicación *"
             multiline
             placeholder="¿Qué quieres compartir?"
             value={content}
@@ -162,7 +163,7 @@ export default function CreatePost({ onBack }: CreatePostProps) {
           <View style={styles.imagesGrid}>
             {images.map((uri, index) => (
               <View key={index} style={styles.imageBox}>
-                <Image source={{ uri }} style={styles.previewImage} />
+                <ViewImage src={uri} imageStyle={styles.previewImage} />
                 <TouchableOpacity
                   onPress={() => handleRemoveImage(index)}
                   style={styles.removeBtn}
@@ -234,7 +235,7 @@ export default function CreatePost({ onBack }: CreatePostProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   },
   header: {
     flexDirection: "row",
@@ -255,10 +256,12 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: COLORS.background,
   },
   scrollContent: {
     padding: 16,
     paddingBottom: 100,
+    backgroundColor: COLORS.background,
   },
   card: {
     backgroundColor: COLORS.white,

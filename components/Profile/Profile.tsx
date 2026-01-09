@@ -1,6 +1,6 @@
 /**
  * Profile.tsx - COMPLETO Y OPTIMIZADO
- * 
+ *
  * MEJORAS:
  * - Tabs para Posts, Reels y Propiedades
  * - Avatar con cambio de foto inline
@@ -26,20 +26,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { COLORS } from "../../constants/colors";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
 // Types
-import {
-  perfiles,
-  EstadisticasResenas,
-  Property,
-  Post,
-  Reel,
-  ProfileContentType,
-} from "../../types";
+import { perfiles, Property, ProfileContentType, FeedItem } from "../../types";
 
 // Components
 import { Avatar } from "../shared";
@@ -51,20 +43,13 @@ import ProfilePostGrid from "./ProfilePostGrid";
 import ProfileReelGrid from "./ProfileReelGrid";
 import PropertyDetail from "../Details/PropertyDetail";
 import SelectionModal from "../modals/SelectionModal";
+import { useProfile } from "../../hooks/profile/useProfile";
+import ReelDetail from "../Reel/ReelDetail";
 
 interface ProfileProps {
   userId?: string | null;
   onBack?: () => void;
 }
-
-type RecommendedByUser = {
-  id: string;
-  nombre: string;
-  apellido_paterno: string;
-  apellido_materno: string;
-  foto: string | null;
-  rol: "admin" | "agente" | "cliente";
-};
 
 const FILTER_OPTIONS = [
   "Todas",
@@ -76,35 +61,40 @@ const FILTER_OPTIONS = [
 ];
 
 const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
-  const { user: authUser, profile: authProfile } = useAuth();
+  const { user: authUser } = useAuth();
   const navigation = useNavigation<any>();
 
-  // State - Profile Data
-  const [profile, setProfile] = useState<perfiles | null>(null);
-  const [reviewStats, setReviewStats] = useState<EstadisticasResenas | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Use Custom Hook
+  const {
+    profile,
+    reviewStats,
+    properties,
+    posts,
+    reels,
+    userRecommendation,
+    recommendedByUsers,
+    recommendedByHasMore,
+    loadingRecommendedBy,
+    recommendedByError,
+    loading,
+    submittingRecommendation,
+    fetchProfileData,
+    handleRecommendation,
+    loadRecommendedByUsers,
+    updateProfilePhoto,
+  } = useProfile(userId);
 
   // State - Content
   const [activeTab, setActiveTab] = useState<ProfileContentType>("properties");
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [reels, setReels] = useState<Reel[]>([]);
 
   // State - Filters & Modals
   const [activeFilter, setActiveFilter] = useState<string>("Todas");
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(
+    null
+  );
   const [showRatingDetails, setShowRatingDetails] = useState(false);
-
-  // State - Recommendations
-  const [userRecommendation, setUserRecommendation] = useState<boolean | null>(null);
-  const [submittingRecommendation, setSubmittingRecommendation] = useState(false);
-  const [recommendedByUsers, setRecommendedByUsers] = useState<RecommendedByUser[]>([]);
-  const [loadingRecommendedBy, setLoadingRecommendedBy] = useState(false);
-  const [recommendedByError, setRecommendedByError] = useState<string | null>(null);
   const [showRecommendedByModal, setShowRecommendedByModal] = useState(false);
-  const [recommendedByHasMore, setRecommendedByHasMore] = useState(false);
-  const [recommendedByPage, setRecommendedByPage] = useState(0);
 
   // Computed
   const targetUserId = userId || authUser?.id;
@@ -121,11 +111,16 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
    */
   const formatFullName = (p: perfiles | null): string => {
     if (!p) return "Usuario";
-    const parts = [p.nombre, p.apellido_paterno, p.apellido_materno].filter(Boolean);
+    const parts = [p.nombre, p.apellido_paterno, p.apellido_materno].filter(
+      Boolean
+    );
     return parts.length > 0 ? parts.join(" ") : p.nombre_completo || "Usuario";
   };
 
-  const formatPhoneNumber = (prefix: string | null, number: string | null): string => {
+  const formatPhoneNumber = (
+    prefix: string | null,
+    number: string | null
+  ): string => {
     if (!number) return "No especificado";
     if (prefix) return `${prefix} ${number}`;
     return number;
@@ -146,76 +141,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   };
 
   /**
-   * Load Recommended By Users
-   */
-  const loadRecommendedByUsers = async (options?: { reset?: boolean }) => {
-    if (!targetUserId) return;
-
-    try {
-      const reset = options?.reset === true;
-      setLoadingRecommendedBy(true);
-      setRecommendedByError(null);
-
-      const pageSize = 30;
-      const nextPage = reset ? 0 : recommendedByPage;
-      const from = nextPage * pageSize;
-      const to = from + pageSize - 1;
-
-      const { data: recsData, error: recsError } = await supabase
-        .from("recomendaciones_usuarios")
-        .select("recomendado_por")
-        .eq("usuario_recomendado_id", targetUserId)
-        .eq("recomienda", true)
-        .range(from, to);
-
-      if (recsError) throw recsError;
-
-      const recommendedByIds = (recsData || [])
-        .map((r: any) => r?.recomendado_por)
-        .filter(Boolean) as string[];
-      const recommendedByIdsUnique = Array.from(new Set(recommendedByIds));
-
-      if (recommendedByIdsUnique.length === 0 && reset) {
-        setRecommendedByUsers([]);
-        setRecommendedByHasMore(false);
-        setRecommendedByPage(0);
-        return;
-      }
-
-      if (recommendedByIdsUnique.length === 0) {
-        setRecommendedByHasMore(false);
-        return;
-      }
-
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("perfiles")
-        .select("id,nombre,apellido_paterno,apellido_materno,foto,rol")
-        .in("id", recommendedByIdsUnique);
-
-      if (profilesError) throw profilesError;
-
-      const profiles = (profilesData || []) as RecommendedByUser[];
-      const profilesById = new Map(profiles.map((p) => [p.id, p]));
-      const ordered = recommendedByIdsUnique
-        .map((id) => profilesById.get(id))
-        .filter(Boolean) as RecommendedByUser[];
-
-      setRecommendedByUsers((prev) => (reset ? ordered : [...prev, ...ordered]));
-      setRecommendedByHasMore(recommendedByIdsUnique.length === pageSize);
-      setRecommendedByPage(nextPage + 1);
-    } catch (error: any) {
-      if (options?.reset) {
-        setRecommendedByUsers([]);
-      }
-      setRecommendedByHasMore(false);
-      setRecommendedByError(error?.message || "Error al cargar recomendaciones");
-    } finally {
-      setLoadingRecommendedBy(false);
-    }
-  };
-
-  /**
-   * useEffect ÚNICO optimizado
+   * useEffect ÚNICO optimizado for Recommended Users
    */
   useEffect(() => {
     const shouldLoad = showRatingDetails || showRecommendedByModal;
@@ -225,13 +151,10 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     if (recommendedByUsers.length > 0) return;
     if (loadingRecommendedBy) return;
     if ((reviewStats?.total_recomiendan || 0) <= 0) {
-      setRecommendedByUsers([]);
+      // Just to be safe, though hook handles data
       return;
     }
 
-    setRecommendedByUsers([]);
-    setRecommendedByHasMore(false);
-    setRecommendedByPage(0);
     loadRecommendedByUsers({ reset: true });
   }, [
     showRatingDetails,
@@ -243,265 +166,23 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   ]);
 
   /**
-   * Handle Recommendation
+   * Wrapper for recommendation to also reload list if needed
    */
-  const handleRecommendation = async (recomienda: boolean) => {
-    if (!authUser?.id || !targetUserId || isMe || submittingRecommendation) return;
-
-    try {
-      setSubmittingRecommendation(true);
-
-      if (userRecommendation === recomienda) {
-        const { error } = await supabase
-          .from("recomendaciones_usuarios")
-          .delete()
-          .eq("usuario_recomendado_id", targetUserId)
-          .eq("recomendado_por", authUser.id);
-
-        if (error) throw error;
-        setUserRecommendation(null);
-      } else if (userRecommendation === null) {
-        const { error } = await supabase
-          .from("recomendaciones_usuarios")
-          .insert({
-            usuario_recomendado_id: targetUserId,
-            recomendado_por: authUser.id,
-            recomienda,
-          });
-
-        if (error) throw error;
-        setUserRecommendation(recomienda);
-      } else {
-        const { error } = await supabase
-          .from("recomendaciones_usuarios")
-          .update({ recomienda })
-          .eq("usuario_recomendado_id", targetUserId)
-          .eq("recomendado_por", authUser.id);
-
-        if (error) throw error;
-        setUserRecommendation(recomienda);
-      }
-
-      const { data: statsData } = await supabase
-        .from("vw_estadisticas_resenas")
-        .select("*")
-        .eq("profesional_id", targetUserId)
-        .maybeSingle();
-
-      if (statsData) {
-        setReviewStats(statsData);
-      }
-
-      if (showRatingDetails || showRecommendedByModal) {
-        setRecommendedByUsers([]);
-        setRecommendedByHasMore(false);
-        setRecommendedByPage(0);
-        await loadRecommendedByUsers({ reset: true });
-      }
-    } catch (error: any) {
-      console.error("Error updating recommendation:", error);
-    } finally {
-      setSubmittingRecommendation(false);
+  const onToggleRecommendation = async (recomienda: boolean) => {
+    await handleRecommendation(recomienda);
+    if (showRatingDetails || showRecommendedByModal) {
+      loadRecommendedByUsers({ reset: true });
     }
   };
-
-  /**
-   * Fetch All Profile Data
-   */
-  const fetchProfileData = React.useCallback(async () => {
-    if (!targetUserId) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      if (isMe && authProfile) {
-        setProfile(authProfile);
-      } else {
-        const { data, error } = await supabase
-          .from("perfiles")
-          .select("*")
-          .eq("id", targetUserId)
-          .maybeSingle();
-
-        if (error) {
-          console.error("Error fetching profile:", error);
-        } else {
-          setProfile(data);
-        }
-      }
-
-      const { data: statsData, error: statsError } = await supabase
-        .from("vw_estadisticas_resenas")
-        .select("*")
-        .eq("profesional_id", targetUserId)
-        .maybeSingle();
-
-      if (statsError) {
-        console.error("Error fetching review stats:", statsError);
-      } else {
-        setReviewStats(statsData);
-      }
-
-      if (!isMe && authUser?.id) {
-        const { data: recData, error: recError } = await supabase
-          .from("recomendaciones_usuarios")
-          .select("recomienda")
-          .eq("usuario_recomendado_id", targetUserId)
-          .eq("recomendado_por", authUser.id)
-          .maybeSingle();
-
-        if (recError) {
-          console.error("Error fetching recommendation:", recError);
-        } else {
-          setUserRecommendation(recData?.recomienda ?? null);
-        }
-      }
-
-      const { data: propsData, error: propsError } = await supabase
-        .from("propiedades")
-        .select(
-          `
-          id,
-          tipo,
-          subtipo,
-          descripcion,
-          ciudad,
-          municipio,
-          colonia,
-          fotos,
-          habitaciones,
-          banos,
-          metros_cuadrados_construccion,
-          metros_cuadrados_terreno,
-          activo,
-          codigo_propiedad,
-          created_at,
-          operaciones_propiedad (
-            tipo_operacion,
-            precio,
-            moneda,
-            comision_tipo,
-            comision_porcentaje,
-            comision_monto_fijo,
-            comparte_comision
-          )
-        `
-        )
-        .eq("created_by", targetUserId)
-        .is("deleted_at", null);
-
-      if (propsError) {
-        console.error("Error fetching properties:", propsError);
-      } else if (propsData) {
-        const transformedProps: Property[] = propsData.map((p: any) => {
-          const operation = p.operaciones_propiedad?.[0];
-          let status: Property["status"] = "Publicada";
-          if (!p.activo) status = "Suspendida";
-
-          let commission: Property["commission"] | undefined;
-          if (operation?.comision_porcentaje || operation?.comision_monto_fijo) {
-            commission = {
-              shared: operation?.comparte_comision || false,
-              percentage: operation?.comision_porcentaje || undefined,
-            };
-          }
-
-          return {
-            id: p.id,
-            code: p.codigo_propiedad || undefined,
-            title: `${p.subtipo} en ${p.ciudad}`,
-            description: p.descripcion,
-            price: operation?.precio || 0,
-            currency: operation?.moneda || "MXN",
-            createdAt: p.created_at,
-            location: {
-              address: "",
-              country: "México",
-              state: "",
-              city: p.ciudad || "",
-              municipio: p.municipio,
-              colony: p.colonia || "",
-            },
-            images: p.fotos || [],
-            features: {
-              beds: p.habitaciones || 0,
-              baths: p.banos || 0,
-              constructionSqft: p.metros_cuadrados_construccion || 0,
-              landSqft: p.metros_cuadrados_terreno || 0,
-            },
-            amenities: [],
-            type: p.tipo,
-            subtype: p.subtipo,
-            operation: operation?.tipo_operacion === "venta" ? "Sale" : "Rent",
-            status: status,
-            commission,
-          };
-        });
-        setProperties(transformedProps);
-      }
-
-      const { data: postsData, error: postsError } = await supabase
-        .from("posts")
-        .select("*")
-        .eq("publicado_por", targetUserId)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false });
-
-      if (postsError) {
-        console.error("Error fetching posts:", postsError);
-      } else {
-        setPosts((postsData || []) as Post[]);
-      }
-
-      const { data: reelsData, error: reelsError } = await supabase
-        .from("reels")
-        .select("*")
-        .eq("publicado_por", targetUserId)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false });
-
-      if (reelsError) {
-        console.error("Error fetching reels:", reelsError);
-      } else {
-        setReels((reelsData || []) as Reel[]);
-      }
-    } catch (error) {
-      console.error("Error in fetchProfileData:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [targetUserId, isMe, authProfile, authUser?.id]);
-
-  /**
-   * Refresh content after delete
-   */
-  const refreshProperties = React.useCallback(() => {
-    fetchProfileData();
-  }, [fetchProfileData]);
-
-  const refreshPosts = React.useCallback(() => {
-    fetchProfileData();
-  }, [fetchProfileData]);
-
-  const refreshReels = React.useCallback(() => {
-    fetchProfileData();
-  }, [fetchProfileData]);
-
-  /**
-   * Initial Load
-   */
-  useEffect(() => {
-    fetchProfileData();
-  }, [fetchProfileData]);
 
   const profileData = {
     name: formatFullName(profile),
     avatar: profile?.foto || undefined,
     role: formatRole(profile?.rol || "cliente"),
-    location: formatLocation(profile?.estado || null, profile?.pais || "México"),
+    location: formatLocation(
+      profile?.estado || null,
+      profile?.pais || "México"
+    ),
     phone: formatPhoneNumber(
       profile?.prefijo_celular || null,
       profile?.celular || null
@@ -557,7 +238,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
               userId={targetUserId!}
               isOwnProfile={isMe}
               onPhotoUpdated={(newUrl) => {
-                setProfile((prev) => (prev ? { ...prev, foto: newUrl } : null));
+                updateProfilePhoto(newUrl);
               }}
             />
 
@@ -568,7 +249,11 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
               </View>
               <View style={styles.metaList}>
                 <View style={styles.metaItem}>
-                  <Ionicons name="location" size={12} color={COLORS.textTertiary} />
+                  <Ionicons
+                    name="location"
+                    size={12}
+                    color={COLORS.textTertiary}
+                  />
                   <Text style={styles.metaText}>{profileData.location}</Text>
                 </View>
                 <View style={styles.metaItem}>
@@ -594,7 +279,11 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                   });
                 }}
               >
-                <Ionicons name="chatbubble-outline" size={16} color={COLORS.textPrimary} />
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={16}
+                  color={COLORS.textPrimary}
+                />
                 <Text style={styles.messageBtnText}>Mensaje</Text>
               </TouchableOpacity>
             </View>
@@ -609,14 +298,23 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             style={styles.ratingCard}
           >
             <View style={styles.ratingLeft}>
-              <Text style={styles.ratingValue}>{profileData.rating.toFixed(1)}</Text>
+              <Text style={styles.ratingValue}>
+                {profileData.rating.toFixed(1)}
+              </Text>
               <View style={styles.ratingStars}>
                 <View style={styles.starsRow}>
                   {[1, 2, 3, 4, 5].map((s) => (
-                    <Ionicons key={s} name="star" size={10} color={COLORS.warning} />
+                    <Ionicons
+                      key={s}
+                      name="star"
+                      size={10}
+                      color={COLORS.warning}
+                    />
                   ))}
                 </View>
-                <Text style={styles.reviewCount}>{profileData.reviewCount} reseñas</Text>
+                <Text style={styles.reviewCount}>
+                  {profileData.reviewCount} reseñas
+                </Text>
               </View>
             </View>
             <View style={styles.verticalDivider} />
@@ -645,13 +343,21 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                   disabled={isMe || submittingRecommendation}
                 >
                   <Ionicons
-                    name={userRecommendation === true ? "thumbs-up" : "thumbs-up-outline"}
+                    name={
+                      userRecommendation === true
+                        ? "thumbs-up"
+                        : "thumbs-up-outline"
+                    }
                     size={16}
                     color={
-                      userRecommendation === true ? COLORS.success : COLORS.textSecondary
+                      userRecommendation === true
+                        ? COLORS.success
+                        : COLORS.textSecondary
                     }
                   />
-                  <Text style={styles.recVal}>{profileData.positiveRecommendations}</Text>
+                  <Text style={styles.recVal}>
+                    {profileData.positiveRecommendations}
+                  </Text>
                   <Text style={styles.recLabel}>Recomiendan</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -665,12 +371,20 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                 >
                   <Ionicons
                     name={
-                      userRecommendation === false ? "thumbs-down" : "thumbs-down-outline"
+                      userRecommendation === false
+                        ? "thumbs-down"
+                        : "thumbs-down-outline"
                     }
                     size={16}
-                    color={userRecommendation === false ? COLORS.error : COLORS.textSecondary}
+                    color={
+                      userRecommendation === false
+                        ? COLORS.error
+                        : COLORS.textSecondary
+                    }
                   />
-                  <Text style={styles.recVal}>{profileData.negativeRecommendations}</Text>
+                  <Text style={styles.recVal}>
+                    {profileData.negativeRecommendations}
+                  </Text>
                   <Text style={styles.recLabel}>No recomiendan</Text>
                 </TouchableOpacity>
               </View>
@@ -689,7 +403,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                     <ActivityIndicator size="small" color={COLORS.primary} />
                   </View>
                 ) : recommendedByError ? (
-                  <Text style={styles.recommendedByEmptyText}>{recommendedByError}</Text>
+                  <Text style={styles.recommendedByEmptyText}>
+                    {recommendedByError}
+                  </Text>
                 ) : recommendedByUsers.length === 0 ? (
                   <Text style={styles.recommendedByEmptyText}>
                     Aún no hay recomendaciones
@@ -730,7 +446,10 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                       })}
                     </View>
 
-                    <Text style={styles.recommendedByPreviewText} numberOfLines={1}>
+                    <Text
+                      style={styles.recommendedByPreviewText}
+                      numberOfLines={1}
+                    >
                       {(() => {
                         const first = recommendedByUsers[0];
                         const firstName = first
@@ -741,7 +460,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                           : "Usuario";
                         const total = profileData.positiveRecommendations || 0;
                         const rest = Math.max(0, total - 1);
-                        return rest > 0 ? `${firstName} y ${rest} más` : firstName;
+                        return rest > 0
+                          ? `${firstName} y ${rest} más`
+                          : firstName;
                       })()}
                     </Text>
                   </TouchableOpacity>
@@ -761,11 +482,14 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
                   const count = starCounts[stars as keyof typeof starCounts];
                   const totalReviews = reviewStats?.total_resenas || 0;
-                  const percentage = totalReviews > 0 ? (count / totalReviews) * 100 : 0;
+                  const percentage =
+                    totalReviews > 0 ? (count / totalReviews) * 100 : 0;
 
                   return (
                     <View key={stars} style={styles.progressRow}>
-                      <Text style={styles.progressLabel}>{stars} estrellas</Text>
+                      <Text style={styles.progressLabel}>
+                        {stars} estrellas
+                      </Text>
                       <View style={styles.progressBar}>
                         <View
                           style={[
@@ -774,7 +498,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                           ]}
                         />
                       </View>
-                      <Text style={styles.progressPerc}>{Math.round(percentage)}%</Text>
+                      <Text style={styles.progressPerc}>
+                        {Math.round(percentage)}%
+                      </Text>
                     </View>
                   );
                 })}
@@ -782,10 +508,18 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
               {/* Features Section */}
               <View style={styles.featuresSection}>
-                <Text style={styles.featuresTitle}>Calificación de características</Text>
+                <Text style={styles.featuresTitle}>
+                  Calificación de características
+                </Text>
                 {[
-                  { label: "Disponibilidad", rating: profileData.disponibilidad },
-                  { label: "Profesionalismo", rating: profileData.profesionalismo },
+                  {
+                    label: "Disponibilidad",
+                    rating: profileData.disponibilidad,
+                  },
+                  {
+                    label: "Profesionalismo",
+                    rating: profileData.profesionalismo,
+                  },
                   { label: "Comunicación", rating: profileData.comunicacion },
                   {
                     label: "Conocimiento del Mercado",
@@ -798,7 +532,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Ionicons
                           key={i}
-                          name={i < Math.round(f.rating) ? "star" : "star-outline"}
+                          name={
+                            i < Math.round(f.rating) ? "star" : "star-outline"
+                          }
                           size={16}
                           color={
                             i < Math.round(f.rating)
@@ -827,11 +563,17 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                 onPress={() => setShowRecommendedByModal(false)}
                 style={styles.recommendedByModalBackBtn}
               >
-                <Ionicons name="chevron-back" size={22} color={COLORS.textPrimary} />
+                <Ionicons
+                  name="chevron-back"
+                  size={22}
+                  color={COLORS.textPrimary}
+                />
               </TouchableOpacity>
 
               <View style={styles.recommendedByModalTitleWrap}>
-                <Text style={styles.recommendedByModalTitle}>Recomendado por</Text>
+                <Text style={styles.recommendedByModalTitle}>
+                  Recomendado por
+                </Text>
                 <Text style={styles.recommendedByModalSubtitle}>
                   {profileData.positiveRecommendations} usuarios
                 </Text>
@@ -841,7 +583,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
             {recommendedByError ? (
               <View style={styles.recommendedByModalEmpty}>
-                <Text style={styles.recommendedByEmptyText}>{recommendedByError}</Text>
+                <Text style={styles.recommendedByEmptyText}>
+                  {recommendedByError}
+                </Text>
               </View>
             ) : (
               <FlatList
@@ -867,7 +611,11 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                   )
                 }
                 renderItem={({ item: u }) => {
-                  const fullName = [u.nombre, u.apellido_paterno, u.apellido_materno]
+                  const fullName = [
+                    u.nombre,
+                    u.apellido_paterno,
+                    u.apellido_materno,
+                  ]
                     .filter(Boolean)
                     .join(" ")
                     .trim();
@@ -888,10 +636,16 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                         style={styles.recommendedByAvatar}
                       />
                       <View style={styles.recommendedByInfo}>
-                        <Text style={styles.recommendedByName} numberOfLines={1}>
+                        <Text
+                          style={styles.recommendedByName}
+                          numberOfLines={1}
+                        >
                           {fullName || "Usuario"}
                         </Text>
-                        <Text style={styles.recommendedByRole} numberOfLines={1}>
+                        <Text
+                          style={styles.recommendedByRole}
+                          numberOfLines={1}
+                        >
                           {formatRole(u.rol)}
                         </Text>
                       </View>
@@ -910,7 +664,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                         onPress={() => loadRecommendedByUsers()}
                         activeOpacity={0.85}
                       >
-                        <Text style={styles.recommendedByLoadMoreText}>Cargar más</Text>
+                        <Text style={styles.recommendedByLoadMoreText}>
+                          Cargar más
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
@@ -938,7 +694,11 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             >
               <Ionicons name="funnel" size={16} color={COLORS.textPrimary} />
               <Text style={styles.filterBtnText}>{activeFilter}</Text>
-              <Ionicons name="chevron-down" size={16} color={COLORS.textPrimary} />
+              <Ionicons
+                name="chevron-down"
+                size={16}
+                color={COLORS.textPrimary}
+              />
             </TouchableOpacity>
             <Text style={styles.countText}>
               {filteredProperties.length}{" "}
@@ -956,29 +716,34 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             onEditPress={(property) => {
               navigation.navigate("EditProperty", { propertyId: property.id });
             }}
-            onDelete={refreshProperties}
+            onDelete={fetchProfileData}
           />
         )}
 
         {activeTab === "posts" && (
           <ProfilePostGrid
-            posts={posts}
+            userId={targetUserId}
             onPostPress={(post) => {
               console.log("Post clicked:", post.id);
             }}
             isOwnProfile={isMe}
-            onDelete={refreshPosts}
+            onDelete={fetchProfileData}
           />
         )}
 
         {activeTab === "reels" && (
           <ProfileReelGrid
-            reels={reels}
-            onReelPress={(reel) => {
-              console.log("Reel clicked:", reel.id);
+            userId={targetUserId}
+            onReelPress={(reel: FeedItem) => {
+              <ReelDetail
+                item={reel}
+                onClose={() => {}}
+                onUserClick={() => {}}
+                currentUserId={targetUserId}
+              />;
             }}
             isOwnProfile={isMe}
-            onDelete={refreshReels}
+            onDelete={fetchProfileData}
           />
         )}
       </ScrollView>

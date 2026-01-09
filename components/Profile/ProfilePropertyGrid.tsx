@@ -39,7 +39,9 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
   onEditPress,
   onDelete,
 }) => {
-  const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
+  const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(
+    null
+  );
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async (property: Property) => {
@@ -56,7 +58,7 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
 
       Alert.alert("Éxito", "Propiedad eliminada correctamente");
       setPropertyToDelete(null);
-      
+
       // Trigger refresh
       if (onDelete) {
         onDelete();
@@ -131,19 +133,23 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
           <Text style={styles.propertyLocation} numberOfLines={1}>
             {item.location.city}
           </Text>
-          
+
           {/* Features */}
           <View style={styles.propertyFeatures}>
             {item.features.beds > 0 && (
               <View style={styles.featureBadge}>
                 <Ionicons name="bed-outline" size={10} color={COLORS.white} />
-                <Text style={styles.featureBadgeText}>{item.features.beds}</Text>
+                <Text style={styles.featureBadgeText}>
+                  {item.features.beds}
+                </Text>
               </View>
             )}
             {item.features.baths > 0 && (
               <View style={styles.featureBadge}>
                 <Ionicons name="water-outline" size={10} color={COLORS.white} />
-                <Text style={styles.featureBadgeText}>{item.features.baths}</Text>
+                <Text style={styles.featureBadgeText}>
+                  {item.features.baths}
+                </Text>
               </View>
             )}
           </View>
@@ -163,7 +169,11 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
         scrollEnabled={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="home-outline" size={48} color={COLORS.textTertiary} />
+            <Ionicons
+              name="home-outline"
+              size={48}
+              color={COLORS.textTertiary}
+            />
             <Text style={styles.emptyText}>No hay propiedades aún</Text>
           </View>
         }
@@ -188,13 +198,17 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
 /**
  * Formatear información de comisión
  */
-const formatCommission = (commission?: { shared: boolean; percentage?: number; condition?: string }): string | null => {
+const formatCommission = (commission?: {
+  shared: boolean;
+  percentage?: number;
+  condition?: string;
+}): string | null => {
   if (!commission) return null;
-  
+
   if (commission.percentage) {
     return `${commission.percentage}%`;
   }
-  
+
   return null;
 };
 
@@ -231,6 +245,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     overflow: "hidden",
     position: "relative",
+    borderRadius: 10,
   },
   gridImage: {
     width: "100%",
