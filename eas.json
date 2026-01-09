@@ -1,0 +1,32 @@
+{
+  "cli": {
+    "version": ">= 16.28.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "prodic": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://kpgmcebtzbeatmznwbfb.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwZ21jZWJ0emJlYXRtem53YmZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU4NzEzNDYsImV4cCI6MjA2MTQ0NzM0Nn0.Gh04DTgvIwDh1aHldOfza8oj9r9tCyar7Ke2wXh5Dnc",
+        "EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY": "AIzaSyCMns7F3TjXiJ4oswwws0USAgum-GcwM9A"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

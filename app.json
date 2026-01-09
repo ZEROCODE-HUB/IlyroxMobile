@@ -1,0 +1,85 @@
+{
+  "expo": {
+    "name": "i360",
+    "slug": "i360",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/Logo.jpeg",
+    "userInterfaceStyle": "light",
+    "scheme": "i360realestate",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#06D5B4"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.i360.realestateapp",
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": false,
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent"
+      },
+      "config": {
+        "googleMapsApiKey": "AIzaSyCMns7F3TjXiJ4oswwws0USAgum-GcwM9A"
+      },
+      "associatedDomains": [
+        "applinks:i360.app",
+        "applinks:*.i360.app"
+      ]
+    },
+    "android": {
+      "softwareKeyboardLayoutMode": "pan",
+      "statusBar": {
+        "barStyle": "light-content",
+        "backgroundColor": "#06D5B4",
+        "translucent": false,
+        "hidden": false
+      },
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/Logo.jpeg",
+        "backgroundColor": "#06D5B4"
+      },
+      "package": "com.i360.realestateapp",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyB2SD7BpH4ms3h3N4FiXcTv1CZdlElhRGg"
+        }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "i360.app",
+              "pathPrefix": "/feed"
+            },
+            {
+              "scheme": "i360realestate"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-video",
+      "@react-native-community/datetimepicker"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "bff7f096-fd09-4de5-aec8-914b045bf350"
+      }
+    }
+  }
+}
