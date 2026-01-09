@@ -4,18 +4,9 @@
  */
 
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  ActivityIndicator,
-  FlatList,
-} from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-// import { supabase } from "../../lib/supabase"; // Removed usage
 
 import { FeedItem, User } from "../../types";
 import {
@@ -30,6 +21,7 @@ import ActionButtons from "../ActionButtons";
 import { Bath } from "lucide-react-native";
 import { useUserRecommendations } from "../../hooks/useUserRecommendations";
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
+import { propertyService } from "../../services/propertyService";
 
 interface PropertyCardProps {
   item: FeedItem;
@@ -118,7 +110,38 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         onReport={() => setShowReportModal(true)}
         totalRatings={item.user.totalRatings}
         showRecommendedPreview={false}
+        feedItemType="property"
       />
+
+      {positiveRecommendations > 0 && (
+        <TouchableOpacity
+          style={styles.recommendedRow}
+          onPress={openRecommendedModal}
+          activeOpacity={0.85}
+        >
+          <View style={styles.recommendedAvatars}>
+            {recommendedByPreview.slice(0, 2).map((u, idx) => (
+              <View
+                key={u.id}
+                style={[
+                  styles.recommendedAvatarWrapper,
+                  idx > 0 && styles.recommendedAvatarOverlap,
+                ]}
+              >
+                <Avatar
+                  uri={u.avatar || undefined}
+                  name={u.name}
+                  size={18}
+                  style={{ borderWidth: 1, borderColor: COLORS.white }}
+                />
+              </View>
+            ))}
+          </View>
+          <Text style={styles.recommendedText} numberOfLines={1}>
+            {recommendedText}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* Galería de imágenes con botones flotantes */}
       <View style={styles.imageContainer}>
@@ -155,6 +178,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             showContactButton={false}
             orientation="vertical"
             tintColor={COLORS.white}
+            authorId={item.user.id}
           />
         </View>
       </View>
@@ -171,36 +195,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             : item.timestamp}
         </Text>
       </View>
-
-      {positiveRecommendations > 0 && (
-        <TouchableOpacity
-          style={styles.recommendedRow}
-          onPress={openRecommendedModal}
-          activeOpacity={0.85}
-        >
-          <View style={styles.recommendedAvatars}>
-            {recommendedByPreview.slice(0, 2).map((u, idx) => (
-              <View
-                key={u.id}
-                style={[
-                  styles.recommendedAvatarWrapper,
-                  idx > 0 && styles.recommendedAvatarOverlap,
-                ]}
-              >
-                <Avatar
-                  uri={u.avatar || undefined}
-                  name={u.name}
-                  size={18}
-                  style={{ borderWidth: 1, borderColor: COLORS.white }}
-                />
-              </View>
-            ))}
-          </View>
-          <Text style={styles.recommendedText} numberOfLines={1}>
-            {recommendedText}
-          </Text>
-        </TouchableOpacity>
-      )}
 
       {/* Información de la propiedad */}
       <View style={[commonStyles.cardContent, styles.compactContent]}>

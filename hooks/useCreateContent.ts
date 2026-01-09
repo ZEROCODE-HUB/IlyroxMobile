@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Alert } from "react-native";
 import { supabase } from "../lib/supabase";
 import { useImageUpload } from "./useImageUpload";
+import * as Burnt from "burnt";
 
 export function useCreateContent(userId?: string) {
   const {
@@ -57,11 +58,19 @@ export function useCreateContent(userId?: string) {
 
       if (feedError) throw feedError;
 
-      Alert.alert("✅ Éxito", "Post publicado correctamente");
+      Burnt.toast({
+        title: "Post publicado correctamente!",
+        preset: "done",
+        duration: 2500,
+      });
+
       return true;
     } catch (error: any) {
       console.error("Error creating post:", error);
-      Alert.alert("Error", error.message || "No se pudo publicar el post");
+      Burnt.toast({
+        title: "Error al publicar el post",
+        preset: "error",
+      });
       return false;
     } finally {
       setIsCreatingInDB(false);
@@ -119,11 +128,17 @@ export function useCreateContent(userId?: string) {
 
       if (feedError) throw feedError;
 
-      Alert.alert("✅ Éxito", "Reel publicado correctamente");
+      Burnt.toast({
+        title: "Reel publicado correctamente!",
+        preset: "done",
+      });
       return true;
     } catch (error: any) {
       console.error("Error creating reel:", error);
-      Alert.alert("Error", error.message || "No se pudo publicar el reel");
+      Burnt.toast({
+        title: "Error al publicar el reel",
+        preset: "error",
+      });
       return false;
     } finally {
       setIsCreatingInDB(false);

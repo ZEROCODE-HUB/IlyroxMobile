@@ -183,11 +183,12 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   gridItem: {
-    width: ITEM_SIZE,
-    height: ITEM_SIZE,
-    marginBottom: 2,
-    marginRight: 2,
+    width: ITEM_SIZE - 2,
+    height: ITEM_SIZE - 2,
+    marginBottom: 3,
+    marginRight: 3,
     backgroundColor: COLORS.background,
+    borderRadius: 8,
     overflow: "hidden",
   },
   gridImage: {

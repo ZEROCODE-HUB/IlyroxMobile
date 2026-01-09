@@ -31,7 +31,15 @@ import { COLORS } from "../../constants/colors";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
 // Types
-import { perfiles, Property, ProfileContentType, FeedItem } from "../../types";
+import {
+  perfiles,
+  Property,
+  ProfileContentType,
+  FeedItem,
+  User,
+  Post,
+  Reel,
+} from "../../types";
 
 // Components
 import { Avatar } from "../shared";
@@ -45,6 +53,7 @@ import PropertyDetail from "../Details/PropertyDetail";
 import SelectionModal from "../modals/SelectionModal";
 import { useProfile } from "../../hooks/profile/useProfile";
 import ReelDetail from "../Reel/ReelDetail";
+import FeedDetail from "../Feed/FeedDetail";
 
 interface ProfileProps {
   userId?: string | null;
@@ -95,6 +104,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   );
   const [showRatingDetails, setShowRatingDetails] = useState(false);
   const [showRecommendedByModal, setShowRecommendedByModal] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<FeedItem | null>(null);
+  const [selectedReel, setSelectedReel] = useState<FeedItem | null>(null);
 
   // Computed
   const targetUserId = userId || authUser?.id;
@@ -138,6 +149,74 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       admin: "Admin",
     };
     return roleMap[rol] || rol;
+  };
+
+  /**
+   * Helper: Map entities to FeedItem
+   */
+  const mapProfileToUser = (p: perfiles): User => {
+    const name = [p.nombre, p.apellido_paterno, p.apellido_materno]
+      .filter(Boolean)
+      .join(" ");
+
+    return {
+      id: p.id,
+      nombre: p.nombre,
+      name: p.nombre_completo || name || "Usuario",
+      avatar: p.foto,
+      role: (p.rol.charAt(0).toUpperCase() + p.rol.slice(1)) as any,
+      rating: parseFloat(p.calificacion_promedio || "0"),
+      totalRatings: parseInt(p.total_calificaciones || "0"),
+      positiveRecommendations: parseInt(
+        p.total_recomendaciones_positivas || "0"
+      ),
+      negativeRecommendations: parseInt(
+        p.total_recomendaciones_negativas || "0"
+      ),
+      isFollowing: false,
+    };
+  };
+
+  const mapPostToFeedItem = (post: Post): FeedItem => {
+    const defaultUser: User = {
+      id: targetUserId || "",
+      name: "Usuario",
+      avatar: "",
+      role: "Cliente",
+      isFollowing: false,
+    };
+
+    return {
+      id: post.id,
+      type: "post",
+      user: profile ? mapProfileToUser(profile) : defaultUser,
+      content: post.contenido || "",
+      images: post.imagenes || [],
+      likes: 0,
+      comments: 0,
+      timestamp: post.created_at,
+    };
+  };
+
+  const mapReelToFeedItem = (reel: Reel): FeedItem => {
+    const defaultUser: User = {
+      id: targetUserId || "",
+      name: "Usuario",
+      avatar: "",
+      role: "Cliente",
+      isFollowing: false,
+    };
+
+    return {
+      id: reel.id,
+      type: "reel",
+      user: profile ? mapProfileToUser(profile) : defaultUser,
+      content: reel.descripcion || "",
+      videoUrl: reel.video_url,
+      likes: 0,
+      comments: 0,
+      timestamp: reel.created_at,
+    };
   };
 
   /**
@@ -244,9 +323,13 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
             <View style={styles.infoRight}>
               <Text style={styles.name}>{profileData.name}</Text>
-              <View style={styles.roleBadge}>
-                <Text style={styles.roleText}>{profileData.role}</Text>
-              </View>
+              {profileData.role === "Cliente" ? (
+                <></>
+              ) : (
+                <View style={styles.roleBadge}>
+                  <Text style={styles.roleText}>{profileData.role}</Text>
+                </View>
+              )}
               <View style={styles.metaList}>
                 <View style={styles.metaItem}>
                   <Ionicons
@@ -722,10 +805,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
         {activeTab === "posts" && (
           <ProfilePostGrid
-            userId={targetUserId}
-            onPostPress={(post) => {
-              console.log("Post clicked:", post.id);
-            }}
+            userId={targetUserId || ""}
+            onPostPress={(post) => setSelectedPost(mapPostToFeedItem(post))}
             isOwnProfile={isMe}
             onDelete={fetchProfileData}
           />
@@ -733,22 +814,33 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
         {activeTab === "reels" && (
           <ProfileReelGrid
-            userId={targetUserId}
-            onReelPress={(reel: FeedItem) => {
-              <ReelDetail
-                item={reel}
-                onClose={() => {}}
-                onUserClick={() => {}}
-                currentUserId={targetUserId}
-              />;
-            }}
+            userId={targetUserId || ""}
+            onReelPress={(reel: any) =>
+              setSelectedReel(mapReelToFeedItem(reel))
+            }
             isOwnProfile={isMe}
             onDelete={fetchProfileData}
           />
         )}
       </ScrollView>
 
-      {/* Modals */}
+      {/* Modal Rating Details */}
+      {selectedPost && (
+        <FeedDetail
+          item={selectedPost}
+          onClose={() => setSelectedPost(null)}
+          currentUserId={authUser?.id}
+        />
+      )}
+
+      {selectedReel && (
+        <ReelDetail
+          item={selectedReel}
+          onClose={() => setSelectedReel(null)}
+          currentUserId={authUser?.id}
+        />
+      )}
+
       <SelectionModal
         visible={showFilterModal}
         onClose={() => setShowFilterModal(false)}

@@ -12,6 +12,9 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLikes, useShare } from "../hooks";
 import { COLORS } from "../constants";
+import { propertyService } from "../services/propertyService";
+import { useReportProperty } from "../hooks/useReportProperty";
+import ReportPropertyModal from "./modals/ReportPropertyModal";
 
 interface ActionButtonsProps {
   feedItemId: string;
@@ -24,12 +27,13 @@ interface ActionButtonsProps {
   shareDescription?: string;
   shareImageUrl?: string;
   showContactButton?: boolean;
-  fetchCount?: boolean;
   orientation?: "horizontal" | "vertical";
   tintColor?: string;
   onTrackInteraction?: (
     type: "like" | "comentario" | "compartir" | "guardar"
   ) => void;
+  authorId?: string; // ID of the user who owns/posted the content
+  contentId?: string; // ID of the actual property/post (for reports)
 }
 
 const ActionButtons: React.FC<ActionButtonsProps> = ({
@@ -43,18 +47,60 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   shareDescription = "",
   shareImageUrl,
   showContactButton = false,
-  fetchCount = false,
   orientation = "horizontal",
   tintColor = COLORS.textPrimary,
   onTrackInteraction,
+  authorId,
+  contentId,
 }) => {
+  // Hook de likes con optimistic updates
+  const {
+    getCounterReportsProperty,
+    reportProperty,
+    loading: reporting,
+  } = useReportProperty();
+  const [reportCount, setReportCount] = React.useState(0);
+  const [showReportModal, setShowReportModal] = React.useState(false);
+  const [propertyAuthorId, setPropertyAuthorId] = React.useState<
+    string | undefined
+  >(authorId);
+
+  useEffect(() => {
+    if (authorId) {
+      setPropertyAuthorId(authorId);
+    }
+  }, [authorId]);
+
   // Hook de likes con optimistic updates
   const { likes, isLiked, toggleLike } = useLikes({
     feedItemId,
     initialLikes,
     userId,
-    onLikeSuccess: () => onTrackInteraction?.("like"), // ⬅️ AGREGAR
+    onLikeSuccess: () => onTrackInteraction?.("like"),
   });
+
+  useEffect(() => {
+    if (feedItemType === "property") {
+      const targetId = contentId || feedItemId;
+      if (targetId) {
+        fetchReportCount();
+        if (!propertyAuthorId) {
+          propertyService
+            .getIdbyPropertyId(targetId)
+            .then((id) => {
+              if (id) setPropertyAuthorId(id);
+            })
+            .catch((err) => console.error("Error fetching owner ID:", err));
+        }
+      }
+    }
+  }, [feedItemId, contentId, feedItemType]);
+
+  const fetchReportCount = async () => {
+    const targetId = contentId || feedItemId;
+    const count = await getCounterReportsProperty(targetId);
+    setReportCount(count || 0);
+  };
 
   // Hook de compartir con deep linking
   const { shareContent } = useShare();
@@ -72,6 +118,10 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     }
   };
 
+  const handleReport = () => {
+    setShowReportModal(true);
+  };
+
   const isVertical = orientation === "vertical";
   const containerStyle = isVertical ? styles.actionColumn : styles.actionRow;
   const leftStyle = isVertical ? styles.actionLeftVertical : styles.actionLeft;
@@ -79,6 +129,12 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     ? styles.iconWithCountVertical
     : styles.iconWithCount;
   const textColor = tintColor;
+  const reportIconColor =
+    reportCount > 3
+      ? COLORS.error
+      : reportCount > 0
+      ? COLORS.warning
+      : tintColor;
 
   return (
     <View style={containerStyle}>
@@ -131,6 +187,21 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             color={tintColor}
           />
         </TouchableOpacity>
+
+        {feedItemType === "property" && (
+          <TouchableOpacity
+            onPress={handleReport}
+            style={itemStyle}
+            accessibilityLabel="Reportar Propiedad"
+            accessibilityRole="button"
+          >
+            <Ionicons
+              name="flag"
+              size={isVertical ? 26 : 20}
+              color={reportIconColor}
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.actionRight}>
@@ -145,6 +216,18 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <ReportPropertyModal
+          visible={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          propiedadId={contentId || feedItemId}
+          reportadoPorId={userId || ""}
+          propietarioId={propertyAuthorId || ""}
+          onSuccess={fetchReportCount}
+        />
+      )}
     </View>
   );
 };

@@ -94,7 +94,35 @@ const PostCard: React.FC<PostCardProps> = ({
         totalRatings={item.user.totalRatings}
         showRecommendedPreview={false}
       />
-
+      {positiveRecommendations > 0 && (
+        <TouchableOpacity
+          style={styles.recommendedRow}
+          onPress={openRecommendedModal}
+          activeOpacity={0.85}
+        >
+          <View style={styles.recommendedAvatars}>
+            {recommendedByPreview.slice(0, 2).map((u, idx) => (
+              <View
+                key={u.id}
+                style={[
+                  styles.recommendedAvatarWrapper,
+                  idx > 0 && styles.recommendedAvatarOverlap,
+                ]}
+              >
+                <Avatar
+                  uri={u.avatar || undefined}
+                  name={u.name}
+                  size={18}
+                  style={{ borderWidth: 1, borderColor: COLORS.white }}
+                />
+              </View>
+            ))}
+          </View>
+          <Text style={styles.recommendedText} numberOfLines={1}>
+            {recommendedText}
+          </Text>
+        </TouchableOpacity>
+      )}
       {/* Imágenes o Contenido de Texto */}
       <View style={styles.contentContainer}>
         {!hasImages ? (
@@ -139,37 +167,9 @@ const PostCard: React.FC<PostCardProps> = ({
           shareDescription={item.content.substring(0, 100)}
           shareImageUrl={hasImages ? images[0] : undefined}
           orientation="horizontal"
+          authorId={item.user.id}
         />
       </View>
-      {positiveRecommendations > 0 && (
-        <TouchableOpacity
-          style={styles.recommendedRow}
-          onPress={openRecommendedModal}
-          activeOpacity={0.85}
-        >
-          <View style={styles.recommendedAvatars}>
-            {recommendedByPreview.slice(0, 2).map((u, idx) => (
-              <View
-                key={u.id}
-                style={[
-                  styles.recommendedAvatarWrapper,
-                  idx > 0 && styles.recommendedAvatarOverlap,
-                ]}
-              >
-                <Avatar
-                  uri={u.avatar || undefined}
-                  name={u.name}
-                  size={18}
-                  style={{ borderWidth: 1, borderColor: COLORS.white }}
-                />
-              </View>
-            ))}
-          </View>
-          <Text style={styles.recommendedText} numberOfLines={1}>
-            {recommendedText}
-          </Text>
-        </TouchableOpacity>
-      )}
 
       {/* Descripción del post (solo si tiene imágenes) */}
       {hasImages && (
@@ -178,7 +178,7 @@ const PostCard: React.FC<PostCardProps> = ({
             <Text style={styles.captionUser}>
               {item.user.nombre || item.user.name}
             </Text>
-            {item.content}
+            {" " + item.content}
           </Text>
         </View>
       )}

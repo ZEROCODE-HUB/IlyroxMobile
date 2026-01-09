@@ -53,7 +53,6 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
   onUserClick,
   currentUserId,
 }) => {
-  console.log(item);
   const { width, height } = useWindowDimensions();
   const { likes, isLiked, toggleLike } = useLikes({
     feedItemId: item.id,

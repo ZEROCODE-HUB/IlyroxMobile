@@ -27,14 +27,14 @@ interface FeedDetailProps {
   item: FeedItem;
   onClose: () => void;
   onUserClick?: (user: User) => void;
-  currentUserId?: string; // ← AGREGAR
+  currentUserId?: string;
 }
 
 const FeedDetail: React.FC<FeedDetailProps> = ({
   item,
   onClose,
   onUserClick,
-  currentUserId, // ← AGREGAR
+  currentUserId,
 }) => {
   const images = item.images || item.propertyDetails?.images || [];
   const [showComments, setShowComments] = useState(false);
@@ -175,8 +175,8 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
                   shareDescription={item.content.substring(0, 100)}
                   shareImageUrl={images[0]}
                   showContactButton={false}
-                  fetchCount={true}
                   orientation="horizontal"
+                  authorId={item.user.id}
                 />
               </View>
             )}
@@ -277,6 +277,7 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
                     shareTitle={`Post de ${item.user.nombre || item.user.name}`}
                     shareDescription={item.content.substring(0, 100)}
                     showContactButton={false}
+                    authorId={item.user.id}
                   />
                 </View>
               )}

@@ -20,7 +20,7 @@ export type Reel = {
   deleted_at: string | null;
 };
 
-export type ProfileContentType = 'properties' | 'posts' | 'reels';
+export type ProfileContentType = "properties" | "posts" | "reels";
 
 export type User = {
   id: string;
@@ -243,4 +243,18 @@ export type operaciones_propiedad = {
   activa: boolean;
   vigente_desde: string;
   vigente_hasta: string;
+};
+
+export type ReportesPropiedades = {
+  id: string;
+  propiedad_id: string;
+  reportado_por: string;
+  propietario_id: string;
+  motivo: string;
+  descripcion: string;
+  estado: "pendiente" | "revisado" | "accion_tomada";
+  revisado_por: string;
+  revisado_en: string;
+  created_at?: string;
+  updated_at?: string;
 };

@@ -43,13 +43,10 @@ import {
   INSTITUCIONES_GRAVAMEN,
   TIPOS_FINANCIAMIENTO,
   MONEDAS,
-  TIPOS_OPERACION,
   OPCIONES_AMUEBLADO,
   OPCIONES_SI_NO,
   TipoPrincipal,
   esTerreno,
-  esDepartamento,
-  esComercialIndustrial,
   getLabelRecamaras,
   getCamposVisibles,
 } from "../../constants/propertyData";

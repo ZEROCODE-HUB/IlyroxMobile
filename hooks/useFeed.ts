@@ -344,6 +344,7 @@ export function useFeed(options: UseFeedOptions = {}) {
                     `
                 id,
                 created_at,
+                created_by,
                 codigo_propiedad,
                 tipo,
                 subtipo,
@@ -480,6 +481,7 @@ export function useFeed(options: UseFeedOptions = {}) {
                 commentsList: [],
                 propertyDetails: {
                   id: property.id,
+                  creado_por: property.created_by,
                   code: property.codigo_propiedad || undefined,
                   title: `${property.tipo} en ${property.ciudad}`,
                   description: property.descripcion,

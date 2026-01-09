@@ -88,4 +88,16 @@ export const propertyService = {
       };
     });
   },
+
+  async getIdbyPropertyId(id: string) {
+    const { data, error } = await supabase
+      .from("propiedades")
+      .select("created_by")
+      .eq("id", id)
+      .single();
+
+    if (error) throw error;
+
+    return data.created_by;
+  },
 };

@@ -107,9 +107,9 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
           resizeMode="cover"
         />
 
-        {/* Play Icon Overlay */}
+        {/* Play Icon Overlay (Bottom Left) */}
         <View style={styles.playOverlay}>
-          <Ionicons name="play" size={32} color={COLORS.white} />
+          <Ionicons name="play" size={16} color={COLORS.white} />
         </View>
 
         {/* Duration Badge */}
@@ -191,11 +191,12 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   gridItem: {
-    width: ITEM_SIZE,
-    height: ITEM_SIZE * 1.5, // Reels are taller (9:16 aspect ratio)
-    marginBottom: 2,
-    marginRight: 2,
+    width: ITEM_SIZE - 2,
+    height: (ITEM_SIZE - 2) * 1.6, // Aspect ratio standard for reels
+    marginBottom: 3,
+    marginRight: 3,
     backgroundColor: COLORS.background,
+    borderRadius: 8,
     overflow: "hidden",
     position: "relative",
   },
@@ -205,13 +206,12 @@ const styles = StyleSheet.create({
   },
   playOverlay: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: COLORS.blackTransparent30,
-    justifyContent: "center",
-    alignItems: "center",
+    bottom: 6,
+    left: 6,
+    zIndex: 1,
+    textShadowColor: "rgba(0, 0, 0, 0.75)",
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
   },
   durationBadge: {
     position: "absolute",
