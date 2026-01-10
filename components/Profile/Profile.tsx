@@ -54,6 +54,7 @@ import SelectionModal from "../modals/SelectionModal";
 import { useProfile } from "../../hooks/profile/useProfile";
 import ReelDetail from "../Reel/ReelDetail";
 import FeedDetail from "../Feed/FeedDetail";
+import CreateProperty from "../CreateContent/CreateProperty";
 
 interface ProfileProps {
   userId?: string | null;
@@ -106,6 +107,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   const [showRecommendedByModal, setShowRecommendedByModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<FeedItem | null>(null);
   const [selectedReel, setSelectedReel] = useState<FeedItem | null>(null);
+
+  const [showModal, setShowModal] = useState(false);
 
   // Computed
   const targetUserId = userId || authUser?.id;
@@ -797,7 +800,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             onPropertyPress={(property) => setSelectedProperty(property)}
             isOwnProfile={isMe}
             onEditPress={(property) => {
-              navigation.navigate("EditProperty", { propertyId: property.id });
+              setShowModal(true);
+              setSelectedProperty(property);
             }}
             onDelete={fetchProfileData}
           />
@@ -867,6 +871,18 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                 navigation.navigate(screen, params);
               },
             }}
+          />
+        </Modal>
+      )}
+      {showModal && (
+        <Modal
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowModal(false)}
+        >
+          <CreateProperty
+            onBack={() => setShowModal(false)}
+            propertyId={selectedProperty?.id}
           />
         </Modal>
       )}

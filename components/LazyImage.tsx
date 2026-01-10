@@ -8,6 +8,7 @@ import {
   StyleProp,
   FlatList,
   Dimensions,
+  Text,
 } from "react-native";
 import { COLORS } from "../constants/colors";
 

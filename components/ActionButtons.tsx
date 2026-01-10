@@ -85,12 +85,9 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
       if (targetId) {
         fetchReportCount();
         if (!propertyAuthorId) {
-          propertyService
-            .getIdbyPropertyId(targetId)
-            .then((id) => {
-              if (id) setPropertyAuthorId(id);
-            })
-            .catch((err) => console.error("Error fetching owner ID:", err));
+          propertyService.getIdbyPropertyId(targetId).then((id) => {
+            if (id) setPropertyAuthorId(id);
+          });
         }
       }
     }

@@ -18,6 +18,7 @@ import { SelectionModal } from "../modals";
 import NumberInputModal from "../modals/NumberInputModal";
 import RadioGroupSelector from "../common/RadioGroupSelector";
 import CascadeLocationSelector from "../common/CascadeLocationSelector";
+import { usePropertyMutation } from "../../hooks/usePropertyMutation";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
 import { useImageUpload } from "../../hooks";
@@ -25,11 +26,6 @@ import LocationPicker from "./LocationPicker";
 import { COLORS } from "../../constants/colors";
 
 // Importar helpers de catálogos
-import {
-  findInstitucionFinancieraId,
-  findAmenidadesIds,
-  findTiposFinanciamientoIds,
-} from "../../lib/catalogHelpers";
 
 // Importar constantes
 import {
@@ -56,14 +52,22 @@ import { ViewImage } from "../modals/ViewImage";
 
 interface CreatePropertyProps {
   onBack: () => void;
+  propertyId?: string;
 }
 
-export default function CreateProperty({ onBack }: CreatePropertyProps) {
+export default function CreateProperty({
+  onBack,
+  propertyId,
+}: CreatePropertyProps) {
   const { top } = useStableSafeInsets();
   const { user } = useAuth();
+  const { saveProperty } = usePropertyMutation();
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isLoadingProperty, setIsLoadingProperty] = useState(false);
   const { uploadImage } = useImageUpload();
+
+  const [status, setStatus] = useState<string>("Publicada");
 
   // ============================================
   // 1. GALERÍA DE IMÁGENES
@@ -185,6 +189,7 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
     useState(false);
   const [showNivelesModal, setShowNivelesModal] = useState(false);
   const [showAntiguedadModal, setShowAntiguedadModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
 
   // NumberInputModal states
   const [showNumberInput, setShowNumberInput] = useState(false);
@@ -210,6 +215,14 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
       });
     }
   };
+
+  const PROPERTY_STATUS = [
+    "Publicada",
+    "Suspendida",
+    "Rentada",
+    "Reservada",
+    "Vendida",
+  ] as const;
 
   React.useEffect(() => {
     if (ubicacionData.estado) clearError("estado");
@@ -250,6 +263,217 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
     if (location.latitude !== 0 && location.longitude !== 0)
       clearError("location");
   }, [location]);
+
+  // ============================================
+  // LOAD DATA FOR EDITING
+  // ============================================
+  React.useEffect(() => {
+    if (propertyId) {
+      fetchPropertyDetails();
+    }
+  }, [propertyId]);
+
+  const fetchPropertyDetails = async () => {
+    try {
+      setIsLoadingProperty(true);
+      // Ajusta la consulta según tus relaciones reales en Supabase
+      const { data, error } = await supabase
+        .from("propiedades")
+        .select(
+          `
+          *,
+          operaciones_propiedad (*),
+          propiedad_amenidades (
+            catalogo_amenidades (nombre)
+          ),
+          propiedad_financiamientos (
+            catalogo_tipos_financiamiento (nombre)
+          ),
+          propiedad_gravamenes (
+            monto,
+            catalogo_instituciones_financieras (nombre)
+          )
+        `
+        )
+        .eq("id", propertyId)
+        .single();
+
+      if (error) throw error;
+      if (data) loadPropertyData(data);
+    } catch (e) {
+      console.error("Error fetching property:", e);
+      Alert.alert("Error", "No se pudo cargar la información de la propiedad");
+      onBack();
+    } finally {
+      setIsLoadingProperty(false);
+    }
+  };
+
+  const loadPropertyData = (data: any) => {
+    // 1. Imágenes
+    if (data.fotos && Array.isArray(data.fotos)) {
+      setImages(data.fotos);
+    }
+
+    // 2. Info Básica
+    setDescripcion(data.descripcion || "");
+    setStatus(data.status || "Publicada");
+    setTipoPrincipal(data.tipo as TipoPrincipal);
+    setSubtipo(data.subtipo || "");
+
+    // 3. Ubicación
+    setUbicacionData({
+      estado: data.estado || "",
+      ciudad: data.ciudad || "",
+      municipio: data.municipio || "",
+      colonia: data.colonia || "",
+    });
+    setCalle(data.calle || "");
+    setNumeroExterior(data.numero_exterior || "");
+    setNumeroInterior(data.numero_interior || "");
+    setCodigoPostal(""); // Si lo guardaras en BD, ponlo aquí.
+    setLocation({
+      latitude: data.latitud || 0,
+      longitude: data.longitud || 0,
+    });
+
+    // 4. Características Físicas
+    setRecamaras(data.habitaciones?.toString() || "0");
+    setBanosCompletos(data.banos?.toString() || "0");
+    setMediosBanos(""); // Si tienes campo medios_banos, úsalo
+    setEstacionamientos(data.estacionamientos?.toString() || "0");
+    setM2Construccion(data.metros_cuadrados_construccion?.toString() || "");
+    setM2Terreno(data.metros_cuadrados_terreno?.toString() || "");
+    setNiveles(data.pisos?.toString() || "1");
+    setAntiguedad(data.antiguedad || "");
+    setAmueblado(data.amueblado || "No");
+    setPetFriendly(data.pet_friendly || "No");
+
+    // 5. Operaciones
+    const ops = data.operaciones_propiedad || [];
+    const ventaOp = ops.find((o: any) => o.tipo_operacion === "venta");
+    const rentaOp = ops.find((o: any) => o.tipo_operacion === "renta");
+
+    if (ventaOp && rentaOp) {
+      setTipoOperacion("ambas");
+    } else if (ventaOp) {
+      setTipoOperacion("venta");
+    } else if (rentaOp) {
+      setTipoOperacion("renta");
+    }
+
+    // Configurar campos de VENTA
+    if (ventaOp) {
+      setPrecioVenta(ventaOp.precio?.toString() || "");
+      setMoneda(ventaOp.moneda || "MXN");
+      setComparteComision(ventaOp.comparte_comision ? "Sí" : "No");
+
+      if (ventaOp.comparte_comision) {
+        setComisionTipo(
+          ventaOp.comision_tipo === "monto_fijo" ? "monto" : "porcentaje"
+        );
+        const valor =
+          ventaOp.comision_tipo === "monto_fijo"
+            ? ventaOp.comision_monto_fijo
+            : ventaOp.comision_porcentaje;
+        setComisionValor(valor?.toString() || "");
+
+        // Compartida
+        if (ventaOp.porcentaje_comision_compartida) {
+          setComisionCompartidaTipo("porcentaje");
+          setComisionCompartidaValor(
+            ventaOp.porcentaje_comision_compartida.toString()
+          );
+        } else if (ventaOp.monto_comision_compartida) {
+          setComisionCompartidaTipo("monto");
+          setComisionCompartidaValor(
+            ventaOp.monto_comision_compartida.toString()
+          );
+        }
+        setCondicionesComision(ventaOp.condiciones_comision_compartida || "");
+      }
+    }
+
+    // Configurar campos de RENTA
+    if (rentaOp) {
+      setPrecioRenta(rentaOp.precio?.toString() || "");
+      if (!ventaOp) setMoneda(rentaOp.moneda || "MXN");
+
+      // Si es "ambas", usamos variables secundarias
+      const isAmbas = !!ventaOp;
+
+      const setComparte = isAmbas
+        ? setComparteComisionRenta
+        : setComparteComision;
+      const setTipo = isAmbas ? setComisionTipoRenta : setComisionTipo;
+      const setValor = isAmbas ? setComisionValorRenta : setComisionValor;
+      const setCompartidaTipo = isAmbas
+        ? setComisionCompartidaTipoRenta
+        : setComisionCompartidaTipo;
+      const setCompartidaValor = isAmbas
+        ? setComisionCompartidaValorRenta
+        : setComisionCompartidaValor;
+      const setCondiciones = isAmbas
+        ? setCondicionesComisionRenta
+        : setCondicionesComision;
+
+      setComparte(rentaOp.comparte_comision ? "Sí" : "No");
+
+      if (rentaOp.comparte_comision) {
+        setTipo(
+          rentaOp.comision_tipo === "monto_fijo" ? "monto" : "porcentaje"
+        );
+        const valor =
+          rentaOp.comision_tipo === "monto_fijo"
+            ? rentaOp.comision_monto_fijo
+            : rentaOp.comision_porcentaje;
+        setValor(valor?.toString() || "");
+
+        if (rentaOp.porcentaje_comision_compartida) {
+          setCompartidaTipo("porcentaje");
+          setCompartidaValor(rentaOp.porcentaje_comision_compartida.toString());
+        } else if (rentaOp.monto_comision_compartida) {
+          setCompartidaTipo("monto");
+          setCompartidaValor(rentaOp.monto_comision_compartida.toString());
+        }
+        setCondiciones(rentaOp.condiciones_comision_compartida || "");
+      }
+    }
+
+    // 6. Amenidades
+    if (data.propiedad_amenidades) {
+      const names = data.propiedad_amenidades
+        .map((pa: any) => pa.catalogo_amenidades?.nombre)
+        .filter(Boolean);
+      setAmenidadesSeleccionadas(names);
+    }
+
+    // 7. Financiamiento
+    if (
+      data.propiedad_financiamientos &&
+      data.propiedad_financiamientos.length > 0
+    ) {
+      setAceptaFinanciamiento("Sí");
+      const names = data.propiedad_financiamientos
+        .map((pf: any) => pf.catalogo_tipos_financiamiento?.nombre)
+        .filter(Boolean);
+      setTiposFinanciamientoSeleccionados(names);
+    } else {
+      setAceptaFinanciamiento("No");
+    }
+
+    // 8. Gravamen
+    if (data.propiedad_gravamenes && data.propiedad_gravamenes.length > 0) {
+      setTieneGravamen("Sí");
+      const grav = data.propiedad_gravamenes[0];
+      setInstitucionGravamen(
+        grav.catalogo_instituciones_financieras?.nombre || ""
+      );
+      setMontoGravamen(grav.monto?.toString() || "");
+    } else {
+      setTieneGravamen("No");
+    }
+  };
 
   // ============================================
   // HELPERS
@@ -403,6 +627,12 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
       const uploadedUrls: string[] = [];
 
       for (let i = 0; i < images.length; i++) {
+        // Verificar si la imagen ya es una URL remota
+        if (images[i].startsWith("http")) {
+          uploadedUrls.push(images[i]);
+          continue;
+        }
+
         const url = await uploadImage(images[i], "feed-images", "properties");
         if (url) {
           uploadedUrls.push(url);
@@ -416,53 +646,46 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
 
       setUploadProgress(40);
 
-      // 2. Crear propiedad - CORREGIDO: Campos según esquema real
-      const { data: propiedad, error: propError } = await supabase
-        .from("propiedades")
-        .insert({
-          tipo: tipoPrincipal,
-          subtipo: subtipo || PROPERTY_TYPES[tipoPrincipal][0],
-          descripcion: descripcion, // ✅ SÍ existe en BD
-          ciudad: ubicacionData.ciudad,
-          municipio: ubicacionData.municipio,
-          estado: ubicacionData.estado,
-          colonia: ubicacionData.colonia || null, // ✅ SÍ existe en BD
-          calle: calle || null,
-          numero_exterior: numeroExterior || null,
-          numero_interior: numeroInterior || null,
-          latitud: location.latitude,
-          longitud: location.longitude,
-          fotos: uploadedUrls,
-          habitaciones: camposVisibles.recamaras ? parseInt(recamaras) || 0 : 0,
-          banos: camposVisibles.banos ? parseInt(banosCompletos) || 0 : 0,
-          estacionamientos: camposVisibles.estacionamientos
-            ? parseInt(estacionamientos) || 0
-            : 0,
-          metros_cuadrados_construccion: camposVisibles.m2Construccion
-            ? parseFloat(m2Construccion) || null
-            : null,
-          metros_cuadrados_terreno: camposVisibles.m2Terreno // ✅ SÍ existe en BD
-            ? parseFloat(m2Terreno) || null
-            : null,
-          pisos: camposVisibles.niveles ? parseInt(niveles) || 1 : null,
-          amueblado: camposVisibles.amueblado ? amueblado : null,
-          pet_friendly: camposVisibles.petFriendly ? petFriendly : "No",
-          antiguedad: camposVisibles.antiguedad ? antiguedad : null,
-          created_by: user.id, // ✅ Nombre correcto del campo en BD
-        })
-        .select()
-        .single();
+      // 2. Datos de la Propiedad
+      const propertyData = {
+        tipo: tipoPrincipal,
+        subtipo: subtipo || PROPERTY_TYPES[tipoPrincipal][0],
+        descripcion: descripcion,
+        ciudad: ubicacionData.ciudad,
+        municipio: ubicacionData.municipio,
+        estado: ubicacionData.estado,
+        colonia: ubicacionData.colonia || null,
+        calle: calle || null,
+        numero_exterior: numeroExterior || null,
+        numero_interior: numeroInterior || null,
+        latitud: location.latitude,
+        longitud: location.longitude,
+        fotos: uploadedUrls,
+        habitaciones: camposVisibles.recamaras ? parseInt(recamaras) || 0 : 0,
+        banos: camposVisibles.banos ? parseInt(banosCompletos) || 0 : 0,
+        estacionamientos: camposVisibles.estacionamientos
+          ? parseInt(estacionamientos) || 0
+          : 0,
+        metros_cuadrados_construccion: camposVisibles.m2Construccion
+          ? parseFloat(m2Construccion) || null
+          : null,
+        metros_cuadrados_terreno: camposVisibles.m2Terreno
+          ? parseFloat(m2Terreno) || null
+          : null,
+        pisos: camposVisibles.niveles ? parseInt(niveles) || 1 : null,
+        amueblado: camposVisibles.amueblado ? amueblado : null,
+        pet_friendly: camposVisibles.petFriendly ? petFriendly : "No",
+        antiguedad: camposVisibles.antiguedad ? antiguedad : null,
+        status: status,
+        activo: status === "Publicada",
+        created_by: user.id,
+      };
 
-      if (propError) throw propError;
-
-      setUploadProgress(50);
-
-      // 3. Crear operación(es) de venta/renta con comisión
+      // 3. Preparar Operaciones
       const operaciones = [];
 
       if (tipoOperacion === "venta" || tipoOperacion === "ambas") {
         operaciones.push({
-          propiedad_id: propiedad.id,
           tipo_operacion: "venta",
           precio: parseFloat(precioVenta.replace(/,/g, "")),
           moneda: moneda,
@@ -497,10 +720,7 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
       }
 
       if (tipoOperacion === "renta" || tipoOperacion === "ambas") {
-        // Si es "ambas", usamos las variables de Renta secundarias.
-        // Si es "renta" pura, usamos las variables principales (por defecto).
         const isAmbas = tipoOperacion === "ambas";
-
         const comparte = isAmbas ? comparteComisionRenta : comparteComision;
         const tipo = isAmbas ? comisionTipoRenta : comisionTipo;
         const valor = isAmbas ? comisionValorRenta : comisionValor;
@@ -515,7 +735,6 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
           : condicionesComision;
 
         operaciones.push({
-          propiedad_id: propiedad.id,
           tipo_operacion: "renta",
           precio: parseFloat(precioRenta.replace(/,/g, "")),
           moneda: moneda,
@@ -543,109 +762,46 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
         });
       }
 
-      const { error: opError } = await supabase
-        .from("operaciones_propiedad")
-        .insert(operaciones);
-
-      if (opError) throw opError;
-
       setUploadProgress(60);
 
-      // 4. Crear gravamen si existe
-      if (tieneGravamen === "Sí" && institucionGravamen) {
-        const institucionId = await findInstitucionFinancieraId(
-          institucionGravamen
-        );
-
-        if (institucionId) {
-          const { error: gravamenError } = await supabase
-            .from("propiedad_gravamenes")
-            .insert({
-              propiedad_id: propiedad.id,
-              institucion_id: institucionId,
-              monto: montoGravamen ? parseFloat(montoGravamen) : null,
-              notas: null,
-            });
-
-          if (gravamenError) {
-            console.error("Error creando gravamen:", gravamenError);
-          }
-        } else {
-          console.warn(
-            "No se encontró ID para institución:",
-            institucionGravamen
-          );
-        }
-      }
-
-      setUploadProgress(70);
-
-      // 5. Crear amenidades
-      if (amenidadesSeleccionadas.length > 0) {
-        const amenidadesIds = await findAmenidadesIds(amenidadesSeleccionadas);
-
-        if (amenidadesIds.length > 0) {
-          const amenidadesInserts = amenidadesIds.map((amenidadId) => ({
-            propiedad_id: propiedad.id,
-            amenidad_id: amenidadId,
-          }));
-
-          const { error: amenidadesError } = await supabase
-            .from("propiedad_amenidades")
-            .insert(amenidadesInserts);
-
-          if (amenidadesError) {
-            console.error("Error creando amenidades:", amenidadesError);
-          }
-        }
-      }
+      // 4. Preparar Datos Relacionados
+      const relatedData = {
+        operaciones,
+        amenidades: amenidadesSeleccionadas,
+        financiamientos:
+          aceptaFinanciamiento === "Sí" ? tiposFinanciamientoSeleccionados : [],
+        gravamenes:
+          tieneGravamen === "Sí" && institucionGravamen
+            ? [
+                {
+                  institucion: institucionGravamen,
+                  monto: montoGravamen ? parseFloat(montoGravamen) : null,
+                },
+              ]
+            : [],
+      };
 
       setUploadProgress(80);
 
-      // 6. Crear financiamientos si acepta
-      if (
-        aceptaFinanciamiento === "Sí" &&
-        tiposFinanciamientoSeleccionados.length > 0
-      ) {
-        const financiamientosIds = await findTiposFinanciamientoIds(
-          tiposFinanciamientoSeleccionados
-        );
-
-        if (financiamientosIds.length > 0) {
-          const financiamientosInserts = financiamientosIds.map((tipoId) => ({
-            propiedad_id: propiedad.id,
-            tipo_financiamiento_id: tipoId,
-          }));
-
-          const { error: financiamientoError } = await supabase
-            .from("propiedad_financiamientos")
-            .insert(financiamientosInserts);
-
-          if (financiamientoError) {
-            console.error(
-              "Error creando financiamientos:",
-              financiamientoError
-            );
-          }
-        }
-      }
-
-      setUploadProgress(90);
-
-      // 7. Crear feed_item
-      const { error: feedError } = await supabase.from("feed_items").insert({
-        tipo_contenido: "propiedad",
-        contenido_id: propiedad.id,
-        publicado_por: user.id,
-        visibilidad: "publico",
-        estado_moderacion: "activo",
-      });
-
-      if (feedError) throw feedError;
+      // 5. Guardar Propiedad
+      await saveProperty(propertyId, propertyData, relatedData);
 
       setUploadProgress(100);
 
-      Alert.alert("¡Éxito!", "Propiedad publicada correctamente");
+      Alert.alert(
+        "¡Éxito!",
+        propertyId
+          ? "Propiedad actualizada correctamente"
+          : "Propiedad publicada correctamente",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              if (onBack) onBack();
+            },
+          },
+        ]
+      );
 
       setTimeout(() => {
         onBack();
@@ -854,7 +1010,9 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Crear Propiedad</Text>
+        <Text style={styles.headerTitle}>
+          {propertyId ? "Editar Propiedad" : "Crear Propiedad"}
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -906,6 +1064,27 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
             <Text style={styles.errorText}>{errors.images}</Text>
           )}
         </View>
+
+        {/* ============================================ */}
+        {/* Update Estado */}
+        {/* ============================================ */}
+
+        {propertyId && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Estado de la Propiedad</Text>
+            <TouchableOpacity
+              style={styles.selector}
+              onPress={() => setShowStatusModal(true)}
+            >
+              <Text style={styles.selectorText}>{status}</Text>
+              <Ionicons
+                name="chevron-down"
+                size={20}
+                color={COLORS.textTertiary}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* ============================================ */}
         {/* 2. INFORMACIÓN BÁSICA */}
@@ -1647,7 +1826,9 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
                 size={24}
                 color={COLORS.white}
               />
-              <Text style={styles.publishText}>Publicar Propiedad</Text>
+              <Text style={styles.publishText}>
+                {propertyId ? "Actualizar Propiedad" : "Publicar Propiedad"}
+              </Text>
             </>
           )}
         </TouchableOpacity>
@@ -1679,6 +1860,14 @@ export default function CreateProperty({ onBack }: CreatePropertyProps) {
         placeholder="Ingresa un número"
         maxValue={999}
         minValue={0}
+      />
+      <SelectionModal
+        visible={showStatusModal}
+        onClose={() => setShowStatusModal(false)}
+        onSelect={(val) => setStatus(val)}
+        title="Estado de la Propiedad"
+        options={[...PROPERTY_STATUS]}
+        currentValue={status}
       />
     </ScreenWrapper>
   );
@@ -1786,7 +1975,10 @@ const styles = StyleSheet.create({
   },
   textArea: {
     height: 100,
+    width: "100%",
     textAlignVertical: "top",
+    fontSize: 15,
+    padding: 14,
   },
   charCount: {
     fontSize: 11,

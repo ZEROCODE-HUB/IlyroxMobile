@@ -154,7 +154,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
         {/* Badge de operación (Sale/Rent) */}
         <View style={styles.operationBadge}>
-          <Text style={styles.operationText}>{property.operation}</Text>
+          <Text style={styles.operationText}>{property.status}</Text>
         </View>
 
         {/* Botones de acción flotantes (Columna derecha) */}

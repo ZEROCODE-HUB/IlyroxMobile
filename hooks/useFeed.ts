@@ -507,10 +507,11 @@ export function useFeed(options: UseFeedOptions = {}) {
                   amenities: [],
                   type: "habitacional" as const,
                   subtype: property.subtipo || property.tipo,
-                  operation: (operation?.tipo_operacion === "venta"
-                    ? "Publicada"
-                    : "Rentada") as "Publicada" | "Rentada",
-                  status: "Available" as const,
+                  operation:
+                    operation?.tipo_operacion === "venta"
+                      ? "Publicada"
+                      : "Rentada",
+                  status: "Publicada" as const,
                 },
               };
             }

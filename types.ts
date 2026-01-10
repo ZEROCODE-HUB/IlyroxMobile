@@ -129,6 +129,7 @@ export type FeedItem = {
   comments: number;
   commentsList?: Comment[];
   timestamp: string;
+  status: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
 };
 
 export type Lead = {

@@ -10,6 +10,7 @@ import {
   Dimensions,
   Alert,
   Platform,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
@@ -22,6 +23,7 @@ import usePropertyDetails from "../../hooks/usePropertyDetails";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MapDetails } from "./MapDetails";
+import CreateProperty from "../CreateContent/CreateProperty";
 
 const { width } = Dimensions.get("window");
 
@@ -41,6 +43,8 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   const [property, setProperty] = useState<any>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showComments, setShowComments] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [propertyIdModal, setPropertyIdModal] = useState<string | null>(null);
 
   // Hook de view tracking
   const { trackInteraction } = useViewTracking({
@@ -509,9 +513,8 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
             <TouchableOpacity
               style={[styles.mainContactBtn, { backgroundColor: COLORS.info }]}
               onPress={() => {
-                navigation.navigate("EditProperty", {
-                  propertyId: propertyDetails.id,
-                });
+                setShowModal(true);
+                setPropertyIdModal(propertyDetails.id);
               }}
             >
               <Ionicons
@@ -546,6 +549,13 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
         feedItemId={propertyDetails.feed_items.id}
         currentUserId={user?.id}
       />
+
+      <Modal visible={showModal} onRequestClose={() => setShowModal(false)}>
+        <CreateProperty
+          onBack={() => setShowModal(false)}
+          propertyId={propertyIdModal}
+        />
+      </Modal>
     </SafeAreaView>
   );
 };
