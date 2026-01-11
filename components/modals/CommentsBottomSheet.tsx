@@ -248,20 +248,28 @@ export default function CommentsBottomSheet({
   const handlePostComment = useCallback(async () => {
     if (!canSend) return;
 
-    const success = await addComment(commentText, imageUri, replyTo || undefined);
+    const success = await addComment(
+      commentText,
+      imageUri,
+      replyTo || undefined
+    );
 
     if (success) {
       setCommentText("");
       setImageUri("");
       setReplyTo(null);
       Keyboard.dismiss();
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      setTimeout(
+        () => flatListRef.current?.scrollToEnd({ animated: true }),
+        100
+      );
     }
   }, [commentText, imageUri, replyTo, canSend, addComment]);
 
   const handlePickImage = useCallback(async () => {
     if (Platform.OS !== "web") {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") return;
     }
 
@@ -384,22 +392,34 @@ export default function CommentsBottomSheet({
               <View style={styles.contextBar}>
                 {!!imageUri && (
                   <View style={styles.previewContainer}>
-                    <Image source={{ uri: imageUri }} style={styles.previewImage} />
+                    <Image
+                      source={{ uri: imageUri }}
+                      style={styles.previewImage}
+                    />
                     <TouchableOpacity
                       onPress={() => setImageUri("")}
                       style={styles.removePreview}
                     >
-                      <Ionicons name="close-circle" size={20} color={COLORS.white} />
+                      <Ionicons
+                        name="close-circle"
+                        size={20}
+                        color={COLORS.white}
+                      />
                     </TouchableOpacity>
                   </View>
                 )}
                 {!!replyTo && (
                   <View style={styles.replyBadge}>
                     <Text style={styles.replyBadgeText}>
-                      Respondiendo a: <Text style={styles.replyBadgeName}>{replyToUser}</Text>
+                      Respondiendo a:{" "}
+                      <Text style={styles.replyBadgeName}>{replyToUser}</Text>
                     </Text>
                     <TouchableOpacity onPress={() => setReplyTo(null)}>
-                      <Ionicons name="close" size={20} color={COLORS.textSecondary} />
+                      <Ionicons
+                        name="close"
+                        size={20}
+                        color={COLORS.textSecondary}
+                      />
                     </TouchableOpacity>
                   </View>
                 )}
@@ -437,7 +457,10 @@ export default function CommentsBottomSheet({
               <TouchableOpacity
                 onPress={handlePostComment}
                 disabled={!canSend || posting}
-                style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
+                style={[
+                  styles.sendButton,
+                  !canSend && styles.sendButtonDisabled,
+                ]}
               >
                 {posting ? (
                   <ActivityIndicator size="small" color={COLORS.white} />
@@ -452,11 +475,6 @@ export default function CommentsBottomSheet({
     </Modal>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
-
 const styles = StyleSheet.create({
   // Modal structure
   overlay: {
