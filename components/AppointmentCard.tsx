@@ -27,14 +27,14 @@ interface AppointmentCardProps {
   };
   onMarkComplete: (id: string) => void;
   onOpenRating: (id: string) => void;
-  onMessage?: (id: string) => void;
+  onContact?: (id: string) => void;
 }
 
 export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   appointment,
   onMarkComplete,
   onOpenRating,
-  onMessage,
+  onContact,
 }) => {
   // Verificar si la fecha y hora de la cita ya pasaron
   const canMarkAsCompleted = () => {
@@ -77,10 +77,10 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
               </View>
             </View>
           </View>
-          {onMessage && (
+          {onContact && (
             <TouchableOpacity
               style={styles.msgButton}
-              onPress={() => onMessage(appointment.id)}
+              onPress={() => onContact(appointment.id)}
             >
               <Ionicons
                 name="chatbubble-outline"

@@ -1,7 +1,7 @@
 /**
  * MessagingScreen.tsx - REFACTORIZADO
  * Pantalla principal de mensajería integrada con Supabase
- * 
+ *
  * FIXES:
  * - useConversations solo se ejecuta cuando se muestra la lista
  * - Optimización de re-renders
@@ -25,29 +25,33 @@ import HeaderChat from "./Messaging/HeaderChat";
 interface MessagingScreenProps {
   initialUser?: User;
   initialPropertyId?: string;
+  conversationId?: string;
   onBack?: () => void;
 }
 
 export default function MessagingScreen({
   initialUser,
   initialPropertyId,
+  conversationId,
   onBack,
 }: MessagingScreenProps) {
   const { top } = useStableSafeInsets();
   const { profile } = useAuth();
   const navigation = useNavigation<any>();
-  
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+
+  const [activeConversationId, setActiveConversationId] = useState<
+    string | null
+  >(null);
   const [activePropertyId, setActivePropertyId] = useState<string | null>(null);
   const [otherUser, setOtherUser] = useState<any>(null);
   const [headerHeight, setHeaderHeight] = useState<number>(64);
-  
+
   const lastProcessedUserId = useRef<string | null>(null);
   const isInitializedRef = useRef(false);
 
   // FIX: Solo llamar useConversations cuando NO estamos en un chat activo
   const isInChatView = !!(activeConversationId && otherUser);
-  
+
   // Este hook se ejecuta condicionalmente
   const conversationsHook = useConversations(
     !isInChatView ? profile?.id : undefined
@@ -66,6 +70,34 @@ export default function MessagingScreen({
 
   // Manejar initialUser solo una vez
   useEffect(() => {
+    // Si tenemos un conversationId explícito, usarlo directamente
+    if (conversationId && initialUser) {
+      if (
+        !isInitializedRef.current ||
+        lastProcessedUserId.current !== initialUser.id
+      ) {
+        isInitializedRef.current = true;
+        lastProcessedUserId.current = initialUser.id;
+
+        setActiveConversationId(conversationId);
+        setOtherUser({
+          id: initialUser.id,
+          nombre:
+            (initialUser as any).nombre ||
+            initialUser.name?.split(" ")[0] ||
+            "",
+          apellido_paterno:
+            (initialUser as any).apellido_paterno ||
+            initialUser.name?.split(" ")[1] ||
+            "",
+          foto:
+            (initialUser as any).foto || (initialUser as any).avatar || null,
+        });
+        setActivePropertyId(initialPropertyId || null);
+      }
+      return;
+    }
+
     if (
       initialUser &&
       profile?.id &&
@@ -76,7 +108,7 @@ export default function MessagingScreen({
       lastProcessedUserId.current = initialUser.id;
       handleInitialUser(initialUser);
     }
-  }, [initialUser?.id, initialPropertyId, profile?.id]);
+  }, [initialUser?.id, initialPropertyId, profile?.id, conversationId]);
 
   const handleInitialUser = async (user: User) => {
     if (!profile?.id) return;

@@ -6,6 +6,7 @@ export type Post = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
 };
 
 export type Reel = {
@@ -15,6 +16,7 @@ export type Reel = {
   thumbnail_url: string | null;
   descripcion: string | null;
   duracion_segundos: number | null;
+  status?: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -129,7 +131,7 @@ export type FeedItem = {
   comments: number;
   commentsList?: Comment[];
   timestamp: string;
-  status: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
+  status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
 };
 
 export type Lead = {

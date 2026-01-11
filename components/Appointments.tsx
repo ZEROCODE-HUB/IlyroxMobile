@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { useChatInitiator } from "../hooks/messaging/useChatInitiator";
 
 type AppointmentStatus = "pending" | "completed" | "cancelled" | "rated";
 
@@ -42,6 +43,7 @@ interface AppointmentItem {
     avatar: string | null;
     role: string;
   };
+  propertyId?: string;
   propertyTitle?: string;
   propertyImage?: string;
   location: string;
@@ -50,12 +52,25 @@ interface AppointmentItem {
   status: AppointmentStatus;
   rating?: number;
   featureRatings?: FeatureRatings;
+  agente?: {
+    id: string;
+    nombre: string;
+    apellido_paterno: string;
+    foto: string | null;
+  };
+  cliente?: {
+    id: string;
+    nombre: string;
+    apellido_paterno: string;
+    foto: string | null;
+  };
 }
 
 const Appointments: React.FC = () => {
   const navigation = useNavigation<any>();
   const { profile } = useAuth();
   const { showToast } = useToast();
+  const { handleContact } = useChatInitiator();
   const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,71 +91,79 @@ const Appointments: React.FC = () => {
       setLoading(true);
 
       let query = supabase
-        .from('citas')
-        .select(`
+        .from("citas")
+        .select(
+          `
           *,
           agente:perfiles!agente_id(id, nombre, apellido_paterno, foto, rol),
           cliente:perfiles!cliente_id(id, nombre, apellido_paterno, foto, rol),
           propiedad:propiedades(id, tipo, subtipo, ciudad, fotos),
           resenas:resenas(id, revisor_id, calificacion_general)
-        `)
+        `
+        )
         .or(`agente_id.eq.${profile.id},cliente_id.eq.${profile.id}`)
-        .is('deleted_at', null);
+        .is("deleted_at", null);
 
       // Filtrar según el tab activo
-      if (activeTab === 'upcoming') {
+      if (activeTab === "upcoming") {
         query = query
-          .eq('estado', 'pendiente')
-          .gte('fecha', new Date().toISOString().split('T')[0]);
+          .eq("estado", "pendiente")
+          .gte("fecha", new Date().toISOString().split("T")[0]);
       } else {
         query = query.or(
-          `estado.in.(completada,cancelada),fecha.lt.${new Date().toISOString().split('T')[0]}`
+          `estado.in.(completada,cancelada),fecha.lt.${
+            new Date().toISOString().split("T")[0]
+          }`
         );
       }
 
-      query = query.order('fecha', { ascending: activeTab === 'upcoming' });
-      query = query.order('hora', { ascending: activeTab === 'upcoming' });
+      query = query.order("fecha", { ascending: activeTab === "upcoming" });
+      query = query.order("hora", { ascending: activeTab === "upcoming" });
 
       const { data, error } = await query;
 
       if (error) throw error;
 
       // Transformar datos
-      const transformedData: AppointmentItem[] = (data || []).map((cita: any) => {
-        const isAgente = cita.agente_id === profile.id;
-        const otherUser = isAgente ? cita.cliente : cita.agente;
+      const transformedData: AppointmentItem[] = (data || []).map(
+        (cita: any) => {
+          const isAgente = cita.agente_id === profile.id;
+          const otherUser = isAgente ? cita.cliente : cita.agente;
 
-        // Verificar si el usuario actual ya calificó esta cita
-        const userReview = (cita.resenas || []).find(
-          (resena: any) => resena.revisor_id === profile.id
-        );
+          // Verificar si el usuario actual ya calificó esta cita
+          const userReview = (cita.resenas || []).find(
+            (resena: any) => resena.revisor_id === profile.id
+          );
 
-        const hasUserRated = !!userReview;
+          const hasUserRated = !!userReview;
 
-        return {
-          ...cita,
-          user: {
-            name: `${otherUser.nombre || ''} ${otherUser.apellido_paterno || ''}`.trim(),
-            avatar: otherUser.foto,
-            role: isAgente ? 'Cliente' : 'Agente',
-          },
-          propertyTitle: cita.propiedad
-            ? `${cita.propiedad.tipo} en ${cita.propiedad.ciudad}`
-            : undefined,
-          propertyImage: cita.propiedad?.fotos?.[0],
-          location: cita.propiedad?.ciudad || 'No especificado',
-          date: formatDate(cita.fecha),
-          time: formatTime(cita.hora),
-          status: cita.estado as AppointmentStatus,
-          hasUserRated,
-          rating: userReview?.calificacion_general,
-        };
-      });
+          return {
+            ...cita,
+            user: {
+              name: `${otherUser.nombre || ""} ${
+                otherUser.apellido_paterno || ""
+              }`.trim(),
+              avatar: otherUser.foto,
+              role: isAgente ? "Cliente" : "Agente",
+            },
+            propertyTitle: cita.propiedad
+              ? `${cita.propiedad.tipo} en ${cita.propiedad.ciudad}`
+              : undefined,
+            propertyImage: cita.propiedad?.fotos?.[0],
+            location: cita.propiedad?.ciudad || "No especificado",
+            date: formatDate(cita.fecha),
+            time: formatTime(cita.hora),
+            status: cita.estado as AppointmentStatus,
+            hasUserRated,
+            rating: userReview?.calificacion_general,
+          };
+        }
+      );
 
       setAppointments(transformedData);
     } catch (error: any) {
-      console.error('Error loading appointments:', error);
-      showToast(error.message || 'Error al cargar las citas', 'error');
+      console.error("Error loading appointments:", error);
+      showToast(error.message || "Error al cargar las citas", "error");
     } finally {
       setLoading(false);
     }
@@ -156,20 +179,20 @@ const Appointments: React.FC = () => {
     const todayOnly = today.toDateString();
     const tomorrowOnly = tomorrow.toDateString();
 
-    if (dateOnly === todayOnly) return 'Hoy';
-    if (dateOnly === tomorrowOnly) return 'Mañana';
+    if (dateOnly === todayOnly) return "Hoy";
+    if (dateOnly === tomorrowOnly) return "Mañana";
 
-    return date.toLocaleDateString('es-MX', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
+    return date.toLocaleDateString("es-MX", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
     });
   };
 
   const formatTime = (timeStr: string) => {
-    const [hours, minutes] = timeStr.split(':');
+    const [hours, minutes] = timeStr.split(":");
     const hour = parseInt(hours, 10);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const ampm = hour >= 12 ? "PM" : "AM";
     const hour12 = hour % 12 || 12;
     return `${hour12}:${minutes} ${ampm}`;
   };
@@ -197,12 +220,13 @@ const Appointments: React.FC = () => {
       if (!appointment) return;
 
       // Determinar quién recibe la calificación (el profesional)
-      const profesionalId = appointment.agente_id === profile.id
-        ? appointment.cliente_id
-        : appointment.agente_id;
+      const profesionalId =
+        appointment.agente_id === profile.id
+          ? appointment.cliente_id
+          : appointment.agente_id;
 
       // Insertar reseña
-      const { error: reviewError } = await supabase.from('resenas').insert({
+      const { error: reviewError } = await supabase.from("resenas").insert({
         revisor_id: profile.id,
         profesional_id: profesionalId,
         cita_id: rateApptId,
@@ -212,43 +236,61 @@ const Appointments: React.FC = () => {
         profesionalismo: featureRatings.profesionalismo,
         disponibilidad: featureRatings.disponibilidad,
         comentario: comentario.trim() || null,
-        tipo_resena: 'detallada',
+        tipo_resena: "detallada",
         visible: true,
       });
 
       if (reviewError) throw reviewError;
 
       // Marcar la cita como completada (si aún está pendiente)
-      if (appointment.estado === 'pendiente') {
+      if (appointment.estado === "pendiente") {
         const { error: updateError } = await supabase
-          .from('citas')
+          .from("citas")
           .update({
-            estado: 'completada',
+            estado: "completada",
             completado_en: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
-          .eq('id', rateApptId);
+          .eq("id", rateApptId);
 
         if (updateError) throw updateError;
       }
 
-      showToast('Calificación enviada exitosamente', 'success');
+      showToast("Calificación enviada exitosamente", "success");
       setShowRateModal(false);
       setRateApptId(null);
 
       // Recargar citas para reflejar los cambios
       loadAppointments();
     } catch (error: any) {
-      console.error('Error submitting rating:', error);
-      showToast(error.message || 'Error al enviar la calificación', 'error');
+      console.error("Error submitting rating:", error);
+      showToast(error.message || "Error al enviar la calificación", "error");
       // Re-lanzar el error para que el modal pueda manejar el estado de carga
       throw error;
     }
   };
 
-  const handleMessage = (id: string) => {
-    console.log("Abrir mensaje para cita:", id);
-    // TODO: Navegar a mensajes
+  const handleContactPress = (id: string) => {
+    const appointment = appointments.find((a) => a.id === id);
+    if (!appointment || !profile?.id) return;
+
+    const isAgente = appointment.agente_id === profile.id;
+    const otherUser = isAgente ? appointment.cliente : appointment.agente;
+    const otherUserId = isAgente
+      ? appointment.cliente_id
+      : appointment.agente_id;
+
+    if (!otherUserId || !otherUser) {
+      showToast("No se pudo identificar al usuario contactar", "error");
+      return;
+    }
+
+    handleContact(otherUserId, appointment.propiedad_id || null, {
+      id: otherUserId,
+      nombre: otherUser.nombre,
+      apellido_paterno: otherUser.apellido_paterno,
+      foto: otherUser.foto,
+    });
   };
 
   const handleBack = () => {
@@ -259,11 +301,7 @@ const Appointments: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <AppHeader
-        title="Citas"
-        showBackButton
-        onBack={handleBack}
-      />
+      <AppHeader title="Citas" showBackButton onBack={handleBack} />
 
       <ScrollView
         style={styles.scrollView}
@@ -326,7 +364,7 @@ const Appointments: React.FC = () => {
                 appointment={appt}
                 onMarkComplete={handleMarkComplete}
                 onOpenRating={handleOpenRating}
-                onMessage={handleMessage}
+                onContact={handleContactPress}
               />
             ))}
           </View>

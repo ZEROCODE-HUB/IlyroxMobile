@@ -198,6 +198,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       likes: 0,
       comments: 0,
       timestamp: post.created_at,
+      status: post.status,
     };
   };
 

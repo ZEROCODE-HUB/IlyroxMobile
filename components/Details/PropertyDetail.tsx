@@ -24,6 +24,7 @@ import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MapDetails } from "./MapDetails";
 import CreateProperty from "../CreateContent/CreateProperty";
+import { useChatInitiator } from "../../hooks/messaging/useChatInitiator";
 
 const { width } = Dimensions.get("window");
 
@@ -45,6 +46,9 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   const [showComments, setShowComments] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [propertyIdModal, setPropertyIdModal] = useState<string | null>(null);
+  const [loadingEdit, setLoadingEdit] = useState(false);
+
+  const { handleContact } = useChatInitiator();
 
   // Hook de view tracking
   const { trackInteraction } = useViewTracking({
@@ -496,7 +500,18 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
               ) : (
                 <TouchableOpacity
                   style={styles.contactIconBtn}
-                  onPress={() => onContact?.(profile.id, propertyDetails.id)}
+                  onPress={() => {
+                    if (onContact) {
+                      onContact(profile.id, propertyDetails.id);
+                    } else {
+                      handleContact(profile.id, propertyDetails.id, {
+                        id: profile.id,
+                        nombre: profile.nombre,
+                        foto: profile.foto,
+                        apellido_paterno: profile.apellido_paterno || "",
+                      });
+                    }
+                  }}
                 >
                   <Ionicons
                     name="chatbubble-ellipses"
@@ -513,22 +528,42 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
             <TouchableOpacity
               style={[styles.mainContactBtn, { backgroundColor: COLORS.info }]}
               onPress={() => {
+                setLoadingEdit(true);
                 setShowModal(true);
                 setPropertyIdModal(propertyDetails.id);
               }}
             >
-              <Ionicons
-                name="pencil"
-                size={20}
-                color={COLORS.white}
-                style={{ marginRight: 8 }}
-              />
-              <Text style={styles.mainContactBtnText}>Editar Propiedad</Text>
+              <Text style={styles.mainContactBtnText}>
+                {loadingEdit ? (
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="pencil"
+                      size={20}
+                      color={COLORS.white}
+                      style={{ marginRight: 8, gap: 8 }}
+                    />
+                    <Text style={{ marginLeft: 8 }}>Editar Propiedad</Text>
+                  </>
+                )}
+              </Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
               style={styles.mainContactBtn}
-              onPress={() => onContact?.(profile?.id, propertyDetails.id)}
+              onPress={() => {
+                if (onContact) {
+                  onContact(profile.id, propertyDetails.id);
+                } else {
+                  handleContact(profile.id, propertyDetails.id, {
+                    id: profile.id,
+                    nombre: profile.nombre,
+                    foto: profile.foto,
+                    apellido_paterno: profile.apellido_paterno || "",
+                  });
+                }
+              }}
             >
               <Ionicons
                 name="call"
@@ -552,7 +587,10 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
 
       <Modal visible={showModal} onRequestClose={() => setShowModal(false)}>
         <CreateProperty
-          onBack={() => setShowModal(false)}
+          onBack={() => {
+            setShowModal(false);
+            setLoadingEdit(false);
+          }}
           propertyId={propertyIdModal}
         />
       </Modal>

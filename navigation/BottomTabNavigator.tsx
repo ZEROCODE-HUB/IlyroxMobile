@@ -132,11 +132,13 @@ const MessagesWrapper = ({ route }: any) => {
   const initialPropertyId = route.params?.initialPropertyId as
     | string
     | undefined;
+  const conversationId = route.params?.conversationId as string | undefined;
 
   return (
     <MessagingScreen
       initialUser={initialUser}
       initialPropertyId={initialPropertyId}
+      conversationId={conversationId}
     />
   );
 };
