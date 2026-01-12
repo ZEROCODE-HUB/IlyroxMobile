@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   View,
   Text,
@@ -7,12 +7,13 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import PropertyCard from './cards/PropertyCard';
-import { AppHeader } from './AppHeader';
-import { COLORS } from '../constants';
-import { FeedItem } from '../types';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import PropertyCard from "./cards/PropertyCard";
+import { AppHeader } from "./AppHeader";
+import { COLORS } from "../constants";
+import { FeedItem } from "../types";
+import { ScreenWrapper } from "../screens/ScreenWrapper";
 
 interface LeadPropertiesModalProps {
   visible: boolean;
@@ -39,13 +40,13 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
 }) => {
   const handleDeleteSearch = () => {
     Alert.alert(
-      'Eliminar búsqueda',
-      '¿Estás seguro de que deseas eliminar esta búsqueda guardada? Se eliminarán todos los matches asociados.',
+      "Eliminar búsqueda",
+      "¿Estás seguro de que deseas eliminar esta búsqueda guardada? Se eliminarán todos los matches asociados.",
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: "Cancelar", style: "cancel" },
         {
-          text: 'Eliminar',
-          style: 'destructive',
+          text: "Eliminar",
+          style: "destructive",
           onPress: () => {
             onDeleteSearch(busquedaId);
             onClose();
@@ -57,44 +58,52 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.container}>
-        {/* Header */}
-        <AppHeader
-          title={leadName}
-          subtitle={leadPhone}
-          showBackButton
-          onBack={onClose}
-          rightComponent={
-            <TouchableOpacity onPress={handleDeleteSearch} style={styles.deleteBtn}>
-              <Ionicons name="trash-outline" size={22} color={COLORS.error} />
-            </TouchableOpacity>
-          }
-        />
+      <ScreenWrapper withHeader={false}>
+        <View style={styles.container}>
+          {/* Header */}
+          <AppHeader
+            title={leadName}
+            subtitle={leadPhone}
+            showBackButton
+            onBack={onClose}
+            rightComponent={
+              <TouchableOpacity
+                onPress={handleDeleteSearch}
+                style={styles.deleteBtn}
+              >
+                <Ionicons name="trash-outline" size={22} color={COLORS.error} />
+              </TouchableOpacity>
+            }
+          />
 
-        {/* Properties List */}
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.countBadge}>
-            <Text style={styles.countText}>
-              {properties.length} {properties.length === 1 ? 'propiedad' : 'propiedades'}
-            </Text>
-          </View>
-
-          {properties.map((property, index) => (
-            <View key={property.id || index} style={styles.propertyCard}>
-              <PropertyCard
-                item={property}
-                onClick={() => onPropertyClick(property.propertyDetails?.id || property.id)}
-                onCommentClick={() => {}}
-                currentUserId={currentUserId}
-              />
+          {/* Properties List */}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.countBadge}>
+              <Text style={styles.countText}>
+                {properties.length}{" "}
+                {properties.length === 1 ? "propiedad" : "propiedades"}
+              </Text>
             </View>
-          ))}
-        </ScrollView>
-      </View>
+
+            {properties.map((property, index) => (
+              <View key={property.id || index} style={styles.propertyCard}>
+                <PropertyCard
+                  item={property}
+                  onClick={() =>
+                    onPropertyClick(property.propertyDetails?.id || property.id)
+                  }
+                  onCommentClick={() => {}}
+                  currentUserId={currentUserId}
+                />
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </ScreenWrapper>
     </Modal>
   );
 };
@@ -119,19 +128,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     marginBottom: 16,
   },
   countText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.primary,
   },
   propertyCard: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
     marginBottom: 16,
-    overflow: 'hidden',
+    overflow: "hidden",
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },

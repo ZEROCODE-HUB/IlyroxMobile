@@ -55,6 +55,8 @@ import { useProfile } from "../../hooks/profile/useProfile";
 import ReelDetail from "../Reel/ReelDetail";
 import FeedDetail from "../Feed/FeedDetail";
 import CreateProperty from "../CreateContent/CreateProperty";
+import { ThumbsUp } from "lucide-react-native";
+import AnimatedLike from "../../design-system/components/AnimatedLike";
 
 interface ProfileProps {
   userId?: string | null;
@@ -270,6 +272,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       profile?.prefijo_celular || null,
       profile?.celular || null
     ),
+    anos_experiencia: profile?.anos_experiencia || 0,
     rating: reviewStats?.calificacion_promedio || 0,
     reviewCount: reviewStats?.total_resenas || 0,
     positiveRecommendations: reviewStats?.total_recomiendan || 0,
@@ -344,9 +347,19 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                   <Text style={styles.metaText}>{profileData.location}</Text>
                 </View>
                 <View style={styles.metaItem}>
+                  <Ionicons
+                    name="school"
+                    size={12}
+                    color={COLORS.textTertiary}
+                  />
+                  <Text style={styles.metaText}>
+                    {`+${profileData.anos_experiencia} años de experiencia`}
+                  </Text>
+                </View>
+                {/* <View style={styles.metaItem}>
                   <Ionicons name="call" size={12} color={COLORS.textTertiary} />
                   <Text style={styles.metaText}>{profileData.phone}</Text>
-                </View>
+                </View> */}
               </View>
             </View>
           </View>
@@ -385,23 +398,66 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             style={styles.ratingCard}
           >
             <View style={styles.ratingLeft}>
-              <Text style={styles.ratingValue}>
-                {profileData.rating.toFixed(1)}
-              </Text>
-              <View style={styles.ratingStars}>
-                <View style={styles.starsRow}>
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Ionicons
-                      key={s}
-                      name="star"
-                      size={10}
-                      color={COLORS.warning}
-                    />
-                  ))}
-                </View>
-                <Text style={styles.reviewCount}>
-                  {profileData.reviewCount} reseñas
+              <View style={styles.ratingTopRow}>
+                <Text style={styles.ratingValue}>
+                  {profileData.rating.toFixed(1)}
                 </Text>
+                <View style={styles.ratingStars}>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Ionicons
+                        key={s}
+                        name="star"
+                        size={13}
+                        color={COLORS.warning}
+                      />
+                    ))}
+                    <Text style={styles.reviewCount}>
+                      {profileData.reviewCount} reseñas
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.recommendsRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.recItem,
+                    isMe && styles.recItemDisabled,
+
+                    { borderRightWidth: 1 },
+                  ]}
+                  onPress={() => handleRecommendation(true)}
+                  disabled={isMe || submittingRecommendation}
+                >
+                  <AnimatedLike
+                    isActive={userRecommendation === true}
+                    onPress={() => handleRecommendation(true)}
+                    activeColor={COLORS.primary}
+                    inactiveColor={COLORS.textSecondary}
+                    variant="thumbs-up"
+                  />
+                  <Text style={styles.recVal}>
+                    {profileData.positiveRecommendations}
+                  </Text>
+                  {/* <Text style={styles.recLabel}>Recomiendan</Text> */}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.recItem, isMe && styles.recItemDisabled]}
+                  onPress={() => handleRecommendation(false)}
+                  disabled={isMe || submittingRecommendation}
+                >
+                  <AnimatedLike
+                    isActive={userRecommendation === false}
+                    onPress={() => handleRecommendation(false)}
+                    activeColor={COLORS.error}
+                    inactiveColor={COLORS.textSecondary}
+                    variant="thumbs-down"
+                  />
+                  <Text style={styles.recVal}>
+                    {profileData.negativeRecommendations}
+                  </Text>
+                  {/* <Text style={styles.recLabel}>No recomiendan</Text> */}
+                </TouchableOpacity>
               </View>
             </View>
             <View style={styles.verticalDivider} />
@@ -419,62 +475,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
           {showRatingDetails && (
             <View style={styles.statsPanel}>
               {/* Recommends Row */}
-              <View style={styles.recommendsRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.recItem,
-                    isMe && styles.recItemDisabled,
-                    userRecommendation === true && styles.recItemActive,
-                  ]}
-                  onPress={() => handleRecommendation(true)}
-                  disabled={isMe || submittingRecommendation}
-                >
-                  <Ionicons
-                    name={
-                      userRecommendation === true
-                        ? "thumbs-up"
-                        : "thumbs-up-outline"
-                    }
-                    size={16}
-                    color={
-                      userRecommendation === true
-                        ? COLORS.success
-                        : COLORS.textSecondary
-                    }
-                  />
-                  <Text style={styles.recVal}>
-                    {profileData.positiveRecommendations}
-                  </Text>
-                  <Text style={styles.recLabel}>Recomiendan</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.recItem,
-                    isMe && styles.recItemDisabled,
-                    userRecommendation === false && styles.recItemActive,
-                  ]}
-                  onPress={() => handleRecommendation(false)}
-                  disabled={isMe || submittingRecommendation}
-                >
-                  <Ionicons
-                    name={
-                      userRecommendation === false
-                        ? "thumbs-down"
-                        : "thumbs-down-outline"
-                    }
-                    size={16}
-                    color={
-                      userRecommendation === false
-                        ? COLORS.error
-                        : COLORS.textSecondary
-                    }
-                  />
-                  <Text style={styles.recVal}>
-                    {profileData.negativeRecommendations}
-                  </Text>
-                  <Text style={styles.recLabel}>No recomiendan</Text>
-                </TouchableOpacity>
-              </View>
 
               {/* Recommended By Section */}
               <View style={styles.recommendedBySection}>
@@ -986,13 +986,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    alignSelf: "center",
+    paddingVertical: 3,
   },
   ratingLeft: {
+    flex: 1,
+    flexDirection: "column",
+    gap: 12,
+  },
+  ratingTopRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
   },
   ratingValue: {
     fontSize: 24,
@@ -1001,13 +1007,16 @@ const styles = StyleSheet.create({
   },
   ratingStars: {
     gap: 4,
+    justifyContent: "center",
   },
   starsRow: {
+    flex: 1,
     flexDirection: "row",
     gap: 2,
+    justifyContent: "center",
   },
   reviewCount: {
-    fontSize: 10,
+    fontSize: 15,
     color: COLORS.textTertiary,
   },
   verticalDivider: {
@@ -1015,6 +1024,7 @@ const styles = StyleSheet.create({
     height: 32,
     backgroundColor: COLORS.cardBorder,
     marginHorizontal: 16,
+    alignSelf: "flex-end",
   },
   ratingRight: {
     flexDirection: "row",
@@ -1037,17 +1047,15 @@ const styles = StyleSheet.create({
   },
   recommendsRow: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
+    gap: 12,
   },
   recItem: {
+    flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    padding: 8,
-    borderRadius: 8,
-    minWidth: 100,
+    gap: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    borderColor: COLORS.cardBorder,
   },
   recItemDisabled: {
     opacity: 0.5,
@@ -1056,7 +1064,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   recVal: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "bold",
     color: COLORS.textPrimary,
   },

@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
     textColor: COLORS.backgroundDeep,
     borderWidth: 1,
     overflow: "hidden",
-    borderColor: COLORS.backgroundDeep,
+    borderColor: COLORS.primary,
     focus: COLORS.primary,
     borderRadius: 10,
     ...Platform.select({

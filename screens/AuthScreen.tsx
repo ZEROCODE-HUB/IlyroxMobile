@@ -166,7 +166,7 @@ export default function AuthScreen() {
 
     setLoading(true);
     let timeoutId: NodeJS.Timeout | null = null;
-    
+
     // Timeout más corto y con limpieza adecuada
     timeoutId = setTimeout(() => {
       if (timeoutId) {
@@ -185,16 +185,13 @@ export default function AuthScreen() {
           email,
           password,
         });
-        
+
         const loginTimeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => reject(new Error("Login timeout")), 12000);
         });
 
-        const result = await Promise.race([
-          loginPromise,
-          loginTimeoutPromise,
-        ]);
-        
+        const result = await Promise.race([loginPromise, loginTimeoutPromise]);
+
         const { data, error } = result;
 
         if (error) throw error;
@@ -211,7 +208,7 @@ export default function AuthScreen() {
           email,
           password,
         });
-        
+
         const signUpTimeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => reject(new Error("Sign up timeout")), 12000);
         });
@@ -220,7 +217,7 @@ export default function AuthScreen() {
           signUpPromise,
           signUpTimeoutPromise,
         ]);
-        
+
         const { data, error } = result;
 
         if (error) throw error;
@@ -705,6 +702,9 @@ export default function AuthScreen() {
                       secureTextEntry
                       value={password}
                       onChangeText={setPassword}
+                      inputStyle={{
+                        color: COLORS.black,
+                      }}
                     />
                     <SubmitButton
                       loading={loading}

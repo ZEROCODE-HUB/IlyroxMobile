@@ -370,7 +370,7 @@ export default function TagsModal({
                             </Text>
                           </>
                         ) : (
-                          <Text style={styles.buttonPrimaryText}>Crear</Text>
+                          <Text style={styles.buttonPrimaryText}>Guardar</Text>
                         )}
                       </TouchableOpacity>
                     </View>

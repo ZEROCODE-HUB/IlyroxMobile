@@ -37,6 +37,8 @@ export const COLORS = {
   textPrimary: "#1a2e2f",
   textSecondary: "#5a7172",
   textTertiary: "#90a4a5",
+  textQuaternary: "#5f5f5fff",
+  textQuinary: "#464646ff",
   textDisabled: "#bdc8c9",
 
   // Backgrounds

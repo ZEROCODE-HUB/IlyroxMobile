@@ -318,7 +318,13 @@ export default function CreateProperty({
     // 2. Info Básica
     setDescripcion(data.descripcion || "");
     setStatus(data.status || "Publicada");
-    setTipoPrincipal(data.tipo as TipoPrincipal);
+
+    // Validar tipo para evitar crash si viene nulo o inválido
+    const rawTipo = (data.tipo || "habitacional").toLowerCase();
+    const isValidTipo = Object.keys(PROPERTY_TYPES).includes(rawTipo);
+    const safeTipo = isValidTipo ? (rawTipo as TipoPrincipal) : "habitacional";
+
+    setTipoPrincipal(safeTipo);
     setSubtipo(data.subtipo || "");
 
     // 3. Ubicación

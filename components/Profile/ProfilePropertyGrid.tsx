@@ -20,9 +20,11 @@ import { Property } from "../../types";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import { supabase } from "../../lib/supabase";
+import { Bath } from "lucide-react-native";
 
 const { width } = Dimensions.get("window");
-const ITEM_SIZE = (width - 24) / 3;
+const GAP = 8;
+const ITEM_SIZE = (width - 24 - GAP * 2) / 3;
 
 interface ProfilePropertyGridProps {
   properties: Property[];
@@ -71,7 +73,14 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
     }
   };
 
-  const renderProperty = ({ item }: { item: Property }) => {
+  const renderProperty = ({
+    item,
+    index,
+  }: {
+    item: Property;
+    index: number;
+  }) => {
+    const isLastInRow = (index + 1) % 3 === 0;
     const commissionText = formatCommission(item.commission);
 
     const menuOptions: MenuOption[] = [
@@ -90,27 +99,22 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
 
     return (
       <TouchableOpacity
-        style={styles.gridItem}
+        style={[styles.gridItem, isLastInRow && { marginRight: 0 }]}
         onPress={() => onPropertyPress(item)}
         activeOpacity={0.8}
       >
-        <Image
-          source={{ uri: item.images[0] }}
-          style={styles.gridImage}
-          resizeMode="cover"
-        />
+        <Image source={{ uri: item.images[0] }} style={styles.gridImage} />
 
-        {/* Status Badge */}
-        <View style={[styles.statusBadge, getStatusStyle(item.status)]}>
-          <Text style={styles.statusText}>{item.status}</Text>
+        {/* Status Badge  getStatusStyle(item.status) */}
+        <View style={[styles.statusBadge, { backgroundColor: "#ffffff69" }]}>
+          {commissionText ? (
+            <Text style={styles.statusText}>{commissionText} comisión</Text>
+          ) : (
+            <Text style={styles.statusText}>{item.status}</Text>
+          )}
         </View>
 
         {/* Commission Badge */}
-        {commissionText && (
-          <View style={styles.commissionBadge}>
-            <Text style={styles.commissionText}>{commissionText}</Text>
-          </View>
-        )}
 
         {/* 3-Dot Menu (solo si es perfil propio) */}
         {isOwnProfile && (
@@ -119,8 +123,8 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
           </View>
         )}
 
-        {/* Property Info Overlay */}
-        <View style={styles.infoOverlay}>
+        {/* Property Info Container */}
+        <View style={styles.infoContainer}>
           <View style={styles.priceRow}>
             <Text style={styles.propertyPrice}>
               $
@@ -137,18 +141,49 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
           {/* Features */}
           <View style={styles.propertyFeatures}>
             {item.features.beds > 0 && (
-              <View style={styles.featureBadge}>
-                <Ionicons name="bed-outline" size={10} color={COLORS.white} />
+              <View
+                style={{
+                  ...styles.featureBadge,
+                  borderRightWidth: 1,
+                  paddingRight: 5,
+                  borderRightColor: "#cccccc",
+                }}
+              >
+                <Ionicons
+                  name="bed-outline"
+                  size={10}
+                  color={COLORS.textPrimary}
+                />
                 <Text style={styles.featureBadgeText}>
                   {item.features.beds}
                 </Text>
               </View>
             )}
             {item.features.baths > 0 && (
-              <View style={styles.featureBadge}>
-                <Ionicons name="water-outline" size={10} color={COLORS.white} />
+              <View
+                style={{
+                  ...styles.featureBadge,
+                  borderRightWidth: 1,
+                  paddingRight: 5,
+                  borderRightColor: "#cccccc",
+                }}
+              >
+                <Bath size={10} color={COLORS.textPrimary} />
                 <Text style={styles.featureBadgeText}>
                   {item.features.baths}
+                </Text>
+              </View>
+            )}
+            {item.features.constructionSqft > 0 && (
+              <View
+                style={{
+                  ...styles.featureBadge,
+                  paddingHorizontal: 3,
+                  borderRightColor: "#cccccc",
+                }}
+              >
+                <Text style={styles.featureBadgeText}>
+                  {item.features.constructionSqft} m²
                 </Text>
               </View>
             )}
@@ -165,6 +200,7 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
         renderItem={renderProperty}
         keyExtractor={(item) => item.id}
         numColumns={3}
+        columnWrapperStyle={styles.columnWrapper}
         contentContainerStyle={styles.grid}
         scrollEnabled={false}
         ListEmptyComponent={
@@ -235,26 +271,29 @@ const getStatusStyle = (status: Property["status"]) => {
 const styles = StyleSheet.create({
   grid: {
     paddingHorizontal: 12,
-    paddingTop: 12,
+    paddingVertical: 12,
+  },
+  columnWrapper: {
+    justifyContent: "flex-start",
   },
   gridItem: {
     width: ITEM_SIZE,
-    height: ITEM_SIZE,
-    marginBottom: 2,
-    marginRight: 2,
-    backgroundColor: COLORS.background,
+    marginBottom: 12,
+    marginRight: GAP,
+    backgroundColor: COLORS.white,
     overflow: "hidden",
-    position: "relative",
-    borderRadius: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
   },
   gridImage: {
     width: "100%",
-    height: "100%",
+    height: ITEM_SIZE,
   },
   statusBadge: {
     position: "absolute",
     top: 6,
-    right: 6,
+    left: 6,
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 4,
@@ -265,10 +304,9 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   statusText: {
-    color: COLORS.white,
-    fontSize: 8,
+    color: COLORS.textQuinary,
+    fontSize: 10,
     fontWeight: "700",
-    textTransform: "uppercase",
     letterSpacing: 0.3,
   },
   commissionBadge: {
@@ -296,38 +334,37 @@ const styles = StyleSheet.create({
     right: 6,
     zIndex: 9999,
   },
-  infoOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.blackTransparent60,
-    padding: 6,
+  infoContainer: {
+    backgroundColor: COLORS.white,
+    padding: 8,
   },
   priceRow: {
     flexDirection: "row",
     alignItems: "baseline",
   },
   propertyPrice: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "700",
-    color: COLORS.white,
+    color: COLORS.textQuaternary,
   },
   propertyCurrency: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: "600",
-    color: COLORS.whiteTransparent80,
+    color: COLORS.textQuaternary,
     marginLeft: 2,
   },
   propertyLocation: {
-    fontSize: 9,
-    color: COLORS.whiteTransparent90,
+    fontSize: 10,
+    color: COLORS.textQuaternary,
     marginTop: 2,
   },
   propertyFeatures: {
     flexDirection: "row",
     gap: 4,
     marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.cardBorder,
+    paddingTop: 4,
   },
   featureBadge: {
     flexDirection: "row",
@@ -335,9 +372,9 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   featureBadgeText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "600",
-    color: COLORS.white,
+    color: COLORS.textQuaternary,
   },
   emptyState: {
     padding: 40,
