@@ -34,9 +34,13 @@ import { COLORS } from "./constants";
 import { SafeInsetsProvider } from "./context/SafeInsetsContext";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import { OneSignal } from "react-native-onesignal";
 
 export const navigationRef = createNavigationContainerRef<RootTabParamList>();
 const queryClient = new QueryClient();
+
+OneSignal.initialize("a727fcbb-320c-4028-bd6b-a2ec90ed2141");
+OneSignal.Notifications.requestPermission(true);
 
 export default function App() {
   return (

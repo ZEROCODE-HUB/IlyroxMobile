@@ -1,7 +1,7 @@
 /**
  * useAuthListener.ts
  * Hook para escuchar cambios de autenticación y configurar suscripciones Realtime
- * 
+ *
  * FIX CRÍTICO: Limpieza correcta de suscripciones para evitar loops
  * OPTIMIZACIÓN: Realtime de perfil deshabilitado para reducir requests
  */
@@ -10,6 +10,7 @@ import { useEffect, useRef } from "react";
 import { supabase } from "../../lib/supabase";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { perfiles } from "../../types";
+import { OneSignal } from "react-native-onesignal";
 
 interface UseAuthListenerProps {
   onSessionChange: (session: Session | null) => void;
@@ -40,7 +41,9 @@ export const useAuthListener = ({
       // Timeout de emergencia
       const emergencyTimeoutId = setTimeout(() => {
         if (mounted) {
-          console.warn("⏰ Auth init emergency timeout (15s), forcing loading false");
+          console.warn(
+            "⏰ Auth init emergency timeout (15s), forcing loading false"
+          );
           onLoadingChange(false);
         }
       }, 15000);
@@ -53,13 +56,19 @@ export const useAuthListener = ({
         });
 
         const result = await Promise.race([sessionPromise, timeoutPromise]);
-        const { data: { session }, error } = result;
+        const {
+          data: { session },
+          error,
+        } = result;
 
         clearTimeout(emergencyTimeoutId);
 
         if (error) {
           console.error("❌ Error getting session:", error);
-          if (error.message?.includes("expired") || error.message?.includes("invalid")) {
+          if (
+            error.message?.includes("expired") ||
+            error.message?.includes("invalid")
+          ) {
             console.log("🔄 Session expired/invalid, clearing auth state");
             onSessionChange(null);
             onUserChange(null);
@@ -85,6 +94,13 @@ export const useAuthListener = ({
 
         onSessionChange(session);
         onUserChange(session?.user ?? null);
+
+        if (session?.user) {
+          OneSignal.login(session.user.id);
+        } else {
+          OneSignal.User.removeAlias("external_id");
+          OneSignal.logout();
+        }
 
         // Cargar perfil si hay usuario
         if (session?.user) {
@@ -115,7 +131,10 @@ export const useAuthListener = ({
         }
       } catch (err: any) {
         console.error("❌ Unexpected error during auth init:", err);
-        if (err.message?.includes("timeout") || err.message?.includes("Network")) {
+        if (
+          err.message?.includes("timeout") ||
+          err.message?.includes("Network")
+        ) {
           console.log("🔄 Network/timeout error, clearing auth state");
           onSessionChange(null);
           onUserChange(null);
@@ -215,6 +234,7 @@ export const useAuthListener = ({
       onUserChange(session?.user ?? null);
 
       if (session?.user) {
+        OneSignal.login(session.user.id);
         try {
           const profilePromise = loadProfile(session.user.id);
           const profileTimeoutPromise = new Promise<never>((_, reject) => {
@@ -238,7 +258,6 @@ export const useAuthListener = ({
             //   await setupProfileSubscription(session.user.id);
             // }
           }
-
         } catch (profileErr) {
           console.error("❌ Error loading profile:", profileErr);
           if (mounted) {
@@ -249,6 +268,8 @@ export const useAuthListener = ({
         // Sin sesión, limpiar todo
         if (mounted) {
           onProfileChange(null);
+          OneSignal.User.removeAlias("external_id");
+          OneSignal.logout();
           // await cleanupProfileSubscription(); // DESHABILITADO
         }
       }
@@ -262,7 +283,9 @@ export const useAuthListener = ({
     initAuth();
 
     // Escuchar cambios
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(handleAuthChange);
 
     // Cleanup
     return () => {

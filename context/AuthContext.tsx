@@ -3,13 +3,20 @@
  * Contexto principal de autenticación simplificado
  */
 
-import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+} from "react";
 import { supabase } from "../lib/supabase";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { perfiles } from "../types";
 import { useProfileLoader } from "./auth/useProfileLoader";
 import { useAuthListener } from "./auth/useAuthListener";
 import { useSessionRefresh } from "./auth/useSessionRefresh";
+import { OneSignal } from "react-native-onesignal";
 
 interface AuthContextType {
   session: Session | null;
@@ -63,10 +70,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   /**
    * Cerrar sesión
+   * //  DELETE /apps/{app_id}/users/by/{alias_label}/{alias_id}/identity/external_id
+   * // alias_label = el tipo de alias para identificar al usuario (ej: onesignal_id)
+   * // alias_id = el identificador del usuario
+   * // El último parámetro es external_id (el alias a eliminar)
    */
   const signOut = async () => {
     try {
+      console.log("Cerrar sesión presionado");
       await supabase.auth.signOut();
+      OneSignal.User.removeAlias("external_id");
+      await OneSignal.logout();
     } catch (error) {
       console.error("❌ Supabase signOut error:", error);
     } finally {

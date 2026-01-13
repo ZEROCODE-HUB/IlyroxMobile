@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo } from "react";
+import React, { useState, useCallback, memo, useEffect } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,11 @@ import { COLORS } from "../constants/colors";
 import { LinearGradient } from "expo-linear-gradient";
 import { useImageUpload } from "../hooks/useImageUpload";
 import { useStableSafeInsets } from "../context/SafeInsetsContext";
+import { useGoogleAuth } from "../lib/useGoogleAuth";
+import { OneSignal } from "react-native-onesignal";
+
+// Tipos para los proveedores
+type AuthProvider = "google" | "facebook" | "apple";
 
 const SubmitButton = memo(
   ({
@@ -53,20 +58,32 @@ const SubmitButton = memo(
 export default function AuthScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [step, setStep] = useState(1); // Para el flujo de registro multietapa
-  const [authMethod, setAuthMethod] = useState<"none" | "email">("none");
+  const [step, setStep] = useState(1);
+  const [authMethod, setAuthMethod] = useState<"none" | "email" | "external">(
+    "none"
+  );
   const [loading, setLoading] = useState(false);
+
+  // Estados para manejo de datos faltantes en Auth Externa
+  const [pendingExternalUser, setPendingExternalUser] = useState<{
+    id: string;
+    email: string;
+    avatarUrl?: string | null;
+    fullName?: string | null;
+  } | null>(null);
+
+  // Modales de selección
   const [showEstadoModal, setShowEstadoModal] = useState(false);
   const [showOcupacionModal, setShowOcupacionModal] = useState(false);
   const [showModalidadModal, setShowModalidadModal] = useState(false);
   const [showExperienciaModal, setShowExperienciaModal] = useState(false);
 
-  // Form states
+  // Form states (Email Auth)
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // Registration extra fields
+  // Registration extra fields (Compartidos entre Email y External Auth)
   const [name, setName] = useState("");
   const [lastNamePaterno, setLastNamePaterno] = useState("");
   const [lastNameMaterno, setLastNameMaterno] = useState("");
@@ -83,6 +100,12 @@ export default function AuthScreen() {
   const { uploadImage } = useImageUpload();
   const { bottom } = useStableSafeInsets();
 
+  // Hooks de Auth Externa
+  const { signInWithGoogle, loading: googleLoading } = useGoogleAuth();
+  // TODO: Agregar hooks de Facebook y Apple aquí
+  // const { promptAsync: promptFacebook } = useFacebookAuth();
+  // const { promptAsync: promptApple } = useAppleAuth();
+
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -96,6 +119,7 @@ export default function AuthScreen() {
     }
   };
 
+  // Validación básica (Paso 1 - Email)
   const validateStep1 = () => {
     if (
       !name ||
@@ -123,7 +147,14 @@ export default function AuthScreen() {
     return true;
   };
 
-  const validateStep2 = () => {
+  // Validación de perfil profesional (Paso 2 - Email & External)
+  const validateProfessionalData = () => {
+    // Si es auth externa, validamos también el estado aquí ya que no hubo paso 1
+    if (pendingExternalUser && !estado) {
+      Alert.alert("Error", "Selecciona tu estado");
+      return false;
+    }
+
     if (!ocupacion) {
       Alert.alert("Error", "Selecciona tu ocupación");
       return false;
@@ -148,89 +179,226 @@ export default function AuthScreen() {
   const handleOpenModal = useCallback((selectedMode: "login" | "register") => {
     setMode(selectedMode);
     setStep(1);
-    setAuthMethod("none"); // Reset to selection
+    setAuthMethod("none");
+    setPendingExternalUser(null);
     setModalVisible(true);
   }, []);
 
-  /*
-   * FIX: Hooks can be sensitive to conditional rendering if components are defined inside.
-   * Picker itself is a component, so conditional rendering is fine unless it changes order.
-   * However, logic needs updates.
-   */
+  // --- LÓGICA DE AUTH EXTERNA (Google, Apple, Facebook) ---
+  const handleProviderAuth = async (provider: AuthProvider) => {
+    setLoading(true);
+    try {
+      let authResult: { user: any; error: any } | null = null;
+      let externalError = null;
 
-  const handleAuth = async () => {
+      // 1. Ejecutar el login del proveedor
+      switch (provider) {
+        case "google":
+          const res = await signInWithGoogle();
+          if (res?.error) {
+            externalError = res.error;
+          } else if (res?.user) {
+            authResult = { user: res.user, error: null };
+          }
+          break;
+        case "facebook":
+          // Aquí integrarás el hook de Facebook
+          // const resFB = await signInWithFacebook();
+          Alert.alert("Próximamente", "Inicio con Facebook en desarrollo");
+          setLoading(false);
+          return;
+        case "apple":
+          // Aquí integrarás el hook de Apple
+          // const resApple = await signInWithApple();
+          Alert.alert("Próximamente", "Inicio con Apple en desarrollo");
+          setLoading(false);
+          return;
+      }
+
+      if (externalError) {
+        // Si hubo un error explícito (y no cancelación silenciosa)
+        if (externalError !== "Inicio de sesión cancelado o fallido") {
+          Alert.alert("Error de Autenticación", externalError);
+        }
+        setLoading(false);
+        return;
+      }
+
+      if (!authResult?.user) {
+        setLoading(false);
+        return; // Cancelado o error manejado
+      }
+
+      const user = authResult.user;
+
+      // 2. Verificar si el perfil existe en Supabase
+      const { data: profile, error: profileError } = await supabase
+        .from("perfiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      if (profile) {
+        // A) Usuario ya existe -> Login exitoso
+        OneSignal.login(user.id);
+        setCurrentUser(profile);
+        setModalVisible(false);
+      } else {
+        // B) Usuario nuevo -> Solicitar datos faltantes
+        // Pre-llenamos lo que podamos del proveedor
+        const fullName =
+          user.user_metadata?.full_name || user.user_metadata?.name || "";
+        const spaceIndex = fullName.indexOf(" ");
+
+        let extractedName = "";
+        let extractedLastName = "";
+
+        if (spaceIndex > 0) {
+          extractedName = fullName.substring(0, spaceIndex);
+          extractedLastName = fullName.substring(spaceIndex + 1);
+        } else {
+          extractedName = fullName;
+        }
+
+        setName(extractedName);
+        setLastNamePaterno(extractedLastName); // Intentamos adivinar, usuario puede corregir
+
+        setEmail(user.email || "");
+
+        setPendingExternalUser({
+          id: user.id,
+          email: user.email!,
+          avatarUrl:
+            user.user_metadata?.avatar_url || user.user_metadata?.picture,
+          fullName,
+        });
+
+        // Cambiamos la vista al formulario de completado
+        setAuthMethod("external");
+      }
+    } catch (error: any) {
+      Alert.alert("Error de Autenticación", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- FINALIZAR REGISTRO EXTERNO ---
+  const finalizeExternalRegistration = async () => {
+    if (!pendingExternalUser) return;
+    if (!validateProfessionalData()) return;
+
+    setLoading(true);
+    try {
+      // Subir avatar nuevo si el usuario eligió uno diferente al de Google
+      let finalAvatarUrl = pendingExternalUser.avatarUrl || "";
+      if (avatarUri) {
+        const url = await uploadImage(avatarUri, "fotos", "fotoperfil");
+        if (url) finalAvatarUrl = url;
+      }
+
+      // Crear perfil
+      const newProfile: perfiles = {
+        id: pendingExternalUser.id,
+        email: pendingExternalUser.email,
+        nombre: name || pendingExternalUser.fullName || "Usuario",
+        apellido_paterno: lastNamePaterno,
+        apellido_materno: lastNameMaterno,
+        celular: phone || "",
+        prefijo_celular: null,
+        rol: "cliente",
+        pais: "Mexico",
+        estado: estado,
+        foto: finalAvatarUrl,
+        estado_registro: "pendiente",
+        aprobaciones_recibidas: 0,
+        aprobaciones_requeridas: 3,
+        anos_experiencia: anosExperiencia,
+        ocupacion: ocupacion,
+        otro_ocupacion: null,
+        modalidad: modalidad || null,
+        nombre_inmobiliaria: nombreInmobiliaria || null,
+        curso_certificacion: null,
+        nombre_completo: `${name} ${lastNamePaterno} ${lastNameMaterno}`.trim(),
+        activado_en: null,
+        deleted_at: null,
+        biografia: null,
+        sitio_web: null,
+        calificacion_promedio: null,
+        total_calificaciones: null,
+        total_recomendaciones_positivas: null,
+        total_recomendaciones_negativas: null,
+      };
+
+      const { data, error } = await supabase
+        .from("perfiles")
+        .upsert(newProfile)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      OneSignal.login(pendingExternalUser.id);
+      setCurrentUser(data);
+      setModalVisible(false);
+    } catch (error: any) {
+      Alert.alert("Error al crear perfil", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- LÓGICA DE AUTH POR EMAIL (EXISTENTE) ---
+  const handleEmailAuth = async () => {
     if (!email || !password) {
       Alert.alert("Error", "Por favor ingresa email y contraseña");
       return;
     }
 
     setLoading(true);
+    // ... (Tu lógica de timeout original se mantiene aquí)
     let timeoutId: NodeJS.Timeout | null = null;
-
-    // Timeout más corto y con limpieza adecuada
     timeoutId = setTimeout(() => {
       if (timeoutId) {
         setLoading(false);
-        Alert.alert(
-          "Error de conexión",
-          "El proceso está tardando demasiado. Por favor, verifica tu conexión e intenta de nuevo."
-        );
+        Alert.alert("Error de conexión", "Tiempo de espera agotado.");
       }
-    }, 15000); // 15 segundos para el flujo completo
+    }, 15000);
 
     try {
       if (mode === "login") {
-        // Agregar timeout específico para signInWithPassword
-        const loginPromise = supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-
-        const loginTimeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Login timeout")), 12000);
-        });
-
-        const result = await Promise.race([loginPromise, loginTimeoutPromise]);
-
-        const { data, error } = result;
-
         if (error) throw error;
+
+        if (data?.user) {
+          OneSignal.login(data.user.id);
+        }
+        // El listener de onAuthStateChange manejará el resto en App.tsx o context
       } else {
-        // Register
-        if (!validateStep1() || !validateStep2()) {
-          clearTimeout(timeoutId);
+        // Register Email
+        if (!validateStep1() || !validateProfessionalData()) {
+          clearTimeout(timeoutId!);
           setLoading(false);
           return;
         }
 
-        // Agregar timeout específico para signUp
-        const signUpPromise = supabase.auth.signUp({
-          email,
-          password,
-        });
-
-        const signUpTimeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Sign up timeout")), 12000);
-        });
-
-        const result = await Promise.race([
-          signUpPromise,
-          signUpTimeoutPromise,
-        ]);
-
-        const { data, error } = result;
-
+        const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
 
         if (data.user) {
-          // Subir avatar si existe
           let finalAvatarUrl = "";
           if (avatarUri) {
             const url = await uploadImage(avatarUri, "fotos", "fotoperfil");
-            if (url) {
-              finalAvatarUrl = url;
-            }
+            if (url) finalAvatarUrl = url;
           }
+          console.log("ID USER", data.user.id);
+
+          OneSignal.login(data.user.id);
+
+          OneSignal.User.addTag("email", data.user.email);
 
           const newProfile: perfiles = {
             id: data.user.id,
@@ -268,47 +436,17 @@ export default function AuthScreen() {
             .from("perfiles")
             .upsert(newProfile)
             .select();
-
-          if (userError) {
-            console.error("Profile creation error:", userError);
-            throw userError;
-          }
+          if (userError) throw userError;
         }
       }
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
+      if (timeoutId) clearTimeout(timeoutId);
     } catch (error: any) {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-      console.error("Auth Error Details:", error);
-      let msg = error.message || "Error desconocido";
-      if (
-        error.message === "Network request failed" ||
-        error.message === "Login timeout" ||
-        error.message === "Sign up timeout" ||
-        error instanceof TypeError
-      ) {
-        msg = "Error de conexión. Verifica tu internet e intenta de nuevo.";
-      } else if (error.message?.includes("timeout")) {
-        msg = "La solicitud tardó demasiado. Por favor, intenta de nuevo.";
-      }
-      Alert.alert("Error", msg);
+      if (timeoutId) clearTimeout(timeoutId);
+      Alert.alert("Error", error.message || "Ocurrió un error");
     } finally {
       setLoading(false);
     }
   };
-
-  const estados = [
-    { label: "Selecciona un estado", value: "" },
-    { label: "Aguascalientes", value: "Aguascalientes" },
-    { label: "Baja California", value: "Baja California" },
-    { label: "Baja California Sur", value: "Baja California Sur" },
-    { label: "Campeche", value: "Campeche" },
-  ];
 
   const renderOption = (
     icon: any,
@@ -341,6 +479,212 @@ export default function AuthScreen() {
     </TouchableOpacity>
   );
 
+  // Renderizado del formulario de datos profesionales
+  // Este bloque se usa tanto para el PASO 2 de Email como para COMPLETAR PERFIL EXTERNO
+  const renderProfessionalForm = (isExternal: boolean) => (
+    <>
+      <Text style={styles.stepTitle}>
+        {isExternal ? "Completa tu Registro" : "Información Profesional"}
+      </Text>
+
+      {/* Si es externo, quizás queramos pedir nombre/apellido si Google no lo dio bien, 
+          o pedir ESTADO que es obligatorio en tu lógica */}
+      {isExternal && (
+        <>
+          <View style={styles.row}>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <AppInput
+                placeholder="Nombre"
+                value={name}
+                onChangeText={setName}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppInput
+                placeholder="Apellido Paterno"
+                value={lastNamePaterno}
+                onChangeText={setLastNamePaterno}
+              />
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.input}
+            onPress={() => setShowEstadoModal(true)}
+          >
+            <View style={styles.pickerTrigger}>
+              <Text
+                style={[styles.pickerText, !estado && styles.placeholderText]}
+              >
+                {estado || "Selecciona tu Estado *"}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={20}
+                color={COLORS.textSecondary}
+              />
+            </View>
+          </TouchableOpacity>
+          <SelectionModal
+            visible={showEstadoModal}
+            onClose={() => setShowEstadoModal(false)}
+            onSelect={setEstado}
+            title="Selecciona tu Estado"
+            options={[...ESTADOS_MEXICO]}
+            searchable
+            currentValue={estado}
+          />
+        </>
+      )}
+
+      <TouchableOpacity style={styles.avatarUpload} onPress={handlePickImage}>
+        <Avatar
+          uri={avatarUri || pendingExternalUser?.avatarUrl || undefined}
+          name={name || pendingExternalUser?.fullName || "User"}
+          size={100}
+        />
+        <Text style={styles.avatarUploadText}>
+          {avatarUri ? "Cambiar foto" : "Confirmar foto de perfil"}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.input}
+        onPress={() => setShowOcupacionModal(true)}
+      >
+        <View style={styles.pickerTrigger}>
+          <Text
+            style={[styles.pickerText, !ocupacion && styles.placeholderText]}
+          >
+            {ocupacion || "Ocupación *"}
+          </Text>
+          <Ionicons
+            name="chevron-down"
+            size={20}
+            color={COLORS.textSecondary}
+          />
+        </View>
+      </TouchableOpacity>
+
+      <SelectionModal
+        visible={showOcupacionModal}
+        onClose={() => setShowOcupacionModal(false)}
+        onSelect={setOcupacion}
+        title="Selecciona tu Ocupación"
+        options={[
+          "Asesor Inmobiliario",
+          "Desarrollador Inmobiliario",
+          "Arquitecto",
+          "Constructor",
+        ]}
+        currentValue={ocupacion}
+      />
+
+      {ocupacion === "Asesor Inmobiliario" && (
+        <>
+          <TouchableOpacity
+            style={styles.input}
+            onPress={() => setShowModalidadModal(true)}
+          >
+            <View style={styles.pickerTrigger}>
+              <Text
+                style={[
+                  styles.pickerText,
+                  !modalidad && styles.placeholderText,
+                ]}
+              >
+                {modalidad || "Modalidad *"}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={20}
+                color={COLORS.textSecondary}
+              />
+            </View>
+          </TouchableOpacity>
+
+          <SelectionModal
+            visible={showModalidadModal}
+            onClose={() => setShowModalidadModal(false)}
+            onSelect={setModalidad}
+            title="Selecciona tu Modalidad"
+            options={["Inmobiliaria", "Independiente"]}
+            currentValue={modalidad}
+          />
+
+          {modalidad === "Inmobiliaria" && (
+            <AppInput
+              placeholder="Nombre de inmobiliaria *"
+              value={nombreInmobiliaria}
+              onChangeText={setNombreInmobiliaria}
+            />
+          )}
+        </>
+      )}
+
+      <TouchableOpacity
+        style={styles.input}
+        onPress={() => setShowExperienciaModal(true)}
+      >
+        <View style={styles.pickerTrigger}>
+          <Text
+            style={[
+              styles.pickerText,
+              !anosExperiencia && styles.placeholderText,
+            ]}
+          >
+            {anosExperiencia
+              ? `${anosExperiencia} años`
+              : "Años de experiencia *"}
+          </Text>
+          <Ionicons
+            name="chevron-down"
+            size={20}
+            color={COLORS.textSecondary}
+          />
+        </View>
+      </TouchableOpacity>
+
+      <SelectionModal
+        visible={showExperienciaModal}
+        onClose={() => setShowExperienciaModal(false)}
+        onSelect={setAnosExperiencia}
+        title="Años de experiencia"
+        options={[...Array(11).keys()].map((n) => ({
+          label: `${n} años`,
+          value: n.toString(),
+        }))}
+        currentValue={anosExperiencia}
+      />
+
+      <SubmitButton
+        loading={loading}
+        onPress={isExternal ? finalizeExternalRegistration : handleEmailAuth}
+        text={isExternal ? "Guardar y Continuar" : "Finalizar Registro"}
+      />
+
+      {/* Botón de volver diferente según el contexto */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={async () => {
+          if (isExternal) {
+            setPendingExternalUser(null);
+            setAuthMethod("none");
+            // Logout de supabase para limpiar sesión incompleta si es necesario
+            await supabase.auth.signOut();
+            OneSignal.User.removeAlias("external_id");
+            await OneSignal.logout();
+          } else {
+            setStep(1);
+          }
+        }}
+      >
+        <Text style={styles.backButtonText}>
+          {isExternal ? "Cancelar registro" : "Volver al paso 1"}
+        </Text>
+      </TouchableOpacity>
+    </>
+  );
+
   return (
     <View style={styles.container}>
       {/* Background decoration */}
@@ -358,12 +702,6 @@ export default function AuthScreen() {
       <View style={styles.content}>
         <View style={styles.header}>
           <View style={styles.logoWrapper}>
-            {/* <LinearGradient
-              colors={["#4c669f", "#3b5998", "#192f6a"]}
-              style={styles.gradientLogo}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            /> */}
             <Image
               source={require("../assets/Logo.jpeg")}
               style={styles.logo}
@@ -407,13 +745,18 @@ export default function AuthScreen() {
           >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {mode === "login" ? "Bienvenido de nuevo" : "Crear cuenta"}
+                {pendingExternalUser
+                  ? "Completa tu perfil"
+                  : mode === "login"
+                  ? "Bienvenido de nuevo"
+                  : "Crear cuenta"}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={24} color={COLORS.textSecondary} />
               </TouchableOpacity>
             </View>
 
+            {/* SELECCIÓN DE MÉTODO DE AUTENTICACIÓN */}
             {authMethod === "none" ? (
               <View style={styles.optionsContainer}>
                 {renderOption(
@@ -422,25 +765,27 @@ export default function AuthScreen() {
                   COLORS.white,
                   COLORS.white,
                   COLORS.facebook,
-                  () => {}
+                  () => handleProviderAuth("facebook")
                 )}
 
                 {renderOption(
-                  "mail-outline",
-                  "Continuar con Gmail",
+                  "logo-google",
+                  "Continuar con Google",
                   COLORS.white,
                   COLORS.white,
                   COLORS.google,
-                  () => {}
+                  () => handleProviderAuth("google")
                 )}
+
                 {renderOption(
                   "logo-apple",
                   "Continuar con Apple",
                   COLORS.white,
                   COLORS.white,
                   COLORS.apple,
-                  () => {}
+                  () => handleProviderAuth("apple")
                 )}
+
                 {renderOption(
                   "mail",
                   "Continuar con Email",
@@ -450,7 +795,17 @@ export default function AuthScreen() {
                   () => setAuthMethod("email")
                 )}
               </View>
+            ) : authMethod === "external" && pendingExternalUser ? (
+              // FORMULARIO PARA COMPLETAR DATOS DE AUTH EXTERNA
+              <ScrollView
+                style={styles.formContainer}
+                contentContainerStyle={{ width: "100%" }}
+                showsVerticalScrollIndicator={false}
+              >
+                {renderProfessionalForm(true)}
+              </ScrollView>
             ) : (
+              // FLUJO DE EMAIL ORIGINAL
               <ScrollView
                 style={styles.formContainer}
                 contentContainerStyle={{ width: "100%" }}
@@ -541,155 +896,11 @@ export default function AuthScreen() {
                       />
                     </>
                   ) : (
-                    <>
-                      <Text style={styles.stepTitle}>
-                        Información Profesional
-                      </Text>
-
-                      <TouchableOpacity
-                        style={styles.avatarUpload}
-                        onPress={handlePickImage}
-                      >
-                        <Avatar
-                          uri={avatarUri || undefined}
-                          name={name}
-                          size={100}
-                        />
-                        <Text style={styles.avatarUploadText}>
-                          {avatarUri ? "Cambiar foto" : "Subir foto de perfil"}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.input}
-                        onPress={() => setShowOcupacionModal(true)}
-                      >
-                        <View style={styles.pickerTrigger}>
-                          <Text
-                            style={[
-                              styles.pickerText,
-                              !ocupacion && styles.placeholderText,
-                            ]}
-                          >
-                            {ocupacion || "Ocupación *"}
-                          </Text>
-                          <Ionicons
-                            name="chevron-down"
-                            size={20}
-                            color={COLORS.textSecondary}
-                          />
-                        </View>
-                      </TouchableOpacity>
-
-                      <SelectionModal
-                        visible={showOcupacionModal}
-                        onClose={() => setShowOcupacionModal(false)}
-                        onSelect={setOcupacion}
-                        title="Selecciona tu Ocupación"
-                        options={[
-                          "Asesor Inmobiliario",
-                          "Desarrollador Inmobiliario",
-                          "Arquitecto",
-                          "Constructor",
-                        ]}
-                        currentValue={ocupacion}
-                      />
-
-                      {ocupacion === "Asesor Inmobiliario" && (
-                        <>
-                          <TouchableOpacity
-                            style={styles.input}
-                            onPress={() => setShowModalidadModal(true)}
-                          >
-                            <View style={styles.pickerTrigger}>
-                              <Text
-                                style={[
-                                  styles.pickerText,
-                                  !modalidad && styles.placeholderText,
-                                ]}
-                              >
-                                {modalidad || "Modalidad *"}
-                              </Text>
-                              <Ionicons
-                                name="chevron-down"
-                                size={20}
-                                color={COLORS.textSecondary}
-                              />
-                            </View>
-                          </TouchableOpacity>
-
-                          <SelectionModal
-                            visible={showModalidadModal}
-                            onClose={() => setShowModalidadModal(false)}
-                            onSelect={setModalidad}
-                            title="Selecciona tu Modalidad"
-                            options={["Inmobiliaria", "Independiente"]}
-                            currentValue={modalidad}
-                          />
-
-                          {modalidad === "Inmobiliaria" && (
-                            <AppInput
-                              placeholder="Nombre de inmobiliaria *"
-                              value={nombreInmobiliaria}
-                              onChangeText={setNombreInmobiliaria}
-                            />
-                          )}
-                        </>
-                      )}
-
-                      <TouchableOpacity
-                        style={styles.input}
-                        onPress={() => setShowExperienciaModal(true)}
-                      >
-                        <View style={styles.pickerTrigger}>
-                          <Text
-                            style={[
-                              styles.pickerText,
-                              !anosExperiencia && styles.placeholderText,
-                            ]}
-                          >
-                            {anosExperiencia
-                              ? `${anosExperiencia} años`
-                              : "Años de experiencia *"}
-                          </Text>
-                          <Ionicons
-                            name="chevron-down"
-                            size={20}
-                            color={COLORS.textSecondary}
-                          />
-                        </View>
-                      </TouchableOpacity>
-
-                      <SelectionModal
-                        visible={showExperienciaModal}
-                        onClose={() => setShowExperienciaModal(false)}
-                        onSelect={setAnosExperiencia}
-                        title="Años de experiencia"
-                        options={[...Array(11).keys()].map((n) => ({
-                          label: `${n} años`,
-                          value: n.toString(),
-                        }))}
-                        currentValue={anosExperiencia}
-                      />
-
-                      <SubmitButton
-                        loading={loading}
-                        onPress={handleAuth}
-                        text="Finalizar Registro"
-                      />
-
-                      <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => setStep(1)}
-                      >
-                        <Text style={styles.backButtonText}>
-                          Volver al paso 1
-                        </Text>
-                      </TouchableOpacity>
-                    </>
+                    // REUTILIZACIÓN DE FORMULARIO PROFESIONAL PARA EMAIL (Paso 2)
+                    renderProfessionalForm(false)
                   )
                 ) : (
-                  <>
+                  <View style={styles.formContainer}>
                     <AppInput
                       placeholder="Correo electrónico"
                       autoCapitalize="none"
@@ -708,10 +919,10 @@ export default function AuthScreen() {
                     />
                     <SubmitButton
                       loading={loading}
-                      onPress={handleAuth}
+                      onPress={handleEmailAuth}
                       text="Entrar"
                     />
-                  </>
+                  </View>
                 )}
 
                 <TouchableOpacity
@@ -730,6 +941,7 @@ export default function AuthScreen() {
 }
 
 const styles = StyleSheet.create({
+  // ... (Tus estilos originales intactos)
   container: {
     flex: 1,
     justifyContent: "center",
@@ -744,27 +956,26 @@ const styles = StyleSheet.create({
     left: 0,
   },
   logoWrapper: {
-    // Efecto de Elevación (Sombras)
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 10, // Da la sensación de estar flotando
+      height: 10,
     },
     shadowOpacity: 0.3,
     shadowRadius: 12,
-    elevation: 15, // Elevación para Android
-    borderRadius: 30, // Debe coincidir con el logo
+    elevation: 15,
+    borderRadius: 30,
     backgroundColor: "transparent",
   },
   logo: {
     width: 160,
     height: 160,
-    borderRadius: 26, // Un poco menos que el contenedor para que encaje bien
+    borderRadius: 26,
     borderWidth: 5,
-    borderColor: "rgba(177, 165, 165, 0.2)", // Borde fino para separar del fondo
+    borderColor: "rgba(177, 165, 165, 0.2)",
   },
   gradientLogo: {
-    padding: 4, // Este padding crea un borde brillante con el degradado
+    padding: 4,
     borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
@@ -784,7 +995,7 @@ const styles = StyleSheet.create({
   header: {
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 60, // Ajustado para que no esté pegado al borde superior
+    marginTop: 60,
     width: "100%",
   },
   title: {
