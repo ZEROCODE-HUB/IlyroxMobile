@@ -40,6 +40,7 @@ import { COLORS } from "../../constants";
 import { Avatar } from "../shared";
 import { ViewImage } from "./ViewImage";
 import { Comment } from "../../types";
+import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
 // ============================================================================
 // Types
@@ -73,66 +74,72 @@ const MODAL_HEIGHT = SCREEN_HEIGHT * 0.75;
 
 const CommentItem = React.memo<CommentItemProps>(
   ({ comment, replies, isLiked, onLike, onReply }) => (
-    <View style={styles.commentContainer}>
-      {/* Comentario principal */}
-      <View style={styles.commentMain}>
-        <Avatar
-          uri={comment.user.avatar}
-          name={comment.user.nombre}
-          size={36}
-        />
-        <View style={styles.commentBody}>
-          <View style={styles.bubble}>
-            <View style={styles.bubbleHeader}>
-              <Text style={styles.userName}>{comment.user.nombre}</Text>
-              <Text style={styles.timestamp}>{comment.timestamp}</Text>
-            </View>
-            {!!comment.text && (
-              <Text style={styles.commentText}>{comment.text}</Text>
-            )}
-            {!!comment.imageUrl && (
-              <ViewImage
-                src={comment.imageUrl}
-                containerStyle={styles.commentImageContainer}
-                imageStyle={styles.commentImage}
-              />
-            )}
-          </View>
-
-          <View style={styles.commentActions}>
-            <TouchableOpacity onPress={onLike} style={styles.actionButton}>
-              <Ionicons
-                name={isLiked ? "heart" : "heart-outline"}
-                size={16}
-                color={isLiked ? COLORS.error : COLORS.textTertiary}
-              />
-              {isLiked && <Text style={styles.actionText}>Like</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onReply} style={styles.actionButton}>
-              <Text style={styles.actionText}>Responder</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
-      {/* Respuestas */}
-      {replies.map((reply) => (
-        <View key={reply.id} style={styles.replyContainer}>
-          <Avatar uri={reply.user.avatar} name={reply.user.nombre} size={28} />
+    <ScreenWrapper withHeader={false}>
+      <View style={styles.commentContainer}>
+        {/* Comentario principal */}
+        <View style={styles.commentMain}>
+          <Avatar
+            uri={comment.user.avatar}
+            name={comment.user.nombre}
+            size={36}
+          />
           <View style={styles.commentBody}>
             <View style={styles.bubble}>
               <View style={styles.bubbleHeader}>
-                <Text style={styles.userName}>{reply.user.nombre}</Text>
-                <Text style={styles.timestamp}>{reply.timestamp}</Text>
+                <Text style={styles.userName}>{comment.user.nombre}</Text>
+                <Text style={styles.timestamp}>{comment.timestamp}</Text>
               </View>
-              {!!reply.text && (
-                <Text style={styles.commentText}>{reply.text}</Text>
+              {!!comment.text && (
+                <Text style={styles.commentText}>{comment.text}</Text>
               )}
+              {!!comment.imageUrl && (
+                <ViewImage
+                  src={comment.imageUrl}
+                  containerStyle={styles.commentImageContainer}
+                  imageStyle={styles.commentImage}
+                />
+              )}
+            </View>
+
+            <View style={styles.commentActions}>
+              <TouchableOpacity onPress={onLike} style={styles.actionButton}>
+                <Ionicons
+                  name={isLiked ? "heart" : "heart-outline"}
+                  size={16}
+                  color={isLiked ? COLORS.error : COLORS.textTertiary}
+                />
+                {isLiked && <Text style={styles.actionText}>Like</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onReply} style={styles.actionButton}>
+                <Text style={styles.actionText}>Responder</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
-      ))}
-    </View>
+
+        {/* Respuestas */}
+        {replies.map((reply) => (
+          <View key={reply.id} style={styles.replyContainer}>
+            <Avatar
+              uri={reply.user.avatar}
+              name={reply.user.nombre}
+              size={28}
+            />
+            <View style={styles.commentBody}>
+              <View style={styles.bubble}>
+                <View style={styles.bubbleHeader}>
+                  <Text style={styles.userName}>{reply.user.nombre}</Text>
+                  <Text style={styles.timestamp}>{reply.timestamp}</Text>
+                </View>
+                {!!reply.text && (
+                  <Text style={styles.commentText}>{reply.text}</Text>
+                )}
+              </View>
+            </View>
+          </View>
+        ))}
+      </View>
+    </ScreenWrapper>
   )
 );
 
@@ -526,7 +533,7 @@ const styles = StyleSheet.create({
   // List
   list: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   },
   listContent: {
     padding: 16,
@@ -547,7 +554,7 @@ const styles = StyleSheet.create({
 
   // Comment item
   commentContainer: {
-    marginBottom: 20,
+    marginBottom: 5,
   },
   commentMain: {
     flexDirection: "row",

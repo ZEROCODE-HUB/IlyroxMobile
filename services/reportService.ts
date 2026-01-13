@@ -13,7 +13,6 @@ export const reportService = {
   },
 
   async reportProperty(reporte: Partial<ReportesPropiedades>) {
-    console.log("reporrrrrrrte", reporte);
     const { error } = await supabase
       .from("reportes_propiedades")
       .insert([

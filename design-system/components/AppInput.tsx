@@ -152,6 +152,7 @@ const styles = StyleSheet.create({
       default: {},
     }),
     backgroundColor: COLORS.background,
+    color: COLORS.black,
   },
   leftIconContainer: {},
   rightIconContainer: {},

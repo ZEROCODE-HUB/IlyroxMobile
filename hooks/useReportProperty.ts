@@ -19,6 +19,19 @@ export const useReportProperty = () => {
     }
   };
 
+  const getReportsByProperty = async (property_id: string) => {
+    try {
+      setLoading(true);
+      const data = await reportService.getReports(property_id);
+      return data;
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const reportProperty = async (report: Partial<ReportesPropiedades>) => {
     try {
       setLoading(true);
@@ -45,6 +58,7 @@ export const useReportProperty = () => {
   return {
     loading,
     getCounterReportsProperty,
+    getReportsByProperty,
     reportProperty,
   };
 };

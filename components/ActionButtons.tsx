@@ -34,6 +34,7 @@ interface ActionButtonsProps {
   ) => void;
   authorId?: string; // ID of the user who owns/posted the content
   contentId?: string; // ID of the actual property/post (for reports)
+  propertyId?: string; // Direct property ID for properties
 }
 
 const ActionButtons: React.FC<ActionButtonsProps> = ({
@@ -52,6 +53,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   onTrackInteraction,
   authorId,
   contentId,
+  propertyId,
 }) => {
   // Hook de likes con optimistic updates
   const {
@@ -81,9 +83,9 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 
   useEffect(() => {
     if (feedItemType === "property") {
-      const targetId = contentId || feedItemId;
+      const targetId = propertyId || contentId;
       if (targetId) {
-        fetchReportCount();
+        fetchReportCount(targetId);
         if (!propertyAuthorId) {
           propertyService.getIdbyPropertyId(targetId).then((id) => {
             if (id) setPropertyAuthorId(id);
@@ -91,10 +93,9 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
         }
       }
     }
-  }, [feedItemId, contentId, feedItemType]);
+  }, [feedItemId, contentId, propertyId, feedItemType]);
 
-  const fetchReportCount = async () => {
-    const targetId = contentId || feedItemId;
+  const fetchReportCount = async (targetId: string) => {
     const count = await getCounterReportsProperty(targetId);
     setReportCount(count || 0);
   };
@@ -219,10 +220,12 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
         <ReportPropertyModal
           visible={showReportModal}
           onClose={() => setShowReportModal(false)}
-          propiedadId={contentId || feedItemId}
+          propiedadId={propertyId || contentId || feedItemId}
           reportadoPorId={userId || ""}
           propietarioId={propertyAuthorId || ""}
-          onSuccess={fetchReportCount}
+          onSuccess={() =>
+            fetchReportCount(propertyId || contentId || feedItemId)
+          }
         />
       )}
     </View>

@@ -79,8 +79,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log("Cerrar sesión presionado");
       await supabase.auth.signOut();
-      OneSignal.User.removeAlias("external_id");
       await OneSignal.logout();
+      OneSignal.User.removeAlias("external_id");
     } catch (error) {
       console.error("❌ Supabase signOut error:", error);
     } finally {

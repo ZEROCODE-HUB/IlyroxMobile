@@ -176,6 +176,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
               orientation="vertical"
               tintColor={COLORS.white}
               showContactButton={false}
+              propertyId={propertyDetails.id}
             />
           </View>
 

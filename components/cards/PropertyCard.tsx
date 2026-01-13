@@ -179,6 +179,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             orientation="vertical"
             tintColor={COLORS.white}
             authorId={item.user.id}
+            propertyId={property.id}
           />
         </View>
       </View>
