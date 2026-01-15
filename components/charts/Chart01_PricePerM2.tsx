@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,23 +10,8 @@ import {
 import { LineChart } from "react-native-gifted-charts";
 import { BaseChartProps, PricePerM2Data } from "./types";
 import { COLORS } from "../../constants/colors";
-
-const SCREEN_WIDTH = Dimensions.get("window").width;
-
-const pricePerM2Data: PricePerM2Data[] = [
-  { month: "Ene 2024", total: 3900, terrain: 3500, construction: 4200 },
-  { month: "Feb 2024", total: 4200, terrain: 3800, construction: 4500 },
-  { month: "Abr 2024", total: 4800, terrain: 4300, construction: 5100 },
-  { month: "Jul 2024", total: 5800, terrain: 5200, construction: 6200 },
-  { month: "Sep 2024", total: 6500, terrain: 5800, construction: 6900 },
-  { month: "Ene 2025", total: 7600, terrain: 6800, construction: 8100 },
-  { month: "Feb 2025", total: 7600, terrain: 6800, construction: 8100 },
-  { month: "May 2025", total: 7600, terrain: 6800, construction: 8100 },
-  { month: "Jun 2025", total: 8167, terrain: 7300, construction: 8700 },
-  { month: "Jul 2025", total: 9500, terrain: 8500, construction: 10100 },
-  { month: "Sep 2025", total: 11300, terrain: 10100, construction: 12000 },
-  { month: "Oct 2025", total: 9800, terrain: 8800, construction: 10400 },
-];
+import { chartService } from "../../services/chartService";
+import currencyConverter from "../../utils/currencyConverter";
 
 interface Chart01Props extends BaseChartProps {}
 
@@ -38,12 +23,138 @@ const Chart01_PricePerM2: React.FC<Chart01Props> = ({
     "total" | "terrain" | "construction"
   >("total");
   const [localActiveIndex, setLocalActiveIndex] = useState<number | null>(null);
+  const [processedData, setProcessedData] = useState<PricePerM2Data[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [valueCoin, setValueCoin] = useState<number>(0);
+
+  useEffect(() => {
+    const fetchRate = async () => {
+      const value = await currencyConverter();
+      setValueCoin(value);
+    };
+    fetchRate();
+  }, []);
+
+  const EXCHANGE_RATE = valueCoin || 18;
+
+  const getDataChart = async () => {
+    try {
+      setLoading(true);
+      const rawData = await chartService.getDataChart();
+
+      if (!rawData) return;
+
+      const groups: {
+        [key: string]: {
+          total: number[];
+          terrain: number[];
+          construction: number[];
+        };
+      } = {};
+
+      const months = [
+        "Ene",
+        "Feb",
+        "Mar",
+        "Abr",
+        "May",
+        "Jun",
+        "Jul",
+        "Ago",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dic",
+      ];
+
+      rawData.forEach((item: any) => {
+        if (!item.created_at) return;
+
+        const date = new Date(item.created_at);
+        const label = `${months[date.getMonth()]} ${date.getFullYear()}`;
+
+        const ops = Array.isArray(item.operaciones_propiedad)
+          ? item.operaciones_propiedad
+          : [item.operaciones_propiedad];
+
+        const saleOp = ops.find((o: any) => o?.tipo_operacion === "venta");
+
+        if (saleOp) {
+          let price = saleOp.precio || 0;
+          if (saleOp.moneda === "USD") price *= EXCHANGE_RATE;
+
+          if (!groups[label]) {
+            groups[label] = { total: [], terrain: [], construction: [] };
+          }
+
+          const m2Terreno = item.metros_cuadrados_terreno || 0;
+          const m2Construccion = item.metros_cuadrados_construccion || 0;
+
+          // Precio por m2 Total (promedio de ambos o lo que esté disponible)
+          const m2Total = m2Terreno || m2Construccion;
+          if (m2Total > 0) {
+            groups[label].total.push(price / m2Total);
+          }
+
+          if (m2Terreno > 0) {
+            groups[label].terrain.push(price / m2Terreno);
+          }
+
+          if (m2Construccion > 0) {
+            groups[label].construction.push(price / m2Construccion);
+          }
+        }
+      });
+
+      const processed = Object.keys(groups).map((label) => {
+        const g = groups[label];
+        const avg = (arr: number[]) =>
+          arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
+        const [mStr, yStr] = label.split(" ");
+        const monthIdx = months.indexOf(mStr);
+        const year = parseInt(yStr);
+
+        return {
+          month: label,
+          total: avg(g.total),
+          terrain: avg(g.terrain),
+          construction: avg(g.construction),
+          sortDate: new Date(year, monthIdx, 1),
+        };
+      });
+
+      // Ordenar cronológicamente
+      processed.sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime());
+
+      // Mapear al tipo final
+      const finalData: PricePerM2Data[] = processed.map((p) => ({
+        month: p.month,
+        total: Math.round(p.total),
+        terrain: Math.round(p.terrain),
+        construction: Math.round(p.construction),
+      }));
+
+      setProcessedData(finalData);
+    } catch (error) {
+      console.error("Error processing chart data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    getDataChart();
+  }, []);
 
   const formatPrice = (price: number): string => {
+    if (price >= 1000000) {
+      return `$${(price / 1000000).toFixed(1)}M`;
+    }
     if (price >= 1000) {
       return `$${(price / 1000).toFixed(1)}K`;
     }
-    return `$${price}`;
+    return `$${Math.round(price)}`;
   };
 
   const formatMonth = (monthYear: string): string => {
@@ -67,10 +178,10 @@ const Chart01_PricePerM2: React.FC<Chart01Props> = ({
 
   const handleDataPointClick = (item: any, index: number) => {
     setLocalActiveIndex(index);
-    onPress?.("chart1", index, pricePerM2Data[index]);
+    onPress?.("chart1", index, processedData[index]);
   };
 
-  const chartData = pricePerM2Data.map((d, index) => {
+  const chartData = processedData.map((d, index) => {
     const value =
       priceType === "total"
         ? d.total
@@ -105,7 +216,10 @@ const Chart01_PricePerM2: React.FC<Chart01Props> = ({
     };
   });
 
-  const chartWidth = pricePerM2Data.length * 60;
+  const chartWidth = Math.max(
+    Dimensions.get("window").width - 64,
+    processedData.length * 60
+  );
   const currentIndex =
     activePoint?.chart === "chart1" ? activePoint.index : localActiveIndex;
 
@@ -147,62 +261,91 @@ const Chart01_PricePerM2: React.FC<Chart01Props> = ({
         showsHorizontalScrollIndicator={false}
         style={{ maxHeight: 300 }}
       >
-        <View style={{ height: 280 }}>
-          <LineChart
-            data={chartData}
-            height={240}
-            width={chartWidth}
-            spacing={50}
-            initialSpacing={20}
-            color={COLORS.primary}
-            thickness={3}
-            dataPointsColor={COLORS.primary}
-            dataPointsRadius={6}
-            startFillColor={COLORS.primaryTransparent}
-            endFillColor="transparent"
-            startOpacity={0.9}
-            endOpacity={0.1}
-            areaChart
-            curved
-            isAnimated
-            yAxisThickness={0}
-            xAxisThickness={1}
-            xAxisColor={COLORS.cardBorder}
-            yAxisColor={COLORS.cardBorder}
-            yAxisTextStyle={{ color: COLORS.textSecondary, fontSize: 10 }}
-            xAxisLabelTextStyle={{ color: COLORS.textSecondary, fontSize: 8 }}
-            noOfSections={4}
-            rulesColor={COLORS.background}
-            rulesType="solid"
-            formatYLabel={(value) => formatPrice(parseFloat(value))}
-            hideDataPoints={false}
-            focusEnabled={true}
-            showDataPointOnFocus={true}
-            onFocus={(item: any, index: number) =>
-              handleDataPointClick(item, index)
-            }
-            delayBeforeUnFocus={3000}
-            unFocusOnPressOut={false}
-          />
+        <View style={{ height: 280, justifyContent: "center" }}>
+          {loading ? (
+            <View
+              style={{
+                width: Dimensions.get("window").width - 64,
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: COLORS.textSecondary }}>
+                Cargando datos...
+              </Text>
+            </View>
+          ) : processedData.length > 0 ? (
+            <LineChart
+              data={chartData}
+              height={240}
+              width={chartWidth}
+              spacing={50}
+              initialSpacing={20}
+              color={COLORS.primary}
+              thickness={3}
+              dataPointsColor={COLORS.primary}
+              dataPointsRadius={6}
+              startFillColor={COLORS.primaryTransparent}
+              endFillColor="transparent"
+              startOpacity={0.9}
+              endOpacity={0.1}
+              areaChart
+              curved
+              isAnimated
+              animateOnDataChange
+              animationDuration={1000}
+              yAxisThickness={0}
+              xAxisThickness={1}
+              xAxisColor={COLORS.cardBorder}
+              yAxisColor={COLORS.cardBorder}
+              yAxisTextStyle={{ color: COLORS.textSecondary, fontSize: 10 }}
+              xAxisLabelTextStyle={{ color: COLORS.textSecondary, fontSize: 8 }}
+              noOfSections={4}
+              rulesColor={COLORS.background}
+              rulesType="solid"
+              formatYLabel={(value) => formatPrice(parseFloat(value))}
+              hideDataPoints={false}
+              focusEnabled={true}
+              showDataPointOnFocus={true}
+              onFocus={(item: any, index: number) =>
+                handleDataPointClick(item, index)
+              }
+              delayBeforeUnFocus={3000}
+              unFocusOnPressOut={false}
+            />
+          ) : (
+            <View
+              style={{
+                width: Dimensions.get("window").width - 64,
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: COLORS.textSecondary }}>
+                No hay datos disponibles
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
-      {currentIndex !== null && currentIndex !== undefined && (
-        <View style={styles.tooltip}>
-          <Text style={styles.tooltipValue}>
-            {formatPrice(
-              priceType === "total"
-                ? pricePerM2Data[currentIndex].total
-                : priceType === "terrain"
-                ? pricePerM2Data[currentIndex].terrain
-                : pricePerM2Data[currentIndex].construction
-            )}
-          </Text>
-          <Text style={styles.tooltipLabel}>
-            {formatMonth(pricePerM2Data[currentIndex].month)}
-          </Text>
-        </View>
-      )}
+      {!loading &&
+        currentIndex !== null &&
+        currentIndex !== undefined &&
+        processedData[currentIndex] && (
+          <View style={styles.tooltip}>
+            <Text style={styles.tooltipValue}>
+              {formatPrice(
+                priceType === "total"
+                  ? processedData[currentIndex].total
+                  : priceType === "terrain"
+                  ? processedData[currentIndex].terrain
+                  : processedData[currentIndex].construction
+              )}
+            </Text>
+            <Text style={styles.tooltipLabel}>
+              {formatMonth(processedData[currentIndex].month)}
+            </Text>
+          </View>
+        )}
     </View>
   );
 };
