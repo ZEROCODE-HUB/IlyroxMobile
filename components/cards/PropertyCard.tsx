@@ -4,18 +4,9 @@
  */
 
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  ActivityIndicator,
-  FlatList,
-} from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { supabase } from "../../lib/supabase";
 
 import { FeedItem, User } from "../../types";
 import {
@@ -28,6 +19,9 @@ import { commonStyles } from "../../styles";
 import { UserHeader, ImageGallery, ReportModal, Avatar } from "../shared";
 import ActionButtons from "../ActionButtons";
 import { Bath } from "lucide-react-native";
+import { useUserRecommendations } from "../../hooks/useUserRecommendations";
+import RecommendedUsersModal from "../modals/RecommendedUsersModal";
+import { propertyService } from "../../services/propertyService";
 
 interface PropertyCardProps {
   item: FeedItem;
@@ -53,7 +47,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     setShowReportModal,
     handleReport,
   } = useFeedInteractions();
-  const userId = currentUserId ?? useCurrentUserId();
+  const contextUserId = useCurrentUserId();
+  const userId = currentUserId ?? contextUserId;
   const { trackInteraction } = useViewTracking({
     feedItemId: item.id,
     userId: currentUserId,
@@ -66,7 +61,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const navigation = useNavigation<any>();
 
   const handleContactPress = () => {
-    if (!currentUserId) return;
+    if (!userId) return;
 
     navigation.navigate("Messages", {
       initialUser: {
@@ -91,47 +86,13 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         }`
       : `Recomendado por ${positiveRecommendations} usuarios`;
   const [showRecommendedModal, setShowRecommendedModal] = React.useState(false);
-  const [recommendedList, setRecommendedList] = React.useState<
-    { id: string; name: string; role?: string; avatar?: string | null }[]
-  >([]);
-  const [loadingRecommended, setLoadingRecommended] = React.useState(false);
+
+  const { recommendedList, loadingRecommended, fetchRecommendations } =
+    useUserRecommendations(item.user.id);
 
   const openRecommendedModal = async () => {
-    const userIdToQuery = item.user.id;
-    if (!userIdToQuery) return;
     setShowRecommendedModal(true);
-    setLoadingRecommended(true);
-    setRecommendedList([]);
-    const { data: recs } = await supabase
-      .from("recomendaciones_usuarios")
-      .select("recomendado_por")
-      .eq("usuario_recomendado_id", userIdToQuery)
-      .eq("recomienda", true)
-      .range(0, 49);
-    const ids = (recs || [])
-      .map((r: any) => r?.recomendado_por)
-      .filter(Boolean) as string[];
-    if (ids.length > 0) {
-      const { data: profiles } = await supabase
-        .from("perfiles")
-        .select("id,nombre,apellido_paterno,apellido_materno,foto,rol")
-        .in("id", ids);
-      const mapped =
-        (profiles || []).map((p: any) => {
-          const name = [p?.nombre, p?.apellido_paterno, p?.apellido_materno]
-            .filter(Boolean)
-            .join(" ")
-            .trim();
-          return {
-            id: p.id,
-            name: name || "Usuario",
-            role: p.rol,
-            avatar: p.foto ?? null,
-          };
-        }) || [];
-      setRecommendedList(mapped);
-    }
-    setLoadingRecommended(false);
+    fetchRecommendations();
   };
 
   return (
@@ -149,59 +110,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         onReport={() => setShowReportModal(true)}
         totalRatings={item.user.totalRatings}
         showRecommendedPreview={false}
+        feedItemType="property"
       />
-
-      {/* Galería de imágenes con botones flotantes */}
-      <View style={styles.imageContainer}>
-        <ImageGallery
-          images={images.slice(0, 3)}
-          aspectRatio={DIMENSIONS.POST_ASPECT_RATIO}
-          showDots={true}
-          showImageCount={false}
-        />
-
-        {/* Badge de operación (Sale/Rent) */}
-        <View style={styles.operationBadge}>
-          <Text style={styles.operationText}>{property.operation}</Text>
-        </View>
-
-        {/* Botones de acción flotantes (Columna derecha) */}
-        <View style={styles.floatingActions}>
-          <ActionButtons
-            feedItemId={item.id}
-            feedItemType="property"
-            initialLikes={item.likes}
-            comments={item.comments}
-            userId={currentUserId}
-            onCommentClick={() => {
-              trackInteraction("comentario");
-              onCommentClick();
-            }}
-            onTrackInteraction={trackInteraction}
-            shareTitle={property.title}
-            shareDescription={`${
-              property.operation
-            } - $${property.price.toLocaleString()} ${property.currency}`}
-            shareImageUrl={images[0]}
-            showContactButton={false}
-            orientation="vertical"
-            tintColor={COLORS.white}
-          />
-        </View>
-      </View>
-
-      <View style={styles.metaRow}>
-        <Text style={styles.metaText}>
-          ID: {property.code ?? property.id} •{" "}
-          {property.createdAt
-            ? new Date(property.createdAt).toLocaleDateString("es-MX", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })
-            : item.timestamp}
-        </Text>
-      </View>
 
       {positiveRecommendations > 0 && (
         <TouchableOpacity
@@ -232,6 +142,60 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           </Text>
         </TouchableOpacity>
       )}
+
+      {/* Galería de imágenes con botones flotantes */}
+      <View style={styles.imageContainer}>
+        <ImageGallery
+          images={images.slice(0, 3)}
+          aspectRatio={DIMENSIONS.POST_ASPECT_RATIO}
+          showDots={true}
+          showImageCount={false}
+        />
+
+        {/* Badge de operación (Sale/Rent) */}
+        <View style={styles.operationBadge}>
+          <Text style={styles.operationText}>{property.status}</Text>
+        </View>
+
+        {/* Botones de acción flotantes (Columna derecha) */}
+        <View style={styles.floatingActions}>
+          <ActionButtons
+            feedItemId={item.id}
+            feedItemType="property"
+            initialLikes={item.likes}
+            comments={item.comments}
+            userId={currentUserId}
+            onCommentClick={() => {
+              trackInteraction("comentario");
+              onCommentClick();
+            }}
+            onTrackInteraction={trackInteraction}
+            shareTitle={property.title}
+            shareDescription={`${
+              property.operation
+            } - $${property.price.toLocaleString()} ${property.currency}`}
+            shareImageUrl={images[0]}
+            showContactButton={false}
+            orientation="vertical"
+            tintColor={COLORS.white}
+            authorId={item.user.id}
+            propertyId={property.id}
+          />
+        </View>
+      </View>
+
+      <View style={styles.metaRow}>
+        <Text style={styles.metaText}>
+          ID: {property.code ?? property.id} •{" "}
+          {property.createdAt
+            ? new Date(property.createdAt).toLocaleDateString("es-MX", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })
+            : item.timestamp}
+        </Text>
+      </View>
 
       {/* Información de la propiedad */}
       <View style={[commonStyles.cardContent, styles.compactContent]}>
@@ -330,67 +294,13 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         onClose={() => setShowReportModal(false)}
         onReport={handleReport}
       />
-      {showRecommendedModal && (
-        <Modal visible transparent animationType="fade">
-          <TouchableOpacity
-            style={commonStyles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => setShowRecommendedModal(false)}
-          >
-            <View style={styles.recommendedModal}>
-              <View style={styles.recommendedModalHeader}>
-                <Text style={styles.recommendedModalTitle}>
-                  Recomendado por
-                </Text>
-                <Text style={styles.recommendedModalSubtitle}>
-                  {positiveRecommendations} usuarios
-                </Text>
-              </View>
-              {loadingRecommended ? (
-                <View style={styles.recommendedModalLoading}>
-                  <ActivityIndicator size="small" color={COLORS.primary} />
-                </View>
-              ) : (
-                <FlatList
-                  data={recommendedList}
-                  keyExtractor={(u) => u.id}
-                  contentContainerStyle={styles.recommendedModalList}
-                  renderItem={({ item }) => (
-                    <View style={styles.recommendedModalItem}>
-                      <Avatar
-                        uri={item.avatar || undefined}
-                        name={item.name}
-                        size={40}
-                      />
-                      <View style={styles.recommendedModalInfo}>
-                        <Text
-                          style={styles.recommendedModalName}
-                          numberOfLines={1}
-                        >
-                          {item.name}
-                        </Text>
-                        <Text
-                          style={styles.recommendedModalRole}
-                          numberOfLines={1}
-                        >
-                          {item.role === "agente" ? "Agente" : "Cliente"}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-                  ListEmptyComponent={
-                    <View style={styles.recommendedModalEmpty}>
-                      <Text style={styles.recommendedModalEmptyText}>
-                        Aún no hay recomendaciones
-                      </Text>
-                    </View>
-                  }
-                />
-              )}
-            </View>
-          </TouchableOpacity>
-        </Modal>
-      )}
+      <RecommendedUsersModal
+        visible={showRecommendedModal}
+        onClose={() => setShowRecommendedModal(false)}
+        loading={loadingRecommended}
+        users={recommendedList}
+        totalCount={positiveRecommendations}
+      />
     </TouchableOpacity>
   );
 };

@@ -60,6 +60,7 @@ import {
   getLabelRecamaras,
   getCamposVisibles,
 } from "../../constants/propertyData";
+import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
 const PROPERTY_STATUS = [
   "Publicada",
@@ -75,7 +76,11 @@ interface EditPropertyProps {
   onSuccess?: () => void;
 }
 
-export default function EditProperty({ propertyId, onBack, onSuccess }: EditPropertyProps) {
+export default function EditProperty({
+  propertyId,
+  onBack,
+  onSuccess,
+}: EditPropertyProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -92,11 +97,14 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
   // ============================================
   const [descripcionPlantaBaja, setDescripcionPlantaBaja] = useState("");
   const [descripcionPlantaAlta, setDescripcionPlantaAlta] = useState("");
-  const [tipoOperacion, setTipoOperacion] = useState<"venta" | "renta" | "ambas">("venta");
+  const [tipoOperacion, setTipoOperacion] = useState<
+    "venta" | "renta" | "ambas"
+  >("venta");
   const [precioVenta, setPrecioVenta] = useState("");
   const [precioRenta, setPrecioRenta] = useState("");
   const [moneda, setMoneda] = useState<"MXN" | "USD">("MXN");
-  const [tipoPrincipal, setTipoPrincipal] = useState<TipoPrincipal>("habitacional");
+  const [tipoPrincipal, setTipoPrincipal] =
+    useState<TipoPrincipal>("habitacional");
   const [subtipo, setSubtipo] = useState("");
   const [status, setStatus] = useState<string>("Publicada");
 
@@ -133,23 +141,35 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
   // ============================================
   // 5. AMENIDADES
   // ============================================
-  const [amenidadesSeleccionadas, setAmenidadesSeleccionadas] = useState<string[]>([]);
+  const [amenidadesSeleccionadas, setAmenidadesSeleccionadas] = useState<
+    string[]
+  >([]);
 
   // ============================================
   // 6. COMISIÓN
   // ============================================
   const [comparteComision, setComparteComision] = useState<"No" | "Sí">("No");
-  const [comisionTipo, setComisionTipo] = useState<"porcentaje" | "monto">("porcentaje");
+  const [comisionTipo, setComisionTipo] = useState<"porcentaje" | "monto">(
+    "porcentaje"
+  );
   const [comisionValor, setComisionValor] = useState("");
-  const [comisionCompartidaTipo, setComisionCompartidaTipo] = useState<"porcentaje" | "monto">("porcentaje");
+  const [comisionCompartidaTipo, setComisionCompartidaTipo] = useState<
+    "porcentaje" | "monto"
+  >("porcentaje");
   const [comisionCompartidaValor, setComisionCompartidaValor] = useState("");
   const [condicionesComision, setCondicionesComision] = useState("");
 
-  const [comparteComisionRenta, setComparteComisionRenta] = useState<"No" | "Sí">("No");
-  const [comisionTipoRenta, setComisionTipoRenta] = useState<"porcentaje" | "monto">("porcentaje");
+  const [comparteComisionRenta, setComparteComisionRenta] = useState<
+    "No" | "Sí"
+  >("No");
+  const [comisionTipoRenta, setComisionTipoRenta] = useState<
+    "porcentaje" | "monto"
+  >("porcentaje");
   const [comisionValorRenta, setComisionValorRenta] = useState("");
-  const [comisionCompartidaTipoRenta, setComisionCompartidaTipoRenta] = useState<"porcentaje" | "monto">("porcentaje");
-  const [comisionCompartidaValorRenta, setComisionCompartidaValorRenta] = useState("");
+  const [comisionCompartidaTipoRenta, setComisionCompartidaTipoRenta] =
+    useState<"porcentaje" | "monto">("porcentaje");
+  const [comisionCompartidaValorRenta, setComisionCompartidaValorRenta] =
+    useState("");
   const [condicionesComisionRenta, setCondicionesComisionRenta] = useState("");
 
   // ============================================
@@ -162,8 +182,13 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
   // ============================================
   // 8. FINANCIAMIENTO
   // ============================================
-  const [aceptaFinanciamiento, setAceptaFinanciamiento] = useState<"No" | "Sí">("No");
-  const [tiposFinanciamientoSeleccionados, setTiposFinanciamientoSeleccionados] = useState<string[]>([]);
+  const [aceptaFinanciamiento, setAceptaFinanciamiento] = useState<"No" | "Sí">(
+    "No"
+  );
+  const [
+    tiposFinanciamientoSeleccionados,
+    setTiposFinanciamientoSeleccionados,
+  ] = useState<string[]>([]);
 
   // ============================================
   // MODAL STATES
@@ -173,23 +198,29 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
   const [showTipoPrincipalModal, setShowTipoPrincipalModal] = useState(false);
   const [showSubtipoModal, setShowSubtipoModal] = useState(false);
   const [showNumberInput, setShowNumberInput] = useState(false);
-  const [numberInputConfig, setNumberInputConfig] = useState({ title: "", onSave: (val: string) => {} });
-  const [showInstitucionGravamenModal, setShowInstitucionGravamenModal] = useState(false);
+  const [numberInputConfig, setNumberInputConfig] = useState({
+    title: "",
+    onSave: (val: string) => {},
+  });
+  const [showInstitucionGravamenModal, setShowInstitucionGravamenModal] =
+    useState(false);
   const [showAmenidadesModal, setShowAmenidadesModal] = useState(false);
   const [showFinanciamientoModal, setShowFinanciamientoModal] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Calcular campos visibles de forma segura
-  const camposVisibles = subtipo ? getCamposVisibles(subtipo) : {
-    recamaras: true,
-    banos: true,
-    estacionamientos: true,
-    m2Construccion: true,
-    niveles: true,
-    amueblado: true,
-    petFriendly: true,
-    antiguedad: true,
-  };
+  const camposVisibles = subtipo
+    ? getCamposVisibles(subtipo)
+    : {
+        recamaras: true,
+        banos: true,
+        estacionamientos: true,
+        m2Construccion: true,
+        niveles: true,
+        amueblado: true,
+        petFriendly: true,
+        antiguedad: true,
+      };
 
   useEffect(() => {
     if (propertyId) {
@@ -201,8 +232,9 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
    * Helper para manejar valores numéricos de forma segura
    */
   const safeNumber = (value: any, defaultValue: number = 0): number => {
-    if (value === null || value === undefined || value === "") return defaultValue;
-    const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+    if (value === null || value === undefined || value === "")
+      return defaultValue;
+    const num = typeof value === "string" ? parseFloat(value) : Number(value);
     return isNaN(num) ? defaultValue : num;
   };
 
@@ -219,13 +251,13 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
    */
   const safeArray = <T,>(value: any, defaultValue: T[] = []): T[] => {
     if (!Array.isArray(value)) return defaultValue;
-    return value.filter(item => item !== null && item !== undefined);
+    return value.filter((item) => item !== null && item !== undefined);
   };
 
   const fetchPropertyData = async () => {
     try {
       setLoading(true);
-      
+
       // 1. Fetch propiedad base con manejo de errores robusto
       const { data: prop, error: propError } = await supabase
         .from("propiedades")
@@ -261,7 +293,7 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
       setCalle(safeString(prop.calle));
       setNumeroExterior(safeString(prop.numero_exterior));
       setNumeroInterior(safeString(prop.numero_interior));
-      
+
       // Location con valores seguros
       setLocation({
         latitude: safeNumber(prop.latitud, 0),
@@ -272,27 +304,34 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
       setRecamaras(safeNumber(prop.habitaciones, 0).toString());
       setBanosCompletos(safeNumber(prop.banos, 0).toString());
       setEstacionamientos(safeNumber(prop.estacionamientos, 0).toString());
-      
+
       // M2 con manejo especial para valores vacíos
       const m2Const = safeNumber(prop.metros_cuadrados_construccion, 0);
       setM2Construccion(m2Const > 0 ? m2Const.toString() : "");
-      
+
       setNiveles(safeNumber(prop.pisos, 1).toString());
       setAntiguedad(safeString(prop.antiguedad));
-      
+
       // Amueblado y PetFriendly con valores por defecto
       const amuebladoValue = safeString(prop.amueblado, "No");
-      setAmueblado(["No", "Sí", "Parcial"].includes(amuebladoValue) ? amuebladoValue as any : "No");
-      
+      setAmueblado(
+        ["No", "Sí", "Parcial"].includes(amuebladoValue)
+          ? (amuebladoValue as any)
+          : "No"
+      );
+
       const petValue = safeString(prop.pet_friendly, "No");
-      setPetFriendly(["No", "Sí"].includes(petValue) ? petValue as any : "No");
-      
+      setPetFriendly(
+        ["No", "Sí"].includes(petValue) ? (petValue as any) : "No"
+      );
+
       // Fotos con filtrado robusto
       const fotosArray = safeArray<string>(prop.fotos);
-      const fotosValidas = fotosArray.filter(foto => 
-        typeof foto === 'string' && 
-        foto.trim() !== '' && 
-        (foto.startsWith('http://') || foto.startsWith('https://'))
+      const fotosValidas = fotosArray.filter(
+        (foto) =>
+          typeof foto === "string" &&
+          foto.trim() !== "" &&
+          (foto.startsWith("http://") || foto.startsWith("https://"))
       );
       setImages(fotosValidas);
 
@@ -314,52 +353,81 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
           }
 
           // Procesar cada operación
-          ops.forEach(op => {
+          ops.forEach((op) => {
             if (!op) return;
 
             const precio = safeNumber(op.precio, 0);
             const monedaOp = safeString(op.moneda, "MXN");
             const comparteComisionOp = op.comparte_comision === true;
-            const comisionTipoOp = op.comision_tipo === "monto_fijo" ? "monto" : "porcentaje";
+            const comisionTipoOp =
+              op.comision_tipo === "monto_fijo" ? "monto" : "porcentaje";
             const comisionValorOp = safeNumber(
-              op.comision_tipo === "monto_fijo" ? op.comision_monto_fijo : op.comision_porcentaje,
+              op.comision_tipo === "monto_fijo"
+                ? op.comision_monto_fijo
+                : op.comision_porcentaje,
               0
             );
-            const comisionCompartidaTipoOp = op.porcentaje_comision_compartida ? "porcentaje" : "monto";
+            const comisionCompartidaTipoOp = op.porcentaje_comision_compartida
+              ? "porcentaje"
+              : "monto";
             const comisionCompartidaValorOp = safeNumber(
               op.porcentaje_comision_compartida || op.monto_comision_compartida,
               0
             );
-            const condicionesOp = safeString(op.condiciones_comision_compartida);
+            const condicionesOp = safeString(
+              op.condiciones_comision_compartida
+            );
 
             if (op.tipo_operacion === "venta") {
               setPrecioVenta(precio > 0 ? precio.toString() : "");
-              setMoneda(["MXN", "USD"].includes(monedaOp) ? monedaOp as any : "MXN");
+              setMoneda(
+                ["MXN", "USD"].includes(monedaOp) ? (monedaOp as any) : "MXN"
+              );
               setComparteComision(comparteComisionOp ? "Sí" : "No");
               setComisionTipo(comisionTipoOp);
-              setComisionValor(comisionValorOp > 0 ? comisionValorOp.toString() : "");
+              setComisionValor(
+                comisionValorOp > 0 ? comisionValorOp.toString() : ""
+              );
               setComisionCompartidaTipo(comisionCompartidaTipoOp);
-              setComisionCompartidaValor(comisionCompartidaValorOp > 0 ? comisionCompartidaValorOp.toString() : "");
+              setComisionCompartidaValor(
+                comisionCompartidaValorOp > 0
+                  ? comisionCompartidaValorOp.toString()
+                  : ""
+              );
               setCondicionesComision(condicionesOp);
             } else if (op.tipo_operacion === "renta") {
               setPrecioRenta(precio > 0 ? precio.toString() : "");
-              setMoneda(["MXN", "USD"].includes(monedaOp) ? monedaOp as any : "MXN");
-              
+              setMoneda(
+                ["MXN", "USD"].includes(monedaOp) ? (monedaOp as any) : "MXN"
+              );
+
               if (ops.length === 2) {
                 // Cuando hay ambas operaciones, usar variables de renta
                 setComparteComisionRenta(comparteComisionOp ? "Sí" : "No");
                 setComisionTipoRenta(comisionTipoOp);
-                setComisionValorRenta(comisionValorOp > 0 ? comisionValorOp.toString() : "");
+                setComisionValorRenta(
+                  comisionValorOp > 0 ? comisionValorOp.toString() : ""
+                );
                 setComisionCompartidaTipoRenta(comisionCompartidaTipoOp);
-                setComisionCompartidaValorRenta(comisionCompartidaValorOp > 0 ? comisionCompartidaValorOp.toString() : "");
+                setComisionCompartidaValorRenta(
+                  comisionCompartidaValorOp > 0
+                    ? comisionCompartidaValorOp.toString()
+                    : ""
+                );
                 setCondicionesComisionRenta(condicionesOp);
               } else {
                 // Solo renta, usar variables generales
                 setComparteComision(comparteComisionOp ? "Sí" : "No");
                 setComisionTipo(comisionTipoOp);
-                setComisionValor(comisionValorOp > 0 ? comisionValorOp.toString() : "");
+                setComisionValor(
+                  comisionValorOp > 0 ? comisionValorOp.toString() : ""
+                );
                 setComisionCompartidaTipo(comisionCompartidaTipoOp);
-                setComisionCompartidaValor(comisionCompartidaValorOp > 0 ? comisionCompartidaValorOp.toString() : "");
+                setComisionCompartidaValor(
+                  comisionCompartidaValorOp > 0
+                    ? comisionCompartidaValorOp.toString()
+                    : ""
+                );
                 setCondicionesComision(condicionesOp);
               }
             }
@@ -375,11 +443,14 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
           .from("propiedad_amenidades")
           .select("amenidades(nombre)")
           .eq("propiedad_id", propertyId);
-        
+
         if (!amensError && amens) {
           const amenidadesNombres = amens
             .map((a: any) => a?.amenidades?.nombre)
-            .filter((nombre): nombre is string => typeof nombre === 'string' && nombre.trim() !== '');
+            .filter(
+              (nombre): nombre is string =>
+                typeof nombre === "string" && nombre.trim() !== ""
+            );
           setAmenidadesSeleccionadas(amenidadesNombres);
         } else {
           setAmenidadesSeleccionadas([]);
@@ -396,10 +467,12 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
           .select("*, instituciones_financieras(nombre)")
           .eq("propiedad_id", propertyId)
           .maybeSingle();
-        
+
         if (!gravError && grav) {
           setTieneGravamen("Sí");
-          setInstitucionGravamen(safeString(grav.instituciones_financieras?.nombre));
+          setInstitucionGravamen(
+            safeString(grav.instituciones_financieras?.nombre)
+          );
           const monto = safeNumber(grav.monto, 0);
           setMontoGravamen(monto > 0 ? monto.toString() : "");
         } else {
@@ -418,12 +491,15 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
           .from("propiedad_financiamientos")
           .select("instituciones_financieras(nombre)")
           .eq("propiedad_id", propertyId);
-        
+
         if (!finError && fin && fin.length > 0) {
           const financiamientosNombres = fin
             .map((f: any) => f?.instituciones_financieras?.nombre)
-            .filter((nombre): nombre is string => typeof nombre === 'string' && nombre.trim() !== '');
-          
+            .filter(
+              (nombre): nombre is string =>
+                typeof nombre === "string" && nombre.trim() !== ""
+            );
+
           if (financiamientosNombres.length > 0) {
             setAceptaFinanciamiento("Sí");
             setTiposFinanciamientoSeleccionados(financiamientosNombres);
@@ -439,15 +515,14 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
         console.error("Error fetching financiamiento:", finError);
         setAceptaFinanciamiento("No");
       }
-
     } catch (error: any) {
       console.error("Error fetching property data:", error);
       Alert.alert(
-        "Error", 
+        "Error",
         error.message || "No se pudo cargar la información de la propiedad.",
         [
           { text: "Reintentar", onPress: fetchPropertyData },
-          { text: "Volver", onPress: onBack, style: "cancel" }
+          { text: "Volver", onPress: onBack, style: "cancel" },
         ]
       );
     } finally {
@@ -480,7 +555,9 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
     });
 
     if (!result.canceled && result.assets) {
-      const uris = result.assets.map((asset) => asset.uri).filter(uri => uri && uri.trim() !== '');
+      const uris = result.assets
+        .map((asset) => asset.uri)
+        .filter((uri) => uri && uri.trim() !== "");
       setImages((prev) => [...prev, ...uris].slice(0, 15));
     }
   };
@@ -506,21 +583,29 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (images.length === 0) newErrors.images = "Debes agregar al menos 1 imagen";
-    
+    if (images.length === 0)
+      newErrors.images = "Debes agregar al menos 1 imagen";
+
     if (tipoOperacion === "venta" && (!precioVenta || precioVenta === "0")) {
       newErrors.precioVenta = "El precio de venta es requerido";
     }
     if (tipoOperacion === "renta" && (!precioRenta || precioRenta === "0")) {
       newErrors.precioRenta = "El precio de renta es requerido";
     }
-    if (tipoOperacion === "ambas" && ((!precioVenta || precioVenta === "0") || (!precioRenta || precioRenta === "0"))) {
+    if (
+      tipoOperacion === "ambas" &&
+      (!precioVenta ||
+        precioVenta === "0" ||
+        !precioRenta ||
+        precioRenta === "0")
+    ) {
       newErrors.precios = "Ambos precios son requeridos";
     }
-    
+
     if (!ubicacionData.estado) newErrors.estado = "El estado es requerido";
     if (!ubicacionData.ciudad) newErrors.ciudad = "La ciudad es requerida";
-    if (!ubicacionData.municipio) newErrors.municipio = "El municipio es requerido";
+    if (!ubicacionData.municipio)
+      newErrors.municipio = "El municipio es requerido";
 
     // Validación de m2 construcción
     if (!m2Construccion || m2Construccion === "0") {
@@ -543,18 +628,24 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
     try {
       // 1. Subir nuevas imágenes (solo las que son URIs locales)
       const finalImageUrls: string[] = [];
-      const newImagesToUpload = images.filter(img => 
-        img && (img.startsWith('file://') || img.startsWith('content://'))
+      const newImagesToUpload = images.filter(
+        (img) =>
+          img && (img.startsWith("file://") || img.startsWith("content://"))
       );
-      const existingImages = images.filter(img => 
-        img && (img.startsWith('http://') || img.startsWith('https://'))
+      const existingImages = images.filter(
+        (img) =>
+          img && (img.startsWith("http://") || img.startsWith("https://"))
       );
 
       finalImageUrls.push(...existingImages);
 
       for (let i = 0; i < newImagesToUpload.length; i++) {
         try {
-          const url = await uploadImage(newImagesToUpload[i], "feed-images", "properties");
+          const url = await uploadImage(
+            newImagesToUpload[i],
+            "feed-images",
+            "properties"
+          );
           if (url) finalImageUrls.push(url);
         } catch (uploadError) {
           console.error("Error uploading image:", uploadError);
@@ -593,9 +684,10 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
         updateData.estacionamientos = parseInt(estacionamientos) || 0;
       }
       if (camposVisibles.m2Construccion) {
-        updateData.metros_cuadrados_construccion = parseFloat(m2Construccion) || null;
+        updateData.metros_cuadrados_construccion =
+          parseFloat(m2Construccion) || null;
       }
-      
+
       if (camposVisibles.niveles) {
         updateData.pisos = parseInt(niveles) || 1;
       }
@@ -619,10 +711,13 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
       setUploadProgress(60);
 
       // 3. Actualizar operaciones (borrar y re-insertar)
-      await supabase.from("operaciones_propiedad").delete().eq("propiedad_id", propertyId);
+      await supabase
+        .from("operaciones_propiedad")
+        .delete()
+        .eq("propiedad_id", propertyId);
 
       const operaciones = [];
-      
+
       if (tipoOperacion === "venta" || tipoOperacion === "ambas") {
         const precioVentaNum = parseFloat(precioVenta.replace(/,/g, ""));
         if (precioVentaNum > 0) {
@@ -632,12 +727,33 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
             precio: precioVentaNum,
             moneda: moneda,
             comparte_comision: comparteComision === "Sí",
-            comision_tipo: comparteComision === "Sí" ? (comisionTipo === "monto" ? "monto_fijo" : comisionTipo) : null,
-            comision_porcentaje: comparteComision === "Sí" && comisionTipo === "porcentaje" ? parseFloat(comisionValor) || null : null,
-            comision_monto_fijo: comparteComision === "Sí" && comisionTipo === "monto" ? parseFloat(comisionValor) || null : null,
-            porcentaje_comision_compartida: comparteComision === "Sí" && comisionCompartidaTipo === "porcentaje" ? parseFloat(comisionCompartidaValor) || null : null,
-            monto_comision_compartida: comparteComision === "Sí" && comisionCompartidaTipo === "monto" ? parseFloat(comisionCompartidaValor) || null : null,
-            condiciones_comision_compartida: comparteComision === "Sí" && condicionesComision ? condicionesComision : null,
+            comision_tipo:
+              comparteComision === "Sí"
+                ? comisionTipo === "monto"
+                  ? "monto_fijo"
+                  : comisionTipo
+                : null,
+            comision_porcentaje:
+              comparteComision === "Sí" && comisionTipo === "porcentaje"
+                ? parseFloat(comisionValor) || null
+                : null,
+            comision_monto_fijo:
+              comparteComision === "Sí" && comisionTipo === "monto"
+                ? parseFloat(comisionValor) || null
+                : null,
+            porcentaje_comision_compartida:
+              comparteComision === "Sí" &&
+              comisionCompartidaTipo === "porcentaje"
+                ? parseFloat(comisionCompartidaValor) || null
+                : null,
+            monto_comision_compartida:
+              comparteComision === "Sí" && comisionCompartidaTipo === "monto"
+                ? parseFloat(comisionCompartidaValor) || null
+                : null,
+            condiciones_comision_compartida:
+              comparteComision === "Sí" && condicionesComision
+                ? condicionesComision
+                : null,
           });
         }
       }
@@ -647,9 +763,15 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
         const comparte = isAmbas ? comparteComisionRenta : comparteComision;
         const tipo = isAmbas ? comisionTipoRenta : comisionTipo;
         const valor = isAmbas ? comisionValorRenta : comisionValor;
-        const compartidaTipo = isAmbas ? comisionCompartidaTipoRenta : comisionCompartidaTipo;
-        const compartidaValor = isAmbas ? comisionCompartidaValorRenta : comisionCompartidaValor;
-        const condiciones = isAmbas ? condicionesComisionRenta : condicionesComision;
+        const compartidaTipo = isAmbas
+          ? comisionCompartidaTipoRenta
+          : comisionCompartidaTipo;
+        const compartidaValor = isAmbas
+          ? comisionCompartidaValorRenta
+          : comisionCompartidaValor;
+        const condiciones = isAmbas
+          ? condicionesComisionRenta
+          : condicionesComision;
 
         const precioRentaNum = parseFloat(precioRenta.replace(/,/g, ""));
         if (precioRentaNum > 0) {
@@ -659,18 +781,38 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
             precio: precioRentaNum,
             moneda: moneda,
             comparte_comision: comparte === "Sí",
-            comision_tipo: comparte === "Sí" ? (tipo === "monto" ? "monto_fijo" : tipo) : null,
-            comision_porcentaje: comparte === "Sí" && tipo === "porcentaje" ? parseFloat(valor) || null : null,
-            comision_monto_fijo: comparte === "Sí" && tipo === "monto" ? parseFloat(valor) || null : null,
-            porcentaje_comision_compartida: comparte === "Sí" && compartidaTipo === "porcentaje" ? parseFloat(compartidaValor) || null : null,
-            monto_comision_compartida: comparte === "Sí" && compartidaTipo === "monto" ? parseFloat(compartidaValor) || null : null,
-            condiciones_comision_compartida: comparte === "Sí" && condiciones ? condiciones : null,
+            comision_tipo:
+              comparte === "Sí"
+                ? tipo === "monto"
+                  ? "monto_fijo"
+                  : tipo
+                : null,
+            comision_porcentaje:
+              comparte === "Sí" && tipo === "porcentaje"
+                ? parseFloat(valor) || null
+                : null,
+            comision_monto_fijo:
+              comparte === "Sí" && tipo === "monto"
+                ? parseFloat(valor) || null
+                : null,
+            porcentaje_comision_compartida:
+              comparte === "Sí" && compartidaTipo === "porcentaje"
+                ? parseFloat(compartidaValor) || null
+                : null,
+            monto_comision_compartida:
+              comparte === "Sí" && compartidaTipo === "monto"
+                ? parseFloat(compartidaValor) || null
+                : null,
+            condiciones_comision_compartida:
+              comparte === "Sí" && condiciones ? condiciones : null,
           });
         }
       }
 
       if (operaciones.length > 0) {
-        const { error: opError } = await supabase.from("operaciones_propiedad").insert(operaciones);
+        const { error: opError } = await supabase
+          .from("operaciones_propiedad")
+          .insert(operaciones);
         if (opError) throw opError;
       }
 
@@ -678,9 +820,18 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
 
       // 4. Amenidades, Gravamen, Financiamiento (Borrar y re-insertar)
       await Promise.all([
-        supabase.from("propiedad_amenidades").delete().eq("propiedad_id", propertyId),
-        supabase.from("propiedad_gravamenes").delete().eq("propiedad_id", propertyId),
-        supabase.from("propiedad_financiamientos").delete().eq("propiedad_id", propertyId),
+        supabase
+          .from("propiedad_amenidades")
+          .delete()
+          .eq("propiedad_id", propertyId),
+        supabase
+          .from("propiedad_gravamenes")
+          .delete()
+          .eq("propiedad_id", propertyId),
+        supabase
+          .from("propiedad_financiamientos")
+          .delete()
+          .eq("propiedad_id", propertyId),
       ]);
 
       // Re-insertar amenidades
@@ -688,9 +839,11 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
         try {
           const ids = await findAmenidadesIds(amenidadesSeleccionadas);
           if (ids.length > 0) {
-            await supabase.from("propiedad_amenidades").insert(
-              ids.map(id => ({ propiedad_id: propertyId, amenidad_id: id }))
-            );
+            await supabase
+              .from("propiedad_amenidades")
+              .insert(
+                ids.map((id) => ({ propiedad_id: propertyId, amenidad_id: id }))
+              );
           }
         } catch (amenError) {
           console.error("Error updating amenidades:", amenError);
@@ -714,13 +867,23 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
       }
 
       // Re-insertar financiamiento
-      if (aceptaFinanciamiento === "Sí" && tiposFinanciamientoSeleccionados.length > 0) {
+      if (
+        aceptaFinanciamiento === "Sí" &&
+        tiposFinanciamientoSeleccionados.length > 0
+      ) {
         try {
-          const ids = await findTiposFinanciamientoIds(tiposFinanciamientoSeleccionados);
+          const ids = await findTiposFinanciamientoIds(
+            tiposFinanciamientoSeleccionados
+          );
           if (ids.length > 0) {
-            await supabase.from("propiedad_financiamientos").insert(
-              ids.map(id => ({ propiedad_id: propertyId, tipo_financiamiento_id: id }))
-            );
+            await supabase
+              .from("propiedad_financiamientos")
+              .insert(
+                ids.map((id) => ({
+                  propiedad_id: propertyId,
+                  tipo_financiamiento_id: id,
+                }))
+              );
           }
         } catch (finError) {
           console.error("Error updating financiamiento:", finError);
@@ -731,11 +894,10 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
       Alert.alert("¡Éxito!", "Propiedad actualizada correctamente");
       if (onSuccess) onSuccess();
       onBack();
-
     } catch (error: any) {
       console.error("Error updating property:", error);
       Alert.alert(
-        "Error", 
+        "Error",
         error.message || "No se pudo actualizar la propiedad",
         [{ text: "OK" }]
       );
@@ -755,7 +917,7 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
   }
 
   return (
-    <View style={styles.container}>
+    <ScreenWrapper withHeader={false} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
@@ -765,7 +927,10 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Status Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Estado de la Propiedad</Text>
@@ -774,7 +939,11 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
             onPress={() => setShowStatusModal(true)}
           >
             <Text style={styles.selectorText}>{status}</Text>
-            <Ionicons name="chevron-down" size={20} color={COLORS.textTertiary} />
+            <Ionicons
+              name="chevron-down"
+              size={20}
+              color={COLORS.textTertiary}
+            />
           </TouchableOpacity>
         </View>
 
@@ -786,13 +955,19 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
               <Text style={styles.addText}>+ Agregar</Text>
             </TouchableOpacity>
           </View>
-          {errors.images && <Text style={styles.errorText}>{errors.images}</Text>}
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imagesScroll}>
+          {errors.images && (
+            <Text style={styles.errorText}>{errors.images}</Text>
+          )}
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.imagesScroll}
+          >
             {images.map((img, index) => (
               <View key={`${img}-${index}`} style={styles.imageWrapper}>
-                <Image 
-                  source={{ uri: img }} 
+                <Image
+                  source={{ uri: img }}
                   style={styles.imageItem}
                   onError={(e) => {
                     console.log("Error loading image:", img);
@@ -802,13 +977,24 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
                   style={styles.removeImageBtn}
                   onPress={() => handleRemoveImage(index)}
                 >
-                  <Ionicons name="close-circle" size={20} color={COLORS.error} />
+                  <Ionicons
+                    name="close-circle"
+                    size={20}
+                    color={COLORS.error}
+                  />
                 </TouchableOpacity>
               </View>
             ))}
             {images.length === 0 && (
-              <TouchableOpacity style={styles.imagePlaceholder} onPress={handlePickImages}>
-                <Ionicons name="camera-outline" size={40} color={COLORS.textTertiary} />
+              <TouchableOpacity
+                style={styles.imagePlaceholder}
+                onPress={handlePickImages}
+              >
+                <Ionicons
+                  name="camera-outline"
+                  size={40}
+                  color={COLORS.textTertiary}
+                />
                 <Text style={styles.placeholderText}>Agregar fotos</Text>
               </TouchableOpacity>
             )}
@@ -864,32 +1050,57 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
             />
           )}
 
-          <TouchableOpacity style={styles.selector} onPress={() => setShowMonedaModal(true)}>
+          <TouchableOpacity
+            style={styles.selector}
+            onPress={() => setShowMonedaModal(true)}
+          >
             <View>
               <Text style={styles.selectorLabel}>Moneda</Text>
               <Text style={styles.selectorText}>{moneda}</Text>
             </View>
-            <Ionicons name="chevron-down" size={20} color={COLORS.textTertiary} />
+            <Ionicons
+              name="chevron-down"
+              size={20}
+              color={COLORS.textTertiary}
+            />
           </TouchableOpacity>
         </View>
 
         {/* Tipo de Propiedad */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Categoría</Text>
-          <TouchableOpacity style={styles.selector} onPress={() => setShowTipoPrincipalModal(true)}>
+          <TouchableOpacity
+            style={styles.selector}
+            onPress={() => setShowTipoPrincipalModal(true)}
+          >
             <View>
               <Text style={styles.selectorLabel}>Tipo Principal</Text>
-              <Text style={styles.selectorText}>{tipoPrincipal.toUpperCase()}</Text>
+              <Text style={styles.selectorText}>
+                {tipoPrincipal.toUpperCase()}
+              </Text>
             </View>
-            <Ionicons name="chevron-down" size={20} color={COLORS.textTertiary} />
+            <Ionicons
+              name="chevron-down"
+              size={20}
+              color={COLORS.textTertiary}
+            />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.selector} onPress={() => setShowSubtipoModal(true)}>
+          <TouchableOpacity
+            style={styles.selector}
+            onPress={() => setShowSubtipoModal(true)}
+          >
             <View>
               <Text style={styles.selectorLabel}>Subtipo</Text>
-              <Text style={styles.selectorText}>{subtipo || "Seleccionar..."}</Text>
+              <Text style={styles.selectorText}>
+                {subtipo || "Seleccionar..."}
+              </Text>
             </View>
-            <Ionicons name="chevron-down" size={20} color={COLORS.textTertiary} />
+            <Ionicons
+              name="chevron-down"
+              size={20}
+              color={COLORS.textTertiary}
+            />
           </TouchableOpacity>
         </View>
 
@@ -900,18 +1111,28 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
             initialData={ubicacionData}
             onChange={setUbicacionData}
           />
-          {errors.estado && <Text style={styles.errorText}>{errors.estado}</Text>}
-          
+          {errors.estado && (
+            <Text style={styles.errorText}>{errors.estado}</Text>
+          )}
+
           <AppInput label="Calle" value={calle} onChangeText={setCalle} />
           <View style={styles.row}>
             <View style={{ flex: 1, marginRight: 8 }}>
-              <AppInput label="Num. Ext." value={numeroExterior} onChangeText={setNumeroExterior} />
+              <AppInput
+                label="Num. Ext."
+                value={numeroExterior}
+                onChangeText={setNumeroExterior}
+              />
             </View>
             <View style={{ flex: 1 }}>
-              <AppInput label="Num. Int." value={numeroInterior} onChangeText={setNumeroInterior} />
+              <AppInput
+                label="Num. Int."
+                value={numeroInterior}
+                onChangeText={setNumeroInterior}
+              />
             </View>
           </View>
-          
+
           <Text style={styles.inputLabel}>Mapa (Pin de ubicación)</Text>
           <LocationPicker
             initialLatitude={location.latitude || 0}
@@ -923,21 +1144,27 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
         {/* Características */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Características</Text>
-          
+
           {camposVisibles.recamaras && (
-            <TouchableOpacity 
-              style={styles.selector} 
-              onPress={() => openNumberInput(getLabelRecamaras(tipoPrincipal), setRecamaras)}
+            <TouchableOpacity
+              style={styles.selector}
+              onPress={() =>
+                openNumberInput(getLabelRecamaras(tipoPrincipal), setRecamaras)
+              }
             >
-              <Text style={styles.selectorLabel}>{getLabelRecamaras(tipoPrincipal)}</Text>
+              <Text style={styles.selectorLabel}>
+                {getLabelRecamaras(tipoPrincipal)}
+              </Text>
               <Text style={styles.selectorText}>{recamaras}</Text>
             </TouchableOpacity>
           )}
 
           {camposVisibles.banos && (
-            <TouchableOpacity 
-              style={styles.selector} 
-              onPress={() => openNumberInput("Baños Completos", setBanosCompletos)}
+            <TouchableOpacity
+              style={styles.selector}
+              onPress={() =>
+                openNumberInput("Baños Completos", setBanosCompletos)
+              }
             >
               <Text style={styles.selectorLabel}>Baños Completos</Text>
               <Text style={styles.selectorText}>{banosCompletos}</Text>
@@ -945,9 +1172,11 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
           )}
 
           {camposVisibles.estacionamientos && (
-            <TouchableOpacity 
-              style={styles.selector} 
-              onPress={() => openNumberInput("Estacionamientos", setEstacionamientos)}
+            <TouchableOpacity
+              style={styles.selector}
+              onPress={() =>
+                openNumberInput("Estacionamientos", setEstacionamientos)
+              }
             >
               <Text style={styles.selectorLabel}>Estacionamientos</Text>
               <Text style={styles.selectorText}>{estacionamientos}</Text>
@@ -965,8 +1194,8 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
           )}
 
           {camposVisibles.niveles && (
-            <TouchableOpacity 
-              style={styles.selector} 
+            <TouchableOpacity
+              style={styles.selector}
               onPress={() => openNumberInput("Niveles", setNiveles)}
             >
               <Text style={styles.selectorLabel}>Niveles</Text>
@@ -1012,8 +1241,8 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
             <Text style={styles.sectionTitle}>Amenidades</Text>
             <TouchableOpacity onPress={() => setShowAmenidadesModal(true)}>
               <Text style={styles.addText}>
-                {amenidadesSeleccionadas.length > 0 
-                  ? `${amenidadesSeleccionadas.length} seleccionadas` 
+                {amenidadesSeleccionadas.length > 0
+                  ? `${amenidadesSeleccionadas.length} seleccionadas`
                   : "+ Agregar"}
               </Text>
             </TouchableOpacity>
@@ -1024,7 +1253,11 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
                 <View key={amenidad} style={styles.tag}>
                   <Text style={styles.tagText}>{amenidad}</Text>
                   <TouchableOpacity onPress={() => toggleAmenidad(amenidad)}>
-                    <Ionicons name="close-circle" size={16} color={COLORS.textSecondary} />
+                    <Ionicons
+                      name="close-circle"
+                      size={16}
+                      color={COLORS.textSecondary}
+                    />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -1051,7 +1284,11 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
                   onSelect={(val) => setComisionTipo(val as any)}
                 />
                 <AppInput
-                  label={comisionTipo === "porcentaje" ? "Porcentaje (%)" : "Monto fijo"}
+                  label={
+                    comisionTipo === "porcentaje"
+                      ? "Porcentaje (%)"
+                      : "Monto fijo"
+                  }
                   value={comisionValor}
                   onChangeText={setComisionValor}
                   keyboardType="numeric"
@@ -1063,7 +1300,11 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
                   onSelect={(val) => setComisionCompartidaTipo(val as any)}
                 />
                 <AppInput
-                  label={comisionCompartidaTipo === "porcentaje" ? "Porcentaje (%)" : "Monto fijo"}
+                  label={
+                    comisionCompartidaTipo === "porcentaje"
+                      ? "Porcentaje (%)"
+                      : "Monto fijo"
+                  }
                   value={comisionCompartidaValor}
                   onChangeText={setComisionCompartidaValor}
                   keyboardType="numeric"
@@ -1100,7 +1341,11 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
                   onSelect={(val) => setComisionTipoRenta(val as any)}
                 />
                 <AppInput
-                  label={comisionTipoRenta === "porcentaje" ? "Porcentaje (%)" : "Monto fijo"}
+                  label={
+                    comisionTipoRenta === "porcentaje"
+                      ? "Porcentaje (%)"
+                      : "Monto fijo"
+                  }
                   value={comisionValorRenta}
                   onChangeText={setComisionValorRenta}
                   keyboardType="numeric"
@@ -1112,7 +1357,11 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
                   onSelect={(val) => setComisionCompartidaTipoRenta(val as any)}
                 />
                 <AppInput
-                  label={comisionCompartidaTipoRenta === "porcentaje" ? "Porcentaje (%)" : "Monto fijo"}
+                  label={
+                    comisionCompartidaTipoRenta === "porcentaje"
+                      ? "Porcentaje (%)"
+                      : "Monto fijo"
+                  }
                   value={comisionCompartidaValorRenta}
                   onChangeText={setComisionCompartidaValorRenta}
                   keyboardType="numeric"
@@ -1148,7 +1397,11 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
                   onSelect={(val) => setComisionTipo(val as any)}
                 />
                 <AppInput
-                  label={comisionTipo === "porcentaje" ? "Porcentaje (%)" : "Monto fijo"}
+                  label={
+                    comisionTipo === "porcentaje"
+                      ? "Porcentaje (%)"
+                      : "Monto fijo"
+                  }
                   value={comisionValor}
                   onChangeText={setComisionValor}
                   keyboardType="numeric"
@@ -1160,7 +1413,11 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
                   onSelect={(val) => setComisionCompartidaTipo(val as any)}
                 />
                 <AppInput
-                  label={comisionCompartidaTipo === "porcentaje" ? "Porcentaje (%)" : "Monto fijo"}
+                  label={
+                    comisionCompartidaTipo === "porcentaje"
+                      ? "Porcentaje (%)"
+                      : "Monto fijo"
+                  }
                   value={comisionCompartidaValor}
                   onChangeText={setComisionCompartidaValor}
                   keyboardType="numeric"
@@ -1189,8 +1446,8 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
           />
           {tieneGravamen === "Sí" && (
             <>
-              <TouchableOpacity 
-                style={styles.selector} 
+              <TouchableOpacity
+                style={styles.selector}
                 onPress={() => setShowInstitucionGravamenModal(true)}
               >
                 <View>
@@ -1199,7 +1456,11 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
                     {institucionGravamen || "Seleccionar..."}
                   </Text>
                 </View>
-                <Ionicons name="chevron-down" size={20} color={COLORS.textTertiary} />
+                <Ionicons
+                  name="chevron-down"
+                  size={20}
+                  color={COLORS.textTertiary}
+                />
               </TouchableOpacity>
               <AppInput
                 label="Monto del gravamen"
@@ -1223,7 +1484,7 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
           />
           {aceptaFinanciamiento === "Sí" && (
             <>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.selector}
                 onPress={() => setShowFinanciamientoModal(true)}
               >
@@ -1232,15 +1493,25 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
                     ? `${tiposFinanciamientoSeleccionados.length} tipos seleccionados`
                     : "Seleccionar tipos..."}
                 </Text>
-                <Ionicons name="chevron-down" size={20} color={COLORS.textTertiary} />
+                <Ionicons
+                  name="chevron-down"
+                  size={20}
+                  color={COLORS.textTertiary}
+                />
               </TouchableOpacity>
               {tiposFinanciamientoSeleccionados.length > 0 && (
                 <View style={styles.tagsContainer}>
                   {tiposFinanciamientoSeleccionados.map((tipo) => (
                     <View key={tipo} style={styles.tag}>
                       <Text style={styles.tagText}>{tipo}</Text>
-                      <TouchableOpacity onPress={() => toggleFinanciamiento(tipo)}>
-                        <Ionicons name="close-circle" size={16} color={COLORS.textSecondary} />
+                      <TouchableOpacity
+                        onPress={() => toggleFinanciamiento(tipo)}
+                      >
+                        <Ionicons
+                          name="close-circle"
+                          size={16}
+                          color={COLORS.textSecondary}
+                        />
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -1259,7 +1530,9 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
           {updating ? (
             <View style={styles.updatingContainer}>
               <ActivityIndicator color={COLORS.white} size="small" />
-              <Text style={styles.saveButtonText}>Actualizando... {Math.round(uploadProgress)}%</Text>
+              <Text style={styles.saveButtonText}>
+                Actualizando... {Math.round(uploadProgress)}%
+              </Text>
             </View>
           ) : (
             <Text style={styles.saveButtonText}>Guardar Cambios</Text>
@@ -1294,7 +1567,7 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
           setSubtipo("");
         }}
         title="Tipo de Propiedad"
-        options={Object.keys(PROPERTY_TYPES || {}).map(t => t.toUpperCase())}
+        options={Object.keys(PROPERTY_TYPES || {}).map((t) => t.toUpperCase())}
         currentValue={tipoPrincipal.toUpperCase()}
       />
 
@@ -1338,9 +1611,17 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
                   onPress={() => toggleAmenidad(amenidad)}
                 >
                   <Ionicons
-                    name={amenidadesSeleccionadas.includes(amenidad) ? "checkbox" : "square-outline"}
+                    name={
+                      amenidadesSeleccionadas.includes(amenidad)
+                        ? "checkbox"
+                        : "square-outline"
+                    }
                     size={24}
-                    color={amenidadesSeleccionadas.includes(amenidad) ? COLORS.primary : COLORS.textSecondary}
+                    color={
+                      amenidadesSeleccionadas.includes(amenidad)
+                        ? COLORS.primary
+                        : COLORS.textSecondary
+                    }
                   />
                   <Text style={styles.checkboxLabel}>{amenidad}</Text>
                 </TouchableOpacity>
@@ -1360,7 +1641,9 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Tipos de Financiamiento</Text>
-              <TouchableOpacity onPress={() => setShowFinanciamientoModal(false)}>
+              <TouchableOpacity
+                onPress={() => setShowFinanciamientoModal(false)}
+              >
                 <Ionicons name="close" size={24} color={COLORS.textPrimary} />
               </TouchableOpacity>
             </View>
@@ -1372,9 +1655,17 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
                   onPress={() => toggleFinanciamiento(tipo)}
                 >
                   <Ionicons
-                    name={tiposFinanciamientoSeleccionados.includes(tipo) ? "checkbox" : "square-outline"}
+                    name={
+                      tiposFinanciamientoSeleccionados.includes(tipo)
+                        ? "checkbox"
+                        : "square-outline"
+                    }
                     size={24}
-                    color={tiposFinanciamientoSeleccionados.includes(tipo) ? COLORS.primary : COLORS.textSecondary}
+                    color={
+                      tiposFinanciamientoSeleccionados.includes(tipo)
+                        ? COLORS.primary
+                        : COLORS.textSecondary
+                    }
                   />
                   <Text style={styles.checkboxLabel}>{tipo}</Text>
                 </TouchableOpacity>
@@ -1390,7 +1681,7 @@ export default function EditProperty({ propertyId, onBack, onSuccess }: EditProp
         onSave={numberInputConfig.onSave}
         title={numberInputConfig.title}
       />
-    </View>
+    </ScreenWrapper>
   );
 }
 

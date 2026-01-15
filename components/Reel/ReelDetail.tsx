@@ -36,7 +36,6 @@ import {
 import { VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { FeedItem, User } from "../../types";
-import { CommentsModalV2 as CommentsModal } from "../modals";
 import { useVideoPlayer, useLikes, useShare } from "../../hooks";
 import { COLORS } from "../../constants";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";

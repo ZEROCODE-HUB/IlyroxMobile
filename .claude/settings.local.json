@@ -10,7 +10,9 @@
       "Bash(npx expo install:*)",
       "Bash(npx expo start:*)",
       "Bash(npx madge:*)",
-      "Bash(npx expo-doctor)"
+      "Bash(npx expo-doctor)",
+      "WebSearch",
+      "WebFetch(domain:gorhom.dev)"
     ]
   }
 }

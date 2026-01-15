@@ -19,7 +19,6 @@ import Chart10_SearchesByNeighborhood from "./charts/Chart10_SearchesByNeighborh
 import Chart11_TopAmenities from "./charts/Chart11_TopAmenities";
 import Chart12_SurfaceVsSaleTime from "./charts/Chart12_SurfaceVsSaleTime";
 import Chart13_PriceByRooms from "./charts/Chart13_PriceByRooms";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
 
 const Statistics = () => {
@@ -29,6 +28,8 @@ const Statistics = () => {
   const handlePress = (chart: string, index: number, value: any) => {
     setActivePoint({ chart, index, value });
   };
+
+  // FILTROS: Zona, tipo de inmueble, venta/Renta
 
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>
@@ -92,10 +93,11 @@ const Statistics = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   },
   scrollView: {
     flex: 1,
+    backgroundColor: COLORS.background,
   },
   contentContainer: {
     padding: 16,

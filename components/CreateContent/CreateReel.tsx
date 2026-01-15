@@ -246,7 +246,7 @@ export default function CreateReel({ onBack }: CreateReelProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   },
   header: {
     flexDirection: "row",
@@ -267,6 +267,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: COLORS.background,
   },
   scrollContent: {
     padding: 16,

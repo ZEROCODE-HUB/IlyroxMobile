@@ -1,7 +1,11 @@
 /**
- * MessagingScreen.tsx
+ * MessagingScreen.tsx - REFACTORIZADO
  * Pantalla principal de mensajería integrada con Supabase
- * FIX: Header posicionado correctamente fuera del KeyboardAvoidingView
+ *
+ * FIXES:
+ * - useConversations solo se ejecuta cuando se muestra la lista
+ * - Optimización de re-renders
+ * - Logs de debug removidos para producción
  */
 
 import React, { useState, useEffect, useRef } from "react";
@@ -21,27 +25,39 @@ import HeaderChat from "./Messaging/HeaderChat";
 interface MessagingScreenProps {
   initialUser?: User;
   initialPropertyId?: string;
+  conversationId?: string;
   onBack?: () => void;
 }
 
 export default function MessagingScreen({
   initialUser,
   initialPropertyId,
+  conversationId,
   onBack,
 }: MessagingScreenProps) {
   const { top } = useStableSafeInsets();
   const { profile } = useAuth();
   const navigation = useNavigation<any>();
+
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(null);
   const [activePropertyId, setActivePropertyId] = useState<string | null>(null);
   const [otherUser, setOtherUser] = useState<any>(null);
   const [headerHeight, setHeaderHeight] = useState<number>(64);
-  const { conversations, getConversationsForUser } = useConversations(
-    profile?.id
-  );
+
   const lastProcessedUserId = useRef<string | null>(null);
+  const isInitializedRef = useRef(false);
+
+  // FIX: Solo llamar useConversations cuando NO estamos en un chat activo
+  const isInChatView = !!(activeConversationId && otherUser);
+
+  // Este hook se ejecuta condicionalmente
+  const conversationsHook = useConversations(
+    !isInChatView ? profile?.id : undefined
+  );
+
+  const { conversations = [], getConversationsForUser } = conversationsHook;
 
   // Función de navegación hacia atrás
   const handleNavigationBack = () => {
@@ -52,17 +68,47 @@ export default function MessagingScreen({
     }
   };
 
-  // Manejar initialUser
+  // Manejar initialUser solo una vez
   useEffect(() => {
+    // Si tenemos un conversationId explícito, usarlo directamente
+    if (conversationId && initialUser) {
+      if (
+        !isInitializedRef.current ||
+        lastProcessedUserId.current !== initialUser.id
+      ) {
+        isInitializedRef.current = true;
+        lastProcessedUserId.current = initialUser.id;
+
+        setActiveConversationId(conversationId);
+        setOtherUser({
+          id: initialUser.id,
+          nombre:
+            (initialUser as any).nombre ||
+            initialUser.name?.split(" ")[0] ||
+            "",
+          apellido_paterno:
+            (initialUser as any).apellido_paterno ||
+            initialUser.name?.split(" ")[1] ||
+            "",
+          foto:
+            (initialUser as any).foto || (initialUser as any).avatar || null,
+        });
+        setActivePropertyId(initialPropertyId || null);
+      }
+      return;
+    }
+
     if (
       initialUser &&
       profile?.id &&
+      !isInitializedRef.current &&
       lastProcessedUserId.current !== initialUser.id
     ) {
+      isInitializedRef.current = true;
       lastProcessedUserId.current = initialUser.id;
       handleInitialUser(initialUser);
     }
-  }, [initialUser?.id, initialPropertyId, profile?.id]);
+  }, [initialUser?.id, initialPropertyId, profile?.id, conversationId]);
 
   const handleInitialUser = async (user: User) => {
     if (!profile?.id) return;
@@ -75,7 +121,7 @@ export default function MessagingScreen({
       (conv) => conv.other_user?.id === user.id
     );
 
-    if (existingGrouping) {
+    if (existingGrouping && getConversationsForUser) {
       // Si existe agrupación, obtener las conversaciones específicas
       const specificConvs = await getConversationsForUser(user.id);
 
@@ -87,14 +133,12 @@ export default function MessagingScreen({
 
         if (propertyChat) {
           // ✅ Existe chat de esta propiedad, abrirlo
-          console.log("✅ Chat de propiedad encontrado:", propertyChat.id);
           setActiveConversationId(propertyChat.id);
           setOtherUser(existingGrouping.other_user);
           setActivePropertyId(initialPropertyId);
           return;
         } else {
           // ❌ No existe chat de esta propiedad, crear uno nuevo
-          console.log("❌ No existe chat de propiedad, creando nuevo...");
           setActiveConversationId("new");
           setOtherUser(existingGrouping.other_user);
           setActivePropertyId(initialPropertyId);
@@ -106,14 +150,12 @@ export default function MessagingScreen({
 
         if (generalChat) {
           // ✅ Existe chat general, abrirlo
-          console.log("✅ Chat general encontrado:", generalChat.id);
           setActiveConversationId(generalChat.id);
           setOtherUser(existingGrouping.other_user);
           setActivePropertyId(null);
           return;
         } else {
           // ❌ No existe chat general, crear uno nuevo
-          console.log("❌ No existe chat general, creando nuevo...");
           setActiveConversationId("new");
           setOtherUser(existingGrouping.other_user);
           setActivePropertyId(null);
@@ -122,7 +164,6 @@ export default function MessagingScreen({
       }
     } else {
       // 🆕 No existe NINGUNA conversación con este usuario
-      console.log("🆕 Primera conversación con este usuario");
       setActiveConversationId("new");
       setOtherUser({
         id: user.id,
@@ -140,20 +181,16 @@ export default function MessagingScreen({
     otherUserData: any,
     propertyId?: string | null
   ) => {
-    console.log("=== handleSelectConversation llamado ===");
-    console.log("conversationId:", conversationId);
-    console.log("otherUserData:", otherUserData);
-    console.log("propertyId:", propertyId);
     setActiveConversationId(conversationId);
     setOtherUser(otherUserData);
     setActivePropertyId(propertyId || null);
-    console.log("Estados actualizados");
   };
 
   const handleBack = () => {
     setActiveConversationId(null);
     setOtherUser(null);
     setActivePropertyId(null);
+    isInitializedRef.current = false; // Reset para permitir nueva inicialización
   };
 
   const handleViewPropertyDetails = (propertyId: string) => {
@@ -161,6 +198,11 @@ export default function MessagingScreen({
     // TODO: Navegar a PropertyDetails
   };
 
+  const handleConversationCreated = (id: string) => {
+    setActiveConversationId(id);
+  };
+
+  // Loading state
   if (!profile?.id) {
     return (
       <View style={[styles.container, { paddingTop: top }]}>
@@ -176,22 +218,11 @@ export default function MessagingScreen({
     );
   }
 
-  const handleConversationCreated = (id: string) => {
-    setActiveConversationId(id);
-    // Refresh conversation list in background if needed
-    // refresh();
-  };
-
-  // Mostrar chat si hay conversación activa
-  if (activeConversationId && otherUser) {
-    console.log("=== Renderizando ChatScreen ===");
-    console.log("activeConversationId:", activeConversationId);
-    console.log("otherUser:", otherUser);
-    console.log("activePropertyId:", activePropertyId);
-
+  // Chat View
+  if (isInChatView) {
     return (
       <View style={styles.container}>
-        {/* Header fijo fuera del área de contenido */}
+        {/* Header fijo */}
         <View
           onLayout={(e) => {
             const h = e.nativeEvent.layout.height;
@@ -208,7 +239,7 @@ export default function MessagingScreen({
           />
         </View>
 
-        {/* Contenido del chat con margen superior igual a la altura del header */}
+        {/* Contenido del chat */}
         <View style={[styles.chatContent, { marginTop: headerHeight }]}>
           <ChatScreen
             conversationId={activeConversationId}
@@ -225,9 +256,7 @@ export default function MessagingScreen({
     );
   }
 
-  console.log("=== Renderizando ConversationsList ===");
-
-  // Mostrar lista de conversaciones
+  // Conversations List View
   return (
     <ScreenWrapper withHeader={false}>
       <View style={styles.container}>
@@ -266,9 +295,9 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 1000, // Aumentado para asegurar que esté encima
-    elevation: 5, // Para Android
-    backgroundColor: COLORS.white, // Asegurar fondo sólido
+    zIndex: 1000,
+    elevation: 5,
+    backgroundColor: COLORS.white,
   },
   chatContent: {
     flex: 1,

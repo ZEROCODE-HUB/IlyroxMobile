@@ -10,7 +10,6 @@ import {
   Platform,
 } from "react-native";
 import { FeedItem, User } from "../../types";
-import { CommentsModal } from "../modals";
 import UsersSlider from "../UsersSlider";
 import { ReelCard, PropertyCard, PostCard } from "../cards";
 import ReelDetail from "../Reel/ReelDetail";

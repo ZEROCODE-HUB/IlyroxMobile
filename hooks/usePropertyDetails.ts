@@ -41,7 +41,7 @@ const usePropertyDetails = (feedItemId: string) => {
 
       if (error) throw error;
       if (feed_items_error) {
-        console.warn("No feed_item found for property:", feedItemId, feed_items_error);
+        console.warn("No feed_item found for property:");
       }
     } catch (error) {
       console.error("Error fetching property details:", error);

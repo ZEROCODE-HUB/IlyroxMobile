@@ -10,6 +10,7 @@ import {
   Dimensions,
   Alert,
   Platform,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
@@ -22,6 +23,8 @@ import usePropertyDetails from "../../hooks/usePropertyDetails";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MapDetails } from "./MapDetails";
+import CreateProperty from "../CreateContent/CreateProperty";
+import { useChatInitiator } from "../../hooks/messaging/useChatInitiator";
 
 const { width } = Dimensions.get("window");
 
@@ -41,6 +44,11 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   const [property, setProperty] = useState<any>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showComments, setShowComments] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [propertyIdModal, setPropertyIdModal] = useState<string | null>(null);
+  const [loadingEdit, setLoadingEdit] = useState(false);
+
+  const { handleContact } = useChatInitiator();
 
   // Hook de view tracking
   const { trackInteraction } = useViewTracking({
@@ -168,6 +176,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
               orientation="vertical"
               tintColor={COLORS.white}
               showContactButton={false}
+              propertyId={propertyDetails.id}
             />
           </View>
 
@@ -492,7 +501,18 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
               ) : (
                 <TouchableOpacity
                   style={styles.contactIconBtn}
-                  onPress={() => onContact?.(profile.id, propertyDetails.id)}
+                  onPress={() => {
+                    if (onContact) {
+                      onContact(profile.id, propertyDetails.id);
+                    } else {
+                      handleContact(profile.id, propertyDetails.id, {
+                        id: profile.id,
+                        nombre: profile.nombre,
+                        foto: profile.foto,
+                        apellido_paterno: profile.apellido_paterno || "",
+                      });
+                    }
+                  }}
                 >
                   <Ionicons
                     name="chatbubble-ellipses"
@@ -509,23 +529,42 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
             <TouchableOpacity
               style={[styles.mainContactBtn, { backgroundColor: COLORS.info }]}
               onPress={() => {
-                navigation.navigate("EditProperty", {
-                  propertyId: propertyDetails.id,
-                });
+                setLoadingEdit(true);
+                setShowModal(true);
+                setPropertyIdModal(propertyDetails.id);
               }}
             >
-              <Ionicons
-                name="pencil"
-                size={20}
-                color={COLORS.white}
-                style={{ marginRight: 8 }}
-              />
-              <Text style={styles.mainContactBtnText}>Editar Propiedad</Text>
+              <Text style={styles.mainContactBtnText}>
+                {loadingEdit ? (
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="pencil"
+                      size={20}
+                      color={COLORS.white}
+                      style={{ marginRight: 8, gap: 8 }}
+                    />
+                    <Text style={{ marginLeft: 8 }}>Editar Propiedad</Text>
+                  </>
+                )}
+              </Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
               style={styles.mainContactBtn}
-              onPress={() => onContact?.(profile?.id, propertyDetails.id)}
+              onPress={() => {
+                if (onContact) {
+                  onContact(profile.id, propertyDetails.id);
+                } else {
+                  handleContact(profile.id, propertyDetails.id, {
+                    id: profile.id,
+                    nombre: profile.nombre,
+                    foto: profile.foto,
+                    apellido_paterno: profile.apellido_paterno || "",
+                  });
+                }
+              }}
             >
               <Ionicons
                 name="call"
@@ -546,6 +585,16 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
         feedItemId={propertyDetails.feed_items.id}
         currentUserId={user?.id}
       />
+
+      <Modal visible={showModal} onRequestClose={() => setShowModal(false)}>
+        <CreateProperty
+          onBack={() => {
+            setShowModal(false);
+            setLoadingEdit(false);
+          }}
+          propertyId={propertyIdModal}
+        />
+      </Modal>
     </SafeAreaView>
   );
 };

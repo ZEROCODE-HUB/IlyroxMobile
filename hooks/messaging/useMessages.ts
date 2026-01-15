@@ -1,9 +1,15 @@
 /**
- * useMessages.ts
+ * useMessages.ts - REFACTORIZADO
  * Hook para gestionar mensajes con paginación y Realtime
+ * 
+ * FIXES:
+ * - Suscripción Realtime con limpieza correcta
+ * - Sin dependencias circulares
+ * - Prevención de loops infinitos
+ * - Mejor manejo de conversaciones nuevas
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { Platform } from "react-native";
@@ -21,7 +27,6 @@ interface Message {
   leido: boolean;
   fecha_leido: string | null;
   created_at: string;
-  // Datos de propiedad (si tipo === 'propiedad')
   propiedad?: {
     id: string;
     tipo: string;
@@ -46,7 +51,11 @@ export function useMessages(conversationId: string | null, userId?: string) {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [channel, setChannel] = useState<RealtimeChannel | null>(null);
+
+  // Refs para evitar recreación de suscripciones
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const currentConversationIdRef = useRef<string | null>(null);
+  const isMountedRef = useRef(true);
 
   /**
    * Cargar mensajes
@@ -57,7 +66,6 @@ export function useMessages(conversationId: string | null, userId?: string) {
     try {
       setLoading(true);
 
-      // Cargar solo mensajes básicos sin joins complejos por ahora
       const { data, error: fetchError } = await supabase
         .from("mensajes")
         .select("*")
@@ -70,6 +78,8 @@ export function useMessages(conversationId: string | null, userId?: string) {
 
       const newMessages = (data || []).reverse();
 
+      if (!isMountedRef.current) return;
+
       if (append) {
         setMessages((prev) => [...newMessages, ...prev]);
       } else {
@@ -79,9 +89,13 @@ export function useMessages(conversationId: string | null, userId?: string) {
       setHasMore(newMessages.length === PAGE_SIZE);
       setError(null);
     } catch (err: any) {
-      setError(err.message);
+      if (isMountedRef.current) {
+        setError(err.message);
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -95,8 +109,7 @@ export function useMessages(conversationId: string | null, userId?: string) {
     try {
       let fileContent: string | Blob | ArrayBuffer;
       let contentType: string | undefined;
-
-      let uploadPath: string; // Declarar aquí para que sea accesible en todo el bloque try
+      let uploadPath: string;
 
       if (Platform.OS === "web") {
         const response = await fetch(fileUri);
@@ -107,18 +120,15 @@ export function useMessages(conversationId: string | null, userId?: string) {
           .substring(7)}`;
         uploadPath = `conversaciones/${folder}/${fileName}`;
       } else {
-        // En Native (iOS/Android) usamos fetch => ArrayBuffer para mayor estabilidad
-        // "Network request failed" suele ocurrir con Blobs en algunas versiones de RN
         const response = await fetch(fileUri);
         const buffer = await response.arrayBuffer();
-        fileContent = buffer as any; // Cast a any para evitar conflictos de tipos con Supabase JS client en RN
+        fileContent = buffer as any;
 
         const match =
           fileUri.match(/\.([0-9a-z]+)(?=[?#])?$/i) ||
           fileUri.match(/\.([0-9a-z]+)$/i);
         const extension = match ? match[1].toLowerCase() : "jpeg";
 
-        // Determinar content type
         if (response.headers.get("content-type")) {
           contentType = response.headers.get("content-type") || undefined;
         }
@@ -144,9 +154,7 @@ export function useMessages(conversationId: string | null, userId?: string) {
           upsert: false,
         });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       const { data: urlData } = supabase.storage
         .from("fotos")
@@ -162,14 +170,13 @@ export function useMessages(conversationId: string | null, userId?: string) {
    * Enviar mensaje de texto
    */
   const sendMessage = async (
-    text: string, 
+    text: string,
     metadata?: { destinatario_id: string; propiedad_id: string | null }
   ) => {
     if (!userId || !text.trim()) {
       return false;
     }
 
-    // Si no hay conversationId, necesitamos metadata
     if (!conversationId && !metadata) {
       console.error("Missing metadata for new conversation message");
       return false;
@@ -187,18 +194,9 @@ export function useMessages(conversationId: string | null, userId?: string) {
       if (conversationId) {
         messageData.conversacion_id = conversationId;
       }
-      
-      // SIEMPRE incluir metadata como pide la guía, incluso si ya existe la conversación
-      // Si no nos pasan metadata explícita, intentamos construirla si tenemos conversationId (esto es más difícil sin datos extra)
-      // PERO la guía dice: "Cuando insertes un mensaje, SIEMPRE debes incluir metadata"
-      // Así que ChatScreen DEBE pasar metadata siempre.
+
       if (metadata) {
         messageData.metadata = metadata;
-      } else if (conversationId) {
-        // Fallback: Si estamos en un chat existente y no pasaron metadata, 
-        // tal vez no sea crítico si el trigger solo lo usa para CREAR.
-        // Pero la guía dice SIEMPRE.
-        // Asumiremos que ChatScreen pasará metadata.
       }
 
       const { data, error } = await supabase
@@ -206,23 +204,20 @@ export function useMessages(conversationId: string | null, userId?: string) {
         .insert(messageData)
         .select();
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      // Agregar mensaje al estado local inmediatamente
-      if (data && data.length > 0) {
+      // ✅ Optimistic update: agregar inmediatamente al estado
+      if (data && data.length > 0 && isMountedRef.current) {
         const newMessage = data[0];
-        setMessages((prev) => [...prev, newMessage]);
-        
-        // Si no teníamos ID y ahora sí (creado por trigger), deberíamos notificar o recargar
-        // El trigger asigna conversacion_id.
-        // Si el componente padre (ChatScreen) no se entera del nuevo ID, 
-        // los siguientes mensajes podrían fallar si no pasamos metadata de nuevo?
-        // No, siempre pasamos metadata. Así que el trigger buscará la conv existente.
+        setMessages((prev) => {
+          // Evitar duplicados si ya llegó por Realtime
+          if (prev.some((msg) => msg.id === newMessage.id)) {
+            return prev;
+          }
+          return [...prev, newMessage];
+        });
       }
 
-      // Actualizar última mensaje en conversación (si tenemos ID)
       if (conversationId) {
         await supabase
           .from("conversaciones")
@@ -250,20 +245,13 @@ export function useMessages(conversationId: string | null, userId?: string) {
     imageUri: string,
     metadata?: { destinatario_id: string; propiedad_id: string | null }
   ) => {
-    console.log("=== sendImage called ===");
-    console.log("imageUri:", imageUri);
-
     if (!userId) return false;
 
     setSending(true);
 
     try {
-      console.log("Uploading image...");
       const uploadedUrl = await uploadFile(imageUri, "images");
       if (!uploadedUrl) throw new Error("Failed to upload image");
-
-      console.log("Image uploaded:", uploadedUrl);
-      console.log("Inserting message...");
 
       const messageData: any = {
         emisor_id: userId,
@@ -284,14 +272,17 @@ export function useMessages(conversationId: string | null, userId?: string) {
         .insert(messageData)
         .select();
 
-      if (error) {
-        console.error("Error inserting image message:", error);
-        throw error;
-      }
+      if (error) throw error;
 
-      // Agregar mensaje al estado local
-      if (data && data.length > 0) {
-        setMessages((prev) => [...prev, data[0]]);
+      // ✅ Optimistic update: agregar inmediatamente al estado
+      if (data && data.length > 0 && isMountedRef.current) {
+        const newMessage = data[0];
+        setMessages((prev) => {
+          if (prev.some((msg) => msg.id === newMessage.id)) {
+            return prev;
+          }
+          return [...prev, newMessage];
+        });
       }
 
       if (conversationId) {
@@ -318,24 +309,17 @@ export function useMessages(conversationId: string | null, userId?: string) {
    * Enviar archivo
    */
   const sendFile = async (
-    fileUri: string, 
+    fileUri: string,
     fileName: string,
     metadata?: { destinatario_id: string; propiedad_id: string | null }
   ) => {
-    console.log("=== sendFile called ===");
-    console.log("fileUri:", fileUri);
-    console.log("fileName:", fileName);
-
     if (!userId) return false;
 
     setSending(true);
 
     try {
-      console.log("Uploading file...");
       const uploadedUrl = await uploadFile(fileUri, "files");
       if (!uploadedUrl) throw new Error("Failed to upload file");
-
-      console.log("File uploaded:", uploadedUrl);
 
       const messageData: any = {
         emisor_id: userId,
@@ -357,16 +341,17 @@ export function useMessages(conversationId: string | null, userId?: string) {
         .insert(messageData)
         .select();
 
-      if (error) {
-        console.error("Error inserting file message:", error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log("File message inserted:", data);
-
-      // Agregar mensaje al estado local
-      if (data && data.length > 0) {
-        setMessages((prev) => [...prev, data[0]]);
+      // ✅ Optimistic update: agregar inmediatamente al estado
+      if (data && data.length > 0 && isMountedRef.current) {
+        const newMessage = data[0];
+        setMessages((prev) => {
+          if (prev.some((msg) => msg.id === newMessage.id)) {
+            return prev;
+          }
+          return [...prev, newMessage];
+        });
       }
 
       if (conversationId) {
@@ -408,11 +393,13 @@ export function useMessages(conversationId: string | null, userId?: string) {
 
       if (error) throw error;
 
+      // NO agregamos al estado local - Realtime lo hará
+
       await supabase
         .from("conversaciones")
         .update({
-          last_message: "📍 Propiedad",
-          last_message_at: new Date().toISOString(),
+          ultimo_mensaje_preview: "📍 Propiedad",
+          ultimo_mensaje_en: new Date().toISOString(),
         })
         .eq("id", conversationId);
 
@@ -451,8 +438,8 @@ export function useMessages(conversationId: string | null, userId?: string) {
   /**
    * Marcar mensajes visibles como leídos automáticamente
    */
-  const markVisibleAsRead = React.useCallback(() => {
-    if (!userId) return;
+  const markVisibleAsRead = useCallback(() => {
+    if (!userId || messages.length === 0) return;
 
     const unreadIds = messages
       .filter((msg) => !msg.leido && msg.emisor_id !== userId)
@@ -474,44 +461,57 @@ export function useMessages(conversationId: string | null, userId?: string) {
   };
 
   /**
-   * Configurar Realtime
+   * Limpiar canal Realtime
    */
-  useEffect(() => {
-    if (!conversationId) {
-      setMessages([]);
-      setLoading(false);
+  const cleanupChannel = async () => {
+    if (channelRef.current) {
+      console.log("🧹 Cleaning up messages subscription");
+      try {
+        await supabase.removeChannel(channelRef.current);
+      } catch (err) {
+        console.warn("⚠️ Error removing messages channel:", err);
+      }
+      channelRef.current = null;
+      currentConversationIdRef.current = null;
+    }
+  };
+
+  /**
+   * Configurar suscripción Realtime
+   * FIX: Solo se crea UNA vez por conversación
+   */
+  const setupRealtimeSubscription = async (convId: string) => {
+    // Si ya existe para esta conversación, no crear otra
+    if (channelRef.current && currentConversationIdRef.current === convId) {
+      console.log("✅ Messages subscription already exists for", convId.substring(0, 8));
       return;
     }
 
-    let isMounted = true;
+    // Limpiar suscripción anterior
+    await cleanupChannel();
 
-    const fetchMessages = async () => {
-      if (isMounted) {
-        await loadMessages(0);
-      }
-    };
+    console.log("📡 Setting up messages subscription for", convId.substring(0, 8));
 
-    fetchMessages();
-
-    // Suscribirse a nuevos mensajes (DESHABILITADO temporalmente para evitar loops)
-    /*
     const newChannel = supabase
-      .channel(`messages_${conversationId}`)
+      .channel(`messages-${convId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'mensajes',
-          filter: `conversacion_id=eq.${conversationId}`,
+          event: "INSERT",
+          schema: "public",
+          table: "mensajes",
+          filter: `conversacion_id=eq.${convId}`,
         },
         async (payload) => {
-          if (!isMounted) return;
+          if (!isMountedRef.current) return;
 
-          // Cargar datos completos del mensaje nuevo
+          console.log("📨 New message received via Realtime");
+
+          // Cargar mensaje completo con relaciones
           const { data } = await supabase
-            .from('mensajes')
-            .select(`
+            .from("mensajes")
+            .select(
+              `
               *,
               propiedad:propiedades(
                 id,
@@ -526,37 +526,90 @@ export function useMessages(conversationId: string | null, userId?: string) {
                   moneda
                 )
               )
-            `)
-            .eq('id', payload.new.id)
+            `
+            )
+            .eq("id", payload.new.id)
             .single();
 
-          if (data && isMounted) {
-            setMessages((prev) => [...prev, data]);
+          if (data && isMountedRef.current) {
+            setMessages((prev) => {
+              // Evitar duplicados
+              if (prev.some((msg) => msg.id === data.id)) {
+                return prev;
+              }
+              return [...prev, data];
+            });
           }
         }
       )
-      .subscribe();
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "mensajes",
+          filter: `conversacion_id=eq.${convId}`,
+        },
+        (payload) => {
+          if (!isMountedRef.current) return;
 
-    setChannel(newChannel);
-    */
+          console.log("📝 Message updated via Realtime");
+
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === payload.new.id ? { ...msg, ...payload.new } : msg
+            )
+          );
+        }
+      )
+      .subscribe((status) => {
+        console.log("📡 Messages subscription status:", status);
+      });
+
+    channelRef.current = newChannel;
+    currentConversationIdRef.current = convId;
+  };
+
+  /**
+   * Effect principal: Cargar mensajes y configurar Realtime
+   */
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    if (!conversationId) {
+      setMessages([]);
+      setLoading(false);
+      cleanupChannel();
+      return;
+    }
+
+    // Cargar mensajes
+    loadMessages(0);
+
+    // Configurar Realtime solo si cambió la conversación
+    if (conversationId !== currentConversationIdRef.current) {
+      setupRealtimeSubscription(conversationId);
+    }
 
     return () => {
-      isMounted = false;
-      if (channel) {
-        channel.unsubscribe();
-      }
+      isMountedRef.current = false;
+      cleanupChannel();
     };
-  }, [conversationId]); // Solo depende de conversationId
+  }, [conversationId]);
 
-  // Marcar como leídos al visualizar
-  // NOTA: Deshabilitado temporalmente para evitar loops infinitos
-  // Se puede implementar de forma más controlada después
-  // useEffect(() => {
-  //   if (conversationId && messages.length > 0) {
-  //     const timer = setTimeout(markVisibleAsRead, 1000);
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, [conversationId, messages.length, markVisibleAsRead]);
+  /**
+   * Effect para marcar como leído
+   * Solo se ejecuta 2 segundos después de que cambien los mensajes
+   */
+  useEffect(() => {
+    if (!conversationId || messages.length === 0) return;
+
+    const timer = setTimeout(() => {
+      markVisibleAsRead();
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [conversationId, messages.length, markVisibleAsRead]);
 
   return {
     messages,

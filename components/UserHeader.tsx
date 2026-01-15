@@ -23,6 +23,7 @@ interface UserHeaderProps {
   onReport: () => void;
   totalRatings?: number;
   showRecommendedPreview?: boolean;
+  feedItemType?: string;
 }
 
 const UserHeader: React.FC<UserHeaderProps> = ({
@@ -34,6 +35,7 @@ const UserHeader: React.FC<UserHeaderProps> = ({
   onReport,
   totalRatings,
   showRecommendedPreview = true,
+  feedItemType,
 }) => {
   const displayName = user.name || user.nombre || "Usuario";
   const ratingsCount = totalRatings ?? user.totalRatings ?? 0;
@@ -67,35 +69,44 @@ const UserHeader: React.FC<UserHeaderProps> = ({
     setShowRecommendedModal(true);
     setLoadingRecommended(true);
     setRecommendedList([]);
+
+    // CORRECCIÓN: Una sola consulta con relación (inner join implícito al pedir datos anidados)
     const { data: recs } = await supabase
       .from("recomendaciones_usuarios")
-      .select("recomendado_por")
+      .select(
+        `
+        recomendado_por,
+        perfil:perfiles!recomendado_por (
+            id,
+            nombre,
+            apellido_paterno,
+            apellido_materno,
+            foto,
+            rol
+        )
+      `
+      )
       .eq("usuario_recomendado_id", user.id)
       .eq("recomienda", true)
       .range(0, 49);
-    const ids = (recs || [])
-      .map((r: any) => r?.recomendado_por)
-      .filter(Boolean) as string[];
-    if (ids.length > 0) {
-      const { data: profiles } = await supabase
-        .from("perfiles")
-        .select("id,nombre,apellido_paterno,apellido_materno,foto,rol")
-        .in("id", ids);
-      const mapped =
-        (profiles || []).map((p: any) => {
-          const name = [p?.nombre, p?.apellido_paterno, p?.apellido_materno]
-            .filter(Boolean)
-            .join(" ")
-            .trim();
-          return {
-            id: p.id,
-            name: name || "Usuario",
-            role: p.rol,
-            avatar: p.foto ?? null,
-          };
-        }) || [];
-      setRecommendedList(mapped);
-    }
+
+    // Mapeo directo de la respuesta anidada
+    const mapped = (recs || []).map((r: any) => {
+      const p = r.perfil; // Supabase devuelve el objeto anidado aquí
+      const name = [p?.nombre, p?.apellido_paterno, p?.apellido_materno]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      return {
+        id: p?.id,
+        name: name || "Usuario",
+        role: p?.rol,
+        avatar: p?.foto ?? null,
+      };
+    });
+
+    setRecommendedList(mapped);
     setLoadingRecommended(false);
   };
   return (
@@ -157,13 +168,17 @@ const UserHeader: React.FC<UserHeaderProps> = ({
       </TouchableOpacity>
 
       <View style={styles.headerActions}>
-        <TouchableOpacity onPress={() => setShowOptions(!showOptions)}>
-          <Ionicons
-            name="ellipsis-horizontal"
-            size={20}
-            color={COLORS.textTertiary}
-          />
-        </TouchableOpacity>
+        {feedItemType === "property" ? (
+          <></>
+        ) : (
+          <TouchableOpacity onPress={() => setShowOptions(!showOptions)}>
+            <Ionicons
+              name="ellipsis-horizontal"
+              size={20}
+              color={COLORS.textTertiary}
+            />
+          </TouchableOpacity>
+        )}
 
         {showOptions && (
           <Modal visible={true} transparent animationType="fade">

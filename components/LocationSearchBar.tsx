@@ -83,7 +83,7 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
     <>
       <AppInput
         containerStyle={[styles.searchWrapper, containerStyle]}
-        placeholder="¿Dónde quieres vivir?"
+        placeholder="Ingresa una ubicación..."
         value={query}
         onChangeText={handleChangeText}
         onFocus={() => {

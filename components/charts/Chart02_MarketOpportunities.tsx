@@ -1,179 +1,311 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
-import { LineChart } from 'react-native-gifted-charts';
-import { BaseChartProps, MarketOpportunityData } from './types';
-import { COLORS } from '../../constants/colors';
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, Dimensions } from "react-native";
+import { BarChart } from "react-native-gifted-charts";
+import { BaseChartProps } from "./types";
+import { COLORS } from "../../constants/colors";
+import { chartService } from "../../services/chartService";
+import currencyConverter from "../../utils/currencyConverter";
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
+interface Chart02Props extends BaseChartProps {}
 
-const marketOpportunities: MarketOpportunityData[] = [
-    { range: '0-50', avgPrice: 2800, searches: 65, minConstruction: 30, minLand: 40 },
-    { range: '50-100', avgPrice: 2650, searches: 156, minConstruction: 60, minLand: 80 },
-    { range: '100-150', avgPrice: 2500, searches: 198, minConstruction: 90, minLand: 120 },
-    { range: '150-200', avgPrice: 2350, searches: 145, minConstruction: 130, minLand: 170 },
-    { range: '200-250', avgPrice: 2100, searches: 98, minConstruction: 180, minLand: 220 },
-    { range: '250+', avgPrice: 1900, searches: 45, minConstruction: 230, minLand: 280 },
-];
+const Chart02_MarketOpportunities: React.FC<Chart02Props> = ({ onPress }) => {
+  const [loading, setLoading] = useState(true);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [lineData, setLineData] = useState<any[]>([]);
+  const [maxBarValue, setMaxBarValue] = useState(0);
+  const [maxLineValue, setMaxLineValue] = useState(0);
+  const [valueCoin, setValueCoin] = useState<number>(0);
 
-interface Chart02Props extends BaseChartProps { }
+  useEffect(() => {
+    const fetchRate = async () => {
+      const value = await currencyConverter();
+      setValueCoin(value);
+    };
+    fetchRate();
+  }, []);
 
-const Chart02_MarketOpportunities: React.FC<Chart02Props> = ({ onPress, activePoint }) => {
-    const [dataType, setDataType] = useState<'searches' | 'avgPrice'>('searches');
+  const EXCHANGE_RATE = valueCoin || 18;
 
-    const chartData = marketOpportunities.map((d, index) => ({
-        value: dataType === 'searches' ? d.searches : d.avgPrice,
-        label: d.range,
-        dataPointText: '',
-        textShiftY: -10,
-        textColor: COLORS.textPrimary,
-        textFontSize: 10,
-        onPress: () => onPress?.('chart2', index, d),
-    }));
+  const ranges = [
+    { label: "0-50", min: 0, max: 50 },
+    { label: "50-100", min: 50, max: 100 },
+    { label: "100-150", min: 100, max: 150 },
+    { label: "150-200", min: 150, max: 200 },
+    { label: "200-250", min: 200, max: 250 },
+    { label: "250-300", min: 250, max: 300 },
+    { label: "300+", min: 300, max: 99999 },
+  ];
 
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [propertiesData, searchesData] = await Promise.all([
+        chartService.getDataChart(),
+        chartService.getBusquedas(),
+      ]);
+
+      if (!propertiesData || !searchesData) return;
+
+      // Acumuladores por rango
+      const acc = ranges.map((r) => ({
+        ...r,
+        totalPriceM2: 0,
+        countProps: 0,
+        searchesCount: 0,
+      }));
+
+      // 1. Procesar Propiedades (Barras: Precio Promedio x m2)
+      propertiesData.forEach((item: any) => {
+        const ops = Array.isArray(item.operaciones_propiedad)
+          ? item.operaciones_propiedad
+          : [item.operaciones_propiedad];
+        const saleOp = ops.find((o: any) => o?.tipo_operacion === "venta");
+
+        if (saleOp) {
+          let price = saleOp.precio || 0;
+          if (saleOp.moneda === "USD") price *= EXCHANGE_RATE;
+
+          // Preferencia: Construcción > Terreno
+          const m2 =
+            item.metros_cuadrados_construccion ||
+            item.metros_cuadrados_terreno ||
+            0;
+
+          if (m2 > 0) {
+            const pricePerM2 = price / m2;
+            const rangeIndex = ranges.findIndex(
+              (r) => m2 >= r.min && m2 < r.max
+            );
+
+            if (rangeIndex !== -1) {
+              acc[rangeIndex].totalPriceM2 += pricePerM2;
+              acc[rangeIndex].countProps += 1;
+            }
+          }
+        }
+      });
+
+      // 2. Procesar Búsquedas (Línea: Cantidad de búsquedas)
+      searchesData.forEach((search: any) => {
+        let m2Target = 0;
+        // Intentar parsear campos de búsqueda
+        if (search.metros_construccion) {
+          m2Target = parseFloat(search.metros_construccion);
+        } else if (search.min_m2_construccion || search.max_m2_construccion) {
+          const min = parseFloat(search.min_m2_construccion) || 0;
+          const max = parseFloat(search.max_m2_construccion) || min;
+          m2Target = (min + max) / 2;
+        } else if (search.metros_terreno) {
+          m2Target = parseFloat(search.metros_terreno);
+        } else if (search.min_m2_terreno || search.max_m2_terreno) {
+          const min = parseFloat(search.min_m2_terreno) || 0;
+          const max = parseFloat(search.max_m2_terreno) || min;
+          m2Target = (min + max) / 2;
+        }
+
+        if (m2Target > 0) {
+          const rangeIndex = ranges.findIndex(
+            (r) => m2Target >= r.min && m2Target < r.max
+          );
+          if (rangeIndex !== -1) {
+            acc[rangeIndex].searchesCount += 1;
+          }
+        }
+      });
+
+      // 3. Formatear datos para Gifted Charts
+      const bars = [];
+      const lines = [];
+      let mP = 0;
+      let mL = 0;
+
+      acc.forEach((item) => {
+        const avgPrice =
+          item.countProps > 0 ? item.totalPriceM2 / item.countProps : 0;
+
+        if (avgPrice > mP) mP = avgPrice;
+        if (item.searchesCount > mL) mL = item.searchesCount;
+
+        bars.push({
+          value: avgPrice,
+          label: item.label,
+          frontColor: COLORS.primary,
+          topLabelComponent: () =>
+            avgPrice > 0 ? (
+              <Text
+                style={{
+                  color: COLORS.textSecondary,
+                  fontSize: 10,
+                  marginBottom: 2,
+                }}
+              >
+                {`$${(avgPrice / 1000).toFixed(0)}k`}
+              </Text>
+            ) : null,
+        });
+
+        lines.push({
+          value: item.searchesCount,
+          dataPointText:
+            item.searchesCount > 0 ? item.searchesCount.toString() : "",
+          dataPointTextColor: COLORS.error,
+          hideDataPoint: item.searchesCount === 0,
+          customDataPoint:
+            item.searchesCount === 0 ? () => <View /> : undefined, // Ocultar punto si es 0
+          isSecondary: true, // Asegurar que use el eje secundario
+        });
+      });
+
+      setMaxBarValue(mP * 1.2);
+      setMaxLineValue(mL > 0 ? mL * 1.2 : 10);
+      setChartData(bars);
+      setLineData(lines);
+    } catch (error) {
+      console.error("Error al procesar Chart 02:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  if (loading) {
     return (
-        <View style={styles.chartCard}>
-            <Text style={styles.chartTitle}>Oportunidades de Mercado</Text>
-            <Text style={styles.chartSubtitle}>Filtros: Tipo: Habitacional | Operación: venta</Text>
-
-            <View style={styles.filterRow}>
-                {(['searches', 'avgPrice'] as const).map((type) => (
-                    <TouchableOpacity
-                        key={type}
-                        onPress={() => setDataType(type)}
-                        style={[styles.filterButton, dataType === type && styles.filterButtonActive]}
-                    >
-                        <Text style={[styles.filterText, dataType === type && styles.filterTextActive]}>
-                            {type === 'searches' ? 'Búsquedas' : 'Precio/m²'}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            <View style={{ height: 280, overflow: 'hidden' }}>
-                <LineChart
-                    data={chartData}
-                    height={220}
-                    width={SCREEN_WIDTH - 60}
-                    spacing={44}
-                    initialSpacing={20}
-                    color={dataType === 'searches' ? COLORS.tagPurple : COLORS.warning}
-                    thickness={3}
-                    dataPointsColor={dataType === 'searches' ? COLORS.tagPurple : COLORS.warning}
-                    dataPointsRadius={5}
-                    startFillColor={dataType === 'searches' ? COLORS.tagPurpleLight : COLORS.warningLight}
-                    endFillColor="transparent"
-                    startOpacity={0.9}
-                    endOpacity={0.1}
-                    areaChart
-                    curved
-                    isAnimated
-                    yAxisThickness={0}
-                    xAxisThickness={1}
-                    xAxisColor={COLORS.cardBorder}
-                    yAxisColor={COLORS.cardBorder}
-                    yAxisTextStyle={{ color: COLORS.textSecondary, fontSize: 10 }}
-                    xAxisLabelTextStyle={{ color: COLORS.textSecondary, fontSize: 9 }}
-                    noOfSections={4}
-                    rulesColor={COLORS.background}
-                    rulesType="solid"
-                />
-            </View>
-
-            {activePoint?.chart === 'chart2' && (
-                <View style={styles.tooltip}>
-                    <Text style={styles.tooltipTitle}>Rango {marketOpportunities[activePoint.index].range} m²</Text>
-                    <Text style={styles.tooltipValue}>
-                        {dataType === 'searches'
-                            ? `${marketOpportunities[activePoint.index].searches} búsquedas`
-                            : `$${marketOpportunities[activePoint.index].avgPrice}/m²`
-                        }
-                    </Text>
-                    <Text style={styles.tooltipLabel}>
-                        {dataType === 'searches'
-                            ? `Precio: $${marketOpportunities[activePoint.index].avgPrice}/m²`
-                            : `Búsquedas: ${marketOpportunities[activePoint.index].searches}`
-                        }
-                    </Text>
-                </View>
-            )}
-        </View>
+      <View style={[styles.chartCard, styles.centered]}>
+        <Text style={styles.loadingText}>Cargando datos del mercado...</Text>
+      </View>
     );
+  }
+
+  return (
+    <View style={styles.chartCard}>
+      <Text style={styles.chartTitle}>Oportunidades de Mercado</Text>
+      <Text style={styles.chartSubtitle}>
+        Barras: Precio Promedio/m² (Oferta) | Línea Roja: Búsquedas (Demanda)
+      </Text>
+
+      <View style={{ height: 320, overflow: "visible" }}>
+        {chartData.length > 0 ? (
+          <BarChart
+            data={chartData}
+            barWidth={32}
+            spacing={30}
+            initialSpacing={10}
+            xAxisThickness={1}
+            xAxisColor={COLORS.cardBorder}
+            yAxisThickness={0}
+            yAxisTextStyle={{ color: COLORS.textSecondary, fontSize: 15 }}
+            noOfSections={5}
+            maxValue={maxBarValue}
+            isAnimated
+            animationDuration={1000}
+            roundedTop
+            // Configuración de la línea (Búsquedas)
+            showLine
+            lineData={lineData}
+            lineConfig={{
+              color: COLORS.error,
+              thickness: 3, // Más grueso
+              curved: false,
+              hideDataPoints: false,
+              dataPointsColor: COLORS.error,
+              dataPointsRadius: 4, // Puntos más grandes
+              strokeDashArray: [0, 0], // Linea sólida
+              isSecondary: true, // Forzar uso de eje secundario
+            }}
+            // Eje secundario para la línea (ya que son escalas diferentes: $ vs #)
+            secondaryYAxis={{
+              maxValue: maxLineValue,
+              yAxisTextStyle: { color: COLORS.error, fontSize: 20 },
+              showYAxisIndices: true,
+              yAxisColor: COLORS.error,
+            }}
+          />
+        ) : (
+          <View style={styles.noDataContainer}>
+            <Text style={styles.noDataText}>No hay datos suficientes</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Leyenda simple */}
+      <View style={styles.legendContainer}>
+        <View style={styles.legendItem}>
+          <View
+            style={[styles.legendColor, { backgroundColor: COLORS.primary }]}
+          />
+          <Text style={styles.legendText}>Precio $/m²</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View
+            style={[styles.legendColor, { backgroundColor: COLORS.error }]}
+          />
+          <Text style={styles.legendText}>Búsquedas</Text>
+        </View>
+      </View>
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-    chartCard: {
-        backgroundColor: COLORS.white,
-        padding: 16,
-        borderRadius: 16,
-        marginBottom: 20,
-        elevation: 2,
-    },
-    chartTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: COLORS.textPrimary,
-        marginBottom: 4,
-    },
-    chartSubtitle: {
-        fontSize: 11,
-        color: COLORS.textSecondary,
-        marginBottom: 12,
-    },
-    filterRow: {
-        flexDirection: 'row',
-        marginBottom: 16,
-        gap: 8,
-    },
-    filterButton: {
-        paddingVertical: 6,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        backgroundColor: COLORS.background,
-    },
-    filterButtonActive: {
-        backgroundColor: COLORS.tagPurple,
-    },
-    filterText: {
-        fontSize: 13,
-        color: COLORS.textSecondary,
-        fontWeight: '500',
-    },
-    filterTextActive: {
-        color: COLORS.white,
-        fontWeight: '600',
-    },
-    tooltip: {
-        position: 'absolute',
-        top: 90,
-        right: 20,
-        backgroundColor: COLORS.white,
-        padding: 12,
-        borderRadius: 8,
-        borderWidth: 2,
-        borderColor: COLORS.tagPurple,
-        shadowColor: COLORS.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 5,
-        minWidth: 140,
-    },
-    tooltipTitle: {
-        fontSize: 10,
-        color: COLORS.textSecondary,
-        marginBottom: 4,
-    },
-    tooltipValue: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: COLORS.tagPurple,
-        marginBottom: 2,
-    },
-    tooltipLabel: {
-        fontSize: 11,
-        color: COLORS.warning,
-        fontWeight: '600',
-    },
+  chartCard: {
+    backgroundColor: COLORS.white,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+    elevation: 2,
+  },
+  centered: {
+    height: 300,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  chartTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  chartSubtitle: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginBottom: 16,
+  },
+  loadingText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+  },
+  noDataContainer: {
+    height: 250,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noDataText: {
+    color: COLORS.textSecondary,
+  },
+  legendContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 10,
+    gap: 20,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  legendColor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: "500",
+  },
 });
 
 export default Chart02_MarketOpportunities;

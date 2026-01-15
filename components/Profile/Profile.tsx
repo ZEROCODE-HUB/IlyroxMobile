@@ -1,46 +1,68 @@
+/**
+ * Profile.tsx - COMPLETO Y OPTIMIZADO
+ *
+ * MEJORAS:
+ * - Tabs para Posts, Reels y Propiedades
+ * - Avatar con cambio de foto inline
+ * - Grid estilo Instagram
+ * - Badges de comisión en propiedades
+ * - Colores centralizados (no hardcoded)
+ * - useEffects optimizados (sin duplicados)
+ * - Rating Details completo con todas las estadísticas
+ */
+
 import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
-  FlatList,
   ScrollView,
   StyleSheet,
   Modal,
-  Dimensions,
   ActivityIndicator,
+  FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { User, Property, perfiles, EstadisticasResenas } from "../../types";
-import { supabase } from "../../lib/supabase";
+import { SafeAreaView } from "react-native-safe-area-context";
+
 import { useAuth } from "../../context/AuthContext";
 import { COLORS } from "../../constants/colors";
-import PropertyDetail from "../Details/PropertyDetail";
-import { Avatar } from "../shared";
-import { ProfileHeader } from "./ProfileHeader";
-import SelectionModal from "../modals/SelectionModal";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
-const { width } = Dimensions.get("window");
+// Types
+import {
+  perfiles,
+  Property,
+  ProfileContentType,
+  FeedItem,
+  User,
+  Post,
+  Reel,
+} from "../../types";
+
+// Components
+import { Avatar } from "../shared";
+import { ProfileHeader } from "./ProfileHeader";
+import ProfileAvatarPicker from "./ProfileAvatarPicker";
+import ProfileTabs from "./ProfileTabs";
+import ProfilePropertyGrid from "./ProfilePropertyGrid";
+import ProfilePostGrid from "./ProfilePostGrid";
+import ProfileReelGrid from "./ProfileReelGrid";
+import PropertyDetail from "../Details/PropertyDetail";
+import SelectionModal from "../modals/SelectionModal";
+import { useProfile } from "../../hooks/profile/useProfile";
+import ReelDetail from "../Reel/ReelDetail";
+import FeedDetail from "../Feed/FeedDetail";
+import CreateProperty from "../CreateContent/CreateProperty";
+import { ThumbsUp } from "lucide-react-native";
+import AnimatedLike from "../../design-system/components/AnimatedLike";
 
 interface ProfileProps {
   userId?: string | null;
   onBack?: () => void;
 }
 
-type RecommendedByUser = {
-  id: string;
-  nombre: string;
-  apellido_paterno: string;
-  apellido_materno: string;
-  foto: string | null;
-  rol: "admin" | "agente" | "cliente";
-};
-
-// Estados disponibles para filtrar
 const FILTER_OPTIONS = [
   "Todas",
   "Publicada",
@@ -51,51 +73,58 @@ const FILTER_OPTIONS = [
 ];
 
 const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
-  const { user: authUser, profile: authProfile } = useAuth();
+  const { user: authUser } = useAuth();
   const navigation = useNavigation<any>();
 
-  // State
-  const [profile, setProfile] = useState<perfiles | null>(null);
-  const [reviewStats, setReviewStats] = useState<EstadisticasResenas | null>(
-    null
-  );
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showRatingDetails, setShowRatingDetails] = useState(false);
+  // Use Custom Hook
+  const {
+    profile,
+    reviewStats,
+    properties,
+    posts,
+    reels,
+    userRecommendation,
+    recommendedByUsers,
+    recommendedByHasMore,
+    loadingRecommendedBy,
+    recommendedByError,
+    loading,
+    submittingRecommendation,
+    fetchProfileData,
+    handleRecommendation,
+    loadRecommendedByUsers,
+    updateProfilePhoto,
+  } = useProfile(userId);
+
+  // State - Content
+  const [activeTab, setActiveTab] = useState<ProfileContentType>("properties");
+
+  // State - Filters & Modals
   const [activeFilter, setActiveFilter] = useState<string>("Todas");
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(
     null
   );
-  const [userRecommendation, setUserRecommendation] = useState<boolean | null>(
-    null
-  );
-  const [submittingRecommendation, setSubmittingRecommendation] =
-    useState(false);
-  const [recommendedByUsers, setRecommendedByUsers] = useState<
-    RecommendedByUser[]
-  >([]);
-  const [loadingRecommendedBy, setLoadingRecommendedBy] = useState(false);
-  const [recommendedByError, setRecommendedByError] = useState<string | null>(
-    null
-  );
+  const [showRatingDetails, setShowRatingDetails] = useState(false);
   const [showRecommendedByModal, setShowRecommendedByModal] = useState(false);
-  const [recommendedByHasMore, setRecommendedByHasMore] = useState(false);
-  const [recommendedByPage, setRecommendedByPage] = useState(0);
+  const [selectedPost, setSelectedPost] = useState<FeedItem | null>(null);
+  const [selectedReel, setSelectedReel] = useState<FeedItem | null>(null);
 
-  // Determine if viewing own profile
+  const [showModal, setShowModal] = useState(false);
+
+  // Computed
   const targetUserId = userId || authUser?.id;
   const isMe = !userId || targetUserId === authUser?.id;
 
-  // Reset selected property when screen gains focus
   useFocusEffect(
     React.useCallback(() => {
-      // Si se desea ocultar el modal al volver a entrar:
       setSelectedProperty(null);
     }, [])
   );
 
-  // Helper functions
+  /**
+   * Helper: Format full name
+   */
   const formatFullName = (p: perfiles | null): string => {
     if (!p) return "Usuario";
     const parts = [p.nombre, p.apellido_paterno, p.apellido_materno].filter(
@@ -127,315 +156,113 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     return roleMap[rol] || rol;
   };
 
-  const loadRecommendedByUsers = async (options?: { reset?: boolean }) => {
-    if (!targetUserId) return;
+  /**
+   * Helper: Map entities to FeedItem
+   */
+  const mapProfileToUser = (p: perfiles): User => {
+    const name = [p.nombre, p.apellido_paterno, p.apellido_materno]
+      .filter(Boolean)
+      .join(" ");
 
-    try {
-      const reset = options?.reset === true;
-      setLoadingRecommendedBy(true);
-      setRecommendedByError(null);
-
-      const pageSize = 30;
-      const nextPage = reset ? 0 : recommendedByPage;
-      const from = nextPage * pageSize;
-      const to = from + pageSize - 1;
-
-      const { data: recsData, error: recsError } = await supabase
-        .from("recomendaciones_usuarios")
-        .select("recomendado_por")
-        .eq("usuario_recomendado_id", targetUserId)
-        .eq("recomienda", true)
-        .range(from, to);
-
-      if (recsError) throw recsError;
-
-      const recommendedByIds = (recsData || [])
-        .map((r: any) => r?.recomendado_por)
-        .filter(Boolean) as string[];
-      const recommendedByIdsUnique = Array.from(new Set(recommendedByIds));
-
-      if (recommendedByIdsUnique.length === 0 && reset) {
-        setRecommendedByUsers([]);
-        setRecommendedByHasMore(false);
-        setRecommendedByPage(0);
-        return;
-      }
-
-      if (recommendedByIdsUnique.length === 0) {
-        setRecommendedByHasMore(false);
-        return;
-      }
-
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("perfiles")
-        .select("id,nombre,apellido_paterno,apellido_materno,foto,rol")
-        .in("id", recommendedByIdsUnique);
-
-      if (profilesError) throw profilesError;
-
-      const profiles = (profilesData || []) as RecommendedByUser[];
-      const profilesById = new Map(profiles.map((p) => [p.id, p]));
-      const ordered = recommendedByIdsUnique
-        .map((id) => profilesById.get(id))
-        .filter(Boolean) as RecommendedByUser[];
-
-      setRecommendedByUsers((prev) =>
-        reset ? ordered : [...prev, ...ordered]
-      );
-      setRecommendedByHasMore(recommendedByIdsUnique.length === pageSize);
-      setRecommendedByPage(nextPage + 1);
-    } catch (error: any) {
-      if (options?.reset) {
-        setRecommendedByUsers([]);
-      }
-      setRecommendedByHasMore(false);
-      setRecommendedByError(
-        error?.message || "Error al cargar recomendaciones"
-      );
-    } finally {
-      setLoadingRecommendedBy(false);
-    }
+    return {
+      id: p.id,
+      nombre: p.nombre,
+      name: p.nombre_completo || name || "Usuario",
+      avatar: p.foto,
+      role: (p.rol.charAt(0).toUpperCase() + p.rol.slice(1)) as any,
+      rating: parseFloat(p.calificacion_promedio || "0"),
+      totalRatings: parseInt(p.total_calificaciones || "0"),
+      positiveRecommendations: parseInt(
+        p.total_recomendaciones_positivas || "0"
+      ),
+      negativeRecommendations: parseInt(
+        p.total_recomendaciones_negativas || "0"
+      ),
+      isFollowing: false,
+    };
   };
 
-  useEffect(() => {
-    if (!showRatingDetails) return;
-    setRecommendedByUsers([]);
-    setRecommendedByHasMore(false);
-    setRecommendedByPage(0);
-    loadRecommendedByUsers({ reset: true });
-  }, [showRatingDetails, targetUserId]);
-
-  useEffect(() => {
-    if (!showRecommendedByModal) return;
-    if (recommendedByUsers.length > 0 || loadingRecommendedBy) return;
-    if ((reviewStats?.total_recomiendan || 0) <= 0) return;
-    setRecommendedByUsers([]);
-    setRecommendedByHasMore(false);
-    setRecommendedByPage(0);
-    loadRecommendedByUsers({ reset: true });
-  }, [showRecommendedByModal]);
-
-  const handleRecommendation = async (recomienda: boolean) => {
-    if (!authUser?.id || !targetUserId || isMe || submittingRecommendation)
-      return;
-
-    try {
-      setSubmittingRecommendation(true);
-
-      // Si ya existe y es el mismo valor, eliminar (toggle off)
-      if (userRecommendation === recomienda) {
-        const { error } = await supabase
-          .from("recomendaciones_usuarios")
-          .delete()
-          .eq("usuario_recomendado_id", targetUserId)
-          .eq("recomendado_por", authUser.id);
-
-        if (error) throw error;
-        setUserRecommendation(null);
-      }
-      // Si no existe, insertar
-      else if (userRecommendation === null) {
-        const { error } = await supabase
-          .from("recomendaciones_usuarios")
-          .insert({
-            usuario_recomendado_id: targetUserId,
-            recomendado_por: authUser.id,
-            recomienda,
-          });
-
-        if (error) throw error;
-        setUserRecommendation(recomienda);
-      }
-      // Si existe con diferente valor, actualizar
-      else {
-        const { error } = await supabase
-          .from("recomendaciones_usuarios")
-          .update({ recomienda })
-          .eq("usuario_recomendado_id", targetUserId)
-          .eq("recomendado_por", authUser.id);
-
-        if (error) throw error;
-        setUserRecommendation(recomienda);
-      }
-
-      // Recargar estadísticas
-      const { data: statsData } = await supabase
-        .from("vw_estadisticas_resenas")
-        .select("*")
-        .eq("profesional_id", targetUserId)
-        .maybeSingle();
-
-      if (statsData) {
-        setReviewStats(statsData);
-      }
-
-      if (showRatingDetails || showRecommendedByModal) {
-        setRecommendedByUsers([]);
-        setRecommendedByHasMore(false);
-        setRecommendedByPage(0);
-        await loadRecommendedByUsers({ reset: true });
-      }
-    } catch (error: any) {
-      console.error("Error updating recommendation:", error);
-    } finally {
-      setSubmittingRecommendation(false);
-    }
-  };
-
-  // Fetch profile data
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      if (!targetUserId) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-
-        // If viewing own profile, use authProfile
-        if (isMe && authProfile) {
-          setProfile(authProfile);
-        } else {
-          // Fetch other user's profile
-          const { data, error } = await supabase
-            .from("perfiles")
-            .select("*")
-            .eq("id", targetUserId)
-            .maybeSingle();
-
-          if (error) {
-            console.error("Error fetching profile:", error);
-          } else {
-            setProfile(data);
-          }
-        }
-
-        // Fetch review statistics from vw_estadisticas_resenas
-        const { data: statsData, error: statsError } = await supabase
-          .from("vw_estadisticas_resenas")
-          .select("*")
-          .eq("profesional_id", targetUserId)
-          .maybeSingle();
-
-        if (statsError) {
-          console.error("Error fetching review stats:", statsError);
-        } else {
-          setReviewStats(statsData);
-        }
-
-        // Fetch user's recommendation (if viewing another user's profile)
-        if (!isMe && authUser?.id) {
-          const { data: recData, error: recError } = await supabase
-            .from("recomendaciones_usuarios")
-            .select("recomienda")
-            .eq("usuario_recomendado_id", targetUserId)
-            .eq("recomendado_por", authUser.id)
-            .maybeSingle();
-
-          if (recError) {
-            console.error("Error fetching recommendation:", recError);
-          } else {
-            setUserRecommendation(recData?.recomienda ?? null);
-          }
-        }
-
-        setRecommendedByUsers([]);
-        setRecommendedByError(null);
-
-        // Fetch user's properties
-        const { data: propsData, error: propsError } = await supabase
-          .from("propiedades")
-          .select(
-            `
-            id,
-            tipo,
-            subtipo,
-            descripcion,
-            ciudad,
-            municipio,
-            colonia,
-            fotos,
-            habitaciones,
-            banos,
-            metros_cuadrados_construccion,
-            metros_cuadrados_terreno,
-            activo,
-            operaciones_propiedad (
-              tipo_operacion,
-              precio,
-              moneda
-            )
-          `
-          )
-          .eq("created_by", targetUserId)
-          .is("deleted_at", null);
-
-        if (propsError) {
-          console.error("Error fetching properties:", propsError);
-        } else if (propsData) {
-          // Transform to Property type
-          const transformedProps: Property[] = propsData.map((p: any) => {
-            const operation = p.operaciones_propiedad?.[0];
-
-            // Mapear el estado de activo a un estado en español
-            let status:
-              | "Publicada"
-              | "Suspendida"
-              | "Rentada"
-              | "Reservada"
-              | "Vendida" = "Publicada";
-            if (!p.activo) {
-              status = "Suspendida";
-            }
-            // Aquí podrías agregar más lógica para determinar otros estados
-            // basándote en otros campos de la BD si existen
-
-            return {
-              id: p.id,
-              title: `${p.subtipo} en ${p.ciudad}`,
-              description: p.descripcion,
-              price: operation?.precio || 0,
-              currency: operation?.moneda || "MXN",
-              location: {
-                address: "",
-                country: "México",
-                state: "",
-                city: p.ciudad || "",
-                municipio: p.municipio,
-                colony: p.colonia || "",
-              },
-              images: p.fotos || [],
-              features: {
-                beds: p.habitaciones || 0,
-                baths: p.banos || 0,
-                constructionSqft: p.metros_cuadrados_construccion || 0,
-                landSqft: p.metros_cuadrados_terreno || 0,
-              },
-              amenities: [],
-              type: p.tipo,
-              subtype: p.subtipo,
-              operation:
-                operation?.tipo_operacion === "venta" ? "Sale" : "Rent",
-              status: status,
-            };
-          });
-          setProperties(transformedProps);
-        }
-      } catch (error) {
-        console.error("Error in fetchProfileData:", error);
-      } finally {
-        setLoading(false);
-      }
+  const mapPostToFeedItem = (post: Post): FeedItem => {
+    const defaultUser: User = {
+      id: targetUserId || "",
+      name: "Usuario",
+      avatar: "",
+      role: "Cliente",
+      isFollowing: false,
     };
 
-    fetchProfileData();
-  }, [targetUserId, isMe, authProfile]);
+    return {
+      id: post.id,
+      type: "post",
+      user: profile ? mapProfileToUser(profile) : defaultUser,
+      content: post.contenido || "",
+      images: post.imagenes || [],
+      likes: 0,
+      comments: 0,
+      timestamp: post.created_at,
+      status: post.status,
+    };
+  };
 
-  // Profile data
+  const mapReelToFeedItem = (reel: Reel): FeedItem => {
+    const defaultUser: User = {
+      id: targetUserId || "",
+      name: "Usuario",
+      avatar: "",
+      role: "Cliente",
+      isFollowing: false,
+    };
+
+    return {
+      id: reel.id,
+      type: "reel",
+      user: profile ? mapProfileToUser(profile) : defaultUser,
+      content: reel.descripcion || "",
+      videoUrl: reel.video_url,
+      likes: 0,
+      comments: 0,
+      timestamp: reel.created_at,
+    };
+  };
+
+  /**
+   * useEffect ÚNICO optimizado for Recommended Users
+   */
+  useEffect(() => {
+    const shouldLoad = showRatingDetails || showRecommendedByModal;
+
+    if (!shouldLoad) return;
+    if (!targetUserId) return;
+    if (recommendedByUsers.length > 0) return;
+    if (loadingRecommendedBy) return;
+    if ((reviewStats?.total_recomiendan || 0) <= 0) {
+      // Just to be safe, though hook handles data
+      return;
+    }
+
+    loadRecommendedByUsers({ reset: true });
+  }, [
+    showRatingDetails,
+    showRecommendedByModal,
+    targetUserId,
+    recommendedByUsers.length,
+    loadingRecommendedBy,
+    reviewStats?.total_recomiendan,
+  ]);
+
+  /**
+   * Wrapper for recommendation to also reload list if needed
+   */
+  const onToggleRecommendation = async (recomienda: boolean) => {
+    await handleRecommendation(recomienda);
+    if (showRatingDetails || showRecommendedByModal) {
+      loadRecommendedByUsers({ reset: true });
+    }
+  };
+
   const profileData = {
     name: formatFullName(profile),
-    avatar: profile?.foto || undefined, // undefined para que Avatar use las iniciales
+    avatar: profile?.foto || undefined,
     role: formatRole(profile?.rol || "cliente"),
     location: formatLocation(
       profile?.estado || null,
@@ -445,6 +272,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       profile?.prefijo_celular || null,
       profile?.celular || null
     ),
+    anos_experiencia: profile?.anos_experiencia || 0,
     rating: reviewStats?.calificacion_promedio || 0,
     reviewCount: reviewStats?.total_resenas || 0,
     positiveRecommendations: reviewStats?.total_recomiendan || 0,
@@ -461,6 +289,12 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     activeFilter === "Todas"
       ? properties
       : properties.filter((p) => p.status === activeFilter);
+
+  const contentCounts = {
+    properties: properties.length,
+    posts: posts.length,
+    reels: reels.length,
+  };
 
   if (loading) {
     return (
@@ -480,19 +314,29 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Profile Info */}
         <View style={styles.infoContainer}>
           <View style={styles.infoRow}>
-            <Avatar
+            <ProfileAvatarPicker
               uri={profileData.avatar}
               name={profileData.name}
               size={100}
-              style={styles.avatar}
+              userId={targetUserId!}
+              isOwnProfile={isMe}
+              onPhotoUpdated={(newUrl) => {
+                updateProfilePhoto(newUrl);
+              }}
             />
+
             <View style={styles.infoRight}>
               <Text style={styles.name}>{profileData.name}</Text>
-              <View style={styles.roleBadge}>
-                <Text style={styles.roleText}>{profileData.role}</Text>
-              </View>
+              {profileData.role === "Cliente" ? (
+                <></>
+              ) : (
+                <View style={styles.roleBadge}>
+                  <Text style={styles.roleText}>{profileData.role}</Text>
+                </View>
+              )}
               <View style={styles.metaList}>
                 <View style={styles.metaItem}>
                   <Ionicons
@@ -503,9 +347,19 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                   <Text style={styles.metaText}>{profileData.location}</Text>
                 </View>
                 <View style={styles.metaItem}>
+                  <Ionicons
+                    name="school"
+                    size={12}
+                    color={COLORS.textTertiary}
+                  />
+                  <Text style={styles.metaText}>
+                    {`+${profileData.anos_experiencia} años de experiencia`}
+                  </Text>
+                </View>
+                {/* <View style={styles.metaItem}>
                   <Ionicons name="call" size={12} color={COLORS.textTertiary} />
                   <Text style={styles.metaText}>{profileData.phone}</Text>
-                </View>
+                </View> */}
               </View>
             </View>
           </View>
@@ -515,11 +369,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
               <TouchableOpacity
                 style={styles.messageBtn}
                 onPress={() => {
-                  console.log("🚀 Navegando a Messages con initialUser:", {
-                    id: targetUserId,
-                    nombre: profile?.nombre,
-                    apellido_paterno: profile?.apellido_paterno || "",
-                  });
                   navigation.navigate("Messages", {
                     initialUser: {
                       id: targetUserId,
@@ -541,33 +390,74 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
           )}
         </View>
 
-        {/* Sección de calificaciones */}
+        {/* ========== RATING SECTION - COMPLETA ========== */}
         <View style={styles.ratingSection}>
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => setShowRatingDetails(!showRatingDetails)}
             style={styles.ratingCard}
-            accessibilityLabel="Ver calificaciones del usuario"
-            accessibilityRole="button"
           >
             <View style={styles.ratingLeft}>
-              <Text style={styles.ratingValue}>
-                {profileData.rating.toFixed(1)}
-              </Text>
-              <View style={styles.ratingStars}>
-                <View style={styles.starsRow}>
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Ionicons
-                      key={s}
-                      name="star"
-                      size={10}
-                      color={COLORS.warning}
-                    />
-                  ))}
-                </View>
-                <Text style={styles.reviewCount}>
-                  {profileData.reviewCount} reseñas
+              <View style={styles.ratingTopRow}>
+                <Text style={styles.ratingValue}>
+                  {profileData.rating.toFixed(1)}
                 </Text>
+                <View style={styles.ratingStars}>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Ionicons
+                        key={s}
+                        name="star"
+                        size={13}
+                        color={COLORS.warning}
+                      />
+                    ))}
+                    <Text style={styles.reviewCount}>
+                      {profileData.reviewCount} reseñas
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.recommendsRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.recItem,
+                    isMe && styles.recItemDisabled,
+
+                    { borderRightWidth: 1 },
+                  ]}
+                  onPress={() => handleRecommendation(true)}
+                  disabled={isMe || submittingRecommendation}
+                >
+                  <AnimatedLike
+                    isActive={userRecommendation === true}
+                    onPress={() => handleRecommendation(true)}
+                    activeColor={COLORS.primary}
+                    inactiveColor={COLORS.textSecondary}
+                    variant="thumbs-up"
+                  />
+                  <Text style={styles.recVal}>
+                    {profileData.positiveRecommendations}
+                  </Text>
+                  {/* <Text style={styles.recLabel}>Recomiendan</Text> */}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.recItem, isMe && styles.recItemDisabled]}
+                  onPress={() => handleRecommendation(false)}
+                  disabled={isMe || submittingRecommendation}
+                >
+                  <AnimatedLike
+                    isActive={userRecommendation === false}
+                    onPress={() => handleRecommendation(false)}
+                    activeColor={COLORS.error}
+                    inactiveColor={COLORS.textSecondary}
+                    variant="thumbs-down"
+                  />
+                  <Text style={styles.recVal}>
+                    {profileData.negativeRecommendations}
+                  </Text>
+                  {/* <Text style={styles.recLabel}>No recomiendan</Text> */}
+                </TouchableOpacity>
               </View>
             </View>
             <View style={styles.verticalDivider} />
@@ -584,63 +474,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
           {showRatingDetails && (
             <View style={styles.statsPanel}>
-              <View style={styles.recommendsRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.recItem,
-                    isMe && styles.recItemDisabled,
-                    userRecommendation === true && styles.recItemActive,
-                  ]}
-                  onPress={() => handleRecommendation(true)}
-                  disabled={isMe || submittingRecommendation}
-                >
-                  <Ionicons
-                    name={
-                      userRecommendation === true
-                        ? "thumbs-up"
-                        : "thumbs-up-outline"
-                    }
-                    size={16}
-                    color={
-                      userRecommendation === true
-                        ? COLORS.success
-                        : COLORS.textSecondary
-                    }
-                  />
-                  <Text style={styles.recVal}>
-                    {profileData.positiveRecommendations}
-                  </Text>
-                  <Text style={styles.recLabel}>Recomiendan</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.recItem,
-                    isMe && styles.recItemDisabled,
-                    userRecommendation === false && styles.recItemActive,
-                  ]}
-                  onPress={() => handleRecommendation(false)}
-                  disabled={isMe || submittingRecommendation}
-                >
-                  <Ionicons
-                    name={
-                      userRecommendation === false
-                        ? "thumbs-down"
-                        : "thumbs-down-outline"
-                    }
-                    size={16}
-                    color={
-                      userRecommendation === false
-                        ? COLORS.error
-                        : COLORS.textSecondary
-                    }
-                  />
-                  <Text style={styles.recVal}>
-                    {profileData.negativeRecommendations}
-                  </Text>
-                  <Text style={styles.recLabel}>No recomiendan</Text>
-                </TouchableOpacity>
-              </View>
+              {/* Recommends Row */}
 
+              {/* Recommended By Section */}
               <View style={styles.recommendedBySection}>
                 <View style={styles.recommendedByHeader}>
                   <Text style={styles.recommendedByTitle}>Recomendado por</Text>
@@ -720,9 +556,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                 )}
               </View>
 
+              {/* Progress Section */}
               <View style={styles.progressSection}>
                 {[5, 4, 3, 2, 1].map((stars) => {
-                  // Obtener el total de reseñas para este nivel de estrellas
                   const starCounts = {
                     5: reviewStats?.total_5_estrellas || 0,
                     4: reviewStats?.total_4_estrellas || 0,
@@ -757,6 +593,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                 })}
               </View>
 
+              {/* Features Section */}
               <View style={styles.featuresSection}>
                 <Text style={styles.featuresTitle}>
                   Calificación de características
@@ -801,6 +638,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
           )}
         </View>
 
+        {/* Modal de "Recomendado por" Completo */}
         <Modal
           visible={showRecommendedByModal}
           animationType="slide"
@@ -811,8 +649,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
               <TouchableOpacity
                 onPress={() => setShowRecommendedByModal(false)}
                 style={styles.recommendedByModalBackBtn}
-                accessibilityRole="button"
-                accessibilityLabel="Cerrar"
               >
                 <Ionicons
                   name="chevron-back"
@@ -929,124 +765,87 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
           </SafeAreaView>
         </Modal>
 
-        {/* Toolbar de filtros */}
-        <View style={styles.toolbar}>
-          <TouchableOpacity
-            onPress={() => setShowFilterModal(true)}
-            style={styles.filterBtn}
-          >
-            <Ionicons name="funnel" size={16} color={COLORS.textPrimary} />
-            <Text style={styles.filterBtnText}>{activeFilter}</Text>
-            <Ionicons
-              name="chevron-down"
-              size={16}
-              color={COLORS.textPrimary}
-            />
-          </TouchableOpacity>
-          <Text style={styles.countText}>
-            {filteredProperties.length}{" "}
-            {filteredProperties.length === 1 ? "Propiedad" : "Propiedades"}
-          </Text>
-        </View>
+        {/* Tabs */}
+        <ProfileTabs
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          counts={contentCounts}
+        />
 
-        {/* Grid de propiedades */}
-        <View style={styles.grid}>
-          {filteredProperties.map((property) => (
+        {/* Filter Toolbar */}
+        {activeTab === "properties" && (
+          <View style={styles.toolbar}>
             <TouchableOpacity
-              key={property.id}
-              style={styles.gridItem}
-              onPress={() => setSelectedProperty(property)}
-              activeOpacity={0.8}
+              onPress={() => setShowFilterModal(true)}
+              style={styles.filterBtn}
             >
-              <Image
-                source={{ uri: property.images[0] }}
-                style={styles.gridImage}
-                resizeMode="cover"
+              <Ionicons name="funnel" size={16} color={COLORS.textPrimary} />
+              <Text style={styles.filterBtnText}>{activeFilter}</Text>
+              <Ionicons
+                name="chevron-down"
+                size={16}
+                color={COLORS.textPrimary}
               />
-
-              <View
-                style={[
-                  styles.statusBadge,
-                  property.status === "Publicada" && styles.statusPublicada,
-                  property.status === "Suspendida" && styles.statusSuspendida,
-                  property.status === "Rentada" && styles.statusRentada,
-                  property.status === "Reservada" && styles.statusReservada,
-                  property.status === "Vendida" && styles.statusVendida,
-                ]}
-              >
-                <Text style={styles.statusText}>{property.status}</Text>
-              </View>
-
-              {isMe && (
-                <TouchableOpacity
-                  style={styles.editIconOverlay}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    navigation.navigate("EditProperty", {
-                      propertyId: property.id,
-                    });
-                  }}
-                >
-                  <Ionicons name="pencil" size={14} color={COLORS.white} />
-                </TouchableOpacity>
-              )}
-
-              <View style={styles.gridInfo}>
-                <View style={styles.priceRow}>
-                  <Text style={styles.propertyPrice}>
-                    $
-                    {property.price >= 1000000
-                      ? `${(property.price / 1000000).toFixed(1)}M`
-                      : `${(property.price / 1000).toFixed(0)}k`}
-                  </Text>
-                  <Text style={styles.propertyCurrency}>
-                    {property.currency}
-                  </Text>
-                </View>
-                <Text style={styles.propertyLocation} numberOfLines={1}>
-                  {property.location.city}
-                </Text>
-                <View style={styles.propertyFeatures}>
-                  {property.features.beds > 0 && (
-                    <View style={styles.featureBadge}>
-                      <Ionicons
-                        name="bed-outline"
-                        size={10}
-                        color={COLORS.textSecondary}
-                      />
-                      <Text style={styles.featureBadgeText}>
-                        {property.features.beds}
-                      </Text>
-                    </View>
-                  )}
-                  {property.features.baths > 0 && (
-                    <View style={styles.featureBadge}>
-                      <Ionicons
-                        name="water-outline"
-                        size={10}
-                        color={COLORS.textSecondary}
-                      />
-                      <Text style={styles.featureBadgeText}>
-                        {property.features.baths}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
             </TouchableOpacity>
-          ))}
-        </View>
-
-        {filteredProperties.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>
-              No se encontraron propiedades en "{activeFilter}"
+            <Text style={styles.countText}>
+              {filteredProperties.length}{" "}
+              {filteredProperties.length === 1 ? "Propiedad" : "Propiedades"}
             </Text>
           </View>
         )}
+
+        {/* Content Grids */}
+        {activeTab === "properties" && (
+          <ProfilePropertyGrid
+            properties={filteredProperties}
+            onPropertyPress={(property) => setSelectedProperty(property)}
+            isOwnProfile={isMe}
+            onEditPress={(property) => {
+              setShowModal(true);
+              setSelectedProperty(property);
+            }}
+            onDelete={fetchProfileData}
+          />
+        )}
+
+        {activeTab === "posts" && (
+          <ProfilePostGrid
+            userId={targetUserId || ""}
+            onPostPress={(post) => setSelectedPost(mapPostToFeedItem(post))}
+            isOwnProfile={isMe}
+            onDelete={fetchProfileData}
+          />
+        )}
+
+        {activeTab === "reels" && (
+          <ProfileReelGrid
+            userId={targetUserId || ""}
+            onReelPress={(reel: any) =>
+              setSelectedReel(mapReelToFeedItem(reel))
+            }
+            isOwnProfile={isMe}
+            onDelete={fetchProfileData}
+          />
+        )}
       </ScrollView>
 
-      {/* Modal de filtros */}
+      {/* Modal Rating Details */}
+      {selectedPost && (
+        <FeedDetail
+          item={selectedPost}
+          onClose={() => setSelectedPost(null)}
+          currentUserId={authUser?.id}
+        />
+      )}
+
+      {selectedReel && (
+        <ReelDetail
+          item={selectedReel}
+          onClose={() => setSelectedReel(null)}
+          currentUserId={authUser?.id}
+        />
+      )}
+
       <SelectionModal
         visible={showFilterModal}
         onClose={() => setShowFilterModal(false)}
@@ -1057,7 +856,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         searchable={false}
       />
 
-      {/* Modal de detalle de propiedad */}
       {selectedProperty && (
         <Modal
           animationType="slide"
@@ -1074,6 +872,18 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                 navigation.navigate(screen, params);
               },
             }}
+          />
+        </Modal>
+      )}
+      {showModal && (
+        <Modal
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowModal(false)}
+        >
+          <CreateProperty
+            onBack={() => setShowModal(false)}
+            propertyId={selectedProperty?.id}
           />
         </Modal>
       )}
@@ -1106,15 +916,6 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  avatar: {
-    elevation: 3,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    borderWidth: 3,
-    borderColor: COLORS.white,
   },
   infoRight: {
     flex: 1,
@@ -1185,13 +986,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    alignSelf: "center",
+    paddingVertical: 3,
   },
   ratingLeft: {
+    flex: 1,
+    flexDirection: "column",
+    gap: 12,
+  },
+  ratingTopRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
   },
   ratingValue: {
     fontSize: 24,
@@ -1200,13 +1007,16 @@ const styles = StyleSheet.create({
   },
   ratingStars: {
     gap: 4,
+    justifyContent: "center",
   },
   starsRow: {
+    flex: 1,
     flexDirection: "row",
     gap: 2,
+    justifyContent: "center",
   },
   reviewCount: {
-    fontSize: 10,
+    fontSize: 15,
     color: COLORS.textTertiary,
   },
   verticalDivider: {
@@ -1214,6 +1024,7 @@ const styles = StyleSheet.create({
     height: 32,
     backgroundColor: COLORS.cardBorder,
     marginHorizontal: 16,
+    alignSelf: "flex-end",
   },
   ratingRight: {
     flexDirection: "row",
@@ -1236,10 +1047,30 @@ const styles = StyleSheet.create({
   },
   recommendsRow: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
+    gap: 12,
+  },
+  recItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    borderColor: COLORS.cardBorder,
+  },
+  recItemDisabled: {
+    opacity: 0.5,
+  },
+  recItemActive: {
+    backgroundColor: COLORS.white,
+  },
+  recVal: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: COLORS.textPrimary,
+  },
+  recLabel: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
   },
   recommendedBySection: {
     paddingTop: 16,
@@ -1272,9 +1103,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textTertiary,
   },
-  recommendedByList: {
-    gap: 12,
-  },
   recommendedByPreviewRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1298,34 +1126,6 @@ const styles = StyleSheet.create({
   },
   recommendedByPreviewText: {
     flex: 1,
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    fontWeight: "600",
-  },
-  recommendedByItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  recommendedByAvatar: {
-    borderWidth: 1,
-    borderColor: COLORS.white,
-  },
-  recommendedByInfo: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  recommendedByName: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  recommendedByRole: {
-    marginTop: 2,
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  recommendedByMoreText: {
     fontSize: 12,
     color: COLORS.textSecondary,
     fontWeight: "600",
@@ -1374,6 +1174,24 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 10,
   },
+  recommendedByAvatar: {
+    borderWidth: 1,
+    borderColor: COLORS.white,
+  },
+  recommendedByInfo: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  recommendedByName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+  },
+  recommendedByRole: {
+    marginTop: 2,
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
   recommendedByModalFooter: {
     paddingVertical: 14,
     alignItems: "center",
@@ -1395,28 +1213,6 @@ const styles = StyleSheet.create({
   recommendedByModalEmpty: {
     padding: 20,
     alignItems: "center",
-  },
-  recItem: {
-    alignItems: "center",
-    gap: 4,
-    padding: 8,
-    borderRadius: 8,
-    minWidth: 100,
-  },
-  recItemDisabled: {
-    opacity: 0.5,
-  },
-  recItemActive: {
-    backgroundColor: COLORS.background,
-  },
-  recVal: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-  },
-  recLabel: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
   },
   progressSection: {
     marginTop: 16,
@@ -1505,129 +1301,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textTertiary,
     fontWeight: "500",
-  },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    justifyContent: "space-between",
-  },
-  gridItem: {
-    width: `${(100 - 4) / 3}%`, // 3 items por fila con espacio entre ellos
-    marginBottom: 12,
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    overflow: "hidden",
-    elevation: 2,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  gridImage: {
-    width: "100%",
-    aspectRatio: 1,
-    backgroundColor: COLORS.background,
-  },
-  statusBadge: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    backgroundColor: COLORS.textSecondary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    elevation: 1,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  statusPublicada: {
-    backgroundColor: COLORS.success,
-  },
-  statusSuspendida: {
-    backgroundColor: COLORS.warning,
-  },
-  statusRentada: {
-    backgroundColor: COLORS.info,
-  },
-  statusReservada: {
-    backgroundColor: COLORS.tagPurple,
-  },
-  statusVendida: {
-    backgroundColor: COLORS.error,
-  },
-  statusText: {
-    color: COLORS.white,
-    fontSize: 9,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
-  editIconOverlay: {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10,
-  },
-  gridInfo: {
-    padding: 10,
-    backgroundColor: COLORS.white,
-  },
-  priceRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    marginBottom: 2,
-  },
-  propertyPrice: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.primary,
-  },
-  propertyCurrency: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-    marginLeft: 3,
-  },
-  propertyLocation: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
-    marginBottom: 6,
-  },
-  propertyFeatures: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  featureBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
-    gap: 3,
-  },
-  featureBadgeText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-  },
-  emptyState: {
-    padding: 40,
-    alignItems: "center",
-  },
-  emptyText: {
-    color: COLORS.textTertiary,
-    fontSize: 14,
   },
 });
 

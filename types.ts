@@ -1,3 +1,29 @@
+export type Post = {
+  id: string;
+  publicado_por: string;
+  contenido: string | null;
+  imagenes: string[] | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
+};
+
+export type Reel = {
+  id: string;
+  publicado_por: string;
+  video_url: string;
+  thumbnail_url: string | null;
+  descripcion: string | null;
+  duracion_segundos: number | null;
+  status?: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+};
+
+export type ProfileContentType = "properties" | "posts" | "reels";
+
 export type User = {
   id: string;
   nombre?: string;
@@ -105,6 +131,7 @@ export type FeedItem = {
   comments: number;
   commentsList?: Comment[];
   timestamp: string;
+  status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
 };
 
 export type Lead = {
@@ -219,4 +246,18 @@ export type operaciones_propiedad = {
   activa: boolean;
   vigente_desde: string;
   vigente_hasta: string;
+};
+
+export type ReportesPropiedades = {
+  id: string;
+  propiedad_id: string;
+  reportado_por: string;
+  propietario_id: string;
+  motivo: string;
+  descripcion: string;
+  estado: "pendiente" | "revisado" | "accion_tomada";
+  revisado_por: string;
+  revisado_en: string;
+  created_at?: string;
+  updated_at?: string;
 };

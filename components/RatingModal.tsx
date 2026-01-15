@@ -1,7 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, TextInput, Switch, ScrollView, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Modal,
+  StyleSheet,
+  TextInput,
+  Switch,
+  ScrollView,
+  ActivityIndicator,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { COLORS } from "../constants/colors";
 
 interface RatingModalProps {
   visible: boolean;
@@ -21,10 +31,10 @@ interface FeatureRatings {
 }
 
 const FEATURES = [
-  { key: 'conocimiento_mercado', label: 'Conocimiento del Mercado' },
-  { key: 'comunicacion', label: 'Comunicación' },
-  { key: 'profesionalismo', label: 'Profesionalismo' },
-  { key: 'disponibilidad', label: 'Disponibilidad' },
+  { key: "conocimiento_mercado", label: "Conocimiento del Mercado" },
+  { key: "comunicacion", label: "Comunicación" },
+  { key: "profesionalismo", label: "Profesionalismo" },
+  { key: "disponibilidad", label: "Disponibilidad" },
 ] as const;
 
 export const RatingModal: React.FC<RatingModalProps> = ({
@@ -39,7 +49,7 @@ export const RatingModal: React.FC<RatingModalProps> = ({
     profesionalismo: 0,
     disponibilidad: 0,
   });
-  const [comentario, setComentario] = useState('');
+  const [comentario, setComentario] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   // Reset ratings when modal opens
@@ -52,7 +62,7 @@ export const RatingModal: React.FC<RatingModalProps> = ({
         profesionalismo: 0,
         disponibilidad: 0,
       });
-      setComentario('');
+      setComentario("");
       setSubmitting(false);
     }
   }, [visible]);
@@ -74,7 +84,7 @@ export const RatingModal: React.FC<RatingModalProps> = ({
   };
 
   const updateFeatureRating = (key: keyof FeatureRatings, value: number) => {
-    setFeatureRatings(prev => ({ ...prev, [key]: value }));
+    setFeatureRatings((prev) => ({ ...prev, [key]: value }));
   };
 
   return (
@@ -82,21 +92,24 @@ export const RatingModal: React.FC<RatingModalProps> = ({
       <View style={styles.modalOverlay}>
         <View style={styles.rateModalCard}>
           <View style={styles.modalHeaderRow}>
-            <Text style={styles.modalTitle}>Calificar cita</Text>
+            <Text style={styles.modalTitle}>Calificar Asesor</Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={20} color={COLORS.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.modalContent}
+            showsVerticalScrollIndicator={false}
+          >
             <Text style={styles.modalLabel}>Calificación general</Text>
             <View style={styles.starsLarge}>
-              {[1, 2, 3, 4, 5].map(s => (
+              {[1, 2, 3, 4, 5].map((s) => (
                 <TouchableOpacity key={s} onPress={() => setOverallRating(s)}>
-                  <Ionicons 
-                    name={overallRating >= s ? 'star' : 'star-outline'} 
-                    size={32} 
-                    color={COLORS.warning} 
+                  <Ionicons
+                    name={overallRating >= s ? "star" : "star-outline"}
+                    size={32}
+                    color={COLORS.warning}
                   />
                 </TouchableOpacity>
               ))}
@@ -109,15 +122,19 @@ export const RatingModal: React.FC<RatingModalProps> = ({
               <View key={feature.key} style={styles.featureRateRow}>
                 <Text style={styles.featureLabel}>{feature.label}</Text>
                 <View style={styles.stars}>
-                  {[1, 2, 3, 4, 5].map(s => (
-                    <TouchableOpacity 
-                      key={s} 
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <TouchableOpacity
+                      key={s}
                       onPress={() => updateFeatureRating(feature.key, s)}
                     >
-                      <Ionicons 
-                        name={featureRatings[feature.key] >= s ? 'star' : 'star-outline'} 
-                        size={20} 
-                        color={COLORS.warning} 
+                      <Ionicons
+                        name={
+                          featureRatings[feature.key] >= s
+                            ? "star"
+                            : "star-outline"
+                        }
+                        size={25}
+                        color={COLORS.warning}
                       />
                     </TouchableOpacity>
                   ))}
@@ -158,7 +175,9 @@ export const RatingModal: React.FC<RatingModalProps> = ({
                 {submitting ? (
                   <>
                     <ActivityIndicator size="small" color={COLORS.white} />
-                    <Text style={[styles.btnTextPri, { marginLeft: 8 }]}>Guardando...</Text>
+                    <Text style={[styles.btnTextPri, { marginLeft: 8 }]}>
+                      Guardando...
+                    </Text>
                   </>
                 ) : (
                   <Text style={styles.btnTextPri}>Guardar</Text>
@@ -176,14 +195,14 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: COLORS.blackTransparent60,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 24,
   },
   rateModalCard: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
-    width: '100%',
+    width: "100%",
     maxWidth: 400,
     elevation: 5,
     shadowColor: COLORS.black,
@@ -192,9 +211,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   modalHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
@@ -202,7 +221,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.textPrimary,
   },
   modalContent: {
@@ -210,7 +229,7 @@ const styles = StyleSheet.create({
   },
   modalLabel: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.textPrimary,
     marginBottom: 8,
   },
@@ -218,14 +237,14 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   starsLarge: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     marginBottom: 8,
   },
   featureRateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.background,
@@ -236,11 +255,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stars: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 4,
   },
   modalActionsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginTop: 20,
   },
@@ -249,24 +268,24 @@ const styles = StyleSheet.create({
     padding: 14,
     backgroundColor: COLORS.backgroundDark,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   btnPrimary: {
     flex: 1,
     padding: 14,
     backgroundColor: COLORS.primary,
     borderRadius: 12,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
   },
   btnTextSec: {
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 14,
     color: COLORS.textSecondary,
   },
   btnTextPri: {
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 14,
     color: COLORS.white,
   },
@@ -280,14 +299,14 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.background,
   },
   switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 8,
   },
   switchLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.textPrimary,
   },
   commentSection: {
@@ -306,7 +325,7 @@ const styles = StyleSheet.create({
   charCount: {
     fontSize: 11,
     color: COLORS.textTertiary,
-    textAlign: 'right',
+    textAlign: "right",
     marginTop: 4,
   },
 });

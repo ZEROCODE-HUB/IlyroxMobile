@@ -3,92 +3,40 @@
  * Hook para crear posts, reels y propiedades en Supabase
  */
 
-import { useState } from 'react';
-import { Alert, Platform } from 'react-native';
-import { supabase } from '../lib/supabase';
-import * as FileSystem from 'expo-file-system';
-import { decode } from 'base64-arraybuffer';
+import { useState } from "react";
+import { Alert } from "react-native";
+import { supabase } from "../lib/supabase";
+import { useImageUpload } from "./useImageUpload";
+import * as Burnt from "burnt";
 
 export function useCreateContent(userId?: string) {
-  const [uploading, setUploading] = useState(false);
+  const {
+    uploadImage,
+    uploadImages,
+    uploading: isUploadingImage,
+  } = useImageUpload();
+  const [isCreatingInDB, setIsCreatingInDB] = useState(false);
 
-  /**
-   * Subir archivo a Supabase Storage
-   */
-  const uploadFile = async (fileUri: string, folder: 'posts' | 'reels' | 'properties'): Promise<string | null> => {
-    try {
-      const isVideo = folder === 'reels';
-      const extension = isVideo ? 'mp4' : 'jpg';
-      const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
-
-      // Generar nombre único
-      const fileName = `${folder}_${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
-      const filePath = `${folder}/${fileName}`;
-
-      // Leer archivo
-      let fileBody: any;
-
-      if (Platform.OS === 'web') {
-        // En Web, fetch del blob URI es lo más directo
-        const response = await fetch(fileUri);
-        fileBody = await response.blob();
-      } else {
-        // En Native, leer como base64 y decodificar a ArrayBuffer es más estable para archivos grandes
-        const base64 = await FileSystem.readAsStringAsync(fileUri, {
-          encoding: 'base64' as any,
-        });
-        fileBody = decode(base64);
-      }
-
-      // Subir a Supabase Storage
-      const { data, error } = await supabase.storage
-        .from('feed-images')
-        .upload(filePath, fileBody, {
-          contentType: mimeType,
-          upsert: false,
-        });
-
-      if (error) throw error;
-
-      // Obtener URL pública
-      const { data: urlData } = supabase.storage
-        .from('feed-images')
-        .getPublicUrl(filePath);
-
-      return urlData.publicUrl;
-    } catch (err) {
-      console.error('Error uploading file:', err);
-      return null;
-    }
-  };
+  const uploading = isUploadingImage || isCreatingInDB;
 
   /**
    * Crear POST
    */
   const createPost = async (content: string, images: string[]) => {
     if (!userId) {
-      Alert.alert('Error', 'Debes iniciar sesión');
+      Alert.alert("Error", "Debes iniciar sesión");
       return false;
     }
 
-    setUploading(true);
+    setIsCreatingInDB(true);
 
     try {
       // 1. Subir imágenes a Supabase Storage
-      let uploadedUrls: string[] = [];
-
-      if (images.length > 0) {
-        for (const imageUri of images) {
-          const url = await uploadFile(imageUri, 'posts');
-          if (url) {
-            uploadedUrls.push(url);
-          }
-        }
-      }
+      const uploadedUrls = await uploadImages(images, "feed-images", "posts");
 
       // 2. Crear post en BD con URLs de Supabase
       const { data: post, error: postError } = await supabase
-        .from('posts')
+        .from("posts")
         .insert({
           publicado_por: userId,
           contenido: content,
@@ -100,26 +48,32 @@ export function useCreateContent(userId?: string) {
       if (postError) throw postError;
 
       // 3. Crear feed_item
-      const { error: feedError } = await supabase
-        .from('feed_items')
-        .insert({
-          tipo_contenido: 'post',
-          contenido_id: post.id,
-          publicado_por: userId,
-          visibilidad: 'publico',
-          estado_moderacion: 'activo',
-        });
+      const { error: feedError } = await supabase.from("feed_items").insert({
+        tipo_contenido: "post",
+        contenido_id: post.id,
+        publicado_por: userId,
+        visibilidad: "publico",
+        estado_moderacion: "activo",
+      });
 
       if (feedError) throw feedError;
 
-      Alert.alert('✅ Éxito', 'Post publicado correctamente');
+      Burnt.toast({
+        title: "Post publicado correctamente!",
+        preset: "done",
+        duration: 2500,
+      });
+
       return true;
     } catch (error: any) {
-      console.error('Error creating post:', error);
-      Alert.alert('Error', error.message || 'No se pudo publicar el post');
+      console.error("Error creating post:", error);
+      Burnt.toast({
+        title: "Error al publicar el post",
+        preset: "error",
+      });
       return false;
     } finally {
-      setUploading(false);
+      setIsCreatingInDB(false);
     }
   };
 
@@ -128,18 +82,22 @@ export function useCreateContent(userId?: string) {
    */
   const createReel = async (description: string, videoUrl: string) => {
     if (!userId) {
-      Alert.alert('Error', 'Debes iniciar sesión');
+      Alert.alert("Error", "Debes iniciar sesión");
       return false;
     }
 
-    setUploading(true);
+    setIsCreatingInDB(true);
 
     try {
       // 1. Subir video a Supabase Storage (si es local)
       let uploadedVideoUrl = videoUrl;
 
-      if (videoUrl && !videoUrl.startsWith('http')) {
-        const videoUploadUrl = await uploadFile(videoUrl, 'reels');
+      if (videoUrl && !videoUrl.startsWith("http")) {
+        const videoUploadUrl = await uploadImage(
+          videoUrl,
+          "feed-images",
+          "reels"
+        );
         if (videoUploadUrl) {
           uploadedVideoUrl = videoUploadUrl;
         }
@@ -148,7 +106,7 @@ export function useCreateContent(userId?: string) {
       // 2. Crear reel en BD
       // NOTA: Se eliminó 'duracion' porque causaba error PGRST204 (columna no existe en la BD)
       const { data: reel, error: reelError } = await supabase
-        .from('reels')
+        .from("reels")
         .insert({
           publicado_por: userId,
           descripcion: description,
@@ -160,26 +118,30 @@ export function useCreateContent(userId?: string) {
       if (reelError) throw reelError;
 
       // 3. Crear feed_item
-      const { error: feedError } = await supabase
-        .from('feed_items')
-        .insert({
-          tipo_contenido: 'reel',
-          contenido_id: reel.id,
-          publicado_por: userId,
-          visibilidad: 'publico',
-          estado_moderacion: 'activo',
-        });
+      const { error: feedError } = await supabase.from("feed_items").insert({
+        tipo_contenido: "reel",
+        contenido_id: reel.id,
+        publicado_por: userId,
+        visibilidad: "publico",
+        estado_moderacion: "activo",
+      });
 
       if (feedError) throw feedError;
 
-      Alert.alert('✅ Éxito', 'Reel publicado correctamente');
+      Burnt.toast({
+        title: "Reel publicado correctamente!",
+        preset: "done",
+      });
       return true;
     } catch (error: any) {
-      console.error('Error creating reel:', error);
-      Alert.alert('Error', error.message || 'No se pudo publicar el reel');
+      console.error("Error creating reel:", error);
+      Burnt.toast({
+        title: "Error al publicar el reel",
+        preset: "error",
+      });
       return false;
     } finally {
-      setUploading(false);
+      setIsCreatingInDB(false);
     }
   };
 
@@ -191,9 +153,9 @@ export function useCreateContent(userId?: string) {
     description: string;
     type: string;
     subtype: string;
-    operation: 'venta' | 'renta';
+    operation: "venta" | "renta";
     price: number;
-    currency: 'MXN' | 'USD';
+    currency: "MXN" | "USD";
     city: string;
     municipality: string;
     colony: string;
@@ -210,16 +172,16 @@ export function useCreateContent(userId?: string) {
     coordinates?: { lat: number; lng: number };
   }) => {
     if (!userId) {
-      Alert.alert('Error', 'Debes iniciar sesión');
+      Alert.alert("Error", "Debes iniciar sesión");
       return false;
     }
 
-    setUploading(true);
+    setIsCreatingInDB(true);
 
     try {
       // 1. Crear propiedad
       const { data: property, error: propertyError } = await supabase
-        .from('propiedades')
+        .from("propiedades")
         .insert({
           tipo: propertyData.type,
           subtipo: propertyData.subtype,
@@ -244,7 +206,7 @@ export function useCreateContent(userId?: string) {
 
       // 2. Crear operación (venta/renta)
       const { error: operationError } = await supabase
-        .from('operaciones_propiedad')
+        .from("operaciones_propiedad")
         .insert({
           propiedad_id: property.id,
           tipo_operacion: propertyData.operation,
@@ -255,26 +217,24 @@ export function useCreateContent(userId?: string) {
       if (operationError) throw operationError;
 
       // 3. Crear feed_item
-      const { error: feedError } = await supabase
-        .from('feed_items')
-        .insert({
-          tipo_contenido: 'propiedad',
-          contenido_id: property.id,
-          publicado_por: userId,
-          visibilidad: 'publico',
-          estado_moderacion: 'activo',
-        });
+      const { error: feedError } = await supabase.from("feed_items").insert({
+        tipo_contenido: "propiedad",
+        contenido_id: property.id,
+        publicado_por: userId,
+        visibilidad: "publico",
+        estado_moderacion: "activo",
+      });
 
       if (feedError) throw feedError;
 
-      Alert.alert('✅ Éxito', 'Propiedad publicada correctamente');
+      Alert.alert("✅ Éxito", "Propiedad publicada correctamente");
       return true;
     } catch (error: any) {
-      console.error('Error creating property:', error);
-      Alert.alert('Error', error.message || 'No se pudo publicar la propiedad');
+      console.error("Error creating property:", error);
+      Alert.alert("Error", error.message || "No se pudo publicar la propiedad");
       return false;
     } finally {
-      setUploading(false);
+      setIsCreatingInDB(false);
     }
   };
 

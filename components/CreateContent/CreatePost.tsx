@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Image,
   Alert,
   ActivityIndicator,
   Modal,
@@ -22,6 +21,8 @@ import { useCreateContent } from "../../hooks/useCreateContent";
 import { useAuth } from "../../context/AuthContext";
 import { COLORS } from "../../constants/colors";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
+import { ViewImage } from "../modals/ViewImage";
+import ReordenableImages from "./ReordenableImages";
 
 interface CreatePostProps {
   onBack: () => void;
@@ -41,6 +42,7 @@ export default function CreatePost({ onBack }: CreatePostProps) {
    */
   const handlePickImage = async () => {
     // Pedir permisos
+    //
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("Permiso denegado", "Necesitamos acceso a tu galería");
@@ -51,6 +53,7 @@ export default function CreatePost({ onBack }: CreatePostProps) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
+      allowsEditing: true,
       quality: 0.8,
       selectionLimit: 5,
     });
@@ -139,7 +142,7 @@ export default function CreatePost({ onBack }: CreatePostProps) {
         {/* Contenido */}
         <View style={styles.card}>
           <AppInput
-            label="Contenido *"
+            label="Nueva Publicación *"
             multiline
             placeholder="¿Qué quieres compartir?"
             value={content}
@@ -154,28 +157,28 @@ export default function CreatePost({ onBack }: CreatePostProps) {
           />
         </View>
 
-        {/* Imágenes */}
         <View style={styles.card}>
           <Text style={styles.label}>Imágenes (opcional)</Text>
           <Text style={styles.hint}>Máximo 5 imágenes</Text>
 
-          <View style={styles.imagesGrid}>
-            {images.map((uri, index) => (
-              <View key={index} style={styles.imageBox}>
-                <Image source={{ uri }} style={styles.previewImage} />
-                <TouchableOpacity
-                  onPress={() => handleRemoveImage(index)}
-                  style={styles.removeBtn}
-                >
-                  <Ionicons name="close" size={14} color={COLORS.white} />
-                </TouchableOpacity>
-              </View>
-            ))}
+          <View
+            style={{ marginTop: 9, flexDirection: "row", flexWrap: "wrap" }}
+          >
+            {images.length > 0 && (
+              <ReordenableImages
+                images={images}
+                onReorder={setImages}
+                onRemove={handleRemoveImage}
+              />
+            )}
 
             {images.length < 5 && (
               <TouchableOpacity
                 onPress={handlePickImage}
-                style={styles.uploadBtn}
+                style={[
+                  styles.uploadBtn,
+                  images.length > 0 && { marginTop: 12, alignSelf: "center" },
+                ]}
               >
                 <Ionicons name="camera" size={28} color={COLORS.textTertiary} />
                 <Text style={styles.uploadText}>Agregar foto</Text>
@@ -234,8 +237,9 @@ export default function CreatePost({ onBack }: CreatePostProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   },
+
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -255,10 +259,12 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: COLORS.background,
   },
   scrollContent: {
     padding: 16,
     paddingBottom: 100,
+    backgroundColor: COLORS.background,
   },
   card: {
     backgroundColor: COLORS.white,
@@ -309,8 +315,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   uploadBtn: {
-    width: 100,
-    height: 100,
+    width: 120,
+    height: 125,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: COLORS.cardBorder,

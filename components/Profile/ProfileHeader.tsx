@@ -51,7 +51,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   headerInner: {
-    height: 90,
     backgroundColor: COLORS.white,
     flexDirection: "row",
     alignItems: "center",
@@ -59,7 +58,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
-    paddingTop: 35,
+    paddingTop: 16,
   },
   iconButton: {
     width: 44,

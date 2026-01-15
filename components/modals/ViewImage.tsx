@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Modal,
   View,
@@ -15,50 +15,66 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 interface ViewImageProps {
   src?: string;
-  // Estilo para el contenedor exterior (donde se posiciona en tu layout)
   containerStyle?: any;
-  // Estilo específico para la imagen miniatura (bordes, ratio, etc.)
   imageStyle?: any;
+  isVisibleAuto?: boolean;
+  onClose?: () => void;
+  showThumbnail?: boolean;
 }
 
 export function ViewImage({
   src,
   containerStyle,
   imageStyle,
+  isVisibleAuto,
+  onClose,
+  showThumbnail = true,
 }: ViewImageProps) {
   const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const isModalVisible = isVisibleAuto || visible;
+
+  useEffect(() => {
+    if (isModalVisible) {
+      setLoading(true);
+    }
+  }, [src, isModalVisible]);
+
   if (!src) return null;
+
+  const handleClose = () => {
+    setVisible(false);
+    if (onClose) onClose();
+  };
 
   return (
     <>
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => setVisible(true)}
-        // El contenedor maneja el posicionamiento
-        style={[styles.defaultContainer, containerStyle]}
-      >
-        <Image
-          source={{ uri: src }}
-          // La imagen llena el contenedor respetando sus propios bordes
-          style={[styles.thumbnail, imageStyle]}
-          resizeMode="cover"
-        />
-      </TouchableOpacity>
+      {showThumbnail && (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setVisible(true)}
+          style={[styles.defaultContainer, containerStyle]}
+        >
+          <Image
+            source={{ uri: src }}
+            style={[styles.thumbnail, imageStyle]}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+      )}
 
       <Modal
-        visible={visible}
+        visible={isModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setVisible(false)}
+        onRequestClose={handleClose}
       >
         <View style={styles.modalContainer}>
-          {/* Botón de cerrar con área de toque mejorada */}
           <TouchableOpacity
             style={[styles.closeButton, { top: insets.top + 10 }]}
-            onPress={() => setVisible(false)}
+            onPress={handleClose}
           >
             <Ionicons name="close-circle" size={32} color="#fff" />
           </TouchableOpacity>
@@ -74,7 +90,6 @@ export function ViewImage({
             <Image
               source={{ uri: src }}
               style={styles.fullImage}
-              // 'contain' es vital para que la imagen completa nunca se corte
               resizeMode="contain"
               onLoadEnd={() => setLoading(false)}
             />
@@ -87,7 +102,7 @@ export function ViewImage({
 
 const styles = StyleSheet.create({
   defaultContainer: {
-    overflow: 'hidden', // Evita que la imagen sobrepase los bordes redondeados
+    overflow: "hidden", // Evita que la imagen sobrepase los bordes redondeados
   },
   thumbnail: {
     width: "100%",

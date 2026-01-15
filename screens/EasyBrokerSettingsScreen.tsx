@@ -1,4 +1,15 @@
-import React, { useState, useEffect } from "react";
+/**
+ * EasyBrokerSettingsScreen.tsx - REFACTORIZADO
+ * 
+ * FIXES:
+ * - Limpieza correcta de suscripciones Realtime
+ * - Eliminado polling agresivo (era 28,800 requests/día)
+ * - Mejor manejo de estados de sincronización
+ * - Código más modular y limpio
+ * - Mensajes mejorados para duplicados
+ */
+
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -15,6 +26,7 @@ import { supabase } from "../lib/supabase";
 import { COLORS } from "../constants/colors";
 import { AppHeader } from "../components/AppHeader";
 import { useAuth } from "../context/AuthContext";
+import { RealtimeChannel } from "@supabase/supabase-js";
 
 interface SyncHistory {
   id: string;
@@ -27,89 +39,48 @@ interface SyncHistory {
   status: string;
 }
 
+interface Stats {
+  total: number;
+  lastSync: string | null;
+  nuevas: number;
+  actualizadas: number;
+}
+
 const EasyBrokerSettingsScreen: React.FC = () => {
   const navigation = useNavigation();
   const { user } = useAuth();
-  
-  // Estados simplificados
+
+  // Estados
   const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<Stats>({
     total: 0,
-    lastSync: null as string | null,
+    lastSync: null,
     nuevas: 0,
     actualizadas: 0,
   });
-  
   const [history, setHistory] = useState<SyncHistory[]>([]);
 
-  useEffect(() => {
-    loadInitialData();
-  }, []);
+  // Refs para control de suscripciones
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const isMountedRef = useRef(true);
 
-  // Suscripción a cambios en tiempo real
-  useEffect(() => {
-    if (!user?.id || !syncing) return;
-
-    const channel = supabase
-      .channel('sync-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'sincronizaciones_easybroker',
-          filter: `usuario_id=eq.${user.id}`
-        },
-        (payload) => {
-          const sync = payload.new;
-          
-          if (sync.status === 'completada') {
-            setSyncing(false);
-            loadInitialData();
-            
-            Alert.alert(
-              '🎉 ¡Listo!',
-              `Se sincronizaron ${sync.propiedades_nuevas} propiedades`,
-              [{ text: 'Genial', style: 'default' }]
-            );
-          } else if (sync.status === 'error') {
-            setSyncing(false);
-            Alert.alert('Error', 'Hubo un problema en la sincronización');
-          }
-        }
-      )
-      .subscribe();
-
-    // Polling de respaldo
-    const interval = setInterval(async () => {
-      const { data } = await supabase.rpc('obtener_config_easybroker');
-      if (data?.data && !data.data.sincronizacion_en_progreso) {
-        setSyncing(false);
-        loadInitialData();
-      }
-    }, 3000);
-
-    return () => {
-      channel.unsubscribe();
-      clearInterval(interval);
-    };
-  }, [user?.id, syncing]);
-
+  /**
+   * Cargar datos iniciales
+   */
   const loadInitialData = async () => {
     try {
       setLoading(true);
-      
+
       // Cargar config
-      const { data: config } = await supabase.rpc('obtener_config_easybroker');
-      
+      const { data: config } = await supabase.rpc("obtener_config_easybroker");
+
       if (config?.success) {
         setHasApiKey(config.tiene_api_key);
-        
+
         if (config.data) {
           setStats({
             total: config.data.total_propiedades_sincronizadas || 0,
@@ -117,98 +88,227 @@ const EasyBrokerSettingsScreen: React.FC = () => {
             nuevas: 0,
             actualizadas: 0,
           });
-          
+
           if (config.data.sincronizacion_en_progreso) {
             setSyncing(true);
           }
         }
       }
-      
+
       // Cargar historial
-      const { data: historial } = await supabase.rpc('obtener_historial_sincronizaciones', { p_limit: 5 });
+      const { data: historial } = await supabase.rpc(
+        "obtener_historial_sincronizaciones",
+        { p_limit: 5 }
+      );
+
       if (historial?.success && historial.data) {
-        const filtered = historial.data.filter((item: SyncHistory) => 
-          item.status === 'completada' || item.status === 'error'
+        const filtered = historial.data.filter(
+          (item: SyncHistory) =>
+            item.status === "completada" || item.status === "error"
         );
         setHistory(filtered);
       }
-      
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error("Error loading data:", error);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
+  /**
+   * Limpiar canal Realtime
+   */
+  const cleanupChannel = async () => {
+    if (channelRef.current) {
+      console.log("🧹 Cleaning up sync subscription");
+      try {
+        await supabase.removeChannel(channelRef.current);
+      } catch (err) {
+        console.warn("⚠️ Error removing sync channel:", err);
+      }
+      channelRef.current = null;
+    }
+  };
+
+  /**
+   * Configurar suscripción Realtime solo cuando está sincronizando
+   */
+  const setupSyncSubscription = async () => {
+    if (!user?.id) return;
+
+    // Limpiar suscripción anterior si existe
+    await cleanupChannel();
+
+    console.log("📡 Setting up sync subscription");
+
+    const channel = supabase
+      .channel(`sync-updates-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "sincronizaciones_easybroker",
+          filter: `usuario_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (!isMountedRef.current) return;
+
+          const sync = payload.new;
+          console.log("📨 Sync update received:", sync.status);
+
+          if (sync.status === "completada") {
+            setSyncing(false);
+            loadInitialData();
+
+            const mensaje =
+              sync.propiedades_nuevas === 0 && sync.propiedades_actualizadas === 0
+                ? "No hay cambios. Tus propiedades ya están sincronizadas."
+                : `${sync.propiedades_nuevas} nuevas, ${sync.propiedades_actualizadas} actualizadas`;
+
+            Alert.alert("🎉 Sincronización completada", mensaje, [
+              { text: "Genial", style: "default" },
+            ]);
+          } else if (sync.status === "error") {
+            setSyncing(false);
+            loadInitialData();
+            
+            const errorMsg = sync.mensaje_error || "Hubo un problema en la sincronización";
+            Alert.alert("Error en sincronización", errorMsg);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log("📡 Sync subscription status:", status);
+      });
+
+    channelRef.current = channel;
+  };
+
+  /**
+   * Effect: Cargar datos iniciales
+   */
+  useEffect(() => {
+    isMountedRef.current = true;
+    loadInitialData();
+
+    return () => {
+      isMountedRef.current = false;
+      cleanupChannel();
+    };
+  }, []);
+
+  /**
+   * Effect: Configurar/limpiar suscripción según estado de sincronización
+   */
+  useEffect(() => {
+    if (syncing && user?.id) {
+      setupSyncSubscription();
+    } else {
+      cleanupChannel();
+    }
+
+    return () => {
+      cleanupChannel();
+    };
+  }, [syncing, user?.id]);
+
+  /**
+   * Guardar API Key y sincronizar
+   */
   const handleSaveAndSync = async () => {
     if (!apiKey.trim()) {
-      Alert.alert('Oops', 'Ingresa tu API Key de EasyBroker');
+      Alert.alert("Oops", "Ingresa tu API Key de EasyBroker");
       return;
     }
 
     try {
       setLoading(true);
-      
-      // Guardar API key
-      const { data, error } = await supabase.rpc('guardar_api_key_easybroker', { 
-        p_api_key: apiKey.trim() 
+
+      const { data, error } = await supabase.rpc("guardar_api_key_easybroker", {
+        p_api_key: apiKey.trim(),
       });
-      
+
       if (error) throw error;
-      
+
       if (data?.success) {
         setHasApiKey(true);
         setApiKey("");
-        
+
         // Sincronizar automáticamente
         setTimeout(() => {
           handleSync();
         }, 500);
       }
     } catch (error) {
-      Alert.alert('Error', 'No se pudo guardar la API Key');
+      Alert.alert("Error", "No se pudo guardar la API Key");
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
+  /**
+   * Iniciar sincronización
+   */
   const handleSync = async () => {
     if (syncing) return;
 
     try {
       setSyncing(true);
-      
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
       if (!currentUser) return;
 
-      await supabase.functions.invoke('sincronizar-easybroker', {
-        body: { usuario_id: currentUser.id }
+      const { error } = await supabase.functions.invoke("sincronizar-easybroker", {
+        body: { usuario_id: currentUser.id },
       });
-      
+
+      if (error) {
+        throw error;
+      }
+
+      // La suscripción Realtime manejará las actualizaciones
     } catch (error: any) {
       setSyncing(false);
-      Alert.alert('Error', 'No se pudo iniciar la sincronización');
+      Alert.alert("Error", "No se pudo iniciar la sincronización");
+      console.error("Error starting sync:", error);
     }
   };
 
+  /**
+   * Formatear fecha relativa
+   */
   const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'Nunca';
+    if (!dateString) return "Nunca";
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
-    if (diffMins < 1) return 'Hace un momento';
+
+    if (diffMins < 1) return "Hace un momento";
     if (diffMins < 60) return `Hace ${diffMins}m`;
     if (diffMins < 1440) return `Hace ${Math.floor(diffMins / 60)}h`;
-    
-    return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+
+    return date.toLocaleDateString("es-MX", {
+      day: "numeric",
+      month: "short",
+    });
   };
 
   if (loading) {
     return (
       <View style={styles.container}>
-        <AppHeader title="EasyBroker" showBackButton onBack={() => navigation.goBack()} />
+        <AppHeader
+          title="EasyBroker"
+          showBackButton
+          onBack={() => navigation.goBack()}
+        />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
@@ -216,24 +316,27 @@ const EasyBrokerSettingsScreen: React.FC = () => {
     );
   }
 
-  // Vista cuando NO tiene API key configurada
+  // Vista de onboarding (sin API key)
   if (!hasApiKey) {
     return (
       <View style={styles.container}>
-        <AppHeader title="EasyBroker" showBackButton onBack={() => navigation.goBack()} />
-        
+        <AppHeader
+          title="EasyBroker"
+          showBackButton
+          onBack={() => navigation.goBack()}
+        />
+
         <ScrollView contentContainerStyle={styles.onboardingContainer}>
           <View style={styles.onboardingContent}>
             <View style={styles.iconCircle}>
               <Ionicons name="cloud-upload" size={48} color={COLORS.primary} />
             </View>
-            
-            <Text style={styles.onboardingTitle}>
-              Sincroniza tus propiedades
-            </Text>
-            
+
+            <Text style={styles.onboardingTitle}>Sincroniza tus propiedades</Text>
+
             <Text style={styles.onboardingSubtitle}>
-              Conecta tu cuenta de EasyBroker para importar automáticamente todas tus propiedades publicadas
+              Conecta tu cuenta de EasyBroker para importar automáticamente todas
+              tus propiedades publicadas
             </Text>
 
             <View style={styles.benefitsList}>
@@ -254,7 +357,7 @@ const EasyBrokerSettingsScreen: React.FC = () => {
 
           <View style={styles.onboardingForm}>
             <Text style={styles.inputLabel}>API Key de EasyBroker</Text>
-            
+
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.input}
@@ -266,19 +369,19 @@ const EasyBrokerSettingsScreen: React.FC = () => {
                 autoCorrect={false}
                 placeholderTextColor={COLORS.textTertiary}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.inputIcon}
                 onPress={() => setShowApiKey(!showApiKey)}
               >
-                <Ionicons 
-                  name={showApiKey ? "eye-off" : "eye"} 
-                  size={22} 
-                  color={COLORS.textSecondary} 
+                <Ionicons
+                  name={showApiKey ? "eye-off" : "eye"}
+                  size={22}
+                  color={COLORS.textSecondary}
                 />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.primaryButton}
               onPress={handleSaveAndSync}
               disabled={loading}
@@ -287,14 +390,20 @@ const EasyBrokerSettingsScreen: React.FC = () => {
                 <ActivityIndicator color={COLORS.white} />
               ) : (
                 <>
-                  <Text style={styles.primaryButtonText}>Conectar y Sincronizar</Text>
+                  <Text style={styles.primaryButtonText}>
+                    Conectar y Sincronizar
+                  </Text>
                   <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
                 </>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.helpButton}>
-              <Ionicons name="help-circle-outline" size={18} color={COLORS.primary} />
+              <Ionicons
+                name="help-circle-outline"
+                size={18}
+                color={COLORS.primary}
+              />
               <Text style={styles.helpText}>¿Dónde encuentro mi API Key?</Text>
             </TouchableOpacity>
           </View>
@@ -303,20 +412,25 @@ const EasyBrokerSettingsScreen: React.FC = () => {
     );
   }
 
-  // Vista principal cuando YA tiene API key
+  // Vista principal (con API key configurada)
   return (
     <View style={styles.container}>
-      <AppHeader title="EasyBroker" showBackButton onBack={() => navigation.goBack()} />
-      
+      <AppHeader
+        title="EasyBroker"
+        showBackButton
+        onBack={() => navigation.goBack()}
+      />
+
       <ScrollView style={styles.mainContent} showsVerticalScrollIndicator={false}>
-        
-        {/* Header con stats principales */}
+        {/* Stats principales */}
         <View style={styles.headerStats}>
           <View style={styles.mainStatCard}>
             <Text style={styles.mainStatLabel}>Propiedades sincronizadas</Text>
             <Text style={styles.mainStatValue}>{stats.total}</Text>
             <Text style={styles.mainStatSubtext}>
-              {stats.lastSync ? `Última vez ${formatDate(stats.lastSync)}` : 'Nunca sincronizado'}
+              {stats.lastSync
+                ? `Última vez ${formatDate(stats.lastSync)}`
+                : "Nunca sincronizado"}
             </Text>
           </View>
         </View>
@@ -328,9 +442,10 @@ const EasyBrokerSettingsScreen: React.FC = () => {
               <View style={styles.syncingDot} />
               <Text style={styles.syncingTitle}>Sincronizando...</Text>
             </View>
-            
+
             <Text style={styles.syncingDescription}>
-              Estamos importando tus propiedades desde EasyBroker. Puedes salir de esta pantalla, te avisaremos cuando termine.
+              Estamos importando tus propiedades desde EasyBroker. Puedes salir de
+              esta pantalla, te avisaremos cuando termine.
             </Text>
 
             <View style={styles.syncingProgress}>
@@ -340,10 +455,7 @@ const EasyBrokerSettingsScreen: React.FC = () => {
             </View>
           </View>
         ) : (
-          <TouchableOpacity 
-            style={styles.syncButton}
-            onPress={handleSync}
-          >
+          <TouchableOpacity style={styles.syncButton} onPress={handleSync}>
             <Ionicons name="sync-outline" size={24} color={COLORS.white} />
             <View style={styles.syncButtonContent}>
               <Text style={styles.syncButtonTitle}>Sincronizar ahora</Text>
@@ -358,39 +470,56 @@ const EasyBrokerSettingsScreen: React.FC = () => {
         {/* Historial */}
         {history.length > 0 && (
           <View style={styles.historySection}>
-            <Text style={styles.historySectionTitle}>Sincronizaciones recientes</Text>
-            
-            {history.map((item, index) => (
+            <Text style={styles.historySectionTitle}>
+              Sincronizaciones recientes
+            </Text>
+
+            {history.map((item) => (
               <View key={item.id} style={styles.historyCard}>
                 <View style={styles.historyCardHeader}>
-                  <View style={[
-                    styles.historyStatusDot,
-                    item.status === 'completada' ? styles.statusDotSuccess : styles.statusDotError
-                  ]} />
+                  <View
+                    style={[
+                      styles.historyStatusDot,
+                      item.status === "completada"
+                        ? styles.statusDotSuccess
+                        : styles.statusDotError,
+                    ]}
+                  />
                   <Text style={styles.historyDate}>{formatDate(item.fecha)}</Text>
                 </View>
-                
+
                 <View style={styles.historyStats}>
                   {item.propiedades_nuevas > 0 && (
                     <View style={styles.historyStatItem}>
-                      <Text style={styles.historyStatValue}>{item.propiedades_nuevas}</Text>
+                      <Text style={styles.historyStatValue}>
+                        {item.propiedades_nuevas}
+                      </Text>
                       <Text style={styles.historyStatLabel}>nuevas</Text>
                     </View>
                   )}
                   {item.propiedades_actualizadas > 0 && (
                     <View style={styles.historyStatItem}>
-                      <Text style={styles.historyStatValue}>{item.propiedades_actualizadas}</Text>
+                      <Text style={styles.historyStatValue}>
+                        {item.propiedades_actualizadas}
+                      </Text>
                       <Text style={styles.historyStatLabel}>actualizadas</Text>
                     </View>
                   )}
                   {item.errores > 0 && (
                     <View style={styles.historyStatItem}>
-                      <Text style={[styles.historyStatValue, { color: COLORS.error }]}>
+                      <Text
+                        style={[styles.historyStatValue, { color: COLORS.error }]}
+                      >
                         {item.errores}
                       </Text>
                       <Text style={styles.historyStatLabel}>errores</Text>
                     </View>
                   )}
+                  {item.propiedades_nuevas === 0 &&
+                    item.propiedades_actualizadas === 0 &&
+                    item.errores === 0 && (
+                      <Text style={styles.noChangesText}>Sin cambios</Text>
+                    )}
                 </View>
               </View>
             ))}
@@ -399,16 +528,19 @@ const EasyBrokerSettingsScreen: React.FC = () => {
 
         {/* Configuración */}
         <View style={styles.settingsSection}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.settingsItem}
             onPress={() => setHasApiKey(false)}
           >
             <Ionicons name="key-outline" size={20} color={COLORS.textSecondary} />
             <Text style={styles.settingsItemText}>Cambiar API Key</Text>
-            <Ionicons name="chevron-forward" size={20} color={COLORS.textTertiary} />
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={COLORS.textTertiary}
+            />
           </TouchableOpacity>
         </View>
-
       </ScrollView>
     </View>
   );
@@ -421,41 +553,41 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
-  
-  // Onboarding styles
+
+  // Onboarding
   onboardingContainer: {
     flexGrow: 1,
     padding: 24,
   },
   onboardingContent: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 40,
   },
   iconCircle: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#E3F2FD',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#E3F2FD",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 24,
   },
   onboardingTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.textPrimary,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 12,
   },
   onboardingSubtitle: {
     fontSize: 16,
     color: COLORS.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 24,
     paddingHorizontal: 20,
     marginBottom: 32,
@@ -464,26 +596,26 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   benefitText: {
     fontSize: 15,
     color: COLORS.textPrimary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   onboardingForm: {
-    width: '100%',
+    width: "100%",
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.textPrimary,
     marginBottom: 8,
   },
   inputWrapper: {
-    position: 'relative',
+    position: "relative",
     marginBottom: 16,
   },
   input: {
@@ -497,15 +629,15 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   inputIcon: {
-    position: 'absolute',
+    position: "absolute",
     right: 16,
     top: 16,
   },
   primaryButton: {
     backgroundColor: COLORS.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     padding: 18,
     borderRadius: 16,
     gap: 8,
@@ -514,22 +646,22 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: COLORS.white,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   helpButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
     padding: 12,
   },
   helpText: {
     fontSize: 14,
     color: COLORS.primary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
-  
-  // Main content styles
+
+  // Main content
   mainContent: {
     flex: 1,
   },
@@ -541,37 +673,37 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderRadius: 24,
     padding: 24,
-    alignItems: 'center',
+    alignItems: "center",
   },
   mainStatLabel: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
+    color: "rgba(255,255,255,0.8)",
     marginBottom: 8,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   mainStatValue: {
     fontSize: 48,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.white,
     marginBottom: 4,
   },
   mainStatSubtext: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.7)',
+    color: "rgba(255,255,255,0.7)",
   },
-  
+
   syncingCard: {
-    backgroundColor: '#FFF3E0',
+    backgroundColor: "#FFF3E0",
     marginHorizontal: 24,
     marginBottom: 16,
     borderRadius: 20,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#FFE0B2',
+    borderColor: "#FFE0B2",
   },
   syncingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
     marginBottom: 12,
   },
@@ -579,16 +711,16 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#FF9800',
+    backgroundColor: "#FF9800",
   },
   syncingTitle: {
     fontSize: 17,
-    fontWeight: '700',
-    color: '#E65100',
+    fontWeight: "700",
+    color: "#E65100",
   },
   syncingDescription: {
     fontSize: 14,
-    color: '#BF360C',
+    color: "#BF360C",
     lineHeight: 20,
     marginBottom: 16,
   },
@@ -597,19 +729,19 @@ const styles = StyleSheet.create({
   },
   progressBarBg: {
     height: 4,
-    backgroundColor: '#FFE0B2',
+    backgroundColor: "#FFE0B2",
     borderRadius: 2,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   progressBarAnimated: {
-    height: '100%',
-    width: '100%',
-    backgroundColor: '#FF9800',
+    height: "100%",
+    width: "100%",
+    backgroundColor: "#FF9800",
   },
-  
+
   syncButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.primaryLight,
     marginHorizontal: 24,
     marginBottom: 16,
@@ -622,15 +754,15 @@ const styles = StyleSheet.create({
   },
   syncButtonTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.white,
     marginBottom: 2,
   },
   syncButtonSubtitle: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.8)',
+    color: "rgba(255,255,255,0.8)",
   },
-  
+
   historySection: {
     paddingHorizontal: 24,
     paddingTop: 8,
@@ -638,9 +770,9 @@ const styles = StyleSheet.create({
   },
   historySectionTitle: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.textSecondary,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 12,
   },
@@ -651,8 +783,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   historyCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     marginBottom: 12,
   },
@@ -670,18 +802,18 @@ const styles = StyleSheet.create({
   historyDate: {
     fontSize: 14,
     color: COLORS.textSecondary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   historyStats: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 20,
   },
   historyStatItem: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   historyStatValue: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.textPrimary,
   },
   historyStatLabel: {
@@ -689,15 +821,20 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 2,
   },
-  
+  noChangesText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    fontStyle: "italic",
+  },
+
   settingsSection: {
     paddingHorizontal: 24,
     paddingTop: 8,
     paddingBottom: 32,
   },
   settingsItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.white,
     borderRadius: 16,
     padding: 16,
@@ -707,7 +844,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     color: COLORS.textPrimary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });
 

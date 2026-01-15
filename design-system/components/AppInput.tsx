@@ -51,35 +51,6 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(
       if (onBlur) onBlur(e);
     };
 
-    const inputContainerStyles = [
-      styles.inputContainer,
-      {
-        backgroundColor: theme.colors.inputBackground,
-        borderColor: theme.colors.border,
-        borderRadius: theme.borderRadius.lg,
-        paddingHorizontal: theme.spacing.md,
-      },
-      isFocused && {
-        borderColor: theme.colors.primary,
-        // Estabilizamos el fondo para evitar parpadeos
-        backgroundColor: theme.isDark ? theme.colors.surface : COLORS.white,
-        // 4. Reducimos la intensidad del shadow/elevation para evitar saltos de layout
-        ...Platform.select({
-          ios: {
-            shadowColor: theme.colors.primary,
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.1,
-            shadowRadius: 2,
-          },
-          android: {
-            elevation: isFocused ? 1 : 0, // Solo elevación mínima si está enfocado
-          },
-        }),
-      },
-      !!error && { borderColor: theme.colors.error },
-      style,
-    ];
-
     return (
       <View
         style={[
@@ -104,7 +75,7 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(
             {label}
           </Text>
         )}
-        <View style={inputContainerStyles}>
+        <View style={styles.inputContainer}>
           {leftIcon && (
             <View
               style={[
@@ -120,9 +91,9 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(
             style={[
               styles.input,
               {
-                paddingVertical: Platform.OS === "ios" ? theme.spacing.md : 8, // Ajuste para Android
+                paddingVertical: Platform.OS === "ios" ? theme.spacing.md : 10, // Ajuste para Android
                 fontSize: theme.typography.fontSizes.md,
-                color: theme.colors.text,
+                paddingLeft: theme.spacing.md,
               },
               inputStyle,
             ]}
@@ -156,14 +127,19 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
+    textColor: COLORS.backgroundDeep,
     borderWidth: 1,
     overflow: "hidden",
+    borderColor: COLORS.primary,
+    focus: COLORS.primary,
+    borderRadius: 10,
     ...Platform.select({
       web: {
         outlineStyle: "none",
       } as any,
       default: {},
     }),
+    backgroundColor: COLORS.background,
   },
   input: {
     flex: 1,
@@ -175,6 +151,8 @@ const styles = StyleSheet.create({
       } as any,
       default: {},
     }),
+    backgroundColor: COLORS.background,
+    color: COLORS.black,
   },
   leftIconContainer: {},
   rightIconContainer: {},

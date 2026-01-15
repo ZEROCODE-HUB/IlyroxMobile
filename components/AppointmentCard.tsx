@@ -1,9 +1,9 @@
-import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
+import React from "react";
+import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { COLORS } from "../constants/colors";
 
-type AppointmentStatus = 'pending' | 'completed' | 'cancelled' | 'rated';
+type AppointmentStatus = "pending" | "completed" | "cancelled" | "rated";
 
 interface AppointmentCardProps {
   appointment: {
@@ -27,21 +27,23 @@ interface AppointmentCardProps {
   };
   onMarkComplete: (id: string) => void;
   onOpenRating: (id: string) => void;
-  onMessage?: (id: string) => void;
+  onContact?: (id: string) => void;
 }
 
 export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   appointment,
   onMarkComplete,
   onOpenRating,
-  onMessage,
+  onContact,
 }) => {
   // Verificar si la fecha y hora de la cita ya pasaron
   const canMarkAsCompleted = () => {
-    if (appointment.estado !== 'pendiente') return false;
+    if (appointment.estado !== "pendiente") return false;
 
     // Combinar fecha y hora para comparar con el momento actual
-    const appointmentDateTime = new Date(`${appointment.fecha}T${appointment.hora}`);
+    const appointmentDateTime = new Date(
+      `${appointment.fecha}T${appointment.hora}`
+    );
     const now = new Date();
 
     return appointmentDateTime <= now;
@@ -59,7 +61,10 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
         <View style={styles.cardHeader}>
           <View style={styles.userInfo}>
             {appointment.user.avatar ? (
-              <Image source={{ uri: appointment.user.avatar }} style={styles.avatar} />
+              <Image
+                source={{ uri: appointment.user.avatar }}
+                style={styles.avatar}
+              />
             ) : (
               <View style={[styles.avatar, styles.avatarPlaceholder]}>
                 <Ionicons name="person" size={16} color={COLORS.textTertiary} />
@@ -72,22 +77,32 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
               </View>
             </View>
           </View>
-          {onMessage && (
-            <TouchableOpacity 
+          {onContact && (
+            <TouchableOpacity
               style={styles.msgButton}
-              onPress={() => onMessage(appointment.id)}
+              onPress={() => onContact(appointment.id)}
             >
-              <Ionicons name="chatbubble-outline" size={16} color={COLORS.textTertiary} />
+              <Ionicons
+                name="chatbubble-outline"
+                size={16}
+                color={COLORS.textTertiary}
+              />
             </TouchableOpacity>
           )}
         </View>
 
         <View style={styles.details}>
           {appointment.propertyImage && (
-            <Image source={{ uri: appointment.propertyImage }} style={styles.propertyImage} />
+            <Image
+              source={{ uri: appointment.propertyImage }}
+              style={styles.propertyImage}
+            />
           )}
           {appointment.propertyTitle && (
-            <Text style={styles.propertyTitle}>{appointment.propertyTitle}</Text>
+            <Text style={styles.propertyTitle}>
+              {appointment.propertyTitle.charAt(0).toUpperCase() +
+                appointment.propertyTitle.slice(1)}
+            </Text>
           )}
         </View>
 
@@ -98,13 +113,17 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
               onPress={() => onMarkComplete(appointment.id)}
               style={styles.completeBtn}
             >
-              <Ionicons name="checkmark-circle" size={16} color={COLORS.white} />
+              <Ionicons
+                name="checkmark-circle"
+                size={16}
+                color={COLORS.white}
+              />
               <Text style={styles.completeBtnText}>Marcar como completada</Text>
             </TouchableOpacity>
           )}
 
           {/* Mostrar botón "Calificar" si está completada y el usuario NO ha calificado */}
-          {appointment.estado === 'completada' && !appointment.hasUserRated && (
+          {appointment.estado === "completada" && !appointment.hasUserRated && (
             <View style={styles.rateContainer}>
               <Text style={styles.rateLabel}>Calificar:</Text>
               <TouchableOpacity
@@ -124,7 +143,9 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
                 {[...Array(5)].map((_, i) => (
                   <Ionicons
                     key={i}
-                    name={i < (appointment.rating || 0) ? "star" : "star-outline"}
+                    name={
+                      i < (appointment.rating || 0) ? "star" : "star-outline"
+                    }
                     size={16}
                     color={COLORS.warning}
                   />
@@ -145,23 +166,23 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
-    flexDirection: 'row',
-    overflow: 'hidden',
+    flexDirection: "row",
+    overflow: "hidden",
   },
   dateColumn: {
     backgroundColor: COLORS.primaryTransparent,
     width: 80,
     padding: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderRightWidth: 1,
     borderRightColor: COLORS.primaryTransparent,
   },
   dateText: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.primaryDark,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 4,
   },
   timeText: {
@@ -174,14 +195,14 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 8,
   },
   userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   avatar: {
@@ -191,12 +212,12 @@ const styles = StyleSheet.create({
   },
   avatarPlaceholder: {
     backgroundColor: COLORS.background,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   userName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.textPrimary,
   },
   roleBadge: {
@@ -204,7 +225,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 4,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   roleText: {
     fontSize: 10,
@@ -219,7 +240,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   propertyImage: {
-    width: '100%',
+    width: "100%",
     height: 140,
     borderRadius: 10,
     backgroundColor: COLORS.shimmer,
@@ -227,7 +248,7 @@ const styles = StyleSheet.create({
   },
   propertyTitle: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
     color: COLORS.textPrimary,
     marginBottom: 2,
   },
@@ -237,9 +258,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   completeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: COLORS.primary,
     paddingVertical: 8,
     borderRadius: 8,
@@ -248,29 +269,29 @@ const styles = StyleSheet.create({
   completeBtnText: {
     color: COLORS.white,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   rateContainer: {
     backgroundColor: COLORS.successLight,
     padding: 8,
     borderRadius: 8,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   rateLabel: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.primary,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   stars: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 2,
   },
   ratedContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   ratedText: {
