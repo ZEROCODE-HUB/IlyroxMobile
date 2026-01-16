@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,13 +17,20 @@ import { useVideoUpload } from "../../hooks/useVideoUpload";
 import { useAuth } from "../../context/AuthContext";
 import { COLORS } from "../../constants/colors";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
+import { Video, ResizeMode } from "expo-av";
+import { supabase } from "../../lib/supabase";
+import * as Burnt from "burnt";
 
 interface CreateReelProps {
-  onBack: () => void;
+  reelId?: string;
+  onBack?: () => void;
 }
 
-export default function CreateReel({ onBack }: CreateReelProps) {
+export default function CreateReel({ reelId, onBack }: CreateReelProps) {
   const { user } = useAuth();
+
+  const isEditing = !!reelId;
+
   const { createReel, uploading: creatingReel } = useCreateContent(user?.id);
   const {
     uploadVideo,
@@ -34,8 +41,38 @@ export default function CreateReel({ onBack }: CreateReelProps) {
   const [description, setDescription] = useState("");
   const [videoUri, setVideoUri] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loadingReel, setLoadingReel] = useState(false);
 
-  const uploading = uploadingVideo || creatingReel;
+  const uploading = uploadingVideo || creatingReel || loadingReel;
+
+  useEffect(() => {
+    if (isEditing) {
+      loadReelData();
+    }
+  }, [reelId]);
+
+  const loadReelData = async () => {
+    try {
+      setLoadingReel(true);
+      const { data, error } = await supabase
+        .from("reels")
+        .select("*")
+        .eq("id", reelId)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setDescription(data.description || "");
+        setVideoUri(data.video_url);
+      }
+    } catch (error) {
+      console.error("Error loading reel:", error);
+      Alert.alert("Error", "No se pudo cargar la información del reel");
+    } finally {
+      setLoadingReel(false);
+    }
+  };
 
   /**
    * Seleccionar video de la galería
@@ -92,7 +129,7 @@ export default function CreateReel({ onBack }: CreateReelProps) {
     }
 
     try {
-      // 1. Subir video a Supabase Storage
+      // 1. Subir video a Supabase Storage (o usar URL existente)
       const videoUrl = await uploadVideo(videoUri, "feed-images", "reels");
 
       if (!videoUrl) {
@@ -100,17 +137,38 @@ export default function CreateReel({ onBack }: CreateReelProps) {
         return;
       }
 
-      // 2. Crear el reel con la URL pública del video
-      const success = await createReel(description, videoUrl);
+      if (isEditing) {
+        // ACTUALIZAR REEL EXISTENTE
+        const { error } = await supabase
+          .from("reels")
+          .update({
+            descripcion: description,
+            video_url: videoUrl,
+            updated_at: new Date(),
+          })
+          .eq("id", reelId);
 
-      if (success) {
-        // Limpiar formulario y volver
-        setTimeout(() => {
-          setDescription("");
-          setVideoUri("");
-          onBack();
-        }, 500);
+        if (error) throw error;
+        Burnt.toast({
+          title: "Reel editado exitosamente!",
+          preset: "done",
+          duration: 2500,
+        });
+      } else {
+        // CREAR NUEVO REEL
+        const success = await createReel(description, videoUrl);
+        if (!success) {
+          throw new Error("No se pudo crear el reel");
+        }
       }
+
+      // Limpiar formulario y volver
+      setTimeout(() => {
+        // No limpiar estado aquí para evitar re-render innecesario antes de desmontar
+        // setDescription("");
+        // setVideoUri("");
+        onBack ? onBack() : null; // Close safely
+      }, 500);
     } catch (error) {
       console.error("Error publishing reel:", error);
       Alert.alert("Error", "Hubo un problema al publicar el reel");
@@ -124,7 +182,9 @@ export default function CreateReel({ onBack }: CreateReelProps) {
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Crear Reel</Text>
+        <Text style={styles.headerTitle}>
+          {isEditing ? "Editar Reel" : "Crear Reel"}
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -139,8 +199,21 @@ export default function CreateReel({ onBack }: CreateReelProps) {
 
           {videoUri ? (
             <View style={styles.videoPreview}>
-              <Ionicons name="videocam" size={48} color={COLORS.primary} />
-              <Text style={styles.videoText}>Video seleccionado</Text>
+              {/* VIDEO PREVIEW using Expo AV */}
+              <Video
+                source={{ uri: videoUri }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  borderRadius: 12,
+                  backgroundColor: "#000",
+                }}
+                resizeMode={ResizeMode.COVER}
+                useNativeControls
+                isLooping
+                shouldPlay={false}
+              />
+
               <TouchableOpacity
                 onPress={() => {
                   setVideoUri("");
@@ -148,10 +221,18 @@ export default function CreateReel({ onBack }: CreateReelProps) {
                     setErrors({ ...errors, video: "" });
                   }
                 }}
-                style={styles.removeVideoBtn}
+                style={[
+                  styles.removeVideoBtn,
+                  {
+                    position: "absolute",
+                    top: 10,
+                    right: 10,
+                    marginTop: 0,
+                    backgroundColor: "rgba(255,255,255,0.9)",
+                  },
+                ]}
               >
                 <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-                <Text style={styles.removeVideoText}>Eliminar</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -216,7 +297,9 @@ export default function CreateReel({ onBack }: CreateReelProps) {
                 size={24}
                 color={COLORS.white}
               />
-              <Text style={styles.publishText}>Publicar Reel</Text>
+              <Text style={styles.publishText}>
+                {isEditing ? "Editar Reel" : "Publicar Reel"}
+              </Text>
             </>
           )}
         </TouchableOpacity>
@@ -357,6 +440,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
+    paddingBottom: 60,
   },
   publishBtn: {
     backgroundColor: COLORS.primary,

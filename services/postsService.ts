@@ -27,4 +27,18 @@ export const postsService = {
 
     return alert("Post eliminado correctamente");
   },
+
+  async getPostById(postId: string) {
+    const { data: postData, error: postError } = await supabase
+      .from("posts")
+      .select("*")
+      .eq("id", postId)
+      .is("deleted_at", null);
+
+    if (postError) {
+      console.error("Error fetching post:", postError);
+    } else {
+      return postData;
+    }
+  },
 };

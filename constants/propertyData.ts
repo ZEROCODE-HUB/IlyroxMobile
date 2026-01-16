@@ -82,6 +82,7 @@ export const INSTITUCIONES_GRAVAMEN = [
   "Infonavit",
   "Fovissste",
   "Hipotecaria Nacional",
+  "Cofinavit",
 ] as const;
 
 // ============================================
@@ -129,7 +130,9 @@ export const esDepartamento = (subtipo: string): boolean => {
 /**
  * Verifica si es propiedad comercial o industrial
  */
-export const esComercialIndustrial = (tipoPrincipal: TipoPrincipal): boolean => {
+export const esComercialIndustrial = (
+  tipoPrincipal: TipoPrincipal
+): boolean => {
   return tipoPrincipal === "comercial" || tipoPrincipal === "industrial";
 };
 
@@ -146,7 +149,7 @@ export const getLabelRecamaras = (tipoPrincipal: TipoPrincipal): string => {
 export const getCamposVisibles = (subtipo: string) => {
   const isTerreno = esTerreno(subtipo);
   const isDepartamento = esDepartamento(subtipo);
-  
+
   return {
     // Características numéricas
     recamaras: !isTerreno,
@@ -155,11 +158,11 @@ export const getCamposVisibles = (subtipo: string) => {
     estacionamientos: !isTerreno,
     niveles: !isTerreno && !isDepartamento,
     antiguedad: !isTerreno,
-    
+
     // Superficies
     m2Construccion: !isTerreno && !isDepartamento,
     m2Terreno: !isDepartamento,
-    
+
     // Características adicionales
     amueblado: !isTerreno,
     petFriendly: !isTerreno,

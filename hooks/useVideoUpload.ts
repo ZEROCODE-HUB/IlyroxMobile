@@ -32,6 +32,13 @@ export const useVideoUpload = () => {
       setUploading(true);
       setUploadProgress(0);
 
+      // Si la URI ya es una URL remota (ej. Supabase), retornarla directamente sin resubir.
+      if (videoUri.startsWith("http") || videoUri.startsWith("https")) {
+        console.log("ℹ️ Video ya está en la nube, saltando subida.");
+        setUploadProgress(100);
+        return videoUri;
+      }
+
       let fileBody: string | Blob | ArrayBuffer;
       let contentType = "video/mp4";
 

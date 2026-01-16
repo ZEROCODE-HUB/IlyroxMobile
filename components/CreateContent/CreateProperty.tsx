@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -46,9 +46,11 @@ import {
   getLabelRecamaras,
   getCamposVisibles,
 } from "../../constants/propertyData";
+import { COORDENADAS_ESTADO } from "../../constants/locations";
 import { useStableSafeInsets } from "../../context/SafeInsetsContext";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
-import { ViewImage } from "../modals/ViewImage";
+import ReordenableImages from "./ReordenableImages";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 interface CreatePropertyProps {
   onBack: () => void;
@@ -106,6 +108,11 @@ export default function CreateProperty({
     latitude: 0,
     longitude: 0,
   });
+  // Estado para controlar el centro del mapa programáticamente (separado de la ubicación seleccionada)
+  const [mapCenter, setMapCenter] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
 
   // ============================================
   // 4. CARACTERÍSTICAS FÍSICAS
@@ -259,10 +266,25 @@ export default function CreateProperty({
   //   }
   // }, [m2Construccion, m2Terreno]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (location.latitude !== 0 && location.longitude !== 0)
       clearError("location");
   }, [location]);
+
+  // Efecto para centrar el mapa cuando cambia el Estado
+  useEffect(() => {
+    if (ubicacionData.estado && COORDENADAS_ESTADO[ubicacionData.estado]) {
+      const coords = COORDENADAS_ESTADO[ubicacionData.estado];
+      // Actualizamos el centro visual del mapa
+      setMapCenter(coords);
+      // Opcional: También pre-seleccionamos esa ubicación como el marker (si no hay uno ya definido por el usuario o si queremos forzarlo)
+      // En este caso, forzamos para que el pin aparezca en el estado seleccionado
+      setLocation({
+        latitude: coords.lat,
+        longitude: coords.lng,
+      });
+    }
+  }, [ubicacionData.estado]);
 
   // ============================================
   // LOAD DATA FOR EDITING
@@ -342,6 +364,13 @@ export default function CreateProperty({
       latitude: data.latitud || 0,
       longitude: data.longitud || 0,
     });
+    // Sincronizar también el centro del mapa con la ubicación cargada
+    if (data.latitud && data.longitud) {
+      setMapCenter({
+        lat: data.latitud,
+        lng: data.longitud,
+      });
+    }
 
     // 4. Características Físicas
     setRecamaras(data.habitaciones?.toString() || "0");
@@ -959,7 +988,7 @@ export default function CreateProperty({
 
           {values.compartidaTipo === "porcentaje" ? (
             <AppInput
-              label="Porcentaje Compartido (%)"
+              label="Porcentaje de Comisión (%)"
               placeholder="1.5"
               keyboardType="numeric"
               value={values.compartidaValor}
@@ -1037,35 +1066,35 @@ export default function CreateProperty({
             <Text style={styles.sectionTitle}>Fotos de la Propiedad</Text>
           </View>
           <Text style={styles.hint}>
-            Mínimo 1 imagen, máximo 15 ({images.length}/15)
+            Mínimo 1 imagen, máximo 15 ({images.length}/15). Arrastra para
+            reordenar.
           </Text>
 
-          <View style={styles.imagesGrid}>
-            {images.map((uri, index) => (
-              <View key={index} style={styles.imageBox}>
-                <ViewImage src={uri} imageStyle={styles.previewImage} />
-                <TouchableOpacity
-                  onPress={() => handleRemoveImage(index)}
-                  style={styles.removeBtn}
-                >
-                  <Ionicons name="close" size={16} color={COLORS.white} />
-                </TouchableOpacity>
-              </View>
-            ))}
+          <GestureHandlerRootView>
+            <ReordenableImages
+              images={images}
+              onReorder={setImages}
+              onRemove={handleRemoveImage}
+            />
+          </GestureHandlerRootView>
 
-            {images.length < 15 && (
+          {images.length < 15 && (
+            <View style={{ marginTop: 12 }}>
               <TouchableOpacity
                 onPress={handlePickImages}
                 style={[
                   styles.uploadBtn,
                   errors.images && styles.uploadBtnError,
+                  { width: "100%", flexDirection: "row", gap: 8, height: 50 },
                 ]}
               >
-                <Ionicons name="camera" size={32} color={COLORS.textTertiary} />
-                <Text style={styles.uploadText}>Agregar</Text>
+                <Ionicons name="camera" size={24} color={COLORS.textTertiary} />
+                <Text style={[styles.uploadText, { marginTop: 0 }]}>
+                  Agregar Más Fotos
+                </Text>
               </TouchableOpacity>
-            )}
-          </View>
+            </View>
+          )}
           {errors.images && (
             <Text style={styles.errorText}>{errors.images}</Text>
           )}
@@ -1555,7 +1584,7 @@ export default function CreateProperty({
           {camposVisibles.m2Construccion && (
             <AppInput
               label="m² de Construcción *"
-              placeholder="120.5"
+              placeholder="m²"
               keyboardType="decimal-pad"
               value={m2Construccion || ""}
               onChangeText={(text) => {
@@ -1573,7 +1602,7 @@ export default function CreateProperty({
           {camposVisibles.m2Terreno && (
             <AppInput
               label={`m² de Terreno ${esTerreno(subtipo) ? "*" : ""}`}
-              placeholder="200.0"
+              placeholder="m²"
               keyboardType="decimal-pad"
               value={m2Terreno || ""}
               onChangeText={(text) => {
@@ -1598,14 +1627,16 @@ export default function CreateProperty({
           )}
 
           {/* PET FRIENDLY */}
-          {camposVisibles.petFriendly && (
-            <RadioGroupSelector
-              label="Mascotas Permitidas"
-              options={[...OPCIONES_SI_NO]}
-              selectedValue={petFriendly}
-              onSelect={(val) => setPetFriendly(val as any)}
-            />
-          )}
+          {tipoOperacion === "renta" || tipoOperacion === "ambas"
+            ? camposVisibles.petFriendly && (
+                <RadioGroupSelector
+                  label="Mascotas Permitidas"
+                  options={[...OPCIONES_SI_NO]}
+                  selectedValue={petFriendly}
+                  onSelect={(val) => setPetFriendly(val as any)}
+                />
+              )
+            : null}
         </View>
 
         {/* ============================================ */}
@@ -1748,7 +1779,9 @@ export default function CreateProperty({
                 placeholder="0.00"
                 keyboardType="numeric"
                 value={montoGravamen}
-                onChangeText={setMontoGravamen}
+                onChangeText={(text) =>
+                  handleCurrencyChange(text, setMontoGravamen)
+                }
               />
             </>
           )}
@@ -1803,8 +1836,12 @@ export default function CreateProperty({
         {/* ============================================ */}
         {/* 9. UBICACIÓN EN MAPA */}
         {/* ============================================ */}
-        <View style={styles.section}>
-          <LocationPicker onLocationSelected={setLocation} />
+        <View style={[styles.section, { paddingBottom: 50 }]}>
+          <LocationPicker
+            onLocationSelected={setLocation}
+            initialLatitude={mapCenter?.lat}
+            initialLongitude={mapCenter?.lng}
+          />
           {errors.location && (
             <Text style={styles.errorText}>{errors.location}</Text>
           )}
@@ -2112,7 +2149,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
-    paddingBottom: 40,
+    paddingBottom: 50,
   },
   publishBtn: {
     backgroundColor: COLORS.primary,

@@ -7,6 +7,7 @@ export const useGridProfile = () => {
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<Post[]>([]);
   const [reels, setReels] = useState<Reel[]>([]);
+  const [post, setPost] = useState<Post | any>();
 
   const getPosts = async (userId: string) => {
     setLoading(true);
@@ -58,6 +59,20 @@ export const useGridProfile = () => {
     }
   };
 
+  const getPostById = async (postId: string) => {
+    setLoading(true);
+    try {
+      const data = await postsService.getPostById(postId);
+      if (data) {
+        setPost(data);
+      }
+    } catch (error) {
+      console.error("Error fetching post:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     loading,
     posts,
@@ -66,5 +81,6 @@ export const useGridProfile = () => {
     getReels,
     deletePost,
     deleteReel,
+    getPostById,
   };
 };

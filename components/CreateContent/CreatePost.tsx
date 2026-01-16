@@ -3,7 +3,7 @@
  * Formulario para crear posts
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -21,14 +21,20 @@ import { useCreateContent } from "../../hooks/useCreateContent";
 import { useAuth } from "../../context/AuthContext";
 import { COLORS } from "../../constants/colors";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
-import { ViewImage } from "../modals/ViewImage";
 import ReordenableImages from "./ReordenableImages";
+import { Post } from "../../types";
+import { supabase } from "../../lib/supabase";
+import * as Burnt from "burnt";
+import { decode } from "base64-arraybuffer";
+import { Platform } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 interface CreatePostProps {
+  post?: Post;
   onBack: () => void;
 }
 
-export default function CreatePost({ onBack }: CreatePostProps) {
+export default function CreatePost({ post, onBack }: CreatePostProps) {
   const { user } = useAuth();
   const { createPost, uploading } = useCreateContent(user?.id);
 
@@ -36,6 +42,77 @@ export default function CreatePost({ onBack }: CreatePostProps) {
   const [images, setImages] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploadProgress, setUploadProgress] = useState(0);
+  // // const { getPostById } = useGridProfile(); // Removed
+
+  const isEditing = !!post;
+
+  useEffect(() => {
+    if (isEditing) {
+      loadPostData();
+    }
+  }, [post]);
+
+  const loadPostData = async () => {
+    if (post) {
+      try {
+        const { data, error } = await supabase
+          .from("posts")
+          .select("*")
+          .eq("id", post.id)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          setContent(data.contenido); // DB uses 'contenido'
+          setImages(data.imagenes || []);
+        }
+      } catch (err) {
+        console.error("Error loading post:", err);
+        Alert.alert("Error", "No se pudo cargar el post");
+      }
+    }
+  };
+
+  /**
+   * Helper to upload a single image
+   */
+  const uploadImage = async (uri: string): Promise<string | null> => {
+    if (uri.startsWith("http")) return uri; // Already remote
+
+    try {
+      const userPath = user?.id ? `${user.id}/` : "anon/";
+      const fileName = `post_${Date.now()}_${Math.random()
+        .toString(36)
+        .substring(7)}.jpg`;
+      const filePath = `${userPath}${fileName}`;
+
+      let fileBody;
+      if (Platform.OS === "web") {
+        const res = await fetch(uri);
+        fileBody = await res.blob();
+      } else {
+        const { readAsStringAsync } = require("expo-file-system/legacy");
+        const base64 = await readAsStringAsync(uri, { encoding: "base64" });
+        fileBody = decode(base64);
+      }
+
+      const { data, error } = await supabase.storage
+        .from("feed-images")
+        .upload(filePath, fileBody, { contentType: "image/jpeg" });
+
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage
+        .from("feed-images")
+        .getPublicUrl(filePath);
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error("Upload error:", error);
+      return null;
+    }
+  };
 
   /**
    * Seleccionar imagen de la galería
@@ -94,32 +171,52 @@ export default function CreatePost({ onBack }: CreatePostProps) {
       return;
     }
 
-    // Simular progreso de subida
-    setUploadProgress(0);
-    const progressInterval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
+    try {
+      setUploadProgress(10);
+
+      const uploadedImages: string[] = [];
+      if (images.length > 0) {
+        if (isEditing) {
+          for (const img of images) {
+            const url = await uploadImage(img);
+            if (url) uploadedImages.push(url);
+          }
         }
-        return prev + 10;
-      });
-    }, 200);
+      }
 
-    const success = await createPost(content, images);
+      setUploadProgress(50);
 
-    clearInterval(progressInterval);
-    setUploadProgress(100);
+      if (isEditing) {
+        // ACTUALIZAR
+        const { error } = await supabase
+          .from("posts")
+          .update({
+            contenido: content,
+            imagenes: uploadedImages,
+            updated_at: new Date(),
+          })
+          .eq("id", post?.id);
 
-    if (success) {
-      // Esperar un momento para mostrar 100% antes de limpiar
+        if (error) throw error;
+
+        Burnt.toast({ title: "Post actualizado!", preset: "done" });
+      } else {
+        // CREAR
+        const success = await createPost(content, images);
+        if (!success) throw new Error("Error creando post");
+        Burnt.toast({ title: "Post publicado!", preset: "done" });
+      }
+
+      setUploadProgress(100);
       setTimeout(() => {
         setContent("");
         setImages([]);
         setUploadProgress(0);
         onBack();
       }, 500);
-    } else {
+    } catch (error) {
+      console.error("Error publishing:", error);
+      Alert.alert("Error", "No se pudo guardar el post");
       setUploadProgress(0);
     }
   };
@@ -131,7 +228,9 @@ export default function CreatePost({ onBack }: CreatePostProps) {
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Crear Post</Text>
+        <Text style={styles.headerTitle}>
+          {isEditing ? "Editar Post" : "Crear Post"}
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -161,28 +260,35 @@ export default function CreatePost({ onBack }: CreatePostProps) {
           <Text style={styles.label}>Imágenes (opcional)</Text>
           <Text style={styles.hint}>Máximo 5 imágenes</Text>
 
-          <View
-            style={{ marginTop: 9, flexDirection: "row", flexWrap: "wrap" }}
-          >
+          <View style={{ marginTop: 9 }}>
             {images.length > 0 && (
-              <ReordenableImages
-                images={images}
-                onReorder={setImages}
-                onRemove={handleRemoveImage}
-              />
+              <GestureHandlerRootView>
+                <ReordenableImages
+                  images={images}
+                  onReorder={setImages}
+                  onRemove={handleRemoveImage}
+                />
+              </GestureHandlerRootView>
             )}
 
             {images.length < 5 && (
-              <TouchableOpacity
-                onPress={handlePickImage}
-                style={[
-                  styles.uploadBtn,
-                  images.length > 0 && { marginTop: 12, alignSelf: "center" },
-                ]}
-              >
-                <Ionicons name="camera" size={28} color={COLORS.textTertiary} />
-                <Text style={styles.uploadText}>Agregar foto</Text>
-              </TouchableOpacity>
+              <View style={{ marginTop: 12 }}>
+                <TouchableOpacity
+                  onPress={handlePickImage}
+                  style={[
+                    styles.uploadBtn,
+                    errors.images && styles.uploadBtnError,
+                    { width: "100%", flexDirection: "row", gap: 8, height: 50 },
+                  ]}
+                >
+                  <Ionicons
+                    name="camera"
+                    size={28}
+                    color={COLORS.textTertiary}
+                  />
+                  <Text style={styles.uploadText}>Agregar foto</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </View>
@@ -207,7 +313,9 @@ export default function CreatePost({ onBack }: CreatePostProps) {
                 size={24}
                 color={COLORS.white}
               />
-              <Text style={styles.publishText}>Publicar Post</Text>
+              <Text style={styles.publishText}>
+                {isEditing ? "Actualizar Post" : "Publicar Post"}
+              </Text>
             </>
           )}
         </TouchableOpacity>
@@ -340,6 +448,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
+    paddingBottom: 60,
   },
   publishBtn: {
     backgroundColor: COLORS.primary,
@@ -399,5 +508,8 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: COLORS.primary,
     borderRadius: 4,
+  },
+  uploadBtnError: {
+    borderColor: COLORS.error,
   },
 });

@@ -119,7 +119,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   useFocusEffect(
     React.useCallback(() => {
       setSelectedProperty(null);
-    }, [])
+      // Recargar datos al enfocar para reflejar cambios (ej. edición de propiedades)
+      fetchProfileData();
+    }, [fetchProfileData])
   );
 
   /**

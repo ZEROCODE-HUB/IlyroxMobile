@@ -14,6 +14,7 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
@@ -21,6 +22,7 @@ import { Post } from "../../types";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import { useGridProfile } from "../../hooks/profile/useGridProfile";
+import CreatePost from "../CreateContent/CreatePost";
 
 const { width } = Dimensions.get("window");
 const ITEM_SIZE = (width - 24) / 3; // 3 items per row with padding
@@ -39,7 +41,9 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
   onDelete,
 }) => {
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
+  const [postToEdit, setPostToEdit] = useState<Post | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showPostModal, setShowPostModal] = useState(false);
 
   const { posts, getPosts, deletePost, loading } = useGridProfile();
 
@@ -83,8 +87,8 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
         icon: "pencil-outline",
         label: "Editar",
         onPress: () => {
-          // TODO: Implement edit
-          console.log("Edit post:", item.id);
+          setPostToEdit(item);
+          setShowPostModal(true);
         },
       },
       {
@@ -173,6 +177,16 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
         danger
         loading={deleting}
       />
+
+      <Modal visible={showPostModal}>
+        <CreatePost
+          post={postToEdit || undefined} // Pass post to edit
+          onBack={() => {
+            setShowPostModal(false);
+            setPostToEdit(null);
+          }}
+        />
+      </Modal>
     </>
   );
 };

@@ -59,7 +59,7 @@ export function useCreateContent(userId?: string) {
       if (feedError) throw feedError;
 
       Burnt.toast({
-        title: "Post publicado correctamente!",
+        title: "Publicado exitosamente!",
         preset: "done",
         duration: 2500,
       });
@@ -129,9 +129,11 @@ export function useCreateContent(userId?: string) {
       if (feedError) throw feedError;
 
       Burnt.toast({
-        title: "Reel publicado correctamente!",
+        title: "Publicado exitosamente!",
         preset: "done",
+        duration: 2500,
       });
+
       return true;
     } catch (error: any) {
       console.error("Error creating reel:", error);

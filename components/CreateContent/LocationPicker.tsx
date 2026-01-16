@@ -24,12 +24,16 @@ export default function LocationPicker({
   initialLatitude,
   initialLongitude,
 }: LocationPickerProps) {
-  // Default to Monterrey if no initial location
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const mapRef = React.useRef<MapView>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
+  const pendingCoords = React.useRef<{ lat: number; lng: number } | null>(null);
+
   const [region, setRegion] = useState<Region>({
     latitude: initialLatitude || 25.6866,
     longitude: initialLongitude || -100.3161,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
+    latitudeDelta: 0.5,
+    longitudeDelta: 0.5,
   });
 
   const [marker, setMarker] = useState<{
@@ -40,6 +44,43 @@ export default function LocationPicker({
       ? { latitude: initialLatitude, longitude: initialLongitude }
       : null
   );
+
+  // Actualizar región y marcador si cambian las props iniciales (ej. al seleccionar Estado)
+  // Usamos useEffect para reaccionar a cambios externos
+  useEffect(() => {
+    if (initialLatitude && initialLongitude) {
+      const newRegion = {
+        latitude: initialLatitude,
+        longitude: initialLongitude,
+        latitudeDelta: 1,
+        longitudeDelta: 1,
+      };
+
+      setRegion(newRegion);
+      // IMPORTANTE: Actualizar el marcador para que se muestre en el mapa al editar
+      setMarker({ latitude: initialLatitude, longitude: initialLongitude });
+
+      if (isMapReady) {
+        mapRef.current?.animateToRegion(newRegion, 1000);
+      } else {
+        pendingCoords.current = { lat: initialLatitude, lng: initialLongitude };
+      }
+    }
+  }, [initialLatitude, initialLongitude, isMapReady]);
+
+  const handleMapReady = () => {
+    setIsMapReady(true);
+    if (pendingCoords.current) {
+      const targetRegion = {
+        latitude: pendingCoords.current.lat,
+        longitude: pendingCoords.current.lng,
+        latitudeDelta: 1,
+        longitudeDelta: 1,
+      };
+      mapRef.current?.animateToRegion(targetRegion, 1000);
+      pendingCoords.current = null;
+    }
+  };
 
   const handleMapPress = (e: MapPressEvent) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
@@ -76,9 +117,11 @@ export default function LocationPicker({
           </View>
         ) : (
           <MapView
+            ref={mapRef}
             style={styles.map}
             initialRegion={region}
             onPress={handleMapPress}
+            onMapReady={handleMapReady}
             provider={
               Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
             }
@@ -89,7 +132,7 @@ export default function LocationPicker({
                 draggable
                 onDragEnd={handleDragEnd}
                 title="Ubicación de la propiedad"
-                pinColor={COLORS.primary}
+                pinColor={COLORS.primaryDark}
               />
             )}
           </MapView>

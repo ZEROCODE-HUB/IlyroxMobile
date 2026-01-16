@@ -14,13 +14,17 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Video, ResizeMode } from "expo-av";
+import { useNavigation } from "@react-navigation/native";
 import { COLORS } from "../../constants/colors";
 import { FeedItem, Reel } from "../../types";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import { useGridProfile } from "../../hooks/profile/useGridProfile";
+import CreateReel from "../CreateContent/CreateReel";
 
 const { width } = Dimensions.get("window");
 const ITEM_SIZE = (width - 24) / 3; // 3 items per row with padding
@@ -32,6 +36,82 @@ interface ProfileReelGridProps {
   onDelete?: () => void;
 }
 
+const ReelGridItem = React.memo(
+  ({
+    item,
+    isOwnProfile,
+    onPress,
+    onEdit,
+    onDelete,
+  }: {
+    item: Reel;
+    isOwnProfile: boolean;
+    onPress: (item: Reel) => void;
+    onEdit: (item: Reel) => void;
+    onDelete: (item: Reel) => void;
+  }) => {
+    const menuOptions: MenuOption[] = [
+      {
+        icon: "pencil-outline",
+        label: "Editar",
+        onPress: () => onEdit(item),
+      },
+      {
+        icon: "trash-outline",
+        label: "Eliminar",
+        onPress: () => onDelete(item),
+        danger: true,
+      },
+    ];
+
+    return (
+      <TouchableOpacity
+        style={styles.gridItem}
+        onPress={() => onPress(item)}
+        activeOpacity={0.8}
+      >
+        <Video
+          source={{ uri: item.video_url }}
+          style={styles.gridImage}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay={false}
+          isMuted={true}
+        />
+
+        {/* Play Icon Overlay (Bottom Left) */}
+        <View style={styles.playOverlay}>
+          <Ionicons name="play" size={16} color={COLORS.white} />
+        </View>
+
+        {/* Duration Badge */}
+        {item.duracion_segundos && (
+          <View style={styles.durationBadge}>
+            <Text style={styles.durationText}>
+              {formatDuration(item.duracion_segundos)}
+            </Text>
+          </View>
+        )}
+
+        {/* 3-Dot Menu (solo si es perfil propio) */}
+        {isOwnProfile && (
+          <View style={styles.menuContainer}>
+            <ThreeDotsMenu options={menuOptions} />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  }
+);
+
+/**
+ * Formatear duración de segundos a mm:ss
+ */
+const formatDuration = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+};
+
 const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
   userId,
   onReelPress,
@@ -40,6 +120,9 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
 }) => {
   const [reelToDelete, setReelToDelete] = useState<Reel | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const navigation = useNavigation<any>();
+  const [showModalEdit, setShowModalEdit] = useState(false);
+  const [item, setItem] = useState<Reel | null>(null);
 
   const { reels, getReels, deleteReel, loading } = useGridProfile();
 
@@ -73,63 +156,26 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
     }
   };
 
-  const renderReel = ({ item }: { item: Reel }) => {
-    const menuOptions: MenuOption[] = [
-      {
-        icon: "pencil-outline",
-        label: "Editar",
-        onPress: () => {
-          // TODO: Implement edit
-          console.log("Edit reel:", item.id);
-        },
-      },
-      {
-        icon: "trash-outline",
-        label: "Eliminar",
-        onPress: () => setReelToDelete(item),
-        danger: true,
-      },
-    ];
+  // navigation.navigate("CreateContent", {
+  //           screen: "CreateReel",
+  //           params: { reelId: item.id },
+  //         });
 
-    return (
-      <TouchableOpacity
-        style={styles.gridItem}
-        onPress={() => onReelPress(item)}
-        activeOpacity={0.8}
-      >
-        <Image
-          source={{
-            uri:
-              item.thumbnail_url ||
-              "https://placehold.co/400x600/45a0a5/white?text=Video",
-          }}
-          style={styles.gridImage}
-          resizeMode="cover"
-        />
-
-        {/* Play Icon Overlay (Bottom Left) */}
-        <View style={styles.playOverlay}>
-          <Ionicons name="play" size={16} color={COLORS.white} />
-        </View>
-
-        {/* Duration Badge */}
-        {item.duracion_segundos && (
-          <View style={styles.durationBadge}>
-            <Text style={styles.durationText}>
-              {formatDuration(item.duracion_segundos)}
-            </Text>
-          </View>
-        )}
-
-        {/* 3-Dot Menu (solo si es perfil propio) */}
-        {isOwnProfile && (
-          <View style={styles.menuContainer}>
-            <ThreeDotsMenu options={menuOptions} />
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  };
+  const renderReel = React.useCallback(
+    ({ item }: { item: Reel }) => (
+      <ReelGridItem
+        item={item}
+        isOwnProfile={!!isOwnProfile}
+        onPress={onReelPress}
+        onEdit={(i) => {
+          setItem(i);
+          setShowModalEdit(true);
+        }}
+        onDelete={(i) => setReelToDelete(i)}
+      />
+    ),
+    [isOwnProfile, onReelPress]
+  );
 
   if (loading && reels.length === 0) {
     return (
@@ -172,17 +218,12 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
         danger
         loading={deleting}
       />
+
+      <Modal visible={showModalEdit} animationType="slide">
+        <CreateReel reelId={item?.id} onBack={() => setShowModalEdit(false)} />
+      </Modal>
     </>
   );
-};
-
-/**
- * Formatear duración de segundos a mm:ss
- */
-const formatDuration = (seconds: number): string => {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
 const styles = StyleSheet.create({

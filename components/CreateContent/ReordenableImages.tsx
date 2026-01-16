@@ -1,15 +1,10 @@
-import { useCallback, useState } from "react";
-import {
-  Dimensions,
-  Image,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { useCallback, useState, useMemo } from "react";
+import { Dimensions, Image, StyleSheet, View } from "react-native";
 import DraggableFlatList, {
   RenderItemParams,
   ScaleDecorator,
 } from "react-native-draggable-flatlist";
+import { TouchableOpacity } from "react-native-gesture-handler";
 import { COLORS } from "../../constants";
 import { Ionicons } from "@expo/vector-icons";
 import { ViewImage } from "../modals/ViewImage";
@@ -26,24 +21,23 @@ interface ReordenableImagesProps {
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-// Calculamos el tamaño para que quepan aproximadamente 3 imágenes en pantalla
 const IMAGE_SIZE = (SCREEN_WIDTH - 60 - 70) / 3;
 
-/**
- * ReordenableImages
- * Versión simplificada que solo maneja la lista de imágenes reordenables.
- * Ideal para ser integrada en contenedores que ya manejan las acciones de agregar/eliminar.
- */
 export default function ReordenableImages({
   images,
   onReorder,
   onRemove,
 }: ReordenableImagesProps) {
-  // Mapeamos las URIs a objetos con ID único para el DraggableFlatList
-  const imageItems: ImageItem[] = images.map((uri, index) => ({
-    id: `img-${index}-${uri.slice(-10)}`,
-    uri,
-  }));
+  const [selectedUri, setSelectedUri] = useState<string | null>(null);
+
+  // Generar IDs únicos basados en la URI para garantizar estabilidad al reordenar
+  // NO USAR ÍNDICE aquí, ya que rompe el drag & drop al editar.
+  const imageItems: ImageItem[] = useMemo(() => {
+    return images.map((uri) => ({
+      id: uri,
+      uri,
+    }));
+  }, [images]);
 
   const handleDragEnd = useCallback(
     ({ data }: { data: ImageItem[] }) => {
@@ -52,7 +46,6 @@ export default function ReordenableImages({
     },
     [onReorder]
   );
-  const [selectedUri, setSelectedUri] = useState<string | null>(null);
 
   const renderItem = useCallback(
     ({ item, drag, isActive, getIndex }: RenderItemParams<ImageItem>) => {
@@ -62,43 +55,55 @@ export default function ReordenableImages({
         <ScaleDecorator activeScale={1.05}>
           <TouchableOpacity
             onLongPress={drag}
-            disabled={isActive}
+            delayLongPress={150}
+            activeOpacity={0.9}
             style={[
               styles.imageContainer,
               isActive && styles.imageContainerActive,
             ]}
           >
-            <Image source={{ uri: item.uri }} style={styles.image} />
+            <Image
+              source={{ uri: item.uri }}
+              style={[styles.image, isActive && styles.imageActive]}
+            />
 
-            <TouchableOpacity
-              style={styles.expandButton}
-              onPress={() => {
-                setSelectedUri(item.uri);
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="expand" size={10} color={COLORS.white} />
-            </TouchableOpacity>
+            {/* Overlay cuando está activo */}
+            {isActive && <View style={styles.activeOverlay} />}
 
-            {/* Hint visual para indicar que se puede mover */}
+            {/* Expand Button */}
+            <View style={styles.expandButtonContainer}>
+              <TouchableOpacity
+                onPress={() => setSelectedUri(item.uri)}
+                activeOpacity={0.7}
+                style={styles.expandButton}
+              >
+                <Ionicons name="expand" size={12} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Drag hint */}
             <View style={styles.dragHint}>
               <Ionicons name="move" size={16} color="#FFF" />
             </View>
 
-            {/* Botón para eliminar */}
-            <TouchableOpacity
-              onPress={() => onRemove(index)}
-              style={styles.removeButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close-circle" size={20} color={COLORS.error} />
-            </TouchableOpacity>
+            {/* Remove button */}
+            <View style={styles.removeButtonContainer}>
+              <TouchableOpacity
+                onPress={() => onRemove(index)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={styles.removeButton}
+              >
+                <Ionicons name="close-circle" size={20} color={COLORS.error} />
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
         </ScaleDecorator>
       );
     },
     [onRemove]
   );
+
+  if (images.length === 0) return null;
 
   return (
     <View style={styles.container}>
@@ -110,6 +115,8 @@ export default function ReordenableImages({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        activationDistance={10}
+        dragItemOverflow={true}
       />
       <ViewImage
         src={selectedUri || undefined}
@@ -130,15 +137,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 8,
   },
-  expandButton: {
-    position: "absolute",
-    top: 1,
-    left: 0,
-    backgroundColor: COLORS.blackTransparent60,
-    padding: 8,
-    borderRadius: 8,
-    zIndex: 10,
-  },
   imageContainer: {
     width: IMAGE_SIZE,
     height: IMAGE_SIZE,
@@ -152,18 +150,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-  },
-  removeButton: {
-    position: "absolute",
-    top: 4,
-    right: 4,
-    backgroundColor: "#FFF",
-    borderRadius: 10,
+    transform: [{ scale: 1.02 }],
   },
   image: {
     width: "100%",
     height: "100%",
     resizeMode: "cover",
+  },
+  imageActive: {
+    opacity: 0.95,
+  },
+  activeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.1)",
+    borderRadius: 12,
+  },
+  expandButton: {
+    position: "absolute",
+    top: 6,
+    left: 6,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    padding: 6,
+    borderRadius: 6,
   },
   dragHint: {
     position: "absolute",
@@ -175,5 +183,24 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  removeButton: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "#FFF",
+    borderRadius: 11,
+  },
+  removeButtonContainer: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    zIndex: 10,
+  },
+  expandButtonContainer: {
+    position: "absolute",
+    top: 1,
+    left: 0,
+    zIndex: 10,
   },
 });
