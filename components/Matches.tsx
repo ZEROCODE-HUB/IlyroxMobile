@@ -79,9 +79,6 @@ const Matches: React.FC = () => {
 
       if (searchesError) throw searchesError;
 
-      console.log("=== BÚSQUEDAS GUARDADAS ===");
-      console.log("Total búsquedas:", searchesData?.length || 0);
-
       setSavedSearches(searchesData || []);
 
       // PASO 2: Obtener matches
@@ -137,17 +134,6 @@ const Matches: React.FC = () => {
             });
           }
         }
-      }
-
-      console.log("=== DEBUG MATCHES ===");
-      console.log("Total matches recibidos:", data?.length || 0);
-
-      if (data && data.length > 0) {
-        console.log("Primer match:", data[0]);
-        console.log("Propiedad:", data[0]?.propiedad);
-        console.log("Perfil de propiedad:", data[0]?.propiedad?.perfil);
-        console.log("Busqueda del primer match:", data[0]?.busqueda);
-        console.log("Lead del primer match:", data[0]?.busqueda?.lead);
       }
 
       setMatches(data || []);
@@ -360,12 +346,6 @@ const Matches: React.FC = () => {
 
   const filteredMatches = matches.filter((m) => m.tipo_match === activeTab);
   const leadGroups = groupMatchesByLead(filteredMatches, savedSearches);
-
-  console.log("\n=== ANTES DE RENDERIZAR ===");
-  console.log("Tab activo:", activeTab);
-  console.log("Total matches:", matches.length);
-  console.log("Matches filtrados:", filteredMatches.length);
-  console.log("Lead groups:", leadGroups.length);
 
   if (loading && !refreshing) {
     return (

@@ -8,23 +8,22 @@ import {
   ScrollView,
 } from "react-native";
 import { LineChart } from "react-native-gifted-charts";
-import { BaseChartProps, PricePerM2Data } from "./types";
+import { FilteredChartProps, PricePerM2Data } from "./types";
 import { COLORS } from "../../constants/colors";
-import { chartService } from "../../services/chartService";
 import currencyConverter from "../../utils/currencyConverter";
 
-interface Chart01Props extends BaseChartProps {}
-
-const Chart01_PricePerM2: React.FC<Chart01Props> = ({
+const Chart01_PricePerM2: React.FC<FilteredChartProps> = ({
   onPress,
   activePoint,
+  properties,
+  operationType,
 }) => {
   const [priceType, setPriceType] = useState<
     "total" | "terrain" | "construction"
   >("total");
   const [localActiveIndex, setLocalActiveIndex] = useState<number | null>(null);
   const [processedData, setProcessedData] = useState<PricePerM2Data[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [valueCoin, setValueCoin] = useState<number>(0);
 
   useEffect(() => {
@@ -37,12 +36,14 @@ const Chart01_PricePerM2: React.FC<Chart01Props> = ({
 
   const EXCHANGE_RATE = valueCoin || 18;
 
-  const getDataChart = async () => {
-    try {
+  useEffect(() => {
+    const processData = () => {
       setLoading(true);
-      const rawData = await chartService.getDataChart();
-
-      if (!rawData) return;
+      if (!properties || properties.length === 0) {
+        setProcessedData([]);
+        setLoading(false);
+        return;
+      }
 
       const groups: {
         [key: string]: {
@@ -67,7 +68,7 @@ const Chart01_PricePerM2: React.FC<Chart01Props> = ({
         "Dic",
       ];
 
-      rawData.forEach((item: any) => {
+      properties.forEach((item: any) => {
         if (!item.created_at) return;
 
         const date = new Date(item.created_at);
@@ -77,11 +78,14 @@ const Chart01_PricePerM2: React.FC<Chart01Props> = ({
           ? item.operaciones_propiedad
           : [item.operaciones_propiedad];
 
-        const saleOp = ops.find((o: any) => o?.tipo_operacion === "venta");
+        const op = ops.find(
+          (o: any) =>
+            o?.tipo_operacion?.toLowerCase() === operationType.toLowerCase()
+        );
 
-        if (saleOp) {
-          let price = saleOp.precio || 0;
-          if (saleOp.moneda === "USD") price *= EXCHANGE_RATE;
+        if (op) {
+          let price = op.precio || 0;
+          if (op.moneda === "USD") price *= EXCHANGE_RATE;
 
           if (!groups[label]) {
             groups[label] = { total: [], terrain: [], construction: [] };
@@ -89,9 +93,10 @@ const Chart01_PricePerM2: React.FC<Chart01Props> = ({
 
           const m2Terreno = item.metros_cuadrados_terreno || 0;
           const m2Construccion = item.metros_cuadrados_construccion || 0;
+          const m2Suma = m2Terreno + m2Construccion;
 
           // Precio por m2 Total (promedio de ambos o lo que esté disponible)
-          const m2Total = m2Terreno || m2Construccion;
+          const m2Total = m2Suma;
           if (m2Total > 0) {
             groups[label].total.push(price / m2Total);
           }
@@ -136,16 +141,11 @@ const Chart01_PricePerM2: React.FC<Chart01Props> = ({
       }));
 
       setProcessedData(finalData);
-    } catch (error) {
-      console.error("Error processing chart data:", error);
-    } finally {
       setLoading(false);
-    }
-  };
+    };
 
-  useEffect(() => {
-    getDataChart();
-  }, []);
+    processData();
+  }, [properties, operationType, EXCHANGE_RATE]); // Re-run when props change
 
   const formatPrice = (price: number): string => {
     if (price >= 1000000) {
@@ -226,9 +226,6 @@ const Chart01_PricePerM2: React.FC<Chart01Props> = ({
   return (
     <View style={styles.chartCard}>
       <Text style={styles.chartTitle}>Precio por m² en el tiempo</Text>
-      <Text style={styles.chartSubtitle}>
-        Filtros: Tipo: Habitacional | Operación: venta
-      </Text>
 
       <View style={styles.filterRow}>
         {(["total", "terrain", "construction"] as const).map((type) => (
@@ -290,9 +287,9 @@ const Chart01_PricePerM2: React.FC<Chart01Props> = ({
               endOpacity={0.1}
               areaChart
               curved
-              isAnimated
-              animateOnDataChange
-              animationDuration={1000}
+              isAnimated={false}
+              animateOnDataChange={false}
+              animationDuration={0}
               yAxisThickness={0}
               xAxisThickness={1}
               xAxisColor={COLORS.cardBorder}
@@ -362,7 +359,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: COLORS.textPrimary,
-    marginBottom: 4,
+    marginBottom: 12,
   },
   chartSubtitle: {
     fontSize: 11,

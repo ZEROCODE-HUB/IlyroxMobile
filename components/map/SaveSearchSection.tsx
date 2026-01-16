@@ -1,5 +1,13 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Switch } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Switch,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
 import { COLORS } from "../../constants/colors";

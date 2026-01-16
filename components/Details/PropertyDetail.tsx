@@ -244,11 +244,13 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
               <Text style={styles.locationText}>
                 {propertyDetails.calle
                   ? `${propertyDetails.calle} ${
-                      propertyDetails.numero_exterior || ""
+                      propertyDetails.numero_exterior
+                        ? propertyDetails.numero_exterior
+                        : ""
                     }, `
                   : ""}
-                {propertyDetails.colonia}, {propertyDetails.municipio},
-                {propertyDetails.ciudad}
+                {propertyDetails.colonia ? propertyDetails.colonia : ""}
+                {propertyDetails.municipio}, {propertyDetails.ciudad}
               </Text>
             </View>
           </View>
@@ -400,8 +402,8 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                     </Text>
                     {gravamenes.map((g: any, i: number) => (
                       <Text key={i} style={styles.warningText}>
-                        {g.institucion?.nombre}: $
-                        {g.monto?.toLocaleString() || "Monto no especificado"}
+                        {g.institucion?.nombre} :
+                        {g.monto ? g.monto : " Monto no especificado"}
                       </Text>
                     ))}
                   </View>

@@ -261,3 +261,30 @@ export type ReportesPropiedades = {
   created_at?: string;
   updated_at?: string;
 };
+
+export type busquedas_guardadas = {
+  id: string;
+  usuario_id: string;
+  tipo_propiedad: string;
+  query_original?: string;
+  activa: boolean;
+  created_at?: string;
+  lead_id: string;
+  ciudad: string;
+  municipio: string;
+  deleted_at?: string;
+  updated_at?: string;
+  tipo_operacion?: "venta" | "renta";
+  precio_min: number;
+  precio_max: number;
+  monera: string;
+  estado?: string;
+  colonia?: string;
+  subtipo?: string;
+  habitaciones?: string;
+  banos?: string;
+  estacionamientos?: string;
+  metros_construccion?: number;
+  metros_terreno?: number;
+  genero?: "Masculino" | "Femenino";
+};

@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Dimensions } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import { BaseChartProps } from "./types";
+import { FilteredChartProps } from "./types";
 import { COLORS } from "../../constants/colors";
-import { chartService } from "../../services/chartService";
 import currencyConverter from "../../utils/currencyConverter";
 
-interface Chart02Props extends BaseChartProps {}
-
-const Chart02_MarketOpportunities: React.FC<Chart02Props> = ({ onPress }) => {
-  const [loading, setLoading] = useState(true);
+const Chart02_MarketOpportunities: React.FC<FilteredChartProps> = ({
+  onPress,
+  properties,
+  searches,
+  operationType,
+}) => {
+  const [loading, setLoading] = useState(false);
   const [chartData, setChartData] = useState<any[]>([]);
   const [lineData, setLineData] = useState<any[]>([]);
   const [maxBarValue, setMaxBarValue] = useState(0);
@@ -36,15 +38,13 @@ const Chart02_MarketOpportunities: React.FC<Chart02Props> = ({ onPress }) => {
     { label: "300+", min: 300, max: 99999 },
   ];
 
-  const fetchData = async () => {
-    try {
+  useEffect(() => {
+    const processData = () => {
       setLoading(true);
-      const [propertiesData, searchesData] = await Promise.all([
-        chartService.getDataChart(),
-        chartService.getBusquedas(),
-      ]);
-
-      if (!propertiesData || !searchesData) return;
+      if (!properties || !searches) {
+        setLoading(false);
+        return;
+      }
 
       // Acumuladores por rango
       const acc = ranges.map((r) => ({
@@ -55,15 +55,18 @@ const Chart02_MarketOpportunities: React.FC<Chart02Props> = ({ onPress }) => {
       }));
 
       // 1. Procesar Propiedades (Barras: Precio Promedio x m2)
-      propertiesData.forEach((item: any) => {
+      properties.forEach((item: any) => {
         const ops = Array.isArray(item.operaciones_propiedad)
           ? item.operaciones_propiedad
           : [item.operaciones_propiedad];
-        const saleOp = ops.find((o: any) => o?.tipo_operacion === "venta");
+        const op = ops.find(
+          (o: any) =>
+            o?.tipo_operacion?.toLowerCase() === operationType.toLowerCase()
+        );
 
-        if (saleOp) {
-          let price = saleOp.precio || 0;
-          if (saleOp.moneda === "USD") price *= EXCHANGE_RATE;
+        if (op) {
+          let price = op.precio || 0;
+          if (op.moneda === "USD") price *= EXCHANGE_RATE;
 
           // Preferencia: Construcción > Terreno
           const m2 =
@@ -86,7 +89,31 @@ const Chart02_MarketOpportunities: React.FC<Chart02Props> = ({ onPress }) => {
       });
 
       // 2. Procesar Búsquedas (Línea: Cantidad de búsquedas)
-      searchesData.forEach((search: any) => {
+      searches.forEach((search: any) => {
+        // Filter by operation logic if possible (assuming searches have operation/type info or we check criterios)
+        let criteria: any = {};
+        if (search.criterios_busqueda) {
+          if (typeof search.criterios_busqueda === "string") {
+            try {
+              criteria = JSON.parse(search.criterios_busqueda);
+            } catch (e) {}
+          } else {
+            criteria = search.criterios_busqueda;
+          }
+        }
+
+        // If criteria has operation, check it. Or check top level.
+        const searchOp =
+          criteria.operacion ||
+          criteria.tipo_operacion ||
+          search.tipo_operacion;
+        if (
+          searchOp &&
+          searchOp.toLowerCase() !== operationType.toLowerCase()
+        ) {
+          return;
+        }
+
         let m2Target = 0;
         // Intentar parsear campos de búsqueda
         if (search.metros_construccion) {
@@ -114,8 +141,8 @@ const Chart02_MarketOpportunities: React.FC<Chart02Props> = ({ onPress }) => {
       });
 
       // 3. Formatear datos para Gifted Charts
-      const bars = [];
-      const lines = [];
+      const bars: any[] = [];
+      const lines: any[] = [];
       let mP = 0;
       let mL = 0;
 
@@ -160,16 +187,11 @@ const Chart02_MarketOpportunities: React.FC<Chart02Props> = ({ onPress }) => {
       setMaxLineValue(mL > 0 ? mL * 1.2 : 10);
       setChartData(bars);
       setLineData(lines);
-    } catch (error) {
-      console.error("Error al procesar Chart 02:", error);
-    } finally {
       setLoading(false);
-    }
-  };
+    };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+    processData();
+  }, [properties, searches, operationType, EXCHANGE_RATE]);
 
   if (loading) {
     return (
@@ -191,7 +213,7 @@ const Chart02_MarketOpportunities: React.FC<Chart02Props> = ({ onPress }) => {
           <BarChart
             data={chartData}
             barWidth={32}
-            spacing={30}
+            spacing={35}
             initialSpacing={10}
             xAxisThickness={1}
             xAxisColor={COLORS.cardBorder}
@@ -199,8 +221,8 @@ const Chart02_MarketOpportunities: React.FC<Chart02Props> = ({ onPress }) => {
             yAxisTextStyle={{ color: COLORS.textSecondary, fontSize: 15 }}
             noOfSections={5}
             maxValue={maxBarValue}
-            isAnimated
-            animationDuration={1000}
+            isAnimated={false}
+            animationDuration={0}
             roundedTop
             // Configuración de la línea (Búsquedas)
             showLine

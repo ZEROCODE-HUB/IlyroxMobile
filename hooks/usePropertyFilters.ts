@@ -62,17 +62,6 @@ export const usePropertyFilters = (
     useState<Property[]>(properties);
 
   useEffect(() => {
-    console.log("=== INICIO FILTRADO DE PROPIEDADES ===");
-    console.log("Total propiedades recibidas:", properties.length);
-    console.log("Filtros activos:", {
-      operacion: filters.operacion,
-      tipoPropiedad: filters.tipoPropiedad,
-      subtipo: filters.subtipo,
-      precioMin: filters.precioMin,
-      precioMax: filters.precioMax,
-      locationFilter: filters.locationFilter,
-    });
-
     const filtered = properties.filter((p, index) => {
       const anyP = p as any;
 
@@ -155,7 +144,10 @@ export const usePropertyFilters = (
           .toString()
           .trim()
           .toLowerCase();
-        const fEstado = filters.locationFilter.estado.toString().trim().toLowerCase();
+        const fEstado = filters.locationFilter.estado
+          .toString()
+          .trim()
+          .toLowerCase();
         if (pEstado !== fEstado) {
           if (index < 3)
             console.log(
@@ -171,7 +163,10 @@ export const usePropertyFilters = (
           .toString()
           .trim()
           .toLowerCase();
-        const fCiudad = filters.locationFilter.ciudad.toString().trim().toLowerCase();
+        const fCiudad = filters.locationFilter.ciudad
+          .toString()
+          .trim()
+          .toLowerCase();
         if (pCiudad !== fCiudad) {
           if (index < 3)
             console.log(
@@ -188,7 +183,8 @@ export const usePropertyFilters = (
         .toLowerCase();
       if (
         filters.locationFilter.municipio &&
-        pMunicipio !== filters.locationFilter.municipio.toString().trim().toLowerCase()
+        pMunicipio !==
+          filters.locationFilter.municipio.toString().trim().toLowerCase()
       ) {
         if (index < 3)
           console.log(
@@ -203,7 +199,10 @@ export const usePropertyFilters = (
           .toString()
           .trim()
           .toLowerCase();
-        const fColonia = filters.locationFilter.colonia.toString().trim().toLowerCase();
+        const fColonia = filters.locationFilter.colonia
+          .toString()
+          .trim()
+          .toLowerCase();
         if (pColonia !== fColonia) {
           if (index < 3)
             console.log(
@@ -319,13 +318,8 @@ export const usePropertyFilters = (
         if ((p as any).niveles !== filters.niveles) return false;
       }
 
-      if (index < 3) console.log(`  ✅ Propiedad aceptada`);
       return true;
     });
-
-    console.log(`\n=== RESULTADO FILTRADO ===`);
-    console.log("Propiedades filtradas:", filtered.length);
-    console.log("=========================\n");
 
     setFilteredProperties(filtered);
   }, [properties, filters, geofenceBounds]);

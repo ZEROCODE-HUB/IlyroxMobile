@@ -35,10 +35,14 @@ export const chartService = {
   },
 
   async getDataChart2() {
-    // Para chart 4. Obtiene principalmente tipo de propiedad con precio
     const { data, error } = await supabase.from("propiedades").select(`
                 created_at, 
                 tipo,
+                estado,
+                colonia,
+                status,
+                habitaciones,
+                fecha_venta,
                 operaciones_propiedad (
                     precio,
                     moneda,
@@ -49,5 +53,34 @@ export const chartService = {
     if (error) throw error;
 
     return data;
+  },
+
+  async getAllData() {
+    const [propertiesResult, searchesResult] = await Promise.all([
+      supabase.from("propiedades").select(`
+                id,
+                created_at, 
+                metros_cuadrados_construccion, 
+                metros_cuadrados_terreno,
+                tipo,
+                estado,
+                colonia,
+                status,
+                operaciones_propiedad (
+                    precio,
+                    moneda,
+                    tipo_operacion
+                )
+            `),
+      supabase.from("busquedas_guardadas").select("*"),
+    ]);
+
+    if (propertiesResult.error) throw propertiesResult.error;
+    if (searchesResult.error) throw searchesResult.error;
+
+    return {
+      properties: propertiesResult.data,
+      searches: searchesResult.data,
+    };
   },
 };

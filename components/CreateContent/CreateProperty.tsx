@@ -2112,6 +2112,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
+    paddingBottom: 40,
   },
   publishBtn: {
     backgroundColor: COLORS.primary,

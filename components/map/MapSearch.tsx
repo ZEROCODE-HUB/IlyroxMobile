@@ -9,7 +9,10 @@ import { SearchFiltersBar } from "./SearchFiltersBar";
 import { PropertyMap } from "./PropertyMap";
 import { PropertyMapCard } from "./PropertyMapCard";
 import { SearchFiltersModal } from "./SearchFiltersModal";
-import { usePropertyFilters, GeofenceBounds } from "../../hooks/usePropertyFilters";
+import {
+  usePropertyFilters,
+  GeofenceBounds,
+} from "../../hooks/usePropertyFilters";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useStableSafeInsets } from "../../context/SafeInsetsContext";
 
@@ -54,40 +57,16 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
 
   // LOG INICIAL - Ver propiedades recibidas
   useEffect(() => {
-    console.log("=== MAPSEARCH MOUNTED ===");
-    console.log("Total propiedades recibidas:", properties.length);
-
     if (properties.length > 0) {
-      console.log("Primera propiedad (estructura completa):");
-      console.log(JSON.stringify(properties[0], null, 2));
-
-      console.log("\nCampos de ubicación de las primeras 3 propiedades:");
       properties.slice(0, 3).forEach((p, idx) => {
         const anyP = p as any;
-        console.log(`\nPropiedad ${idx + 1}:`);
-        console.log("  - location?.city:", p.location?.city);
-        console.log("  - location?.municipio:", p.location?.municipio);
-        console.log("  - ciudad (directo):", anyP.ciudad);
-        console.log("  - municipio (directo):", anyP.municipio);
-        console.log("  - coordenadas:", {
-          lat: p.coordinates?.lat || anyP.latitud,
-          lng: p.coordinates?.lng || anyP.longitud,
-        });
       });
     }
-
-    console.log("selectedLocation inicial:", selectedLocation);
-    console.log("========================\n");
   }, []);
 
   // INICIALIZAR FILTROS CON selectedLocation
   useEffect(() => {
     if (selectedLocation) {
-      console.log("=== INICIALIZANDO CON UBICACIÓN SELECCIONADA ===");
-      console.log("selectedLocation:", JSON.stringify(selectedLocation));
-      console.log("name:", selectedLocation.name);
-      console.log("type:", selectedLocation.type);
-
       // Crear filtro de ubicación según el tipo
       const newLocationFilter = {
         estado: "",
@@ -111,7 +90,6 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         newLocationFilter.ciudad = selectedLocation.name;
       }
 
-      console.log("Aplicando filtro de ubicación:", newLocationFilter);
       updateLocationFilter(newLocationFilter);
 
       // Geocodificar ubicación para centrar y definir límites
@@ -138,9 +116,15 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
               const MIN_DELTA =
                 type === "colonia" ? 0.02 : type === "municipio" ? 0.04 : 0.03;
               const MAX_DELTA =
-                type === "colonia" ? 0.06 : type === "municipio" ? 0.12 : 0.10;
-              const latDelta = Math.min(Math.max(latSpan * 1.2 || MIN_DELTA, MIN_DELTA), MAX_DELTA);
-              const lngDelta = Math.min(Math.max(lngSpan * 1.2 || MIN_DELTA, MIN_DELTA), MAX_DELTA);
+                type === "colonia" ? 0.06 : type === "municipio" ? 0.12 : 0.1;
+              const latDelta = Math.min(
+                Math.max(latSpan * 1.2 || MIN_DELTA, MIN_DELTA),
+                MAX_DELTA
+              );
+              const lngDelta = Math.min(
+                Math.max(lngSpan * 1.2 || MIN_DELTA, MIN_DELTA),
+                MAX_DELTA
+              );
               setFocusRegion({
                 latitude: (minLat + maxLat) / 2,
                 longitude: (minLng + maxLng) / 2,
@@ -166,8 +150,6 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
       };
       geocode();
     } else {
-      console.log("=== NO HAY UBICACIÓN SELECCIONADA ===");
-      console.log("Mostrando todas las propiedades sin filtro de ubicación");
       setGeoBounds(null);
       setFocusRegion(null);
     }
@@ -270,7 +252,10 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           ref={scrollViewRef}
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[styles.cardsContent, { paddingBottom: 16 + safeBottom }]}
+          contentContainerStyle={[
+            styles.cardsContent,
+            { paddingBottom: 16 + safeBottom },
+          ]}
           decelerationRate="fast"
           snapToInterval={212} // 200 + 12 margin
         >

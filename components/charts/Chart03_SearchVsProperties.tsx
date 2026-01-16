@@ -8,28 +8,25 @@ import {
   ScrollView,
 } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
-import { BaseChartProps } from "./types";
+import { FilteredChartProps } from "./types";
 import { COLORS } from "../../constants/colors";
-import { chartService } from "../../services/chartService";
 import currencyConverter from "../../utils/currencyConverter";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
-interface Chart03Props extends BaseChartProps {}
-
-const Chart03_SearchVsProperties: React.FC<Chart03Props> = ({ onPress }) => {
-  const [loading, setLoading] = useState(true);
+const Chart03_SearchVsProperties: React.FC<FilteredChartProps> = ({
+  onPress,
+  properties,
+  searches,
+  operationType,
+}) => {
+  const [loading, setLoading] = useState(false);
   const [chartData, setChartData] = useState<any[]>([]);
   const [lineData1, setLineData1] = useState<any[]>([]); // Construcción
   const [lineData2, setLineData2] = useState<any[]>([]); // Terreno
   const [maxValue, setMaxValue] = useState(0);
   const [maxM2Value, setMaxM2Value] = useState(0);
   const [valueCoin, setValueCoin] = useState<number>(0);
-
-  // Filters
-  const [operationType, setOperationType] = useState<"venta" | "renta">(
-    "venta"
-  );
   const [localActiveIndex, setLocalActiveIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -43,8 +40,8 @@ const Chart03_SearchVsProperties: React.FC<Chart03Props> = ({ onPress }) => {
   const EXCHANGE_RATE = valueCoin || 18;
 
   // Define ranges based on operation
-  const getRanges = (op: "venta" | "renta") => {
-    if (op === "venta") {
+  const getRanges = (op: string) => {
+    if (op.toLowerCase() === "venta") {
       return [
         { label: "0-10k", min: 0, max: 1000000 },
         { label: "10k-20k", min: 1000000, max: 3000000 },
@@ -77,15 +74,14 @@ const Chart03_SearchVsProperties: React.FC<Chart03Props> = ({ onPress }) => {
     );
   }, []);
 
-  const fetchData = async () => {
-    try {
+  useEffect(() => {
+    const processData = () => {
       setLoading(true);
-      const [propertiesData, searchesData] = await Promise.all([
-        chartService.getDataChart(true),
-        chartService.getBusquedas(),
-      ]);
 
-      if (!propertiesData || !searchesData) return;
+      if (!properties || !searches) {
+        setLoading(false);
+        return;
+      }
 
       const ranges = getRanges(operationType);
       const acc = ranges.map((r) => ({
@@ -99,7 +95,10 @@ const Chart03_SearchVsProperties: React.FC<Chart03Props> = ({ onPress }) => {
       }));
 
       // 1. Process Properties
-      propertiesData.forEach((item: any) => {
+      properties.forEach((item: any) => {
+        // Enforce published status as previously done in Chart03
+        if (item.status !== "Publicada") return;
+
         const ops = Array.isArray(item.operaciones_propiedad)
           ? item.operaciones_propiedad
           : [item.operaciones_propiedad];
@@ -123,9 +122,29 @@ const Chart03_SearchVsProperties: React.FC<Chart03Props> = ({ onPress }) => {
       });
 
       // 2. Process Searches - Updated Fields
-      searchesData.forEach((item: any) => {
-        const searchOp = item.tipo_operacion?.toLowerCase();
-        if (searchOp && searchOp !== operationType.toLowerCase()) {
+      searches.forEach((item: any) => {
+        // Check filtering manually or use passed search results if pre-filtered?
+        // Let's re-check operation here to be safe and consistent with previous charts
+        let criteria: any = {};
+        if (item.criterios_busqueda) {
+          if (typeof item.criterios_busqueda === "string") {
+            try {
+              criteria = JSON.parse(item.criterios_busqueda);
+            } catch (e) {}
+          } else {
+            criteria = item.criterios_busqueda;
+          }
+        }
+
+        const searchOp =
+          criteria.operacion ||
+          criteria.tipo_operacion ||
+          item.tipo_operacion ||
+          "";
+        if (
+          searchOp &&
+          searchOp.toLowerCase() !== operationType.toLowerCase()
+        ) {
           return;
         }
 
@@ -146,7 +165,6 @@ const Chart03_SearchVsProperties: React.FC<Chart03Props> = ({ onPress }) => {
           acc[rangeIndex].searches += 1;
 
           // Use metros_construccion and metros_terreno directly
-          // Handle ranges if stored as min/max in other fields, but prioritizing these as per request
           let m2Const = parseFloat(item.metros_construccion) || 0;
           if (m2Const === 0) {
             const minC = parseFloat(item.min_m2_construccion) || 0;
@@ -173,9 +191,9 @@ const Chart03_SearchVsProperties: React.FC<Chart03Props> = ({ onPress }) => {
       });
 
       // 3. Format Data
-      const bars = [];
-      const line1 = [];
-      const line2 = [];
+      const bars: any[] = [];
+      const line1: any[] = [];
+      const line2: any[] = [];
       let maxY = 0;
       let maxM2 = 0;
 
@@ -235,16 +253,18 @@ const Chart03_SearchVsProperties: React.FC<Chart03Props> = ({ onPress }) => {
       setChartData(bars);
       setLineData1(line1);
       setLineData2(line2);
-    } catch (error) {
-      console.error("Error Chart 03:", error);
-    } finally {
       setLoading(false);
-    }
-  };
+    };
 
-  useEffect(() => {
-    fetchData();
-  }, [operationType, valueCoin, localActiveIndex]);
+    processData();
+  }, [
+    properties,
+    searches,
+    operationType,
+    valueCoin,
+    localActiveIndex,
+    EXCHANGE_RATE,
+  ]);
 
   if (loading) {
     return (
@@ -272,30 +292,7 @@ const Chart03_SearchVsProperties: React.FC<Chart03Props> = ({ onPress }) => {
     <View style={styles.chartCard}>
       <Text style={styles.chartTitle}>Demanda vs Oferta (Por Precio)</Text>
 
-      {/* Filters */}
-      <View style={styles.filterContainer}>
-        <View style={styles.filterRow}>
-          {(["venta", "renta"] as const).map((op) => (
-            <TouchableOpacity
-              key={op}
-              style={[
-                styles.filterBtn,
-                operationType === op && styles.filterBtnActive,
-              ]}
-              onPress={() => setOperationType(op)}
-            >
-              <Text
-                style={[
-                  styles.filterText,
-                  operationType === op && styles.filterTextActive,
-                ]}
-              >
-                {op.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+      {/* Removed Internal Filters, using external operationType */}
 
       <View style={{ height: 320, overflow: "visible" }}>
         <BarChart
@@ -310,8 +307,8 @@ const Chart03_SearchVsProperties: React.FC<Chart03Props> = ({ onPress }) => {
           yAxisTextStyle={{ color: COLORS.textSecondary, fontSize: 10 }}
           noOfSections={5}
           maxValue={maxValue}
-          isAnimated
-          animationDuration={800}
+          isAnimated={false}
+          animationDuration={0}
           // Tooltip and labels
           renderTooltip={(item: any, index: number) => {
             return (
@@ -327,7 +324,7 @@ const Chart03_SearchVsProperties: React.FC<Chart03Props> = ({ onPress }) => {
           lineData2={lineData2} // Yellow: Land
           lineConfig={{
             color: "#2196F3", // Blue
-            thickness: 6,
+            thickness: 3,
             curved: false,
             hideDataPoints: false,
             dataPointsColor: "#2196F3",
@@ -336,7 +333,7 @@ const Chart03_SearchVsProperties: React.FC<Chart03Props> = ({ onPress }) => {
           }}
           lineConfig2={{
             color: "#FFEB3B", // Yellow
-            thickness: 6,
+            thickness: 3,
             curved: false,
             hideDataPoints: false,
             dataPointsColor: "#FFEB3B",
@@ -390,35 +387,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.textPrimary,
     marginBottom: 12,
-  },
-  filterContainer: {
-    gap: 8,
-    marginBottom: 16,
-  },
-  filterRow: {
-    flexDirection: "row",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  filterBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: COLORS.background,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
-  filterBtnActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  filterText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  filterTextActive: {
-    color: COLORS.white,
-    fontWeight: "600",
   },
   legendContainer: {
     flexDirection: "row",
