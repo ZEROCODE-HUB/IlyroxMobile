@@ -131,7 +131,7 @@ export const esDepartamento = (subtipo: string): boolean => {
  * Verifica si es propiedad comercial o industrial
  */
 export const esComercialIndustrial = (
-  tipoPrincipal: TipoPrincipal
+  tipoPrincipal: TipoPrincipal,
 ): boolean => {
   return tipoPrincipal === "comercial" || tipoPrincipal === "industrial";
 };

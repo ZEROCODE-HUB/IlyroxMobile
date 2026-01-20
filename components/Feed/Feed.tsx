@@ -3,12 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   Animated,
   ViewToken,
   RefreshControl,
   Platform,
 } from "react-native";
+import { FlatList } from "react-native-gesture-handler";
 import { FeedItem, User } from "../../types";
 import UsersSlider from "../UsersSlider";
 import { ReelCard, PropertyCard, PostCard } from "../cards";
@@ -38,9 +38,9 @@ const Feed: React.FC<FeedProps> = ({
   const [selectedItem, setSelectedItem] = useState<FeedItem | null>(null);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [activeCommentItem, setActiveCommentItem] = useState<FeedItem | null>(
-    null
+    null,
   );
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<FlatList<FeedItem>>(null);
 
   // Hooks de datos reales
   const {
@@ -60,7 +60,7 @@ const Feed: React.FC<FeedProps> = ({
   useFocusEffect(
     useCallback(() => {
       refreshUserStats();
-    }, [refreshUserStats])
+    }, [refreshUserStats]),
   );
 
   const dynamicPaddingTop = useMemo(() => {
@@ -85,7 +85,7 @@ const Feed: React.FC<FeedProps> = ({
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       const visibleIds = viewableItems.map((viewToken) => viewToken.item.id);
       setViewableItems(visibleIds);
-    }
+    },
   ).current;
 
   const viewabilityConfig = useRef({
@@ -112,7 +112,7 @@ const Feed: React.FC<FeedProps> = ({
         }, 1200);
       });
     },
-    [bannerAnim]
+    [bannerAnim],
   );
 
   const handleOpenDetail = useCallback(
@@ -125,7 +125,7 @@ const Feed: React.FC<FeedProps> = ({
         setSelectedItem(item);
       }
     },
-    [navigation]
+    [navigation],
   );
 
   const handleCloseDetail = useCallback(() => {
@@ -145,7 +145,7 @@ const Feed: React.FC<FeedProps> = ({
       setScrollOffset(currentOffset);
       onScroll?.(currentOffset);
     },
-    [onScroll]
+    [onScroll],
   );
 
   const handleOpenComments = useCallback((item: FeedItem) => {
@@ -164,7 +164,7 @@ const Feed: React.FC<FeedProps> = ({
         onUserClick?.(user);
       }
     },
-    [approveUser, showBanner, onUserClick]
+    [approveUser, showBanner, onUserClick],
   );
 
   const handleRejectUser = useCallback(
@@ -172,7 +172,7 @@ const Feed: React.FC<FeedProps> = ({
       rejectUser(user.id);
       showBanner("Usuario rechazado");
     },
-    [rejectUser, showBanner]
+    [rejectUser, showBanner],
   );
 
   // Renderizar item según su tipo
@@ -220,7 +220,7 @@ const Feed: React.FC<FeedProps> = ({
       onUserClick,
       viewableItems,
       currentUserId,
-    ]
+    ],
   );
 
   const keyExtractor = useCallback((item: FeedItem) => item.id, []);
@@ -234,7 +234,7 @@ const Feed: React.FC<FeedProps> = ({
         onReject={handleRejectUser}
       />
     ),
-    [pendingUsers, onUserClick, handleApproveUser, handleRejectUser]
+    [pendingUsers, onUserClick, handleApproveUser, handleRejectUser],
   );
 
   const ListFooter = useMemo(() => {

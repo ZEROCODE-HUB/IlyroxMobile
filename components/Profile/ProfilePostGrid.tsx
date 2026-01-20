@@ -41,9 +41,9 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
   onDelete,
 }) => {
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
-  const [postToEdit, setPostToEdit] = useState<Post | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
+  const [postToEdit, setPostToEdit] = useState<Post | null>(null);
 
   const { posts, getPosts, deletePost, loading } = useGridProfile();
 
@@ -165,6 +165,17 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
         }
       />
 
+      <Modal visible={showPostModal}>
+        <CreatePost
+          post={postToEdit || undefined} // Pass post to edit
+          onBack={() => {
+            setShowPostModal(false);
+            setPostToEdit(null);
+            if (userId) getPosts(userId);
+          }}
+        />
+      </Modal>
+
       {/* Confirmation Dialog */}
       <ConfirmDialog
         visible={!!postToDelete}
@@ -177,16 +188,6 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
         danger
         loading={deleting}
       />
-
-      <Modal visible={showPostModal}>
-        <CreatePost
-          post={postToEdit || undefined} // Pass post to edit
-          onBack={() => {
-            setShowPostModal(false);
-            setPostToEdit(null);
-          }}
-        />
-      </Modal>
     </>
   );
 };

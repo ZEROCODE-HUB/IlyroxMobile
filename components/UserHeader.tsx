@@ -84,7 +84,7 @@ const UserHeader: React.FC<UserHeaderProps> = ({
             foto,
             rol
         )
-      `
+      `,
       )
       .eq("usuario_recomendado_id", user.id)
       .eq("recomienda", true)
@@ -144,7 +144,7 @@ const UserHeader: React.FC<UserHeaderProps> = ({
               <View style={styles.recommendedAvatars}>
                 {recommendedByPreview.slice(0, 2).map((u, idx) => (
                   <View
-                    key={u.id}
+                    key={`${u.id}-${idx}`}
                     style={[
                       styles.recommendedAvatarWrapper,
                       idx > 0 && styles.recommendedAvatarOverlap,
@@ -167,57 +167,6 @@ const UserHeader: React.FC<UserHeaderProps> = ({
         </View>
       </TouchableOpacity>
 
-      <View style={styles.headerActions}>
-        {feedItemType === "property" ? (
-          <></>
-        ) : (
-          <TouchableOpacity onPress={() => setShowOptions(!showOptions)}>
-            <Ionicons
-              name="ellipsis-horizontal"
-              size={20}
-              color={COLORS.textTertiary}
-            />
-          </TouchableOpacity>
-        )}
-
-        {showOptions && (
-          <Modal visible={true} transparent animationType="fade">
-            <TouchableOpacity
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPress={() => setShowOptions(false)}
-            >
-              <View style={styles.menuContainer}>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => {
-                    setShowOptions(false);
-                    onReport();
-                  }}
-                >
-                  <View style={styles.menuItemContent}>
-                    <Ionicons name="flag" size={16} color={COLORS.error} />
-                    <Text
-                      style={[styles.menuItemText, { color: COLORS.error }]}
-                    >
-                      Reportar
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => setShowOptions(false)}
-                >
-                  <View style={styles.menuItemContent}>
-                    <Ionicons name="ban" size={16} color={COLORS.textPrimary} />
-                    <Text style={styles.menuItemText}>Bloquear</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </Modal>
-        )}
-      </View>
       {showRecommendedModal && (
         <Modal visible transparent animationType="fade">
           <TouchableOpacity

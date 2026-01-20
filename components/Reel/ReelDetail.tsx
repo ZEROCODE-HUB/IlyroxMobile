@@ -115,7 +115,7 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
           }).start();
         }
       },
-    })
+    }),
   ).current;
 
   const handleShare = useCallback(async () => {
@@ -157,6 +157,15 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
       >
         <TouchableWithoutFeedback onPress={togglePlayPause}>
           <View style={[styles.video, { width, height }]}>
+            {/* Placeholder Image (Thumbnail) */}
+            {item.images && item.images.length > 0 && (
+              <Image
+                source={{ uri: item.images[0] }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+              />
+            )}
+
             {/* VIDEO - Pantalla completa manteniendo aspect ratio */}
             <VideoView
               player={player}

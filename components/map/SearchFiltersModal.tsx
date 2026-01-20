@@ -205,7 +205,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
         criterios_busqueda.m2_terreno_min = parseFloat(filters.m2TerrenoMin);
       if (filters.m2ConstruccionMin)
         criterios_busqueda.m2_construccion_min = parseFloat(
-          filters.m2ConstruccionMin
+          filters.m2ConstruccionMin,
         );
       if (filters.locationFilter.estado)
         criterios_busqueda.estado = filters.locationFilter.estado;
@@ -359,7 +359,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
                     } else {
                       onUpdateFilter(
                         "operacion",
-                        val.toLowerCase() as "venta" | "renta"
+                        val.toLowerCase() as "venta" | "renta",
                       );
                     }
                   }}
@@ -448,7 +448,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
                     <>
                       <Text style={styles.label}>
                         {getLabelRecamaras(
-                          filters.tipoPropiedad as TipoPrincipal
+                          filters.tipoPropiedad as TipoPrincipal,
                         )}
                       </Text>
                       <TouchableOpacity
@@ -472,19 +472,19 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
                             setShowRecamarasModal(false);
                             openNumberInput(
                               getLabelRecamaras(
-                                filters.tipoPropiedad as TipoPrincipal
+                                filters.tipoPropiedad as TipoPrincipal,
                               ),
                               (value) => {
                                 onUpdateFilter("habitaciones", value);
                                 setShowNumberInput(false);
-                              }
+                              },
                             );
                           } else {
                             onUpdateFilter("habitaciones", val);
                           }
                         }}
                         title={getLabelRecamaras(
-                          filters.tipoPropiedad as TipoPrincipal
+                          filters.tipoPropiedad as TipoPrincipal,
                         )}
                         options={["No indicado", ...RECAMARAS]}
                         currentValue={filters.habitaciones}

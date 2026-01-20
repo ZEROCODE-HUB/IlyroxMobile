@@ -16,7 +16,7 @@ export const useImageUpload = () => {
   const uploadImage = async (
     imageUri: string,
     bucket: string = "feed-images",
-    folder: string = "uploads"
+    folder: string = "uploads",
   ): Promise<string | null> => {
     try {
       setUploading(true);
@@ -77,7 +77,7 @@ export const useImageUpload = () => {
   const uploadImages = async (
     imageUris: string[],
     bucket: string = "feed-images",
-    folder: string = "uploads"
+    folder: string = "uploads",
   ): Promise<string[]> => {
     if (!imageUris || imageUris.length === 0) return [];
 

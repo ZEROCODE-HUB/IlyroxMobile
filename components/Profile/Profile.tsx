@@ -103,7 +103,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   const [activeFilter, setActiveFilter] = useState<string>("Todas");
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(
-    null
+    null,
   );
   const [showRatingDetails, setShowRatingDetails] = useState(false);
   const [showRecommendedByModal, setShowRecommendedByModal] = useState(false);
@@ -119,9 +119,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   useFocusEffect(
     React.useCallback(() => {
       setSelectedProperty(null);
-      // Recargar datos al enfocar para reflejar cambios (ej. edición de propiedades)
-      fetchProfileData();
-    }, [fetchProfileData])
+    }, []),
   );
 
   /**
@@ -130,14 +128,14 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   const formatFullName = (p: perfiles | null): string => {
     if (!p) return "Usuario";
     const parts = [p.nombre, p.apellido_paterno, p.apellido_materno].filter(
-      Boolean
+      Boolean,
     );
     return parts.length > 0 ? parts.join(" ") : p.nombre_completo || "Usuario";
   };
 
   const formatPhoneNumber = (
     prefix: string | null,
-    number: string | null
+    number: string | null,
   ): string => {
     if (!number) return "No especificado";
     if (prefix) return `${prefix} ${number}`;
@@ -175,10 +173,10 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       rating: parseFloat(p.calificacion_promedio || "0"),
       totalRatings: parseInt(p.total_calificaciones || "0"),
       positiveRecommendations: parseInt(
-        p.total_recomendaciones_positivas || "0"
+        p.total_recomendaciones_positivas || "0",
       ),
       negativeRecommendations: parseInt(
-        p.total_recomendaciones_negativas || "0"
+        p.total_recomendaciones_negativas || "0",
       ),
       isFollowing: false,
     };
@@ -221,6 +219,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       user: profile ? mapProfileToUser(profile) : defaultUser,
       content: reel.descripcion || "",
       videoUrl: reel.video_url,
+      images: reel.thumbnail_url ? [reel.thumbnail_url] : [],
       likes: 0,
       comments: 0,
       timestamp: reel.created_at,
@@ -268,11 +267,11 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     role: formatRole(profile?.rol || "cliente"),
     location: formatLocation(
       profile?.estado || null,
-      profile?.pais || "México"
+      profile?.pais || "México",
     ),
     phone: formatPhoneNumber(
       profile?.prefijo_celular || null,
-      profile?.celular || null
+      profile?.celular || null,
     ),
     anos_experiencia: profile?.anos_experiencia || 0,
     rating: reviewStats?.calificacion_promedio || 0,
@@ -399,33 +398,48 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             onPress={() => setShowRatingDetails(!showRatingDetails)}
             style={styles.ratingCard}
           >
-            <View style={styles.ratingLeft}>
-              <View style={styles.ratingTopRow}>
+            {/* Rating Info Group (Left) */}
+            <View style={styles.ratingInfoGroup}>
+              <View style={styles.ratingHeader}>
                 <Text style={styles.ratingValue}>
                   {profileData.rating.toFixed(1)}
                 </Text>
-                <View style={styles.ratingStars}>
-                  <View style={styles.starsRow}>
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Ionicons
-                        key={s}
-                        name="star"
-                        size={13}
-                        color={COLORS.warning}
-                      />
-                    ))}
-                    <Text style={styles.reviewCount}>
-                      {profileData.reviewCount} reseñas
-                    </Text>
-                  </View>
+                <View style={styles.starsRow}>
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Ionicons
+                      key={s}
+                      name="star"
+                      size={14}
+                      color={COLORS.warning}
+                    />
+                  ))}
                 </View>
               </View>
+              <Text style={styles.reviewCount}>
+                {profileData.reviewCount} reseñas
+              </Text>
+            </View>
+
+            {/* Details Group (Right) */}
+            <View style={styles.ratingRight}>
+              <Text style={styles.viewDetailsText}>Ver Detalles</Text>
+              <Ionicons
+                name={showRatingDetails ? "chevron-up" : "chevron-down"}
+                size={14}
+                color={COLORS.primary}
+                style={styles.chevronIcon}
+              />
+            </View>
+          </TouchableOpacity>
+
+          {showRatingDetails && (
+            <View style={styles.statsPanel}>
+              {/* Recommends Row moved here */}
               <View style={styles.recommendsRow}>
                 <TouchableOpacity
                   style={[
                     styles.recItem,
                     isMe && styles.recItemDisabled,
-
                     { borderRightWidth: 1 },
                   ]}
                   onPress={() => handleRecommendation(true)}
@@ -441,7 +455,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                   <Text style={styles.recVal}>
                     {profileData.positiveRecommendations}
                   </Text>
-                  {/* <Text style={styles.recLabel}>Recomiendan</Text> */}
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.recItem, isMe && styles.recItemDisabled]}
@@ -458,25 +471,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
                   <Text style={styles.recVal}>
                     {profileData.negativeRecommendations}
                   </Text>
-                  {/* <Text style={styles.recLabel}>No recomiendan</Text> */}
                 </TouchableOpacity>
               </View>
-            </View>
-            <View style={styles.verticalDivider} />
-            <View style={styles.ratingRight}>
-              <Text style={styles.viewDetailsText}>Ver Detalles</Text>
-              <Ionicons
-                name={showRatingDetails ? "chevron-up" : "chevron-down"}
-                size={12}
-                color={COLORS.primary}
-                style={styles.chevronIcon}
-              />
-            </View>
-          </TouchableOpacity>
-
-          {showRatingDetails && (
-            <View style={styles.statsPanel}>
-              {/* Recommends Row */}
 
               {/* Recommended By Section */}
               <View style={styles.recommendedBySection}>
@@ -679,7 +675,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             ) : (
               <FlatList
                 data={recommendedByUsers}
-                keyExtractor={(u) => u.id}
+                keyExtractor={(u, idx) => `${u.id}-${idx}`}
                 contentContainerStyle={styles.recommendedByModalList}
                 onEndReached={() => {
                   if (loadingRecommendedBy || !recommendedByHasMore) return;
@@ -977,8 +973,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   ratingSection: {
-    paddingHorizontal: 16,
     marginBottom: 16,
+    alignItems: "stretch", // Changed to stretch to control width via margins
   },
   ratingCard: {
     flexDirection: "row",
@@ -987,46 +983,33 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
-    paddingHorizontal: 16,
-    paddingVertical: 3,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginHorizontal: 32,
+    justifyContent: "space-between",
   },
-  ratingLeft: {
-    flex: 1,
+  ratingInfoGroup: {
     flexDirection: "column",
-    gap: 12,
+    gap: 2,
   },
-  ratingTopRow: {
+  ratingHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
   },
   ratingValue: {
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 20,
+    fontWeight: "800",
     color: COLORS.textPrimary,
   },
-  ratingStars: {
-    gap: 4,
-    justifyContent: "center",
-  },
   starsRow: {
-    flex: 1,
     flexDirection: "row",
     gap: 2,
-    justifyContent: "center",
   },
   reviewCount: {
-    fontSize: 15,
+    fontSize: 12,
     color: COLORS.textTertiary,
-  },
-  verticalDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: COLORS.cardBorder,
-    marginHorizontal: 16,
-    alignSelf: "flex-end",
+    fontWeight: "500",
   },
   ratingRight: {
     flexDirection: "row",
@@ -1034,7 +1017,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   viewDetailsText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "600",
     color: COLORS.primary,
   },
@@ -1043,13 +1026,16 @@ const styles = StyleSheet.create({
   },
   statsPanel: {
     marginTop: 16,
-    padding: 16,
+    padding: 20,
     backgroundColor: COLORS.background,
     borderRadius: 12,
+    marginHorizontal: 16,
   },
   recommendsRow: {
     flexDirection: "row",
     gap: 12,
+    justifyContent: "center",
+    marginBottom: 20,
   },
   recItem: {
     flexDirection: "row",

@@ -76,7 +76,7 @@ const Statistics = () => {
       const hasOp = ops.some(
         (o: any) =>
           o?.tipo_operacion?.toLowerCase() ===
-          filters.operationType.toLowerCase()
+          filters.operationType.toLowerCase(),
       );
       if (!hasOp) return false;
 

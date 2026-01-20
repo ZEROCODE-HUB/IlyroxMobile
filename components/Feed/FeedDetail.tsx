@@ -13,11 +13,10 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 import { FeedItem, User } from "../../types";
-import LazyImage from "../LazyImage";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import UserHeader from "../UserHeader";
 import ActionButtons from "../ActionButtons";
-import { useImageGallery } from "../../hooks";
+import { ImageGallery } from "../shared";
 import { commonStyles } from "../../styles";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
@@ -41,9 +40,6 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
   const [showOptions, setShowOptions] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
 
-  // Hook para el carrusel de imágenes
-  const { currentIndex, handleScroll } = useImageGallery();
-
   const hasImages = images.length > 0;
   const isShortContent = item.content.length < 100;
 
@@ -59,7 +55,12 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return !showCommentsRef.current && Math.abs(gestureState.dy) > 15;
+        // Only capture if vertical movement is dominant and significant
+        return (
+          !showCommentsRef.current &&
+          Math.abs(gestureState.dy) > 15 &&
+          Math.abs(gestureState.dy) > Math.abs(gestureState.dx)
+        );
       },
       onPanResponderMove: (_, gestureState) => {
         if (gestureState.dy > 0) {
@@ -85,7 +86,7 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
           }).start();
         }
       },
-    })
+    }),
   ).current;
 
   return (
@@ -122,40 +123,12 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
 
             {/* Galería de imágenes - AHORA RESPONSIVA */}
             {images.length > 0 && (
-              <View style={styles.imageContainer}>
-                <ScrollView
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  onScroll={handleScroll}
-                  scrollEventThrottle={16}
-                  style={styles.imageGallery}
-                >
-                  {images.map((img, index) => (
-                    <LazyImage
-                      key={index}
-                      source={{ uri: img }}
-                      style={styles.galleryImage}
-                      resizeMode="contain"
-                    />
-                  ))}
-                </ScrollView>
-
-                {/* Indicadores de carrusel */}
-                {images.length > 1 && (
-                  <View style={commonStyles.carouselDots}>
-                    {images.map((_, index) => (
-                      <View
-                        key={index}
-                        style={[
-                          commonStyles.dot,
-                          currentIndex === index && commonStyles.dotActive,
-                        ]}
-                      />
-                    ))}
-                  </View>
-                )}
-              </View>
+              <ImageGallery
+                images={images}
+                aspectRatio={1}
+                showDots={true}
+                showImageCount={false}
+              />
             )}
 
             {/* Botones de acción - Estilo Instagram */}

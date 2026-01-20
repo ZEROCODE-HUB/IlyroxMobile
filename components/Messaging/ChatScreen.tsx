@@ -16,6 +16,8 @@ import {
   Alert,
   AppState,
   StatusBar,
+  Keyboard,
+  Animated,
   KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -63,6 +65,10 @@ export default function ChatScreen({
     string | null
   >(conversationId === "new" ? null : conversationId);
 
+  // Keyboard handling refs
+  const keyboardHeight = useRef(new Animated.Value(0)).current;
+  const keyboardHeightRef = useRef(0);
+
   const {
     messages,
     loading,
@@ -90,7 +96,7 @@ export default function ChatScreen({
         .from("conversaciones")
         .select("id")
         .or(
-          `and(usuario1_id.eq.${userId},usuario2_id.eq.${otherUser.id}),and(usuario1_id.eq.${otherUser.id},usuario2_id.eq.${userId})`
+          `and(usuario1_id.eq.${userId},usuario2_id.eq.${otherUser.id}),and(usuario1_id.eq.${otherUser.id},usuario2_id.eq.${userId})`,
         )
         .is("propiedad_id", null)
         .single();
@@ -114,7 +120,7 @@ export default function ChatScreen({
         .from("conversaciones")
         .select("id")
         .or(
-          `and(usuario1_id.eq.${userId},usuario2_id.eq.${otherUser.id}),and(usuario1_id.eq.${otherUser.id},usuario2_id.eq.${userId})`
+          `and(usuario1_id.eq.${userId},usuario2_id.eq.${otherUser.id}),and(usuario1_id.eq.${otherUser.id},usuario2_id.eq.${userId})`,
         )
         .is("propiedad_id", null)
         .single();
@@ -138,7 +144,7 @@ export default function ChatScreen({
         .from("conversaciones")
         .select("id")
         .or(
-          `and(usuario1_id.eq.${userId},usuario2_id.eq.${otherUser.id}),and(usuario1_id.eq.${otherUser.id},usuario2_id.eq.${userId})`
+          `and(usuario1_id.eq.${userId},usuario2_id.eq.${otherUser.id}),and(usuario1_id.eq.${otherUser.id},usuario2_id.eq.${userId})`,
         )
         .is("propiedad_id", null)
         .single();
@@ -189,11 +195,54 @@ export default function ChatScreen({
     }
   }, [messages.length]);
 
+  // Keyboard handling - instant on Android, animated on iOS
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const onShow = Keyboard.addListener(showEvent, (e) => {
+      keyboardHeightRef.current = e.endCoordinates.height;
+      if (Platform.OS === "ios") {
+        Animated.timing(keyboardHeight, {
+          toValue: e.endCoordinates.height,
+          duration: e.duration || 250,
+          useNativeDriver: false,
+        }).start();
+      } else {
+        keyboardHeight.setValue(e.endCoordinates.height);
+      }
+      // Scroll to end when keyboard opens
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    });
+
+    const onHide = Keyboard.addListener(hideEvent, (e) => {
+      keyboardHeightRef.current = 0;
+      if (Platform.OS === "ios") {
+        Animated.timing(keyboardHeight, {
+          toValue: 0,
+          duration: e.duration || 250,
+          useNativeDriver: false,
+        }).start();
+      } else {
+        keyboardHeight.setValue(0);
+      }
+    });
+
+    return () => {
+      onShow.remove();
+      onHide.remove();
+    };
+  }, [keyboardHeight]);
+
   const handleSendProperty = () => {
     Alert.alert(
       "Compartir propiedad",
       "Esta función abrirá un selector de propiedades en la versión completa.",
-      [{ text: "OK" }]
+      [{ text: "OK" }],
     );
   };
 
@@ -237,8 +286,8 @@ export default function ChatScreen({
     <View style={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={keyboardOffset}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? keyboardOffset : 0}
       >
         <FlatList
           ref={flatListRef}

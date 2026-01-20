@@ -1,4 +1,4 @@
-import React, { useState, forwardRef } from "react"; // 1. Agregamos forwardRef
+import React, { useState, forwardRef } from "react";
 import {
   View,
   TextInput,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TextInputProps,
   Platform,
+  Animated,
 } from "react-native";
 import { useAppTheme } from "../theme";
 import { COLORS } from "../../constants/colors";
@@ -20,7 +21,6 @@ interface AppInputProps extends TextInputProps {
   inputStyle?: object;
 }
 
-// 2. Envolvemos el componente en forwardRef
 export const AppInput = forwardRef<TextInput, AppInputProps>(
   (
     {
@@ -36,7 +36,7 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(
       inputStyle,
       ...props
     },
-    ref // 3. Recibimos la referencia
+    ref,
   ) => {
     const [isFocused, setIsFocused] = useState(false);
     const theme = useAppTheme();
@@ -51,11 +51,34 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(
       if (onBlur) onBlur(e);
     };
 
+    // Determinar el color del borde según el estado
+    const getBorderColor = () => {
+      if (error) return COLORS.error;
+      if (isFocused) return COLORS.primary;
+      return COLORS.cardBorder;
+    };
+
+    // Determinar el estilo de sombra según el estado
+    const getShadowStyle = () => {
+      if (!isFocused) return {};
+      return Platform.select({
+        ios: {
+          shadowColor: error ? COLORS.error : COLORS.primary,
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.15,
+          shadowRadius: 8,
+        },
+        android: {
+          elevation: 3,
+        },
+        default: {},
+      });
+    };
+
     return (
       <View
         style={[
           styles.container,
-          // 5. El margen ahora es opcional. Si pasas containerStyle, este manda.
           { marginBottom: containerStyle ? 0 : theme.spacing.md },
           containerStyle,
         ]}
@@ -67,7 +90,7 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(
               {
                 fontSize: theme.typography.fontSizes.sm,
                 fontWeight: theme.typography.fontWeights.medium,
-                color: theme.colors.textSecondary,
+                color: error ? COLORS.error : theme.colors.textSecondary,
                 marginBottom: theme.spacing.xs,
               },
             ]}
@@ -75,31 +98,42 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(
             {label}
           </Text>
         )}
-        <View style={styles.inputContainer}>
+        <View
+          style={[
+            styles.inputContainer,
+            {
+              borderColor: getBorderColor(),
+              borderWidth: isFocused ? 1.5 : 1,
+              backgroundColor: isFocused ? COLORS.white : COLORS.background,
+            },
+            getShadowStyle(),
+          ]}
+        >
           {leftIcon && (
             <View
               style={[
                 styles.leftIconContainer,
-                { marginRight: theme.spacing.sm },
+                { marginLeft: theme.spacing.md, marginRight: theme.spacing.sm },
               ]}
             >
               {leftIcon}
             </View>
           )}
           <TextInput
-            ref={ref} // 6. Pasamos la ref al input real
+            ref={ref}
             style={[
               styles.input,
               {
-                paddingVertical: Platform.OS === "ios" ? theme.spacing.md : 10, // Ajuste para Android
+                paddingVertical: Platform.OS === "ios" ? theme.spacing.md : 12,
                 fontSize: theme.typography.fontSizes.md,
-                paddingLeft: theme.spacing.md,
+                paddingLeft: leftIcon ? theme.spacing.xs : theme.spacing.md,
+                paddingRight: rightIcon ? theme.spacing.xs : theme.spacing.md,
               },
               inputStyle,
             ]}
             onFocus={handleFocus}
             onBlur={handleBlur}
-            placeholderTextColor={theme.colors.placeholder}
+            placeholderTextColor={COLORS.textTertiary}
             selectionColor={theme.colors.primary}
             {...props}
           />
@@ -107,16 +141,20 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(
             <View
               style={[
                 styles.rightIconContainer,
-                { marginLeft: theme.spacing.sm },
+                { marginRight: theme.spacing.md, marginLeft: theme.spacing.sm },
               ]}
             >
               {rightIcon}
             </View>
           )}
         </View>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+        {helperText && !error && (
+          <Text style={styles.helperText}>{helperText}</Text>
+        )}
       </View>
     );
-  }
+  },
 );
 
 const styles = StyleSheet.create({
@@ -127,35 +165,46 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    textColor: COLORS.backgroundDeep,
-    borderWidth: 1,
+    borderRadius: 12,
     overflow: "hidden",
-    borderColor: COLORS.primary,
-    focus: COLORS.primary,
-    borderRadius: 10,
+    minHeight: 52,
     ...Platform.select({
       web: {
         outlineStyle: "none",
       } as any,
       default: {},
     }),
-    backgroundColor: COLORS.background,
   },
   input: {
     flex: 1,
     minWidth: 0,
     maxWidth: "100%",
+    color: COLORS.textPrimary,
     ...Platform.select({
       web: {
         outlineStyle: "none",
       } as any,
       default: {},
     }),
-    backgroundColor: COLORS.background,
-    color: COLORS.black,
   },
-  leftIconContainer: {},
-  rightIconContainer: {},
-  errorText: {},
-  helperText: {},
+  leftIconContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  rightIconContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
+  },
+  helperText: {
+    color: COLORS.textTertiary,
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
+  },
 });

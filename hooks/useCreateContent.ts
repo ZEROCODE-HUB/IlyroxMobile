@@ -59,7 +59,7 @@ export function useCreateContent(userId?: string) {
       if (feedError) throw feedError;
 
       Burnt.toast({
-        title: "Publicado exitosamente!",
+        title: "Post publicado correctamente!",
         preset: "done",
         duration: 2500,
       });
@@ -80,7 +80,11 @@ export function useCreateContent(userId?: string) {
   /**
    * Crear REEL
    */
-  const createReel = async (description: string, videoUrl: string) => {
+  const createReel = async (
+    description: string,
+    videoUrl: string,
+    thumbnailUrl?: string | null,
+  ) => {
     if (!userId) {
       Alert.alert("Error", "Debes iniciar sesión");
       return false;
@@ -96,21 +100,21 @@ export function useCreateContent(userId?: string) {
         const videoUploadUrl = await uploadImage(
           videoUrl,
           "feed-images",
-          "reels"
+          "reels",
         );
         if (videoUploadUrl) {
           uploadedVideoUrl = videoUploadUrl;
         }
       }
 
-      // 2. Crear reel en BD
-      // NOTA: Se eliminó 'duracion' porque causaba error PGRST204 (columna no existe en la BD)
+      // 2. Crear reel en BD con thumbnail
       const { data: reel, error: reelError } = await supabase
         .from("reels")
         .insert({
           publicado_por: userId,
           descripcion: description,
           video_url: uploadedVideoUrl,
+          thumbnail_url: thumbnailUrl || null,
         })
         .select()
         .single();
@@ -131,14 +135,78 @@ export function useCreateContent(userId?: string) {
       Burnt.toast({
         title: "Publicado exitosamente!",
         preset: "done",
-        duration: 2500,
       });
-
       return true;
     } catch (error: any) {
       console.error("Error creating reel:", error);
       Burnt.toast({
         title: "Error al publicar el reel",
+        preset: "error",
+      });
+      return false;
+    } finally {
+      setIsCreatingInDB(false);
+    }
+  };
+
+  /**
+   * Actualizar REEL
+   */
+  const updateReel = async (
+    reelId: string,
+    description: string,
+    videoUrl: string,
+    thumbnailUrl?: string | null,
+  ) => {
+    if (!userId) {
+      Alert.alert("Error", "Debes iniciar sesión");
+      return false;
+    }
+
+    setIsCreatingInDB(true);
+
+    try {
+      // 1. Subir video a Supabase Storage (si es local)
+      // Nota: la lógica de "si es local" ya se maneja fuera o en uploadVideo,
+      // pero si el hook useVideoUpload ya lo maneja, perfecto.
+      // Aquí asumimos que videoUrl ya es la URL final o que se procesará antes.
+      // Pero para mantener consistencia con createReel, podríamos repetir la lógica o asumir que se pasa la URL final.
+      // Dado que el componente CreateReel pasará la URL final, aquí solo hacemos el update.
+      // Sin embargo, createReel hacía la subida adentro si no era http.
+      // Vamos a asumir que el componente se encarga de llamar a uploadVideo y nos pasa la URL final aquí para simplificar,
+      // O podemos duplicar la lógica de uploadVideo si queremos encapsularlo, pero CreateReel ya llama a uploadVideo.
+      // REVISIÓN: CreateReel llama a uploadVideo ANTES de createReel.
+      // En createReel (arriba) también hay una lógica redundante de uploadImage, pero CreateReel.tsx ya llama a uploadVideo.
+      // Está bien, solo actualizamos la BD.
+
+      // 2. Actualizar reel en BD
+      const updateData: any = {
+        descripcion: description,
+        video_url: videoUrl,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (thumbnailUrl) {
+        updateData.thumbnail_url = thumbnailUrl;
+      }
+
+      const { error: reelError } = await supabase
+        .from("reels")
+        .update(updateData)
+        .eq("id", reelId)
+        .eq("publicado_por", userId); // Seguridad adicional
+
+      if (reelError) throw reelError;
+
+      Burnt.toast({
+        title: "Reel actualizado!",
+        preset: "done",
+      });
+      return true;
+    } catch (error: any) {
+      console.error("Error updating reel:", error);
+      Burnt.toast({
+        title: "Error al actualizar",
         preset: "error",
       });
       return false;
@@ -229,7 +297,10 @@ export function useCreateContent(userId?: string) {
 
       if (feedError) throw feedError;
 
-      Alert.alert("✅ Éxito", "Propiedad publicada correctamente");
+      Burnt.toast({
+        title: "Propiedad publicada exitosamente!",
+        preset: "done",
+      });
       return true;
     } catch (error: any) {
       console.error("Error creating property:", error);
@@ -243,6 +314,7 @@ export function useCreateContent(userId?: string) {
   return {
     createPost,
     createReel,
+    updateReel,
     createProperty,
     uploading,
   };

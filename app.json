@@ -34,6 +34,7 @@
     },
     "android": {
       "softwareKeyboardLayoutMode": "pan",
+      "largeHeap": true,
       "statusBar": {
         "barStyle": "light-content",
         "backgroundColor": "#06D5B4",

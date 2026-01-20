@@ -83,7 +83,7 @@ export const StatisticsFilterModal: React.FC<StatisticsFilterModalProps> = ({
 
   const handleLocationChange = (
     field: "estado" | "ciudad" | "municipio" | "colonia",
-    value: string
+    value: string,
   ) => {
     setLocation((prev) => {
       const newState = { ...prev, [field]: value };
@@ -103,7 +103,7 @@ export const StatisticsFilterModal: React.FC<StatisticsFilterModalProps> = ({
   };
 
   const openSelector = (
-    type: "estado" | "ciudad" | "municipio" | "colonia" | "tipo" | "subtipo"
+    type: "estado" | "ciudad" | "municipio" | "colonia" | "tipo" | "subtipo",
   ) => {
     let options: string[] = [];
     let title = "";
@@ -127,7 +127,7 @@ export const StatisticsFilterModal: React.FC<StatisticsFilterModalProps> = ({
         break;
       case "tipo":
         options = Object.keys(PROPERTY_TYPES).map(
-          (k) => k.charAt(0).toUpperCase() + k.slice(1)
+          (k) => k.charAt(0).toUpperCase() + k.slice(1),
         );
         title = "Tipo de Propiedad";
         break;
