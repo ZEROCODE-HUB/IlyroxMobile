@@ -140,7 +140,7 @@ const CommentItem = React.memo<CommentItemProps>(
         ))}
       </View>
     </ScreenWrapper>
-  )
+  ),
 );
 
 CommentItem.displayName = "CommentItem";
@@ -167,6 +167,7 @@ export default function CommentsBottomSheet({
   const inputRef = useRef<TextInput>(null);
   const flatListRef = useRef<FlatList>(null);
   const translateY = useRef(new Animated.Value(0)).current;
+  const keyboardHeightRef = useRef(0);
 
   // Data
   const { comments, loading, posting, addComment, toggleCommentLike } =
@@ -181,12 +182,12 @@ export default function CommentsBottomSheet({
   // Derived data
   const parentComments = useMemo(
     () => comments.filter((c) => c.parentId == null),
-    [comments]
+    [comments],
   );
 
   const replyToUser = useMemo(
     () => comments.find((c) => c.id === replyTo)?.user.nombre,
-    [replyTo, comments]
+    [replyTo, comments],
   );
 
   const canSend = Boolean(commentText.trim() || imageUri);
@@ -195,35 +196,58 @@ export default function CommentsBottomSheet({
   // Effects
   // ============================================================================
 
-  // Keyboard animation - only when modal is visible
+  // Global keyboard listener - register early to capture all events
   useEffect(() => {
-    if (!visible) return;
-
+    // iOS uses "will" events (before animation), Android uses "did" events (after)
     const showEvent =
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent =
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
     const onShow = Keyboard.addListener(showEvent, (e) => {
-      Animated.timing(translateY, {
-        toValue: -e.endCoordinates.height,
-        duration: e.duration || 250,
-        useNativeDriver: true,
-      }).start();
+      keyboardHeightRef.current = e.endCoordinates.height;
+      if (visible) {
+        if (Platform.OS === "ios") {
+          // iOS: animate smoothly with keyboard
+          Animated.timing(translateY, {
+            toValue: -e.endCoordinates.height,
+            duration: e.duration || 250,
+            useNativeDriver: true,
+          }).start();
+        } else {
+          // Android: instant change since keyboard already visible
+          translateY.setValue(-e.endCoordinates.height);
+        }
+      }
     });
 
     const onHide = Keyboard.addListener(hideEvent, (e) => {
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: e.duration || 250,
-        useNativeDriver: true,
-      }).start();
+      keyboardHeightRef.current = 0;
+      if (visible) {
+        if (Platform.OS === "ios") {
+          Animated.timing(translateY, {
+            toValue: 0,
+            duration: e.duration || 250,
+            useNativeDriver: true,
+          }).start();
+        } else {
+          // Android: instant change
+          translateY.setValue(0);
+        }
+      }
     });
 
     return () => {
       onShow.remove();
       onHide.remove();
     };
+  }, [visible, translateY]);
+
+  // Apply cached keyboard height when modal becomes visible
+  useEffect(() => {
+    if (visible && keyboardHeightRef.current > 0) {
+      translateY.setValue(-keyboardHeightRef.current);
+    }
   }, [visible, translateY]);
 
   // Reset state when modal closes
@@ -258,7 +282,7 @@ export default function CommentsBottomSheet({
     const success = await addComment(
       commentText,
       imageUri,
-      replyTo || undefined
+      replyTo || undefined,
     );
 
     if (success) {
@@ -268,7 +292,7 @@ export default function CommentsBottomSheet({
       Keyboard.dismiss();
       setTimeout(
         () => flatListRef.current?.scrollToEnd({ animated: true }),
-        100
+        100,
       );
     }
   }, [commentText, imageUri, replyTo, canSend, addComment]);
@@ -299,7 +323,7 @@ export default function CommentsBottomSheet({
       });
       toggleCommentLike(commentId);
     },
-    [toggleCommentLike]
+    [toggleCommentLike],
   );
 
   // ============================================================================
@@ -316,7 +340,7 @@ export default function CommentsBottomSheet({
         onReply={() => setReplyTo(item.id)}
       />
     ),
-    [comments, likedComments, handleLikeComment]
+    [comments, likedComments, handleLikeComment],
   );
 
   const ListEmptyComponent = useMemo(() => {

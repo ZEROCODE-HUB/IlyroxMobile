@@ -131,7 +131,7 @@ export const esDepartamento = (subtipo: string): boolean => {
  * Verifica si es propiedad comercial o industrial
  */
 export const esComercialIndustrial = (
-  tipoPrincipal: TipoPrincipal
+  tipoPrincipal: TipoPrincipal,
 ): boolean => {
   return tipoPrincipal === "comercial" || tipoPrincipal === "industrial";
 };
@@ -160,7 +160,7 @@ export const getCamposVisibles = (subtipo: string) => {
     antiguedad: !isTerreno,
 
     // Superficies
-    m2Construccion: !isTerreno && !isDepartamento,
+    m2Construccion: !isTerreno,
     m2Terreno: !isDepartamento,
 
     // Características adicionales

@@ -4,22 +4,26 @@
     "slug": "i360",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/Logo.jpeg",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "scheme": "i360realestate",
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
       "backgroundColor": "#06D5B4"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.i360.realestateapp",
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": false,
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       },
       "entitlements": {
         "aps-environment": "development",
@@ -30,10 +34,14 @@
       "config": {
         "googleMapsApiKey": "AIzaSyCMns7F3TjXiJ4oswwws0USAgum-GcwM9A"
       },
-      "associatedDomains": ["applinks:i360.app", "applinks:*.i360.app"]
+      "associatedDomains": [
+        "applinks:i360.app",
+        "applinks:*.i360.app"
+      ]
     },
     "android": {
-      "softwareKeyboardLayoutMode": "pan",
+      "softwareKeyboardLayoutMode": "resize",
+      "largeHeap": true,
       "statusBar": {
         "barStyle": "light-content",
         "backgroundColor": "#06D5B4",
@@ -41,7 +49,7 @@
         "hidden": false
       },
       "adaptiveIcon": {
-        "foregroundImage": "./assets/Logo.jpeg",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#06D5B4"
       },
       "package": "com.i360.realestateapp",
@@ -64,7 +72,10 @@
               "scheme": "i360realestate"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -84,7 +95,24 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "bff7f096-fd09-4de5-aec8-914b045bf350"
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "OneSignalNotificationServiceExtension",
+                  "bundleIdentifier": "com.i360.realestateapp.OneSignalNotificationServiceExtension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.i360.realestateapp.onesignal"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "a8b8b8c1-fc02-4f09-ae8e-9d929f564dd5"
       }
     }
   }

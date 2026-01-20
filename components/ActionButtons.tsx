@@ -15,6 +15,7 @@ import { COLORS } from "../constants";
 import { propertyService } from "../services/propertyService";
 import { useReportProperty } from "../hooks/useReportProperty";
 import ReportPropertyModal from "./modals/ReportPropertyModal";
+import SharePropertyModal from "./modals/SharePropertyModal";
 
 interface ActionButtonsProps {
   feedItemId: string;
@@ -30,7 +31,7 @@ interface ActionButtonsProps {
   orientation?: "horizontal" | "vertical";
   tintColor?: string;
   onTrackInteraction?: (
-    type: "like" | "comentario" | "compartir" | "guardar"
+    type: "like" | "comentario" | "compartir" | "guardar",
   ) => void;
   authorId?: string; // ID of the user who owns/posted the content
   contentId?: string; // ID of the actual property/post (for reports)
@@ -102,7 +103,12 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 
   // Hook de compartir con deep linking
   const { shareContent } = useShare();
+  const [showShareModal, setShowShareModal] = React.useState(false);
   const handleShare = async () => {
+    if (feedItemType === "property") {
+      setShowShareModal(true);
+      return;
+    }
     const success = await shareContent({
       feedItemId,
       type: feedItemType,
@@ -110,7 +116,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
       description: shareDescription,
       imageUrl: shareImageUrl,
     });
-
     if (success) {
       Alert.alert("¡Compartido!", "Contenido compartido exitosamente");
     }
@@ -131,8 +136,8 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     reportCount > 3
       ? COLORS.error
       : reportCount > 0
-      ? COLORS.warning
-      : tintColor;
+        ? COLORS.warning
+        : tintColor;
 
   return (
     <View style={containerStyle}>
@@ -194,7 +199,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             accessibilityRole="button"
           >
             <Ionicons
-              name="flag"
+              name="warning"
               size={isVertical ? 26 : 20}
               color={reportIconColor}
             />
@@ -226,6 +231,14 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           onSuccess={() =>
             fetchReportCount(propertyId || contentId || feedItemId)
           }
+        />
+      )}
+      {showShareModal && propertyId && (
+        <SharePropertyModal
+          visible={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          propertyTitle={shareTitle || "Propiedad"}
+          propertyId={propertyId}
         />
       )}
     </View>

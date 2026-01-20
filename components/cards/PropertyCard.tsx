@@ -122,7 +122,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           <View style={styles.recommendedAvatars}>
             {recommendedByPreview.slice(0, 2).map((u, idx) => (
               <View
-                key={u.id}
+                key={`${u.id}-${idx}`}
                 style={[
                   styles.recommendedAvatarWrapper,
                   idx > 0 && styles.recommendedAvatarOverlap,
@@ -151,11 +151,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           showDots={true}
           showImageCount={false}
         />
-
-        {/* Badge de operación (Sale/Rent) */}
-        <View style={styles.operationBadge}>
-          <Text style={styles.operationText}>{property.status}</Text>
-        </View>
 
         {/* Botones de acción flotantes (Columna derecha) */}
         <View style={styles.floatingActions}>

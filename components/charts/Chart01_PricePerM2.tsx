@@ -80,7 +80,7 @@ const Chart01_PricePerM2: React.FC<FilteredChartProps> = ({
 
         const op = ops.find(
           (o: any) =>
-            o?.tipo_operacion?.toLowerCase() === operationType.toLowerCase()
+            o?.tipo_operacion?.toLowerCase() === operationType.toLowerCase(),
         );
 
         if (op) {
@@ -186,8 +186,8 @@ const Chart01_PricePerM2: React.FC<FilteredChartProps> = ({
       priceType === "total"
         ? d.total
         : priceType === "terrain"
-        ? d.terrain
-        : d.construction;
+          ? d.terrain
+          : d.construction;
     const isActive =
       (activePoint?.chart === "chart1" && activePoint?.index === index) ||
       localActiveIndex === index;
@@ -218,7 +218,7 @@ const Chart01_PricePerM2: React.FC<FilteredChartProps> = ({
 
   const chartWidth = Math.max(
     Dimensions.get("window").width - 64,
-    processedData.length * 60
+    processedData.length * 60,
   );
   const currentIndex =
     activePoint?.chart === "chart1" ? activePoint.index : localActiveIndex;
@@ -246,8 +246,8 @@ const Chart01_PricePerM2: React.FC<FilteredChartProps> = ({
               {type === "total"
                 ? "Total"
                 : type === "terrain"
-                ? "Terreno"
-                : "Const."}
+                  ? "Terreno"
+                  : "Const."}
             </Text>
           </TouchableOpacity>
         ))}
@@ -334,8 +334,8 @@ const Chart01_PricePerM2: React.FC<FilteredChartProps> = ({
                 priceType === "total"
                   ? processedData[currentIndex].total
                   : priceType === "terrain"
-                  ? processedData[currentIndex].terrain
-                  : processedData[currentIndex].construction
+                    ? processedData[currentIndex].terrain
+                    : processedData[currentIndex].construction,
               )}
             </Text>
             <Text style={styles.tooltipLabel}>

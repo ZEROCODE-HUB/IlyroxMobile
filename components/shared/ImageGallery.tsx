@@ -2,10 +2,8 @@
  * ImageGallery - Carrusel de imágenes reutilizable
  *
  * Componente que maneja la visualización de múltiples imágenes
- * en un carrusel horizontal. Incluye indicadores de posición (dots)
- * y badge opcional de conteo de imágenes.
- *
- * Elimina código duplicado entre PostCard y PropertyCard.
+ * en un carrusel horizontal. Actualizado para usar FlatList
+ * para mejor rendimiento y fluidez en el scroll.
  *
  * @example
  * <ImageGallery
@@ -16,17 +14,17 @@
  * />
  */
 
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   View,
   StyleSheet,
-  ScrollView,
   Text,
   Dimensions,
+  ViewToken,
   LayoutChangeEvent,
 } from "react-native";
+import { FlatList } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
-import { useImageGallery } from "../../hooks";
 import { DIMENSIONS, COLORS } from "../../constants";
 import { commonStyles } from "../../styles";
 import LazyImage from "../LazyImage";
@@ -48,43 +46,92 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
   showImageCount = false,
   onImagePress,
 }) => {
-  const { currentIndex, handleScroll } = useImageGallery();
   const [containerWidth, setContainerWidth] = useState(SCREEN_WIDTH);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Referencia al FlatList
+  // Referencia al FlatList - Tipado correcto para GH FlatList
+  const flatListRef = useRef<FlatList<string>>(null);
+
+  // Callback para manejar cambios de layout y ajustar el ancho de las imágenes
+  const onLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const { width } = event.nativeEvent.layout;
+      // Solo actualizamos si hay una diferencia notable para evitar re-renders excesivos
+      if (width > 0 && Math.abs(width - containerWidth) > 1) {
+        setContainerWidth(width);
+      }
+    },
+    [containerWidth],
+  );
+
+  // Manejo optimizado del índice actual usando viewabilityConfig
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+        setCurrentIndex(viewableItems[0].index);
+      }
+    },
+  ).current;
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+  }).current;
+
+  // Renderizado de cada item de la galería
+  const renderItem = useCallback(
+    ({ item }: { item: string }) => (
+      <LazyImage
+        source={{ uri: item }}
+        style={[styles.image, { width: containerWidth }]}
+      />
+    ),
+    [containerWidth],
+  );
+
+  const keyExtractor = useCallback(
+    (item: string, index: number) => `${index}-${item}`,
+    [],
+  );
 
   if (!images || images.length === 0) {
     return null;
   }
-
-  const onLayout = (event: LayoutChangeEvent) => {
-    const { width } = event.nativeEvent.layout;
-    if (width > 0) {
-      setContainerWidth(width);
-    }
-  };
 
   return (
     <View
       style={[styles.container, { width: "100%", aspectRatio }]}
       onLayout={onLayout}
     >
-      <ScrollView
+      <FlatList
+        ref={flatListRef}
+        data={images}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
         horizontal
-        pagingEnabled
+        snapToInterval={containerWidth}
+        decelerationRate="fast"
+        disableIntervalMomentum={true}
+        bounces={false}
         showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         scrollEventThrottle={16}
+        initialNumToRender={2}
+        maxToRenderPerBatch={3}
+        windowSize={5}
+        removeClippedSubviews={true}
+        nestedScrollEnabled={true}
         style={styles.scroll}
-      >
-        {images.map((img, index) => (
-          <LazyImage
-            key={index}
-            source={{ uri: img }}
-            style={[styles.image, { width: containerWidth }]}
-          />
-        ))}
-      </ScrollView>
+        // Optimizamos el cálculo de layout ya que sabemos el ancho
+        getItemLayout={(_, index) => ({
+          length: containerWidth,
+          offset: containerWidth * index,
+          index,
+        })}
+      />
 
-      {/* Indicadores de carousel */}
+      {/* Indicadores de carousel (Dots) */}
       {showDots && images.length > 1 && (
         <View style={commonStyles.carouselDots}>
           {images.map((_, index) => (
@@ -99,7 +146,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
         </View>
       )}
 
-      {/* Badge de cantidad de imágenes */}
+      {/* Badge de cantidad de imágenes (opcional) */}
       {showImageCount && images.length > 1 && (
         <View style={styles.imageCountBadge}>
           <Ionicons name="grid" size={10} color={COLORS.white} />
@@ -121,7 +168,6 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   image: {
-    width: "100%",
     height: "100%",
     resizeMode: "cover",
   },

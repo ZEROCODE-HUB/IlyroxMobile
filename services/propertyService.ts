@@ -1,6 +1,23 @@
 import { supabase } from "../lib/supabase";
 import { Property } from "../types";
 
+const normalizePropertyStatus = (
+  value: unknown,
+  activo?: boolean
+): Property["status"] => {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (raw) {
+    const normalized = raw.toLowerCase();
+    if (normalized === "publicada") return "Publicada";
+    if (normalized === "suspendida") return "Suspendida";
+    if (normalized === "rentada") return "Rentada";
+    if (normalized === "reservada") return "Reservada";
+    if (normalized === "vendida") return "Vendida";
+  }
+  if (activo === false) return "Suspendida";
+  return "Publicada";
+};
+
 export const propertyService = {
   async propertiesByUser(targetUserId: string): Promise<Property[]> {
     const { data: propsData, error: propsError } = await supabase
@@ -20,6 +37,7 @@ export const propertyService = {
           metros_cuadrados_construccion,
           metros_cuadrados_terreno,
           activo,
+          status,
           codigo_propiedad,
           created_at,
           operaciones_propiedad (
@@ -45,8 +63,7 @@ export const propertyService = {
 
     return propsData.map((p: any) => {
       const operation = p.operaciones_propiedad?.[0];
-      let status: Property["status"] = "Publicada";
-      if (!p.activo) status = "Suspendida";
+      const status = normalizePropertyStatus(p.status, p.activo);
 
       let commission: Property["commission"] | undefined;
       if (operation?.comision_porcentaje || operation?.comision_monto_fijo) {

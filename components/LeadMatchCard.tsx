@@ -1,152 +1,151 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import PropertyCard from './cards/PropertyCard';
-import { COLORS } from '../constants';
-import { FeedItem } from '../types';
+import React from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { COLORS } from "../constants";
 
 interface LeadMatchCardProps {
   leadName: string;
-  leadPhone: string;
-  properties: FeedItem[];
-  totalProperties: number;
-  onViewMore: () => void;
-  onPropertyClick: (propertyId: string) => void;
-  currentUserId?: string;
+  leadPhone?: string;
+  matchCount: number;
+  similarCount: number;
+  minPrice: number;
+  maxPrice: number;
+  currency: string;
+  onPress: () => void;
 }
 
 export const LeadMatchCard: React.FC<LeadMatchCardProps> = ({
   leadName,
   leadPhone,
-  properties,
-  totalProperties,
-  onViewMore,
-  onPropertyClick,
-  currentUserId,
+  matchCount,
+  similarCount,
+  minPrice,
+  maxPrice,
+  currency,
+  onPress,
 }) => {
-  const remainingProperties = totalProperties - 1;
+  const formatCompactPrice = (amount: number) => {
+    if (!amount) return "0";
+    if (amount >= 1000000) {
+      return `$${(amount / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
+    }
+    if (amount >= 1000) {
+      return `$${(amount / 1000).toFixed(0)}k`;
+    }
+    return `$${amount}`;
+  };
+
+  const currencyDisplay = currency === "USD" ? "USD" : "MXN";
 
   return (
-    <View style={styles.container}>
-      {/* Header del Lead */}
-      <View style={styles.leadHeader}>
-        <View style={styles.leadInfo}>
-          <Text style={styles.leadName}>{leadName}</Text>
-          <View style={styles.phoneRow}>
-            <Ionicons name="call-outline" size={14} color={COLORS.textSecondary} />
-            <Text style={styles.leadPhone}>{leadPhone}</Text>
-          </View>
+    <TouchableOpacity
+      style={styles.container}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      {/* Left: Split Pill */}
+
+      {/* Middle: Info */}
+      <View style={styles.infoContainer}>
+        <View style={styles.leadRow}>
+          <Text style={styles.leadName} numberOfLines={1}>
+            {leadName}
+          </Text>
+          <Text style={styles.leadPhone} numberOfLines={1}>
+            {leadPhone}
+          </Text>
         </View>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{totalProperties}</Text>
-        </View>
+        <Text style={styles.priceRange}>
+          {formatCompactPrice(minPrice)} - {formatCompactPrice(maxPrice)}{" "}
+          {currencyDisplay}
+        </Text>
       </View>
 
-      {/* Mostrar primera propiedad o mensaje vacío */}
-      {properties.length > 0 ? (
-        <>
-          <PropertyCard
-            item={properties[0]}
-            onClick={() => onPropertyClick(properties[0].propertyDetails?.id || properties[0].id)}
-            onCommentClick={() => {}}
-            currentUserId={currentUserId}
-          />
-
-          {/* Botón Ver más - Siempre visible */}
-          <TouchableOpacity style={styles.viewMoreBtn} onPress={onViewMore}>
-            {remainingProperties > 0 ? (
-              <Text style={styles.viewMoreText}>
-                Ver {remainingProperties} {remainingProperties === 1 ? 'propiedad' : 'propiedades'} más
-              </Text>
-            ) : (
-              <Text style={styles.viewMoreText}>Ver detalles</Text>
-            )}
-            <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
-          </TouchableOpacity>
-        </>
-      ) : (
-        <View style={styles.emptyCard}>
-          <Ionicons name="search-outline" size={40} color={COLORS.textTertiary} />
-          <Text style={styles.emptyText}>Sin resultados en este momento</Text>
+      {/* Right: Phone */}
+      <View style={styles.pillContainer}>
+        <View style={styles.leftPill}>
+          <Text style={styles.pillTextWhite}>{matchCount}</Text>
         </View>
-      )}
-    </View>
+        <View style={styles.rightPill}>
+          <Text style={styles.pillTextDark}>{similarCount}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     backgroundColor: COLORS.white,
-    borderRadius: 16,
-    marginBottom: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
-  leadHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
-    backgroundColor: COLORS.background,
+    borderBottomColor: COLORS.cardBorder || "#E5E5E5",
   },
-  leadInfo: {
+  pillContainer: {
+    flexDirection: "row",
+    borderRadius: 8,
+    overflow: "hidden",
+    marginRight: 12,
+  },
+  leftPill: {
+    backgroundColor: "#FF3B30", // Red for matches
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    minWidth: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rightPill: {
+    backgroundColor: "#E5E5EA", // Gray for similar
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    minWidth: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pillTextWhite: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  pillTextDark: {
+    color: "#000000",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  infoContainer: {
     flex: 1,
+    justifyContent: "center",
+  },
+  leadRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
   },
   leadName: {
     fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: 4,
-  },
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    fontWeight: "600",
+    color: COLORS.textPrimary || "#000",
   },
   leadPhone: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
+    marginLeft: 8,
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#505050ff",
   },
-  badge: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    minWidth: 32,
-    alignItems: 'center',
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  viewMoreBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.cardBorder,
-    gap: 8,
-  },
-  viewMoreText: {
+  priceRange: {
     fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.primary,
+    color: COLORS.textSecondary || "#666",
+    fontWeight: "500",
   },
-  emptyCard: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+  phoneContainer: {
+    marginLeft: 8,
+    justifyContent: "center",
   },
-  emptyText: {
-    marginTop: 12,
+  phoneText: {
     fontSize: 14,
-    color: COLORS.textTertiary,
-    textAlign: 'center',
+    color: COLORS.textSecondary || "#666",
   },
 });

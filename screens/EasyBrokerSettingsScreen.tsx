@@ -1,6 +1,6 @@
 /**
  * EasyBrokerSettingsScreen.tsx - REFACTORIZADO
- * 
+ *
  * FIXES:
  * - Limpieza correcta de suscripciones Realtime
  * - Eliminado polling agresivo (era 28,800 requests/día)
@@ -27,6 +27,7 @@ import { COLORS } from "../constants/colors";
 import { AppHeader } from "../components/AppHeader";
 import { useAuth } from "../context/AuthContext";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import { ScreenWrapper } from "./ScreenWrapper";
 
 interface SyncHistory {
   id: string;
@@ -98,13 +99,13 @@ const EasyBrokerSettingsScreen: React.FC = () => {
       // Cargar historial
       const { data: historial } = await supabase.rpc(
         "obtener_historial_sincronizaciones",
-        { p_limit: 5 }
+        { p_limit: 5 },
       );
 
       if (historial?.success && historial.data) {
         const filtered = historial.data.filter(
           (item: SyncHistory) =>
-            item.status === "completada" || item.status === "error"
+            item.status === "completada" || item.status === "error",
         );
         setHistory(filtered);
       }
@@ -164,7 +165,8 @@ const EasyBrokerSettingsScreen: React.FC = () => {
             loadInitialData();
 
             const mensaje =
-              sync.propiedades_nuevas === 0 && sync.propiedades_actualizadas === 0
+              sync.propiedades_nuevas === 0 &&
+              sync.propiedades_actualizadas === 0
                 ? "No hay cambios. Tus propiedades ya están sincronizadas."
                 : `${sync.propiedades_nuevas} nuevas, ${sync.propiedades_actualizadas} actualizadas`;
 
@@ -174,11 +176,12 @@ const EasyBrokerSettingsScreen: React.FC = () => {
           } else if (sync.status === "error") {
             setSyncing(false);
             loadInitialData();
-            
-            const errorMsg = sync.mensaje_error || "Hubo un problema en la sincronización";
+
+            const errorMsg =
+              sync.mensaje_error || "Hubo un problema en la sincronización";
             Alert.alert("Error en sincronización", errorMsg);
           }
-        }
+        },
       )
       .subscribe((status) => {
         console.log("📡 Sync subscription status:", status);
@@ -265,9 +268,12 @@ const EasyBrokerSettingsScreen: React.FC = () => {
       } = await supabase.auth.getUser();
       if (!currentUser) return;
 
-      const { error } = await supabase.functions.invoke("sincronizar-easybroker", {
-        body: { usuario_id: currentUser.id },
-      });
+      const { error } = await supabase.functions.invoke(
+        "sincronizar-easybroker",
+        {
+          body: { usuario_id: currentUser.id },
+        },
+      );
 
       if (error) {
         throw error;
@@ -319,7 +325,7 @@ const EasyBrokerSettingsScreen: React.FC = () => {
   // Vista de onboarding (sin API key)
   if (!hasApiKey) {
     return (
-      <View style={styles.container}>
+      <ScreenWrapper withHeader={false} style={styles.container}>
         <AppHeader
           title="EasyBroker"
           showBackButton
@@ -332,24 +338,42 @@ const EasyBrokerSettingsScreen: React.FC = () => {
               <Ionicons name="cloud-upload" size={48} color={COLORS.primary} />
             </View>
 
-            <Text style={styles.onboardingTitle}>Sincroniza tus propiedades</Text>
+            <Text style={styles.onboardingTitle}>
+              Sincroniza tus propiedades
+            </Text>
 
             <Text style={styles.onboardingSubtitle}>
-              Conecta tu cuenta de EasyBroker para importar automáticamente todas
-              tus propiedades publicadas
+              Conecta tu cuenta de EasyBroker para importar automáticamente
+              todas tus propiedades publicadas
             </Text>
 
             <View style={styles.benefitsList}>
               <View style={styles.benefitItem}>
-                <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
-                <Text style={styles.benefitText}>Sincronización automática</Text>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={24}
+                  color={COLORS.success}
+                />
+                <Text style={styles.benefitText}>
+                  Sincronización automática
+                </Text>
               </View>
               <View style={styles.benefitItem}>
-                <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
-                <Text style={styles.benefitText}>Actualización en tiempo real</Text>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={24}
+                  color={COLORS.success}
+                />
+                <Text style={styles.benefitText}>
+                  Actualización en tiempo real
+                </Text>
               </View>
               <View style={styles.benefitItem}>
-                <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
+                <Ionicons
+                  name="checkmark-circle"
+                  size={24}
+                  color={COLORS.success}
+                />
                 <Text style={styles.benefitText}>100% seguro</Text>
               </View>
             </View>
@@ -393,7 +417,11 @@ const EasyBrokerSettingsScreen: React.FC = () => {
                   <Text style={styles.primaryButtonText}>
                     Conectar y Sincronizar
                   </Text>
-                  <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
+                  <Ionicons
+                    name="arrow-forward"
+                    size={20}
+                    color={COLORS.white}
+                  />
                 </>
               )}
             </TouchableOpacity>
@@ -408,7 +436,7 @@ const EasyBrokerSettingsScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </ScrollView>
-      </View>
+      </ScreenWrapper>
     );
   }
 
@@ -421,7 +449,10 @@ const EasyBrokerSettingsScreen: React.FC = () => {
         onBack={() => navigation.goBack()}
       />
 
-      <ScrollView style={styles.mainContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.mainContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Stats principales */}
         <View style={styles.headerStats}>
           <View style={styles.mainStatCard}>
@@ -444,8 +475,8 @@ const EasyBrokerSettingsScreen: React.FC = () => {
             </View>
 
             <Text style={styles.syncingDescription}>
-              Estamos importando tus propiedades desde EasyBroker. Puedes salir de
-              esta pantalla, te avisaremos cuando termine.
+              Estamos importando tus propiedades desde EasyBroker. Puedes salir
+              de esta pantalla, te avisaremos cuando termine.
             </Text>
 
             <View style={styles.syncingProgress}>
@@ -485,7 +516,9 @@ const EasyBrokerSettingsScreen: React.FC = () => {
                         : styles.statusDotError,
                     ]}
                   />
-                  <Text style={styles.historyDate}>{formatDate(item.fecha)}</Text>
+                  <Text style={styles.historyDate}>
+                    {formatDate(item.fecha)}
+                  </Text>
                 </View>
 
                 <View style={styles.historyStats}>
@@ -508,7 +541,10 @@ const EasyBrokerSettingsScreen: React.FC = () => {
                   {item.errores > 0 && (
                     <View style={styles.historyStatItem}>
                       <Text
-                        style={[styles.historyStatValue, { color: COLORS.error }]}
+                        style={[
+                          styles.historyStatValue,
+                          { color: COLORS.error },
+                        ]}
                       >
                         {item.errores}
                       </Text>
@@ -532,7 +568,11 @@ const EasyBrokerSettingsScreen: React.FC = () => {
             style={styles.settingsItem}
             onPress={() => setHasApiKey(false)}
           >
-            <Ionicons name="key-outline" size={20} color={COLORS.textSecondary} />
+            <Ionicons
+              name="key-outline"
+              size={20}
+              color={COLORS.textSecondary}
+            />
             <Text style={styles.settingsItemText}>Cambiar API Key</Text>
             <Ionicons
               name="chevron-forward"
@@ -549,7 +589,8 @@ const EasyBrokerSettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
   },
   loadingContainer: {
     flex: 1,

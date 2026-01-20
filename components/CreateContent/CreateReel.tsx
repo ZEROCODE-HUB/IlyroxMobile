@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,26 +12,29 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
 import * as ImagePicker from "expo-image-picker";
+import * as VideoThumbnails from "expo-video-thumbnails";
 import { useCreateContent } from "../../hooks/useCreateContent";
 import { useVideoUpload } from "../../hooks/useVideoUpload";
 import { useAuth } from "../../context/AuthContext";
 import { COLORS } from "../../constants/colors";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
-import { Video, ResizeMode } from "expo-av";
-import { supabase } from "../../lib/supabase";
 import * as Burnt from "burnt";
+import { supabase } from "../../lib/supabase";
 
 interface CreateReelProps {
   reelId?: string;
-  onBack?: () => void;
+  onBack: () => void;
 }
 
-export default function CreateReel({ reelId, onBack }: CreateReelProps) {
+export default function CreateReel({ onBack, reelId }: CreateReelProps) {
   const { user } = useAuth();
-
   const isEditing = !!reelId;
 
-  const { createReel, uploading: creatingReel } = useCreateContent(user?.id);
+  const {
+    createReel,
+    updateReel,
+    uploading: creatingReel,
+  } = useCreateContent(user?.id);
   const {
     uploadVideo,
     uploading: uploadingVideo,
@@ -40,10 +43,11 @@ export default function CreateReel({ reelId, onBack }: CreateReelProps) {
 
   const [description, setDescription] = useState("");
   const [videoUri, setVideoUri] = useState("");
+  const [thumbnailUri, setThumbnailUri] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loadingReel, setLoadingReel] = useState(false);
 
-  const uploading = uploadingVideo || creatingReel || loadingReel;
+  const uploading = uploadingVideo || creatingReel;
 
   useEffect(() => {
     if (isEditing) {
@@ -75,6 +79,23 @@ export default function CreateReel({ reelId, onBack }: CreateReelProps) {
   };
 
   /**
+   * Generar thumbnail del video
+   */
+  const generateThumbnail = async (videoUri: string) => {
+    try {
+      const { uri } = await VideoThumbnails.getThumbnailAsync(videoUri, {
+        time: 1000, // Captura en el segundo 1
+        quality: 0.8,
+      });
+      setThumbnailUri(uri);
+      return uri;
+    } catch (error) {
+      console.error("Error generando thumbnail:", error);
+      return null;
+    }
+  };
+
+  /**
    * Seleccionar video de la galería
    */
   const handlePickVideo = async () => {
@@ -94,7 +115,12 @@ export default function CreateReel({ reelId, onBack }: CreateReelProps) {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setVideoUri(result.assets[0].uri);
+      const videoUri = result.assets[0].uri;
+      setVideoUri(videoUri);
+
+      // Generar thumbnail automáticamente
+      await generateThumbnail(videoUri);
+
       if (errors.video) {
         setErrors({ ...errors, video: "" });
       }
@@ -129,7 +155,7 @@ export default function CreateReel({ reelId, onBack }: CreateReelProps) {
     }
 
     try {
-      // 1. Subir video a Supabase Storage (o usar URL existente)
+      // 1. Subir video a Supabase Storage
       const videoUrl = await uploadVideo(videoUri, "feed-images", "reels");
 
       if (!videoUrl) {
@@ -137,38 +163,33 @@ export default function CreateReel({ reelId, onBack }: CreateReelProps) {
         return;
       }
 
-      if (isEditing) {
-        // ACTUALIZAR REEL EXISTENTE
-        const { error } = await supabase
-          .from("reels")
-          .update({
-            descripcion: description,
-            video_url: videoUrl,
-            updated_at: new Date(),
-          })
-          .eq("id", reelId);
-
-        if (error) throw error;
-        Burnt.toast({
-          title: "Reel editado exitosamente!",
-          preset: "done",
-          duration: 2500,
-        });
-      } else {
-        // CREAR NUEVO REEL
-        const success = await createReel(description, videoUrl);
-        if (!success) {
-          throw new Error("No se pudo crear el reel");
-        }
+      // 2. Subir thumbnail si existe
+      let thumbnailUrl = null;
+      if (thumbnailUri) {
+        thumbnailUrl = await uploadVideo(
+          thumbnailUri,
+          "feed-images",
+          "thumbnails",
+        );
       }
 
-      // Limpiar formulario y volver
-      setTimeout(() => {
-        // No limpiar estado aquí para evitar re-render innecesario antes de desmontar
-        // setDescription("");
-        // setVideoUri("");
-        onBack ? onBack() : null; // Close safely
-      }, 500);
+      // 3. Crear o Actualizar el reel
+      let success = false;
+      if (isEditing && reelId) {
+        success = await updateReel(reelId, description, videoUrl, thumbnailUrl);
+      } else {
+        success = await createReel(description, videoUrl, thumbnailUrl);
+      }
+
+      if (success) {
+        // Limpiar formulario y volver
+        setTimeout(() => {
+          setDescription("");
+          setVideoUri("");
+          setThumbnailUri("");
+          onBack();
+        }, 500);
+      }
     } catch (error) {
       console.error("Error publishing reel:", error);
       Alert.alert("Error", "Hubo un problema al publicar el reel");
@@ -182,9 +203,7 @@ export default function CreateReel({ reelId, onBack }: CreateReelProps) {
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {isEditing ? "Editar Reel" : "Crear Reel"}
-        </Text>
+        <Text style={styles.headerTitle}>Crear Reel</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -199,40 +218,20 @@ export default function CreateReel({ reelId, onBack }: CreateReelProps) {
 
           {videoUri ? (
             <View style={styles.videoPreview}>
-              {/* VIDEO PREVIEW using Expo AV */}
-              <Video
-                source={{ uri: videoUri }}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  borderRadius: 12,
-                  backgroundColor: "#000",
-                }}
-                resizeMode={ResizeMode.COVER}
-                useNativeControls
-                isLooping
-                shouldPlay={false}
-              />
-
+              <Ionicons name="videocam" size={48} color={COLORS.primary} />
+              <Text style={styles.videoText}>Video seleccionado</Text>
               <TouchableOpacity
                 onPress={() => {
                   setVideoUri("");
+                  setThumbnailUri("");
                   if (errors.video) {
                     setErrors({ ...errors, video: "" });
                   }
                 }}
-                style={[
-                  styles.removeVideoBtn,
-                  {
-                    position: "absolute",
-                    top: 10,
-                    right: 10,
-                    marginTop: 0,
-                    backgroundColor: "rgba(255,255,255,0.9)",
-                  },
-                ]}
+                style={styles.removeVideoBtn}
               >
                 <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+                <Text style={styles.removeVideoText}>Eliminar</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -440,7 +439,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
-    paddingBottom: 60,
+    paddingBottom: 50,
   },
   publishBtn: {
     backgroundColor: COLORS.primary,

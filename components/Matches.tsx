@@ -9,6 +9,7 @@ import {
   Alert,
   RefreshControl,
   Modal,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -22,7 +23,7 @@ import { AppHeader } from "./AppHeader";
 import { COLORS } from "../constants";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
 
-type MatchType = "coincidencia" | "similar";
+export type MatchType = "coincidencia" | "similar";
 
 interface MatchData {
   id: string;
@@ -44,6 +45,30 @@ interface LeadGroup {
   matches: MatchData[];
   properties: FeedItem[];
   latestMatchDate: string;
+  minPrice: number;
+  maxPrice: number;
+  currency: string;
+  matchCount: number;
+  similarCount: number;
+  leadEmail?: string;
+  coincidences: FeedItem[];
+  similars: FeedItem[];
+  searchCriteria: {
+    tipo_propiedad?: string;
+    subtipo?: string;
+    ciudad?: string;
+    municipio?: string;
+    colonia?: string;
+    tipo_operacion?: string;
+    precio_min?: number;
+    precio_max?: number;
+    moneda?: string;
+    habitaciones?: string;
+    banos?: string;
+    estacionamientos?: string;
+    metros_terreno?: number;
+    metros_construccion?: number;
+  };
 }
 
 const Matches: React.FC = () => {
@@ -53,11 +78,12 @@ const Matches: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [savedSearches, setSavedSearches] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<MatchType>("coincidencia");
+  // const [activeTab, setActiveTab] = useState<MatchType>("coincidencia"); // Removed tabs
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(
-    null
+    null,
   );
   const [selectedLead, setSelectedLead] = useState<LeadGroup | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchMatches = async () => {
     if (!user) return;
@@ -70,7 +96,7 @@ const Matches: React.FC = () => {
           `
         *,
         lead:leads(*)
-      `
+      `,
         )
         .eq("usuario_id", user.id)
         .eq("activa", true)
@@ -95,7 +121,7 @@ const Matches: React.FC = () => {
           *,
           lead:leads(*)
         )
-      `
+      `,
         )
         .eq("usuario_id", user.id)
         .eq("activo", true)
@@ -120,7 +146,7 @@ const Matches: React.FC = () => {
             data = data.map((match) => {
               if (match.propiedad && match.propiedad.created_by) {
                 const perfil = perfiles.find(
-                  (p) => p.id === match.propiedad.created_by
+                  (p) => p.id === match.propiedad.created_by,
                 );
                 return {
                   ...match,
@@ -182,7 +208,7 @@ const Matches: React.FC = () => {
   // Agrupar matches por lead e incluir búsquedas sin matches
   const groupMatchesByLead = (
     matchesList: MatchData[],
-    allSearches: any[]
+    allSearches: any[],
   ): LeadGroup[] => {
     console.log("=== AGRUPANDO MATCHES ===");
     const grouped = new Map<string, LeadGroup>();
@@ -195,10 +221,34 @@ const Matches: React.FC = () => {
           leadId: lead.id,
           leadName: lead.nombre || "Lead sin nombre",
           leadPhone: lead.telefono || "Sin teléfono",
+          leadEmail: lead.correo || lead.email,
           busquedaId: search.id,
           matches: [],
           properties: [],
           latestMatchDate: search.created_at, // Usar fecha de creación de búsqueda por defecto
+          minPrice: search.precio_min || 0,
+          maxPrice: search.precio_max || 0,
+          currency: search.moneda || search.monera || "MXN",
+          matchCount: 0,
+          similarCount: 0,
+          coincidences: [],
+          similars: [],
+          searchCriteria: {
+            tipo_propiedad: search.tipo_propiedad,
+            subtipo: search.subtipo,
+            ciudad: search.ciudad,
+            municipio: search.municipio,
+            colonia: search.colonia,
+            tipo_operacion: search.tipo_operacion,
+            precio_min: search.precio_min,
+            precio_max: search.precio_max,
+            moneda: search.moneda || search.monera,
+            habitaciones: search.habitaciones,
+            banos: search.banos,
+            estacionamientos: search.estacionamientos,
+            metros_terreno: search.metros_terreno,
+            metros_construccion: search.metros_construccion,
+          },
         });
       }
     });
@@ -216,15 +266,45 @@ const Matches: React.FC = () => {
           leadId,
           leadName: lead.nombre || "Lead sin nombre",
           leadPhone: lead.telefono || "Sin teléfono",
+          leadEmail: lead.correo || lead.email,
           busquedaId: match.busqueda_id,
           matches: [],
           properties: [],
           latestMatchDate: match.created_at,
+          minPrice: match.busqueda?.precio_min || 0,
+          maxPrice: match.busqueda?.precio_max || 0,
+          currency: match.busqueda?.moneda || match.busqueda?.monera || "MXN",
+          matchCount: 0,
+          similarCount: 0,
+          coincidences: [],
+          similars: [],
+          searchCriteria: {
+            tipo_propiedad: match.busqueda?.tipo_propiedad,
+            subtipo: match.busqueda?.subtipo,
+            ciudad: match.busqueda?.ciudad,
+            municipio: match.busqueda?.municipio,
+            colonia: match.busqueda?.colonia,
+            tipo_operacion: match.busqueda?.tipo_operacion,
+            precio_min: match.busqueda?.precio_min,
+            precio_max: match.busqueda?.precio_max,
+            moneda: match.busqueda?.moneda || match.busqueda?.monera,
+            habitaciones: match.busqueda?.habitaciones,
+            banos: match.busqueda?.banos,
+            estacionamientos: match.busqueda?.estacionamientos,
+            metros_terreno: match.busqueda?.metros_terreno,
+            metros_construccion: match.busqueda?.metros_construccion,
+          },
         });
       }
 
       const group = grouped.get(leadId)!;
       group.matches.push(match);
+
+      if (match.tipo_match === "coincidencia") {
+        group.matchCount++;
+      } else {
+        group.similarCount++;
+      }
 
       // Actualizar fecha más reciente si el match es más nuevo
       if (new Date(match.created_at) > new Date(group.latestMatchDate)) {
@@ -281,7 +361,7 @@ const Matches: React.FC = () => {
           avatar:
             perfil?.foto ||
             `https://ui-avatars.com/api/?name=V&background=${COLORS.primary.substring(
-              1
+              1,
             )}&color=fff`,
           isFollowing: false,
           role: (perfil?.rol === "agente" ? "Agent" : "User") as any,
@@ -322,6 +402,12 @@ const Matches: React.FC = () => {
       };
 
       group.properties.push(feedItem);
+
+      if (match.tipo_match === "coincidencia") {
+        group.coincidences.push(feedItem);
+      } else {
+        group.similars.push(feedItem);
+      }
     });
 
     // Convertir a array y ordenar por fecha más reciente
@@ -344,8 +430,11 @@ const Matches: React.FC = () => {
     return result;
   };
 
-  const filteredMatches = matches.filter((m) => m.tipo_match === activeTab);
-  const leadGroups = groupMatchesByLead(filteredMatches, savedSearches);
+  // const filteredMatches = matches.filter((m) => m.tipo_match === activeTab); // No filtering
+  // const filteredMatches = matches.filter((m) => m.tipo_match === activeTab); // No filtering
+  const leadGroups = groupMatchesByLead(matches, savedSearches).filter((lead) =>
+    lead.leadName.toLowerCase().includes(searchQuery.toLowerCase()),
+  ); // Pass all matches
 
   if (loading && !refreshing) {
     return (
@@ -364,34 +453,29 @@ const Matches: React.FC = () => {
         onBack={() => navigation.goBack()}
       />
 
-      {/* Tabs */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "coincidencia" && styles.activeTab]}
-          onPress={() => setActiveTab("coincidencia")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "coincidencia" && styles.activeTabText,
-            ]}
-          >
-            Coincidencias
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "similar" && styles.activeTab]}
-          onPress={() => setActiveTab("similar")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "similar" && styles.activeTabText,
-            ]}
-          >
-            Similares
-          </Text>
-        </TouchableOpacity>
+      {/* Tabs Removed */}
+
+      {/* Buscador */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchWrapper}>
+          <Ionicons name="search" size={20} color={COLORS.textTertiary} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar prospecto..."
+            placeholderTextColor={COLORS.textTertiary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <Ionicons
+                name="close-circle"
+                size={20}
+                color={COLORS.textTertiary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Content */}
@@ -405,7 +489,13 @@ const Matches: React.FC = () => {
           />
         }
       >
-        {leadGroups.length === 0 ? (
+        {loading ? ( // Show loading inside if initial load
+          <ActivityIndicator
+            size="large"
+            color={COLORS.primary}
+            style={{ marginTop: 50 }}
+          />
+        ) : leadGroups.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons
               name="search-outline"
@@ -422,13 +512,12 @@ const Matches: React.FC = () => {
               key={lead.leadId}
               leadName={lead.leadName}
               leadPhone={lead.leadPhone}
-              properties={lead.properties}
-              totalProperties={lead.properties.length}
-              onViewMore={() => setSelectedLead(lead)}
-              onPropertyClick={(propertyId) =>
-                setSelectedPropertyId(propertyId)
-              }
-              currentUserId={user?.id}
+              minPrice={lead.minPrice}
+              maxPrice={lead.maxPrice}
+              currency={lead.currency}
+              matchCount={lead.matchCount}
+              similarCount={lead.similarCount}
+              onPress={() => setSelectedLead(lead)}
             />
           ))
         )}
@@ -441,11 +530,18 @@ const Matches: React.FC = () => {
           onClose={() => setSelectedLead(null)}
           leadName={selectedLead.leadName}
           leadPhone={selectedLead.leadPhone}
+          leadEmail={selectedLead.leadEmail}
           busquedaId={selectedLead.busquedaId}
-          properties={selectedLead.properties}
+          coincidences={selectedLead.coincidences}
+          similars={selectedLead.similars}
+          searchCriteria={selectedLead.searchCriteria}
           onPropertyClick={(propertyId) => {
             setSelectedLead(null);
             setSelectedPropertyId(propertyId);
+          }}
+          onUserClick={(user) => {
+            setSelectedLead(null);
+            navigation.navigate("UserProfile", { userId: user.id });
           }}
           onDeleteSearch={handleDeleteSearch}
           currentUserId={user?.id}
@@ -470,7 +566,7 @@ const Matches: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   },
   loadingContainer: {
     flex: 1,
@@ -517,6 +613,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textTertiary,
     textAlign: "center",
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+    backgroundColor: COLORS.white,
+  },
+  searchWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.background, // o un color gris claro
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 15,
+    color: COLORS.textPrimary,
   },
 });
 

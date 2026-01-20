@@ -53,7 +53,7 @@ export function useFeed(options: UseFeedOptions = {}) {
     const { data, error: statsError } = await supabase
       .from("vw_estadisticas_resenas")
       .select(
-        "profesional_id,calificacion_promedio,total_resenas,total_recomiendan,total_no_recomiendan"
+        "profesional_id,calificacion_promedio,total_resenas,total_recomiendan,total_no_recomiendan",
       )
       .in("profesional_id", ids);
 
@@ -87,7 +87,7 @@ export function useFeed(options: UseFeedOptions = {}) {
                 : 0,
           },
         };
-      })
+      }),
     );
   }, []);
 
@@ -96,7 +96,7 @@ export function useFeed(options: UseFeedOptions = {}) {
       profesionalIds: string[],
       options?: {
         force?: boolean;
-      }
+      },
     ) => {
       const ids = Array.from(new Set(profesionalIds.filter(Boolean)));
       if (ids.length === 0) return;
@@ -122,7 +122,7 @@ export function useFeed(options: UseFeedOptions = {}) {
         console.error("Error fetching recommendation previews:", error);
       }
     },
-    [recommendedByPreviewByUserId]
+    [recommendedByPreviewByUserId],
   );
 
   /**
@@ -152,7 +152,7 @@ export function useFeed(options: UseFeedOptions = {}) {
             recommendedByPreview: preview,
           },
         };
-      })
+      }),
     );
   }, [recommendedByPreviewByUserId]); // Solo depende de recommendedByPreviewByUserId
 
@@ -274,7 +274,7 @@ export function useFeed(options: UseFeedOptions = {}) {
             foto,
             rol
           )
-        `
+        `,
           )
           .eq("estado_moderacion", "activo")
           .is("deleted_at", null)
@@ -293,8 +293,8 @@ export function useFeed(options: UseFeedOptions = {}) {
           new Set(
             (feedData || [])
               .map((item: any) => (item.perfiles as any)?.id)
-              .filter(Boolean) as string[]
-          )
+              .filter(Boolean) as string[],
+          ),
         );
 
         const statsPromise =
@@ -302,7 +302,7 @@ export function useFeed(options: UseFeedOptions = {}) {
             ? supabase
                 .from("vw_estadisticas_resenas")
                 .select(
-                  "profesional_id,calificacion_promedio,total_resenas,total_recomiendan,total_no_recomiendan"
+                  "profesional_id,calificacion_promedio,total_resenas,total_recomiendan,total_no_recomiendan",
                 )
                 .in("profesional_id", perfilIds)
             : Promise.resolve({ data: [], error: null } as any);
@@ -362,9 +362,10 @@ export function useFeed(options: UseFeedOptions = {}) {
                   precio,
                   moneda
                 )
-              `
+              `,
                   )
                   .in("id", propertyIds)
+                  .eq("activo", true)
                   .is("deleted_at", null)
               : { data: [], error: null },
             statsPromise,
@@ -375,12 +376,12 @@ export function useFeed(options: UseFeedOptions = {}) {
         const reelsMap = new Map(reelsData.data?.map((r) => [r.id, r]) || []);
         const propertiesMap = new Map(
           (propertiesData.data?.map((p) => [p.id, p] as [string, any]) ||
-            []) as Iterable<[string, any]>
+            []) as Iterable<[string, any]>,
         );
         const statsRows =
           ((statsData?.data || []) as unknown as ReviewStatsRow[]) || [];
         const statsByUserId = new Map<string, ReviewStatsRow>(
-          statsRows.map((s) => [s.profesional_id, s])
+          statsRows.map((s) => [s.profesional_id, s]),
         );
 
         // 5. Combinar todo en FeedItems
@@ -544,7 +545,7 @@ export function useFeed(options: UseFeedOptions = {}) {
         setRefreshing(false);
       }
     },
-    [pageSize, recommendedByPreviewByUserId]
+    [pageSize, recommendedByPreviewByUserId],
   );
 
   /**

@@ -254,6 +254,23 @@ export default function EditProperty({
     return value.filter((item) => item !== null && item !== undefined);
   };
 
+  const normalizeStatus = (
+    value: unknown,
+    activo?: boolean,
+  ): "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida" => {
+    const raw = typeof value === "string" ? value.trim() : "";
+    if (raw) {
+      const normalized = raw.toLowerCase();
+      if (normalized === "publicada") return "Publicada";
+      if (normalized === "suspendida") return "Suspendida";
+      if (normalized === "rentada") return "Rentada";
+      if (normalized === "reservada") return "Reservada";
+      if (normalized === "vendida") return "Vendida";
+    }
+    if (activo === false) return "Suspendida";
+    return "Publicada";
+  };
+
   const fetchPropertyData = async () => {
     try {
       setLoading(true);
@@ -281,7 +298,7 @@ export default function EditProperty({
       setDescripcionPlantaAlta(safeString(prop.descripcion_planta_alta));
       setTipoPrincipal(safeString(prop.tipo, "habitacional") as TipoPrincipal);
       setSubtipo(safeString(prop.subtipo));
-      setStatus(prop.activo ? "Publicada" : "Suspendida");
+      setStatus(normalizeStatus(prop.status, prop.activo));
 
       // Ubicación con valores seguros
       setUbicacionData({
@@ -670,6 +687,7 @@ export default function EditProperty({
         latitud: location.latitude,
         longitud: location.longitude,
         fotos: finalImageUrls,
+        status: status,
         activo: status === "Publicada",
       };
 
@@ -1135,8 +1153,16 @@ export default function EditProperty({
 
           <Text style={styles.inputLabel}>Mapa (Pin de ubicación)</Text>
           <LocationPicker
-            initialLatitude={location.latitude || 0}
-            initialLongitude={location.longitude || 0}
+            selectedLocation={
+              location.latitude && location.longitude
+                ? { latitude: location.latitude, longitude: location.longitude }
+                : null
+            }
+            focusLocation={
+              location.latitude && location.longitude
+                ? { latitude: location.latitude, longitude: location.longitude }
+                : null
+            }
             onLocationSelected={(loc) => setLocation(loc)}
           />
         </View>

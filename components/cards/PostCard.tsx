@@ -103,7 +103,7 @@ const PostCard: React.FC<PostCardProps> = ({
           <View style={styles.recommendedAvatars}>
             {recommendedByPreview.slice(0, 2).map((u, idx) => (
               <View
-                key={u.id}
+                key={`${u.id}-${idx}`}
                 style={[
                   styles.recommendedAvatarWrapper,
                   idx > 0 && styles.recommendedAvatarOverlap,

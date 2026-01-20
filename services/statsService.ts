@@ -44,7 +44,7 @@ export const statsService = {
               precio,
               tipo_operacion
             )
-          `
+          `,
           )
           .is("deleted_at", null);
 
@@ -123,7 +123,7 @@ export const statsService = {
           metros_cuadrados_construccion,
           metros_cuadrados_terreno,
           operaciones_propiedad!inner (precio, tipo_operacion)
-        `
+        `,
         )
         .is("deleted_at", null);
 
@@ -222,7 +222,7 @@ export const statsService = {
           `
           habitaciones,
           operaciones_propiedad!inner (precio)
-        `
+        `,
         )
         .is("deleted_at", null)
         .eq("status", "Vendida");
@@ -281,7 +281,7 @@ export const statsService = {
           antiguedad,
           created_at,
           operaciones_propiedad!inner (tipo_operacion)
-        `
+        `,
         )
         .eq("operaciones_propiedad.tipo_operacion", "venta")
         .is("deleted_at", null);
@@ -324,7 +324,7 @@ export const statsService = {
             created_at,
             fecha_venta,
             metros_cuadrados_construccion
-            `
+            `,
           )
           .eq("status", "Vendida")
           .not("fecha_venta", "is", null)
@@ -518,7 +518,7 @@ export const statsService = {
    * Usa vistas_count como indicador de interés en la colonia
    */
   async getSearchesByNeighborhood(
-    filters: FilterOptions
+    filters: FilterOptions,
   ): Promise<SearchesByNeighborhoodData[]> {
     try {
       // Validar que se haya seleccionado un estado
@@ -546,7 +546,7 @@ export const statsService = {
             tipo_operacion,
             precio
           )
-        `
+        `,
         )
         .eq("activo", true)
         .is("deleted_at", null)
@@ -567,7 +567,7 @@ export const statsService = {
       if (filters.tipoOperacion && filters.tipoOperacion !== "Todos") {
         query = query.eq(
           "operaciones_propiedad.tipo_operacion",
-          filters.tipoOperacion
+          filters.tipoOperacion,
         );
       }
 
@@ -628,7 +628,7 @@ export const statsService = {
       if (error) {
         console.error(
           "Error al obtener datos de búsquedas por colonia:",
-          error
+          error,
         );
         return [];
       }
@@ -654,13 +654,13 @@ export const statsService = {
 
         neighborhoodMap.set(
           neighborhood,
-          neighborhoodMap.get(neighborhood)! + weight
+          neighborhoodMap.get(neighborhood)! + weight,
         );
       });
 
       // Convertir a array y simular búsquedas proporcionales al volumen de oferta
       const result: SearchesByNeighborhoodData[] = Array.from(
-        neighborhoodMap.entries()
+        neighborhoodMap.entries(),
       )
         .map(([neighborhood, count]) => {
           // Simulamos que el interés es aproximadamente 5-10 veces el volumen de oferta
@@ -812,8 +812,8 @@ export const statsService = {
         filters.tipoPropiedad === "industrial"
           ? 120
           : filters.tipoPropiedad === "comercial"
-          ? 250
-          : 400;
+            ? 250
+            : 400;
 
       return [
         {
@@ -913,7 +913,7 @@ export const statsService = {
    * Utiliza la tabla de precios_rentas_ventas para datos más específicos de mercado
    */
   async getPublishedVsSold(
-    filters: FilterOptions
+    filters: FilterOptions,
   ): Promise<PublishedVsSoldData[]> {
     try {
       if (
@@ -948,7 +948,7 @@ export const statsService = {
               tipo_operacion,
               precio
             )
-          `
+          `,
           )
           .is("deleted_at", null);
 
@@ -1020,7 +1020,7 @@ export const statsService = {
               const cumpleMax =
                 !filters.precioMax || op.precio <= filters.precioMax;
               return cumpleMin && cumpleMax;
-            }
+            },
           );
           if (!tienePrecioValido) return;
         }

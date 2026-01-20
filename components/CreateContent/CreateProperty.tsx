@@ -12,6 +12,7 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { COORDENADAS_ESTADO } from "../../constants/locations";
 import { AppInput } from "../../design-system/components/AppInput";
 import * as ImagePicker from "expo-image-picker";
 import { SelectionModal } from "../modals";
@@ -46,11 +47,9 @@ import {
   getLabelRecamaras,
   getCamposVisibles,
 } from "../../constants/propertyData";
-import { COORDENADAS_ESTADO } from "../../constants/locations";
 import { useStableSafeInsets } from "../../context/SafeInsetsContext";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
-import ReordenableImages from "./ReordenableImages";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { ViewImage } from "../modals/ViewImage";
 
 interface CreatePropertyProps {
   onBack: () => void;
@@ -108,7 +107,6 @@ export default function CreateProperty({
     latitude: 0,
     longitude: 0,
   });
-  // Estado para controlar el centro del mapa programáticamente (separado de la ubicación seleccionada)
   const [mapCenter, setMapCenter] = useState<{
     lat: number;
     lng: number;
@@ -140,7 +138,7 @@ export default function CreateProperty({
   // ============================================
   const [comparteComision, setComparteComision] = useState<"No" | "Sí">("No");
   const [comisionTipo, setComisionTipo] = useState<"porcentaje" | "monto">(
-    "porcentaje"
+    "porcentaje",
   );
   const [comisionValor, setComisionValor] = useState("");
   const [comisionCompartidaTipo, setComisionCompartidaTipo] = useState<
@@ -174,7 +172,7 @@ export default function CreateProperty({
   // 8. FINANCIAMIENTO
   // ============================================
   const [aceptaFinanciamiento, setAceptaFinanciamiento] = useState<"No" | "Sí">(
-    "No"
+    "No",
   );
   const [
     tiposFinanciamientoSeleccionados,
@@ -266,25 +264,10 @@ export default function CreateProperty({
   //   }
   // }, [m2Construccion, m2Terreno]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (location.latitude !== 0 && location.longitude !== 0)
       clearError("location");
   }, [location]);
-
-  // Efecto para centrar el mapa cuando cambia el Estado
-  useEffect(() => {
-    if (ubicacionData.estado && COORDENADAS_ESTADO[ubicacionData.estado]) {
-      const coords = COORDENADAS_ESTADO[ubicacionData.estado];
-      // Actualizamos el centro visual del mapa
-      setMapCenter(coords);
-      // Opcional: También pre-seleccionamos esa ubicación como el marker (si no hay uno ya definido por el usuario o si queremos forzarlo)
-      // En este caso, forzamos para que el pin aparezca en el estado seleccionado
-      setLocation({
-        latitude: coords.lat,
-        longitude: coords.lng,
-      });
-    }
-  }, [ubicacionData.estado]);
 
   // ============================================
   // LOAD DATA FOR EDITING
@@ -294,6 +277,17 @@ export default function CreateProperty({
       fetchPropertyDetails();
     }
   }, [propertyId]);
+
+  useEffect(() => {
+    if (ubicacionData.estado && COORDENADAS_ESTADO[ubicacionData.estado]) {
+      const coords = COORDENADAS_ESTADO[ubicacionData.estado];
+      // Actualizamos el centro visual del mapa
+      setMapCenter(coords);
+      // YA NO forzamos el pin, solo el foco
+    }
+  }, [ubicacionData.estado]);
+
+  //
 
   const fetchPropertyDetails = async () => {
     try {
@@ -315,7 +309,7 @@ export default function CreateProperty({
             monto,
             catalogo_instituciones_financieras (nombre)
           )
-        `
+        `,
         )
         .eq("id", propertyId)
         .single();
@@ -364,13 +358,6 @@ export default function CreateProperty({
       latitude: data.latitud || 0,
       longitude: data.longitud || 0,
     });
-    // Sincronizar también el centro del mapa con la ubicación cargada
-    if (data.latitud && data.longitud) {
-      setMapCenter({
-        lat: data.latitud,
-        lng: data.longitud,
-      });
-    }
 
     // 4. Características Físicas
     setRecamaras(data.habitaciones?.toString() || "0");
@@ -397,6 +384,13 @@ export default function CreateProperty({
       setTipoOperacion("renta");
     }
 
+    if (data.latitud && data.longitud) {
+      setMapCenter({
+        lat: data.latitud,
+        lng: data.longitud,
+      });
+    }
+
     // Configurar campos de VENTA
     if (ventaOp) {
       setPrecioVenta(ventaOp.precio?.toString() || "");
@@ -405,7 +399,7 @@ export default function CreateProperty({
 
       if (ventaOp.comparte_comision) {
         setComisionTipo(
-          ventaOp.comision_tipo === "monto_fijo" ? "monto" : "porcentaje"
+          ventaOp.comision_tipo === "monto_fijo" ? "monto" : "porcentaje",
         );
         const valor =
           ventaOp.comision_tipo === "monto_fijo"
@@ -417,12 +411,12 @@ export default function CreateProperty({
         if (ventaOp.porcentaje_comision_compartida) {
           setComisionCompartidaTipo("porcentaje");
           setComisionCompartidaValor(
-            ventaOp.porcentaje_comision_compartida.toString()
+            ventaOp.porcentaje_comision_compartida.toString(),
           );
         } else if (ventaOp.monto_comision_compartida) {
           setComisionCompartidaTipo("monto");
           setComisionCompartidaValor(
-            ventaOp.monto_comision_compartida.toString()
+            ventaOp.monto_comision_compartida.toString(),
           );
         }
         setCondicionesComision(ventaOp.condiciones_comision_compartida || "");
@@ -456,7 +450,7 @@ export default function CreateProperty({
 
       if (rentaOp.comparte_comision) {
         setTipo(
-          rentaOp.comision_tipo === "monto_fijo" ? "monto" : "porcentaje"
+          rentaOp.comision_tipo === "monto_fijo" ? "monto" : "porcentaje",
         );
         const valor =
           rentaOp.comision_tipo === "monto_fijo"
@@ -502,7 +496,7 @@ export default function CreateProperty({
       setTieneGravamen("Sí");
       const grav = data.propiedad_gravamenes[0];
       setInstitucionGravamen(
-        grav.catalogo_instituciones_financieras?.nombre || ""
+        grav.catalogo_instituciones_financieras?.nombre || "",
       );
       setMontoGravamen(grav.monto?.toString() || "");
     } else {
@@ -558,6 +552,16 @@ export default function CreateProperty({
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const moveImage = (fromIndex: number, toIndex: number) => {
+    setImages((prev) => {
+      const next = [...prev];
+      if (toIndex < 0 || toIndex >= next.length) return next;
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  };
+
   /**
    * Toggle amenidad
    */
@@ -565,7 +569,7 @@ export default function CreateProperty({
     setAmenidadesSeleccionadas((prev) =>
       prev.includes(amenidad)
         ? prev.filter((a) => a !== amenidad)
-        : [...prev, amenidad]
+        : [...prev, amenidad],
     );
   };
 
@@ -574,7 +578,7 @@ export default function CreateProperty({
    */
   const toggleFinanciamiento = (tipo: string) => {
     setTiposFinanciamientoSeleccionados((prev) =>
-      prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo]
+      prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo],
     );
   };
 
@@ -643,7 +647,7 @@ export default function CreateProperty({
       Alert.alert(
         "Faltan datos requeridos",
         errorMessages || "Por favor revisa los campos marcados en rojo",
-        [{ text: "OK" }]
+        [{ text: "OK" }],
       );
       return;
     }
@@ -835,7 +839,7 @@ export default function CreateProperty({
               if (onBack) onBack();
             },
           },
-        ]
+        ],
       );
 
       setTimeout(() => {
@@ -855,7 +859,7 @@ export default function CreateProperty({
    */
   const handleCurrencyChange = (
     text: string,
-    setter: (val: string) => void
+    setter: (val: string) => void,
   ) => {
     // Eliminar comas para obtener el valor numérico crudo
     const rawValue = text.replace(/,/g, "");
@@ -890,7 +894,7 @@ export default function CreateProperty({
       setCompartidaValor: (val: string) => void;
       setCondiciones: (val: string) => void;
     },
-    isSecondInstance = false
+    isSecondInstance = false,
   ) => (
     <View
       style={
@@ -981,7 +985,7 @@ export default function CreateProperty({
             }
             onSelect={(val) =>
               setters.setCompartidaTipo(
-                val === "Porcentaje" ? "porcentaje" : "monto"
+                val === "Porcentaje" ? "porcentaje" : "monto",
               )
             }
           />
@@ -1066,35 +1070,55 @@ export default function CreateProperty({
             <Text style={styles.sectionTitle}>Fotos de la Propiedad</Text>
           </View>
           <Text style={styles.hint}>
-            Mínimo 1 imagen, máximo 15 ({images.length}/15). Arrastra para
-            reordenar.
+            Mínimo 1 imagen, máximo 15 ({images.length}/15)
           </Text>
 
-          <GestureHandlerRootView>
-            <ReordenableImages
-              images={images}
-              onReorder={setImages}
-              onRemove={handleRemoveImage}
-            />
-          </GestureHandlerRootView>
+          <View style={styles.imagesGrid}>
+            {images.map((uri, index) => (
+              <View key={index} style={styles.imageBox}>
+                <ViewImage src={uri} imageStyle={styles.previewImage} />
+                <TouchableOpacity
+                  onPress={() => moveImage(index, index - 1)}
+                  style={styles.moveLeftBtn}
+                >
+                  <Ionicons
+                    name="chevron-back"
+                    size={14}
+                    color={COLORS.white}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => moveImage(index, index + 1)}
+                  style={styles.moveRightBtn}
+                >
+                  <Ionicons
+                    name="chevron-forward"
+                    size={14}
+                    color={COLORS.white}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleRemoveImage(index)}
+                  style={styles.removeBtn}
+                >
+                  <Ionicons name="close" size={16} color={COLORS.white} />
+                </TouchableOpacity>
+              </View>
+            ))}
 
-          {images.length < 15 && (
-            <View style={{ marginTop: 12 }}>
+            {images.length < 15 && (
               <TouchableOpacity
                 onPress={handlePickImages}
                 style={[
                   styles.uploadBtn,
                   errors.images && styles.uploadBtnError,
-                  { width: "100%", flexDirection: "row", gap: 8, height: 50 },
                 ]}
               >
-                <Ionicons name="camera" size={24} color={COLORS.textTertiary} />
-                <Text style={[styles.uploadText, { marginTop: 0 }]}>
-                  Agregar Más Fotos
-                </Text>
+                <Ionicons name="camera" size={32} color={COLORS.textTertiary} />
+                <Text style={styles.uploadText}>Agregar</Text>
               </TouchableOpacity>
-            </View>
-          )}
+            )}
+          </View>
           {errors.images && (
             <Text style={styles.errorText}>{errors.images}</Text>
           )}
@@ -1375,7 +1399,7 @@ export default function CreateProperty({
                   if (val === "Más") {
                     openNumberInput(
                       getLabelRecamaras(tipoPrincipal),
-                      (customVal) => setRecamaras(customVal)
+                      (customVal) => setRecamaras(customVal),
                     );
                   } else {
                     setRecamaras(val);
@@ -1410,7 +1434,7 @@ export default function CreateProperty({
                 onSelect={(val) => {
                   if (val === "Más") {
                     openNumberInput("Baños Completos", (customVal) =>
-                      setBanosCompletos(customVal)
+                      setBanosCompletos(customVal),
                     );
                   } else {
                     setBanosCompletos(val);
@@ -1445,7 +1469,7 @@ export default function CreateProperty({
                 onSelect={(val) => {
                   if (val === "Más") {
                     openNumberInput("1/2 Baños", (customVal) =>
-                      setMediosBanos(customVal)
+                      setMediosBanos(customVal),
                     );
                   } else {
                     setMediosBanos(val);
@@ -1482,7 +1506,7 @@ export default function CreateProperty({
                 onSelect={(val) => {
                   if (val === "Más") {
                     openNumberInput("Estacionamientos", (customVal) =>
-                      setEstacionamientos(customVal)
+                      setEstacionamientos(customVal),
                     );
                   } else {
                     setEstacionamientos(val);
@@ -1517,7 +1541,7 @@ export default function CreateProperty({
                 onSelect={(val) => {
                   if (val === "Más") {
                     openNumberInput("Niveles", (customVal) =>
-                      setNiveles(customVal)
+                      setNiveles(customVal),
                     );
                   } else {
                     setNiveles(val);
@@ -1560,7 +1584,7 @@ export default function CreateProperty({
                 onSelect={(val) => {
                   if (val === "Más de 50") {
                     openNumberInput("Antigüedad (años)", (customVal) =>
-                      setAntiguedad(customVal)
+                      setAntiguedad(customVal),
                     );
                   } else {
                     setAntiguedad(val);
@@ -1699,7 +1723,7 @@ export default function CreateProperty({
               setCompartidaTipo: setComisionCompartidaTipo,
               setCompartidaValor: setComisionCompartidaValor,
               setCondiciones: setCondicionesComision,
-            }
+            },
           )}
 
           {tipoOperacion === "ambas" &&
@@ -1721,7 +1745,7 @@ export default function CreateProperty({
                 setCompartidaValor: setComisionCompartidaValorRenta,
                 setCondiciones: setCondicionesComisionRenta,
               },
-              true
+              true,
             )}
         </View>
 
@@ -1839,8 +1863,16 @@ export default function CreateProperty({
         <View style={[styles.section, { paddingBottom: 50 }]}>
           <LocationPicker
             onLocationSelected={setLocation}
-            initialLatitude={mapCenter?.lat}
-            initialLongitude={mapCenter?.lng}
+            selectedLocation={
+              location.latitude !== 0 && location.longitude !== 0
+                ? location
+                : null
+            }
+            focusLocation={
+              mapCenter
+                ? { latitude: mapCenter.lat, longitude: mapCenter.lng }
+                : null
+            }
           />
           {errors.location && (
             <Text style={styles.errorText}>{errors.location}</Text>
@@ -2196,5 +2228,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary,
     marginTop: 8,
+  },
+  moveLeftBtn: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    backgroundColor: COLORS.blackTransparent60,
+    padding: 4,
+    borderRadius: 12,
+  },
+  moveRightBtn: {
+    position: "absolute",
+    bottom: 6,
+    right: 6,
+    backgroundColor: COLORS.blackTransparent60,
+    padding: 4,
+    borderRadius: 12,
   },
 });

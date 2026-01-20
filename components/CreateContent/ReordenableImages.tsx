@@ -44,7 +44,7 @@ export default function ReordenableImages({
       const newOrder = data.map((item) => item.uri);
       onReorder(newOrder);
     },
-    [onReorder]
+    [onReorder],
   );
 
   const renderItem = useCallback(
@@ -55,7 +55,7 @@ export default function ReordenableImages({
         <ScaleDecorator activeScale={1.05}>
           <TouchableOpacity
             onLongPress={drag}
-            delayLongPress={150}
+            delayLongPress={100}
             activeOpacity={0.9}
             style={[
               styles.imageContainer,
@@ -100,7 +100,7 @@ export default function ReordenableImages({
         </ScaleDecorator>
       );
     },
-    [onRemove]
+    [onRemove],
   );
 
   if (images.length === 0) return null;

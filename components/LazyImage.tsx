@@ -27,18 +27,11 @@ const LazyImage: React.FC<LazyImageProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [shouldLoad, setShouldLoad] = useState(false);
+  // Removed artificial delay for immediate responsiveness
+  const [shouldLoad, setShouldLoad] = useState(true);
   const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
   const isArray = Array.isArray(source);
-
-  useEffect(() => {
-    // Small delay to allow component mounting before starting load
-    const timer = setTimeout(() => {
-      setShouldLoad(true);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
 
   const handleLoadStart = () => {
     setIsLoading(true);
@@ -96,7 +89,7 @@ const LazyImage: React.FC<LazyImageProps> = ({
               decelerationRate={0}
               onMomentumScrollEnd={(e) => {
                 const index = Math.round(
-                  e.nativeEvent.contentOffset.x / SCREEN_WIDTH
+                  e.nativeEvent.contentOffset.x / SCREEN_WIDTH,
                 );
                 handleLoadStart();
                 handleLoadEnd();

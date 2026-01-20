@@ -15,14 +15,16 @@ interface LocationPickerProps {
     latitude: number;
     longitude: number;
   }) => void;
-  initialLatitude?: number;
-  initialLongitude?: number;
+  // Coordenadas para el PIN (si existe)
+  selectedLocation?: { latitude: number; longitude: number } | null;
+  // Coordenadas para enfocar el mapa (sin poner pin necesariamente)
+  focusLocation?: { latitude: number; longitude: number } | null;
 }
 
 export default function LocationPicker({
   onLocationSelected,
-  initialLatitude,
-  initialLongitude,
+  selectedLocation,
+  focusLocation,
 }: LocationPickerProps) {
   /* eslint-disable react-hooks/exhaustive-deps */
   const mapRef = React.useRef<MapView>(null);
@@ -30,8 +32,9 @@ export default function LocationPicker({
   const pendingCoords = React.useRef<{ lat: number; lng: number } | null>(null);
 
   const [region, setRegion] = useState<Region>({
-    latitude: initialLatitude || 25.6866,
-    longitude: initialLongitude || -100.3161,
+    latitude: selectedLocation?.latitude || focusLocation?.latitude || 25.6866,
+    longitude:
+      selectedLocation?.longitude || focusLocation?.longitude || -100.3161,
     latitudeDelta: 0.5,
     longitudeDelta: 0.5,
   });
@@ -40,33 +43,41 @@ export default function LocationPicker({
     latitude: number;
     longitude: number;
   } | null>(
-    initialLatitude && initialLongitude
-      ? { latitude: initialLatitude, longitude: initialLongitude }
-      : null
+    selectedLocation && selectedLocation.latitude !== 0
+      ? selectedLocation
+      : null,
   );
 
   // Actualizar región y marcador si cambian las props iniciales (ej. al seleccionar Estado)
   // Usamos useEffect para reaccionar a cambios externos
+  // Efecto para enfocar el mapa cuando cambia focusLocation
+  // Efecto para enfocar el mapa cuando cambia focusLocation
   useEffect(() => {
-    if (initialLatitude && initialLongitude) {
+    if (focusLocation) {
       const newRegion = {
-        latitude: initialLatitude,
-        longitude: initialLongitude,
-        latitudeDelta: 1,
-        longitudeDelta: 1,
+        latitude: focusLocation.latitude,
+        longitude: focusLocation.longitude,
+        latitudeDelta: 0.5,
+        longitudeDelta: 0.5,
       };
-
       setRegion(newRegion);
-      // IMPORTANTE: Actualizar el marcador para que se muestre en el mapa al editar
-      setMarker({ latitude: initialLatitude, longitude: initialLongitude });
-
       if (isMapReady) {
         mapRef.current?.animateToRegion(newRegion, 1000);
       } else {
-        pendingCoords.current = { lat: initialLatitude, lng: initialLongitude };
+        pendingCoords.current = {
+          lat: focusLocation.latitude,
+          lng: focusLocation.longitude,
+        };
       }
     }
-  }, [initialLatitude, initialLongitude, isMapReady]);
+  }, [focusLocation?.latitude, focusLocation?.longitude, isMapReady]);
+
+  // Efecto para actualizar el marcador si la prop externa cambia
+  useEffect(() => {
+    if (selectedLocation && selectedLocation.latitude !== 0) {
+      setMarker(selectedLocation);
+    }
+  }, [selectedLocation]);
 
   const handleMapReady = () => {
     setIsMapReady(true);
@@ -139,7 +150,7 @@ export default function LocationPicker({
         )}
 
         {!marker && Platform.OS !== "web" && (
-          <View style={styles.overlay}>
+          <View style={styles.overlay} pointerEvents="none">
             <Text style={styles.overlayText}>
               Toca el mapa para colocar el pin
             </Text>

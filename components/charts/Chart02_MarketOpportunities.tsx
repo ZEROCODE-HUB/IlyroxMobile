@@ -61,7 +61,7 @@ const Chart02_MarketOpportunities: React.FC<FilteredChartProps> = ({
           : [item.operaciones_propiedad];
         const op = ops.find(
           (o: any) =>
-            o?.tipo_operacion?.toLowerCase() === operationType.toLowerCase()
+            o?.tipo_operacion?.toLowerCase() === operationType.toLowerCase(),
         );
 
         if (op) {
@@ -77,7 +77,7 @@ const Chart02_MarketOpportunities: React.FC<FilteredChartProps> = ({
           if (m2 > 0) {
             const pricePerM2 = price / m2;
             const rangeIndex = ranges.findIndex(
-              (r) => m2 >= r.min && m2 < r.max
+              (r) => m2 >= r.min && m2 < r.max,
             );
 
             if (rangeIndex !== -1) {
@@ -132,7 +132,7 @@ const Chart02_MarketOpportunities: React.FC<FilteredChartProps> = ({
 
         if (m2Target > 0) {
           const rangeIndex = ranges.findIndex(
-            (r) => m2Target >= r.min && m2Target < r.max
+            (r) => m2Target >= r.min && m2Target < r.max,
           );
           if (rangeIndex !== -1) {
             acc[rangeIndex].searchesCount += 1;

@@ -26,7 +26,7 @@ import BottomTabNavigator, {
 } from "./navigation/BottomTabNavigator";
 import { User as UserType } from "./types";
 import { useApp } from "./context/AppContext";
-import AuthScreen from "./screens/AuthScreen";
+import AuthScreen from "./screens/auth/AuthScreen";
 import PendingApprovalScreen from "./screens/PendingApprovalScreen";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LocationSearchBar } from "./components/LocationSearchBar";
@@ -72,7 +72,7 @@ function AppContent() {
   const lastScrollY = useRef(0);
 
   const [currentRouteName, setCurrentRouteName] = useState<string | undefined>(
-    "Feed"
+    "Feed",
   );
 
   // Asegurar que el StatusBar se mantenga visible siempre
@@ -194,10 +194,10 @@ function AppContent() {
                   <Ionicons
                     name={
                       screen === "Matches"
-                        ? "grid"
+                        ? "git-compare-outline"
                         : screen === "Messages"
-                        ? "chatbubble"
-                        : "calendar"
+                          ? "chatbubble"
+                          : "calendar"
                     }
                     size={22}
                     color={COLORS.white}

@@ -430,8 +430,46 @@ export function useMessages(conversationId: string | null, userId?: string) {
         .eq("leido", false);
 
       if (error) throw error;
+      await updateUnreadCounters();
     } catch (err: any) {
       console.error("Error marking as read:", err);
+    }
+  };
+
+  const updateUnreadCounters = async () => {
+    if (!conversationId || !userId) return;
+
+    try {
+      const { data: conv, error } = await supabase
+        .from("conversaciones")
+        .select("id, usuario1_id, usuario2_id")
+        .eq("id", conversationId)
+        .single();
+
+      if (error || !conv) return;
+
+      const isUsuario1 = conv.usuario1_id === userId;
+      const conversationUpdate = isUsuario1
+        ? { mensajes_no_leidos_usuario1: 0 }
+        : { mensajes_no_leidos_usuario2: 0 };
+
+      await supabase
+        .from("conversaciones")
+        .update(conversationUpdate)
+        .eq("id", conversationId);
+
+      const groupUpdate = isUsuario1
+        ? { total_mensajes_no_leidos_usuario1: 0 }
+        : { total_mensajes_no_leidos_usuario2: 0 };
+
+      await supabase
+        .from("agrupaciones_conversaciones")
+        .update(groupUpdate)
+        .or(
+          `and(usuario1_id.eq.${conv.usuario1_id},usuario2_id.eq.${conv.usuario2_id}),and(usuario1_id.eq.${conv.usuario2_id},usuario2_id.eq.${conv.usuario1_id})`,
+        );
+    } catch (err) {
+      console.error("Error updating unread counters:", err);
     }
   };
 

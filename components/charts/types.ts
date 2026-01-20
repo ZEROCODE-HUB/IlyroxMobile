@@ -25,6 +25,13 @@ export interface PricePerM2Data {
   construction: number;
 }
 
+export interface FilteredChartProps extends BaseChartProps {
+  properties?: any[];
+  searches?: any[];
+  operationType: string;
+  propertyType?: string;
+}
+
 export interface MarketOpportunityData {
   range: string;
   avgPrice: number;
