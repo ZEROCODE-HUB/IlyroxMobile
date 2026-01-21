@@ -12,18 +12,14 @@
       "resizeMode": "cover",
       "backgroundColor": "#06D5B4"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.i360.realestateapp",
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": false,
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
-        "UIBackgroundModes": [
-          "remote-notification"
-        ]
+        "UIBackgroundModes": ["remote-notification"]
       },
       "entitlements": {
         "aps-environment": "development",
@@ -34,10 +30,7 @@
       "config": {
         "googleMapsApiKey": "AIzaSyCMns7F3TjXiJ4oswwws0USAgum-GcwM9A"
       },
-      "associatedDomains": [
-        "applinks:i360.app",
-        "applinks:*.i360.app"
-      ]
+      "associatedDomains": ["applinks:i360.app", "applinks:*.i360.app"]
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
@@ -72,10 +65,7 @@
               "scheme": "i360realestate"
             }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
     },
