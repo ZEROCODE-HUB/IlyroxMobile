@@ -34,7 +34,7 @@ export interface GeofenceBounds {
 
 export const usePropertyFilters = (
   properties: Property[],
-  geofenceBounds?: GeofenceBounds | null
+  geofenceBounds?: GeofenceBounds | null,
 ) => {
   const [filters, setFilters] = useState<PropertyFilters>({
     tipoPropiedad: "",
@@ -80,10 +80,21 @@ export const usePropertyFilters = (
         });
       }
 
-      // Siempre excluir no publicadas si existe el campo
-      if ((p as any).status && (p as any).status !== "Publicada") {
-        if (index < 3) console.log(`  ❌ Rechazada por estado no publicado`);
-        return false;
+      // Validar status/estado de forma robusta
+      const rawStatus = (p as any).status || (p as any).estado;
+      if (rawStatus) {
+        const s = String(rawStatus).toLowerCase().trim();
+        // Excluir si es vendida o suspendida (o cualquier cosa que no sea publicada/disponible)
+        if (s === "Vendida" || s === "Suspendida" || s === "Baja") {
+          if (index < 3)
+            console.log(
+              `  ❌ Rechazada por status no disponible: ${rawStatus}`,
+            );
+          return false;
+        }
+        // Opcional: Ser estricto y solo permitir "publicada" / "disponible"
+        // Si el sistema usa otros estados intermedios que deban verse, ajustar aquí.
+        // Por seguridad, si dice "vendida", adiós.
       }
 
       // Geocerca por coordenadas si está definida
@@ -103,7 +114,7 @@ export const usePropertyFilters = (
           if (index < 3)
             console.log(
               `  ❌ Fuera de geocerca: (${lat}, ${lng}) no dentro de`,
-              geofenceBounds
+              geofenceBounds,
             );
           return false;
         }
@@ -128,7 +139,7 @@ export const usePropertyFilters = (
         ) {
           if (index < 3)
             console.log(
-              `  ❌ Rechazada por operación: ${pOperacion} !== ${filters.operacion}`
+              `  ❌ Rechazada por operación: ${pOperacion} !== ${filters.operacion}`,
             );
           return false;
         } else if (!pOperacion) {
@@ -151,7 +162,7 @@ export const usePropertyFilters = (
         if (pEstado !== fEstado) {
           if (index < 3)
             console.log(
-              `  ❌ Rechazada por estado: ${pEstado} !== ${filters.locationFilter.estado}`
+              `  ❌ Rechazada por estado: ${pEstado} !== ${filters.locationFilter.estado}`,
             );
           return false;
         }
@@ -170,7 +181,7 @@ export const usePropertyFilters = (
         if (pCiudad !== fCiudad) {
           if (index < 3)
             console.log(
-              `  ❌ Rechazada por ciudad: ${pCiudad} !== ${filters.locationFilter.ciudad}`
+              `  ❌ Rechazada por ciudad: ${pCiudad} !== ${filters.locationFilter.ciudad}`,
             );
           return false;
         }
@@ -188,7 +199,7 @@ export const usePropertyFilters = (
       ) {
         if (index < 3)
           console.log(
-            `  ❌ Rechazada por municipio: ${pMunicipio} !== ${filters.locationFilter.municipio}`
+            `  ❌ Rechazada por municipio: ${pMunicipio} !== ${filters.locationFilter.municipio}`,
           );
         return false;
       }
@@ -206,7 +217,7 @@ export const usePropertyFilters = (
         if (pColonia !== fColonia) {
           if (index < 3)
             console.log(
-              `  ❌ Rechazada por colonia: ${pColonia} !== ${filters.locationFilter.colonia}`
+              `  ❌ Rechazada por colonia: ${pColonia} !== ${filters.locationFilter.colonia}`,
             );
           return false;
         }
@@ -215,7 +226,7 @@ export const usePropertyFilters = (
       if (filters.tipoPropiedad && p.type !== filters.tipoPropiedad) {
         if (index < 3)
           console.log(
-            `  ❌ Rechazada por tipo: ${p.type} !== ${filters.tipoPropiedad}`
+            `  ❌ Rechazada por tipo: ${p.type} !== ${filters.tipoPropiedad}`,
           );
         return false;
       }
@@ -223,7 +234,7 @@ export const usePropertyFilters = (
       if (filters.subtipo && anyP.subtipo !== filters.subtipo) {
         if (index < 3)
           console.log(
-            `  ❌ Rechazada por subtipo: ${anyP.subtipo} !== ${filters.subtipo}`
+            `  ❌ Rechazada por subtipo: ${anyP.subtipo} !== ${filters.subtipo}`,
           );
         return false;
       }
@@ -248,7 +259,7 @@ export const usePropertyFilters = (
       if (finalPrice < minP || finalPrice > maxP) {
         if (index < 3)
           console.log(
-            `  ❌ Rechazada por precio: ${finalPrice} no está entre ${minP} y ${maxP}`
+            `  ❌ Rechazada por precio: ${finalPrice} no está entre ${minP} y ${maxP}`,
           );
         return false;
       }
@@ -326,13 +337,13 @@ export const usePropertyFilters = (
 
   const updateFilter = <K extends keyof PropertyFilters>(
     key: K,
-    value: PropertyFilters[K]
+    value: PropertyFilters[K],
   ) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
   const updateLocationFilter = (
-    location: PropertyFilters["locationFilter"]
+    location: PropertyFilters["locationFilter"],
   ) => {
     setFilters((prev) => ({ ...prev, locationFilter: location }));
   };

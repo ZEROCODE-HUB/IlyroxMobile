@@ -32,6 +32,7 @@ interface ProfilePostGridProps {
   onPostPress: (post: Post) => void;
   isOwnProfile?: boolean;
   onDelete?: () => void;
+  refreshTrigger?: number;
 }
 
 const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
@@ -39,6 +40,7 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
   onPostPress,
   isOwnProfile = false,
   onDelete,
+  refreshTrigger = 0,
 }) => {
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -51,7 +53,7 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
     if (userId) {
       getPosts(userId);
     }
-  }, [userId]);
+  }, [userId, refreshTrigger]);
 
   const handleDelete = async (post: Post) => {
     try {

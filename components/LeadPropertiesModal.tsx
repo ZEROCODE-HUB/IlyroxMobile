@@ -14,6 +14,7 @@ import { AppHeader } from "./AppHeader";
 import { COLORS } from "../constants";
 import { FeedItem, User } from "../types";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
+import CommentsModalV2 from "./modals/CommentsModalV2";
 
 interface LeadPropertiesModalProps {
   visible: boolean;
@@ -66,6 +67,10 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
   const [activeTab, setActiveTab] = useState<"coincidencia" | "similar">(
     "coincidencia",
   );
+  const [selectedFeedItemId, setSelectedFeedItemId] = useState<string | null>(
+    null,
+  );
+  const [showCommentsModal, setShowCommentsModal] = useState(false);
 
   const handleDeleteSearchInternal = () => {
     Alert.alert(
@@ -83,6 +88,11 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
         },
       ],
     );
+  };
+
+  const handleCommentClick = (feedItemId: string) => {
+    setSelectedFeedItemId(feedItemId);
+    setShowCommentsModal(true);
   };
 
   const activeList = activeTab === "coincidencia" ? coincidences : similars;
@@ -272,7 +282,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                         property.propertyDetails?.id || property.id,
                       )
                     }
-                    onCommentClick={() => {}}
+                    onCommentClick={() => handleCommentClick(property.id)}
                     currentUserId={currentUserId}
                   />
                   {/* Badge Overlay */}
@@ -285,6 +295,19 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
               ))
             )}
           </ScrollView>
+
+          {/* Comments Modal */}
+          {selectedFeedItemId && (
+            <CommentsModalV2
+              visible={showCommentsModal}
+              onClose={() => {
+                setShowCommentsModal(false);
+                setSelectedFeedItemId(null);
+              }}
+              feedItemId={selectedFeedItemId}
+              currentUserId={currentUserId}
+            />
+          )}
         </View>
       </ScreenWrapper>
     </Modal>

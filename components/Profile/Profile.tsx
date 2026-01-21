@@ -21,6 +21,7 @@ import {
   Modal,
   ActivityIndicator,
   FlatList,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -95,6 +96,17 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     loadRecommendedByUsers,
     updateProfilePhoto,
   } = useProfile(userId);
+
+  // Refresh Control
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setRefreshTrigger((prev) => prev + 1);
+    await fetchProfileData();
+    setRefreshing(false);
+  };
 
   // State - Content
   const [activeTab, setActiveTab] = useState<ProfileContentType>("properties");
@@ -314,7 +326,16 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         onSettings={() => navigation.navigate("Settings")}
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
         {/* Profile Info */}
         <View style={styles.infoContainer}>
           <View style={styles.infoRow}>
@@ -812,6 +833,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             onPostPress={(post) => setSelectedPost(mapPostToFeedItem(post))}
             isOwnProfile={isMe}
             onDelete={fetchProfileData}
+            refreshTrigger={refreshTrigger}
           />
         )}
 
@@ -823,6 +845,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             }
             isOwnProfile={isMe}
             onDelete={fetchProfileData}
+            refreshTrigger={refreshTrigger}
           />
         )}
       </ScrollView>

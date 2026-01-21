@@ -33,6 +33,7 @@ interface ProfileReelGridProps {
   isOwnProfile?: boolean;
   onEdit?: (item: Reel) => void;
   onDelete?: () => void;
+  refreshTrigger?: number;
 }
 
 const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
@@ -41,6 +42,7 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
   isOwnProfile = false,
   onEdit,
   onDelete,
+  refreshTrigger = 0,
 }) => {
   const [reelToDelete, setReelToDelete] = useState<Reel | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -53,7 +55,7 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
     if (userId) {
       getReels(userId);
     }
-  }, [userId]);
+  }, [userId, refreshTrigger]);
 
   const handleDelete = async (reel: Reel) => {
     try {

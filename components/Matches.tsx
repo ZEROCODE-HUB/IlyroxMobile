@@ -71,6 +71,9 @@ interface LeadGroup {
   };
 }
 
+import { usePropertyFeedItems } from "../hooks/usePropertyFeedItems";
+// ... (keep existing imports)
+
 const Matches: React.FC = () => {
   const { user } = useAuth();
   const navigation = useNavigation<any>();
@@ -78,12 +81,18 @@ const Matches: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [savedSearches, setSavedSearches] = useState<any[]>([]);
-  // const [activeTab, setActiveTab] = useState<MatchType>("coincidencia"); // Removed tabs
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(
     null,
   );
   const [selectedLead, setSelectedLead] = useState<LeadGroup | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Hook para obtener FeedItems (likes/comments)
+  const propertyIds = React.useMemo(
+    () => matches.map((m) => m.propiedad_id),
+    [matches],
+  );
+  const { data: feedItemsRecord = {} } = usePropertyFeedItems(propertyIds);
 
   const fetchMatches = async () => {
     if (!user) return;
@@ -129,6 +138,11 @@ const Matches: React.FC = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+
+      // Filtrar propiedades propias (no mostramos matches de tus propias propiedades)
+      if (data) {
+        data = data.filter((m) => m.propiedad?.created_by !== user.id);
+      }
 
       // Si tenemos datos, obtener perfiles por separado
       if (data && data.length > 0) {
@@ -209,8 +223,8 @@ const Matches: React.FC = () => {
   const groupMatchesByLead = (
     matchesList: MatchData[],
     allSearches: any[],
+    feedItems: Record<string, any> = {},
   ): LeadGroup[] => {
-    console.log("=== AGRUPANDO MATCHES ===");
     const grouped = new Map<string, LeadGroup>();
 
     // 1. Inicializar grupos con todas las búsquedas que tienen un lead
@@ -351,8 +365,11 @@ const Matches: React.FC = () => {
         ];
       }
 
+      // Look up feed item data
+      const feedData = feedItems[prop.id];
+
       const feedItem: FeedItem = {
-        id: prop.id,
+        id: feedData?.id || prop.id, // Use real FeedItem ID if available
         type: "property",
         user: {
           id: perfil?.id || prop.created_by,
@@ -368,8 +385,8 @@ const Matches: React.FC = () => {
         } as User,
         content: prop.descripcion || "",
         images: propertyImages,
-        likes: 0,
-        comments: 0,
+        likes: feedData?.likes_count || 0,
+        comments: feedData?.comments_count || 0,
         timestamp: new Date(match.created_at).toLocaleDateString(),
         propertyDetails: {
           id: prop.id,
@@ -432,7 +449,11 @@ const Matches: React.FC = () => {
 
   // const filteredMatches = matches.filter((m) => m.tipo_match === activeTab); // No filtering
   // const filteredMatches = matches.filter((m) => m.tipo_match === activeTab); // No filtering
-  const leadGroups = groupMatchesByLead(matches, savedSearches).filter((lead) =>
+  const leadGroups = groupMatchesByLead(
+    matches,
+    savedSearches,
+    feedItemsRecord,
+  ).filter((lead) =>
     lead.leadName.toLowerCase().includes(searchQuery.toLowerCase()),
   ); // Pass all matches
 

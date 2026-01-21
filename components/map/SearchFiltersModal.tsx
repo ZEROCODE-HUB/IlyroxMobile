@@ -322,7 +322,10 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalContainer}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.modalContainer}
+      >
         <View style={styles.modalContent}>
           {/* Header */}
           <View style={styles.modalHeader}>
@@ -339,375 +342,371 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
 
           <ScrollView
             showsVerticalScrollIndicator={false}
-            style={styles.modalScroll}
+            style={[styles.modalScroll]}
+            contentContainerStyle={{ paddingBottom: 100 }}
           >
-            <KeyboardAvoidingView>
-              {/* 1. TIPO DE OPERACIÓN */}
-              <View style={styles.formSection}>
-                <RadioGroupSelector
-                  label="Tipo de Operación"
-                  options={["Todas", "Venta", "Renta"]}
-                  selectedValue={
-                    !filters.operacion || filters.operacion === ""
-                      ? "Todas"
-                      : filters.operacion.charAt(0).toUpperCase() +
-                        filters.operacion.slice(1)
+            {/* 1. TIPO DE OPERACIÓN */}
+            <View style={styles.formSection}>
+              <RadioGroupSelector
+                label="Tipo de Operación"
+                options={["Todas", "Venta", "Renta"]}
+                selectedValue={
+                  !filters.operacion || filters.operacion === ""
+                    ? "Todas"
+                    : filters.operacion.charAt(0).toUpperCase() +
+                      filters.operacion.slice(1)
+                }
+                onSelect={(val) => {
+                  if (val === "Todas") {
+                    onUpdateFilter("operacion", "");
+                  } else {
+                    onUpdateFilter(
+                      "operacion",
+                      val.toLowerCase() as "venta" | "renta",
+                    );
                   }
-                  onSelect={(val) => {
-                    if (val === "Todas") {
-                      onUpdateFilter("operacion", "");
-                    } else {
-                      onUpdateFilter(
-                        "operacion",
-                        val.toLowerCase() as "venta" | "renta",
-                      );
-                    }
-                  }}
-                />
-              </View>
-
-              {/* 2. PRECIO Y DIVISA */}
-              <View style={styles.formSection}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionLabel}>Rango de Precio</Text>
-                  <View style={styles.currencyToggle}>
-                    {(["MXN", "USD"] as const).map((curr) => (
-                      <TouchableOpacity
-                        key={curr}
-                        onPress={() => onUpdateFilter("moneda", curr)}
-                        style={[
-                          styles.currencyBtn,
-                          filters.moneda === curr && styles.currencyBtnActive,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.currencyText,
-                            filters.moneda === curr &&
-                              styles.currencyTextActive,
-                          ]}
-                        >
-                          {curr}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.row}>
-                  <View style={styles.halfWidth}>
-                    <Text style={styles.label}>Mínimo ({filters.moneda})</Text>
-                    <AppInput
-                      value={filters.precioMin}
-                      onChangeText={(val) => onUpdateFilter("precioMin", val)}
-                      keyboardType="numeric"
-                      placeholder="0"
-                    />
-                  </View>
-                  <View style={styles.halfWidth}>
-                    <Text style={styles.label}>Máximo ({filters.moneda})</Text>
-                    <AppInput
-                      value={filters.precioMax}
-                      onChangeText={(val) => onUpdateFilter("precioMax", val)}
-                      keyboardType="numeric"
-                      placeholder="Sin límite"
-                    />
-                  </View>
-                </View>
-              </View>
-
-              {/* 3. UBICACIÓN */}
-              <View style={styles.formSection}>
-                <Text style={styles.sectionLabel}>Ubicación</Text>
-                <CascadeLocationSelector
-                  initialData={filters.locationFilter}
-                  onChange={onUpdateLocationFilter}
-                  showColonia={true}
-                />
-              </View>
-
-              {/* 4. TIPO DE PROPIEDAD */}
-              <View style={styles.formSection}>
-                <PropertyTypeSelector
-                  tipoPropiedad={filters.tipoPropiedad}
-                  subtipo={filters.subtipo}
-                  onChangeTipo={(tipo) => onUpdateFilter("tipoPropiedad", tipo)}
-                  onChangeSubtipo={(subtipo) =>
-                    onUpdateFilter("subtipo", subtipo)
-                  }
-                />
-              </View>
-
-              {/* 5. CARACTERÍSTICAS */}
-              {filters.tipoPropiedad && (
-                <View style={styles.formSection}>
-                  <Text style={styles.sectionLabel}>Características</Text>
-
-                  {/* Recámaras */}
-                  {camposVisibles.recamaras && (
-                    <>
-                      <Text style={styles.label}>
-                        {getLabelRecamaras(
-                          filters.tipoPropiedad as TipoPrincipal,
-                        )}
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.selector}
-                        onPress={() => setShowRecamarasModal(true)}
-                      >
-                        <Text style={styles.selectorText}>
-                          {filters.habitaciones || "Cualquiera"}
-                        </Text>
-                        <Ionicons
-                          name="chevron-down"
-                          size={20}
-                          color={COLORS.textTertiary}
-                        />
-                      </TouchableOpacity>
-                      <SelectionModal
-                        visible={showRecamarasModal}
-                        onClose={() => setShowRecamarasModal(false)}
-                        onSelect={(val) => {
-                          if (val === "Más" || val.includes("Más")) {
-                            setShowRecamarasModal(false);
-                            openNumberInput(
-                              getLabelRecamaras(
-                                filters.tipoPropiedad as TipoPrincipal,
-                              ),
-                              (value) => {
-                                onUpdateFilter("habitaciones", value);
-                                setShowNumberInput(false);
-                              },
-                            );
-                          } else {
-                            onUpdateFilter("habitaciones", val);
-                          }
-                        }}
-                        title={getLabelRecamaras(
-                          filters.tipoPropiedad as TipoPrincipal,
-                        )}
-                        options={["No indicado", ...RECAMARAS]}
-                        currentValue={filters.habitaciones}
-                      />
-                    </>
-                  )}
-
-                  {/* Baños */}
-                  {camposVisibles.banos && (
-                    <>
-                      <Text style={[styles.label, { marginTop: 12 }]}>
-                        Baños
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.selector}
-                        onPress={() => setShowBanosModal(true)}
-                      >
-                        <Text style={styles.selectorText}>
-                          {filters.banos || "Cualquiera"}
-                        </Text>
-                        <Ionicons
-                          name="chevron-down"
-                          size={20}
-                          color={COLORS.textTertiary}
-                        />
-                      </TouchableOpacity>
-                      <SelectionModal
-                        visible={showBanosModal}
-                        onClose={() => setShowBanosModal(false)}
-                        onSelect={(val) => {
-                          if (val === "Más" || val.includes("Más")) {
-                            setShowBanosModal(false);
-                            openNumberInput("Baños", (value) => {
-                              onUpdateFilter("banos", value);
-                              setShowNumberInput(false);
-                            });
-                          } else {
-                            onUpdateFilter("banos", val);
-                          }
-                        }}
-                        title="Baños"
-                        options={["No indicado", ...BANOS]}
-                        currentValue={filters.banos}
-                      />
-                    </>
-                  )}
-
-                  {/* Estacionamientos */}
-                  {camposVisibles.estacionamientos && (
-                    <>
-                      <Text style={[styles.label, { marginTop: 12 }]}>
-                        Estacionamientos
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.selector}
-                        onPress={() => setShowEstacionamientosModal(true)}
-                      >
-                        <Text style={styles.selectorText}>
-                          {filters.estacionamientos || "Cualquiera"}
-                        </Text>
-                        <Ionicons
-                          name="chevron-down"
-                          size={20}
-                          color={COLORS.textTertiary}
-                        />
-                      </TouchableOpacity>
-                      <SelectionModal
-                        visible={showEstacionamientosModal}
-                        onClose={() => setShowEstacionamientosModal(false)}
-                        onSelect={(val) => {
-                          if (val === "Más" || val.includes("Más")) {
-                            setShowEstacionamientosModal(false);
-                            openNumberInput("Estacionamientos", (value) => {
-                              onUpdateFilter("estacionamientos", value);
-                              setShowNumberInput(false);
-                            });
-                          } else {
-                            onUpdateFilter("estacionamientos", val);
-                          }
-                        }}
-                        title="Estacionamientos"
-                        options={["No indicado", ...ESTACIONAMIENTOS]}
-                        currentValue={filters.estacionamientos}
-                      />
-                    </>
-                  )}
-
-                  {/* Niveles */}
-                  {camposVisibles.niveles && (
-                    <>
-                      <Text style={[styles.label, { marginTop: 12 }]}>
-                        Niveles
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.selector}
-                        onPress={() => setShowNivelesModal(true)}
-                      >
-                        <Text style={styles.selectorText}>
-                          {filters.niveles || "Cualquiera"}
-                        </Text>
-                        <Ionicons
-                          name="chevron-down"
-                          size={20}
-                          color={COLORS.textTertiary}
-                        />
-                      </TouchableOpacity>
-                      <SelectionModal
-                        visible={showNivelesModal}
-                        onClose={() => setShowNivelesModal(false)}
-                        onSelect={(val) => {
-                          if (val === "Más" || val.includes("Más")) {
-                            setShowNivelesModal(false);
-                            openNumberInput("Niveles", (value) => {
-                              onUpdateFilter("niveles", value);
-                              setShowNumberInput(false);
-                            });
-                          } else {
-                            onUpdateFilter("niveles", val);
-                          }
-                        }}
-                        title="Niveles"
-                        options={["No indicado", ...NIVELES]}
-                        currentValue={filters.niveles}
-                      />
-                    </>
-                  )}
-
-                  {/* Antigüedad */}
-                  {camposVisibles.antiguedad && (
-                    <>
-                      <Text style={[styles.label, { marginTop: 12 }]}>
-                        Antigüedad
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.selector}
-                        onPress={() => setShowAntiguedadModal(true)}
-                      >
-                        <Text style={styles.selectorText}>
-                          {filters.antiguedad || "Cualquiera"}
-                        </Text>
-                        <Ionicons
-                          name="chevron-down"
-                          size={20}
-                          color={COLORS.textTertiary}
-                        />
-                      </TouchableOpacity>
-                      <SelectionModal
-                        visible={showAntiguedadModal}
-                        onClose={() => setShowAntiguedadModal(false)}
-                        onSelect={(val) => {
-                          if (val === "Más de 50" || val.includes("Más")) {
-                            setShowAntiguedadModal(false);
-                            openNumberInput("Antigüedad", (value) => {
-                              onUpdateFilter("antiguedad", value);
-                              setShowNumberInput(false);
-                            });
-                          } else {
-                            onUpdateFilter("antiguedad", val);
-                          }
-                        }}
-                        title="Antigüedad"
-                        options={[
-                          "No indicado",
-                          "0 (Nueva)",
-                          "1-5",
-                          "6-10",
-                          "11-20",
-                          "21-50",
-                          "Más de 50",
-                        ]}
-                        currentValue={filters.antiguedad}
-                      />
-                    </>
-                  )}
-
-                  {/* Superficies */}
-                  <View style={[styles.row, { marginTop: 12 }]}>
-                    {camposVisibles.m2Terreno && (
-                      <View style={styles.halfWidth}>
-                        <Text style={styles.label}>m² Terreno Mín.</Text>
-                        <AppInput
-                          value={filters.m2TerrenoMin}
-                          onChangeText={(val) =>
-                            onUpdateFilter("m2TerrenoMin", val)
-                          }
-                          keyboardType="numeric"
-                          placeholder="Mínimo"
-                        />
-                      </View>
-                    )}
-                    {camposVisibles.m2Construccion && (
-                      <View style={styles.halfWidth}>
-                        <Text style={styles.label}>m² Constr. Mín.</Text>
-                        <AppInput
-                          value={filters.m2ConstruccionMin}
-                          onChangeText={(val) =>
-                            onUpdateFilter("m2ConstruccionMin", val)
-                          }
-                          keyboardType="numeric"
-                          placeholder="Mínimo"
-                        />
-                      </View>
-                    )}
-                  </View>
-                </View>
-              )}
-
-              <View style={styles.divider} />
-
-              {/* GUARDAR BÚSQUEDA CON SWITCH */}
-              <SaveSearchSection
-                createLead={createLead}
-                onToggleCreateLead={setCreateLead}
-                leadName={leadName}
-                leadPhone={leadPhone}
-                leadEmail={leadEmail}
-                onChangeLeadName={setLeadName}
-                onChangeLeadPhone={setLeadPhone}
-                onChangeLeadEmail={setLeadEmail}
-                onSave={handleSaveSearch}
-                errors={errors}
+                }}
               />
-            </KeyboardAvoidingView>
+            </View>
+
+            {/* 2. PRECIO Y DIVISA */}
+            <View style={styles.formSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionLabel}>Rango de Precio</Text>
+                <View style={styles.currencyToggle}>
+                  {(["MXN", "USD"] as const).map((curr) => (
+                    <TouchableOpacity
+                      key={curr}
+                      onPress={() => onUpdateFilter("moneda", curr)}
+                      style={[
+                        styles.currencyBtn,
+                        filters.moneda === curr && styles.currencyBtnActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.currencyText,
+                          filters.moneda === curr && styles.currencyTextActive,
+                        ]}
+                      >
+                        {curr}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.row}>
+                <View style={styles.halfWidth}>
+                  <Text style={styles.label}>Mínimo ({filters.moneda})</Text>
+                  <AppInput
+                    value={filters.precioMin}
+                    onChangeText={(val) => onUpdateFilter("precioMin", val)}
+                    keyboardType="numeric"
+                    placeholder="0"
+                  />
+                </View>
+                <View style={styles.halfWidth}>
+                  <Text style={styles.label}>Máximo ({filters.moneda})</Text>
+                  <AppInput
+                    value={filters.precioMax}
+                    onChangeText={(val) => onUpdateFilter("precioMax", val)}
+                    keyboardType="numeric"
+                    placeholder="Sin límite"
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* 3. UBICACIÓN */}
+            <View style={styles.formSection}>
+              <Text style={styles.sectionLabel}>Ubicación</Text>
+              <CascadeLocationSelector
+                initialData={filters.locationFilter}
+                onChange={onUpdateLocationFilter}
+                showColonia={true}
+              />
+            </View>
+
+            {/* 4. TIPO DE PROPIEDAD */}
+            <View style={styles.formSection}>
+              <PropertyTypeSelector
+                tipoPropiedad={filters.tipoPropiedad}
+                subtipo={filters.subtipo}
+                onChangeTipo={(tipo) => onUpdateFilter("tipoPropiedad", tipo)}
+                onChangeSubtipo={(subtipo) =>
+                  onUpdateFilter("subtipo", subtipo)
+                }
+              />
+            </View>
+
+            {/* 5. CARACTERÍSTICAS */}
+            {filters.tipoPropiedad && (
+              <View style={styles.formSection}>
+                <Text style={styles.sectionLabel}>Características</Text>
+
+                {/* Recámaras */}
+                {camposVisibles.recamaras && (
+                  <>
+                    <Text style={styles.label}>
+                      {getLabelRecamaras(
+                        filters.tipoPropiedad as TipoPrincipal,
+                      )}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.selector}
+                      onPress={() => setShowRecamarasModal(true)}
+                    >
+                      <Text style={styles.selectorText}>
+                        {filters.habitaciones || "Cualquiera"}
+                      </Text>
+                      <Ionicons
+                        name="chevron-down"
+                        size={20}
+                        color={COLORS.textTertiary}
+                      />
+                    </TouchableOpacity>
+                    <SelectionModal
+                      visible={showRecamarasModal}
+                      onClose={() => setShowRecamarasModal(false)}
+                      onSelect={(val) => {
+                        if (val === "Más" || val.includes("Más")) {
+                          setShowRecamarasModal(false);
+                          openNumberInput(
+                            getLabelRecamaras(
+                              filters.tipoPropiedad as TipoPrincipal,
+                            ),
+                            (value) => {
+                              onUpdateFilter("habitaciones", value);
+                              setShowNumberInput(false);
+                            },
+                          );
+                        } else {
+                          onUpdateFilter("habitaciones", val);
+                        }
+                      }}
+                      title={getLabelRecamaras(
+                        filters.tipoPropiedad as TipoPrincipal,
+                      )}
+                      options={["No indicado", ...RECAMARAS]}
+                      currentValue={filters.habitaciones}
+                    />
+                  </>
+                )}
+
+                {/* Baños */}
+                {camposVisibles.banos && (
+                  <>
+                    <Text style={[styles.label, { marginTop: 12 }]}>Baños</Text>
+                    <TouchableOpacity
+                      style={styles.selector}
+                      onPress={() => setShowBanosModal(true)}
+                    >
+                      <Text style={styles.selectorText}>
+                        {filters.banos || "Cualquiera"}
+                      </Text>
+                      <Ionicons
+                        name="chevron-down"
+                        size={20}
+                        color={COLORS.textTertiary}
+                      />
+                    </TouchableOpacity>
+                    <SelectionModal
+                      visible={showBanosModal}
+                      onClose={() => setShowBanosModal(false)}
+                      onSelect={(val) => {
+                        if (val === "Más" || val.includes("Más")) {
+                          setShowBanosModal(false);
+                          openNumberInput("Baños", (value) => {
+                            onUpdateFilter("banos", value);
+                            setShowNumberInput(false);
+                          });
+                        } else {
+                          onUpdateFilter("banos", val);
+                        }
+                      }}
+                      title="Baños"
+                      options={["No indicado", ...BANOS]}
+                      currentValue={filters.banos}
+                    />
+                  </>
+                )}
+
+                {/* Estacionamientos */}
+                {camposVisibles.estacionamientos && (
+                  <>
+                    <Text style={[styles.label, { marginTop: 12 }]}>
+                      Estacionamientos
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.selector}
+                      onPress={() => setShowEstacionamientosModal(true)}
+                    >
+                      <Text style={styles.selectorText}>
+                        {filters.estacionamientos || "Cualquiera"}
+                      </Text>
+                      <Ionicons
+                        name="chevron-down"
+                        size={20}
+                        color={COLORS.textTertiary}
+                      />
+                    </TouchableOpacity>
+                    <SelectionModal
+                      visible={showEstacionamientosModal}
+                      onClose={() => setShowEstacionamientosModal(false)}
+                      onSelect={(val) => {
+                        if (val === "Más" || val.includes("Más")) {
+                          setShowEstacionamientosModal(false);
+                          openNumberInput("Estacionamientos", (value) => {
+                            onUpdateFilter("estacionamientos", value);
+                            setShowNumberInput(false);
+                          });
+                        } else {
+                          onUpdateFilter("estacionamientos", val);
+                        }
+                      }}
+                      title="Estacionamientos"
+                      options={["No indicado", ...ESTACIONAMIENTOS]}
+                      currentValue={filters.estacionamientos}
+                    />
+                  </>
+                )}
+
+                {/* Niveles */}
+                {camposVisibles.niveles && (
+                  <>
+                    <Text style={[styles.label, { marginTop: 12 }]}>
+                      Niveles
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.selector}
+                      onPress={() => setShowNivelesModal(true)}
+                    >
+                      <Text style={styles.selectorText}>
+                        {filters.niveles || "Cualquiera"}
+                      </Text>
+                      <Ionicons
+                        name="chevron-down"
+                        size={20}
+                        color={COLORS.textTertiary}
+                      />
+                    </TouchableOpacity>
+                    <SelectionModal
+                      visible={showNivelesModal}
+                      onClose={() => setShowNivelesModal(false)}
+                      onSelect={(val) => {
+                        if (val === "Más" || val.includes("Más")) {
+                          setShowNivelesModal(false);
+                          openNumberInput("Niveles", (value) => {
+                            onUpdateFilter("niveles", value);
+                            setShowNumberInput(false);
+                          });
+                        } else {
+                          onUpdateFilter("niveles", val);
+                        }
+                      }}
+                      title="Niveles"
+                      options={["No indicado", ...NIVELES]}
+                      currentValue={filters.niveles}
+                    />
+                  </>
+                )}
+
+                {/* Antigüedad */}
+                {camposVisibles.antiguedad && (
+                  <>
+                    <Text style={[styles.label, { marginTop: 12 }]}>
+                      Antigüedad
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.selector}
+                      onPress={() => setShowAntiguedadModal(true)}
+                    >
+                      <Text style={styles.selectorText}>
+                        {filters.antiguedad || "Cualquiera"}
+                      </Text>
+                      <Ionicons
+                        name="chevron-down"
+                        size={20}
+                        color={COLORS.textTertiary}
+                      />
+                    </TouchableOpacity>
+                    <SelectionModal
+                      visible={showAntiguedadModal}
+                      onClose={() => setShowAntiguedadModal(false)}
+                      onSelect={(val) => {
+                        if (val === "Más de 50" || val.includes("Más")) {
+                          setShowAntiguedadModal(false);
+                          openNumberInput("Antigüedad", (value) => {
+                            onUpdateFilter("antiguedad", value);
+                            setShowNumberInput(false);
+                          });
+                        } else {
+                          onUpdateFilter("antiguedad", val);
+                        }
+                      }}
+                      title="Antigüedad"
+                      options={[
+                        "No indicado",
+                        "0 (Nueva)",
+                        "1-5",
+                        "6-10",
+                        "11-20",
+                        "21-50",
+                        "Más de 50",
+                      ]}
+                      currentValue={filters.antiguedad}
+                    />
+                  </>
+                )}
+
+                {/* Superficies */}
+                <View style={[styles.row, { marginTop: 12 }]}>
+                  {camposVisibles.m2Terreno && (
+                    <View style={styles.halfWidth}>
+                      <Text style={styles.label}>m² Terreno Mín.</Text>
+                      <AppInput
+                        value={filters.m2TerrenoMin}
+                        onChangeText={(val) =>
+                          onUpdateFilter("m2TerrenoMin", val)
+                        }
+                        keyboardType="numeric"
+                        placeholder="Mínimo"
+                      />
+                    </View>
+                  )}
+                  {camposVisibles.m2Construccion && (
+                    <View style={styles.halfWidth}>
+                      <Text style={styles.label}>m² Constr. Mín.</Text>
+                      <AppInput
+                        value={filters.m2ConstruccionMin}
+                        onChangeText={(val) =>
+                          onUpdateFilter("m2ConstruccionMin", val)
+                        }
+                        keyboardType="numeric"
+                        placeholder="Mínimo"
+                      />
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+
+            <View style={styles.divider} />
+
+            {/* GUARDAR BÚSQUEDA CON SWITCH */}
+            <SaveSearchSection
+              createLead={createLead}
+              onToggleCreateLead={setCreateLead}
+              leadName={leadName}
+              leadPhone={leadPhone}
+              leadEmail={leadEmail}
+              onChangeLeadName={setLeadName}
+              onChangeLeadPhone={setLeadPhone}
+              onChangeLeadEmail={setLeadEmail}
+              onSave={handleSaveSearch}
+              errors={errors}
+            />
           </ScrollView>
 
           {/* Footer */}
@@ -719,7 +718,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
 
       {/* Number Input Modal */}
       <NumberInputModal

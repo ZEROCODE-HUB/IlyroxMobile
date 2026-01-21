@@ -119,11 +119,11 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
                 type === "colonia" ? 0.06 : type === "municipio" ? 0.12 : 0.1;
               const latDelta = Math.min(
                 Math.max(latSpan * 1.2 || MIN_DELTA, MIN_DELTA),
-                MAX_DELTA
+                MAX_DELTA,
               );
               const lngDelta = Math.min(
                 Math.max(lngSpan * 1.2 || MIN_DELTA, MIN_DELTA),
-                MAX_DELTA
+                MAX_DELTA,
               );
               setFocusRegion({
                 latitude: (minLat + maxLat) / 2,
@@ -162,7 +162,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
 
     // Scroll a la card correspondiente
     const propertyIndex = filteredProperties.findIndex(
-      (p) => p.id === propertyId
+      (p) => p.id === propertyId,
     );
     if (propertyIndex !== -1 && scrollViewRef.current) {
       scrollViewRef.current.scrollTo({
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   },
   cardsContainer: {
     flex: 0.3, // 30% del espacio (antes era 35%)
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#ffffffff",
     borderTopWidth: 1,
     borderTopColor: "#e9ecef",
     paddingVertical: 16,
