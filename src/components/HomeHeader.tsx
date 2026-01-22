@@ -1,0 +1,135 @@
+import React from "react";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Platform,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LocationSearchBar } from "./LocationSearchBar";
+import { COLORS } from "../constants";
+import { useApp } from "../context/AppContext";
+
+// Assuming Logo is in assets folder relative to src/components -> ../../assets/Logo.jpeg
+// Adjust path if necessary based on project structure.
+// User's App.tsx had require("./assets/Logo.jpeg") from root.
+const LOGO_SOURCE = require("../assets/Logo.jpeg");
+
+interface HomeHeaderProps {
+  style?: any;
+}
+
+export const HomeHeader: React.FC<HomeHeaderProps> = ({ style }) => {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { setSelectedLocation } = useApp();
+
+  const handleNavigation = (screen: string) => {
+    switch (screen) {
+      case "Matches":
+        router.push("/(stack)/matches");
+        break;
+      case "Messages":
+        router.push("/(stack)/messages");
+        break;
+      case "Appointments":
+        router.push("/(stack)/appointments");
+        break;
+      default:
+        break;
+    }
+  };
+
+  return (
+    <View style={[styles.headerContainer, { paddingTop: insets.top }, style]}>
+      <View style={styles.headerTopRow}>
+        <Image
+          source={LOGO_SOURCE}
+          style={styles.headerLogo}
+          resizeMode="cover"
+        />
+        <View style={styles.headerIcons}>
+          {["Matches", "Messages", "Appointments"].map((screen, idx) => (
+            <TouchableOpacity
+              key={idx}
+              onPress={() => handleNavigation(screen)}
+              style={styles.iconButton}
+            >
+              <Ionicons
+                name={
+                  screen === "Matches"
+                    ? "git-compare-outline" // Changed from "git-compare-outline" to match App.tsx if it's correct there, App.tsx had "git-compare-outline"
+                    : screen === "Messages"
+                      ? "chatbubble"
+                      : "calendar"
+                }
+                size={22}
+                color={COLORS.white}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.searchWrapper}>
+        <LocationSearchBar
+          onLocationSelect={(loc) => {
+            setSelectedLocation(loc);
+            if (loc) router.push("/(stack)/map");
+          }}
+        />
+      </View>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  headerContainer: {
+    backgroundColor: COLORS.primary,
+    zIndex: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 10, // Added some bottom padding
+    // Shadows
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      android: { elevation: 5 },
+    }),
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    height: 60,
+  },
+  headerLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  headerIcons: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  iconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  searchWrapper: {
+    height: 60,
+    justifyContent: "center",
+  },
+});

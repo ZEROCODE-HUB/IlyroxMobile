@@ -1,5 +1,5 @@
-import { supabase } from "../lib/supabase";
-import { perfiles, EstadisticasResenas } from "../types";
+import { supabase } from "@/lib/supabase";
+import { perfiles, EstadisticasResenas } from "@/types";
 
 export const profileService = {
   async getProfile(userId: string) {
@@ -65,7 +65,7 @@ export const profileService = {
     recommenderId: string,
     targetUserId: string,
     currentStatus: boolean | null,
-    newStatus: boolean
+    newStatus: boolean,
   ) {
     if (currentStatus === newStatus) {
       // Delete recommendation if clicking same status
@@ -133,13 +133,13 @@ export const profileService = {
             .filter(Boolean) as string[];
           recIdsByUserId.set(current, recommenderIds);
         }
-      })()
+      })(),
     );
 
     await Promise.all(workers);
 
     const allRecommenderIds = Array.from(
-      new Set(Array.from(recIdsByUserId.values()).flat())
+      new Set(Array.from(recIdsByUserId.values()).flat()),
     );
 
     const profilesById = new Map<

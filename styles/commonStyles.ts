@@ -5,8 +5,8 @@
  * para evitar duplicación y mantener consistencia.
  */
 
+import { COLORS, DIMENSIONS } from "@/constants";
 import { StyleSheet } from "react-native";
-import { COLORS, DIMENSIONS } from "../constants";
 
 export const commonStyles = StyleSheet.create({
   // Cards

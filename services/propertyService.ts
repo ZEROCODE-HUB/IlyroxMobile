@@ -1,9 +1,9 @@
-import { supabase } from "../lib/supabase";
-import { Property } from "../types";
+import { supabase } from "@/lib/supabase";
+import { Property } from "@/types";
 
 const normalizePropertyStatus = (
   value: unknown,
-  activo?: boolean
+  activo?: boolean,
 ): Property["status"] => {
   const raw = typeof value === "string" ? value.trim() : "";
   if (raw) {
@@ -49,7 +49,7 @@ export const propertyService = {
             comision_monto_fijo,
             comparte_comision
           )
-        `
+        `,
       )
       .eq("created_by", targetUserId)
       .is("deleted_at", null);
@@ -135,7 +135,7 @@ export const propertyService = {
                 monto,
                 catalogo_instituciones_financieras (nombre)
               )
-            `
+            `,
       )
       .eq("id", propertyId)
       .single();
@@ -174,7 +174,7 @@ export const propertyService = {
   async updateProperty(
     propertyId: string,
     propertyData: any,
-    relatedData: any
+    relatedData: any,
   ) {
     // 1. Update Property
     const { error: updateError } = await supabase

@@ -1,9 +1,9 @@
-import { supabase } from "../lib/supabase";
-import { TipoPrincipal } from "../constants/propertyData";
+import { supabase } from "@/lib/supabase";
+import { TipoPrincipal } from "@/constants/propertyData";
 import {
   PublishedVsSoldData,
   SearchesByNeighborhoodData,
-} from "../components/charts/types";
+} from "@/components/charts/types";
 
 export interface FilterOptions {
   estado: string;

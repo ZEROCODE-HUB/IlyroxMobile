@@ -1,7 +1,7 @@
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
-import { supabase } from "../lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 // ============================================================================
 // CONFIGURACION DE CAMPOS - Editar aquí qué información mostrar en el PDF

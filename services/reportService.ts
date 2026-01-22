@@ -1,5 +1,5 @@
-import { supabase } from "../lib/supabase";
-import { ReportesPropiedades } from "../types";
+import { supabase } from "@/lib/supabase";
+import { ReportesPropiedades } from "@/types";
 
 export const reportService = {
   async getReports(propiedad_id: string) {
