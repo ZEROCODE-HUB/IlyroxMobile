@@ -7,7 +7,7 @@ export default function StackLayout() {
       <Stack.Screen name="property/[id]" options={{ presentation: "card" }} />
       <Stack.Screen name="messages" options={{ presentation: "card" }} />
       <Stack.Screen name="settings" options={{ presentation: "card" }} />
-      <Stack.Screen name="post/[id]" options={{ presentation: "modal" }} />
+      <Stack.Screen name="post/[id]" options={{ presentation: "card" }} />
       <Stack.Screen name="reel/[id]" options={{ presentation: "modal" }} />
       <Stack.Screen name="easy-broker" options={{ presentation: "card" }} />
     </Stack>

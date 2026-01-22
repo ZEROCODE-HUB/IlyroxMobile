@@ -1,23 +1,4 @@
-/**
- * ReelDetail - Vista de reel en pantalla completa al estilo TikTok
- *
- * CARACTERÍSTICAS ESTILO TIKTOK:
- * - Video en pantalla completa vertical
- * - Swipe down para cerrar
- * - UI overlay con información del usuario en la parte inferior izquierda
- * - Botones de acción verticales en la parte inferior derecha (like, comment, share)
- * - Timeline de progreso
- * - StatusBar translúcido
- *
- * MEJORAS IMPLEMENTADAS:
- * - Usa useVideoPlayer hook para el control de video
- * - Usa COLORS y DIMENSIONS para consistencia
- * - Código más limpio y organizado
- *
- * MIGRADO A EXPO-VIDEO desde expo-av
- */
-
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -27,7 +8,6 @@ import {
   StyleSheet,
   useWindowDimensions,
   Modal,
-  Share,
   Animated,
   PanResponder,
   StatusBar,
@@ -36,9 +16,10 @@ import {
 import { VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { FeedItem, User } from "../../types";
-import { useVideoPlayer, useLikes, useShare } from "../../hooks/hooks";
+import { useVideoPlayer } from "../../hooks/hooks";
 import { COLORS } from "../../constants";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
+import ActionButtons from "../ActionButtons";
 
 interface ReelDetailProps {
   item: FeedItem;
@@ -54,11 +35,6 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
   currentUserId,
 }) => {
   const { width, height } = useWindowDimensions();
-  const { likes, isLiked, toggleLike } = useLikes({
-    feedItemId: item.id,
-    initialLikes: item.likes,
-    userId: currentUserId,
-  });
   const [showComments, setShowComments] = useState(false);
 
   // Video de fallback si no hay URL
@@ -117,16 +93,6 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
       },
     }),
   ).current;
-
-  const handleShare = useCallback(async () => {
-    try {
-      await Share.share({
-        message: `Check out this reel: ${item.content}`,
-      });
-    } catch (error) {
-      console.warn("Error sharing:", error);
-    }
-  }, [item.content]);
 
   const SAFE_BOTTOM = Platform.OS === "ios" ? 34 : 20;
 
@@ -233,48 +199,20 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
           <View
             style={[styles.actionsContainer, { bottom: SAFE_BOTTOM + 120 }]}
           >
-            {/* Like button */}
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={toggleLike}
-              disabled={!currentUserId}
-            >
-              <View style={styles.actionIconContainer}>
-                <Ionicons
-                  name={isLiked ? "heart" : "heart-outline"}
-                  size={32}
-                  color={isLiked ? COLORS.error : COLORS.white}
-                />
-              </View>
-              <Text style={styles.actionText}>{likes}</Text>
-            </TouchableOpacity>
-
-            {/* Comment button */}
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => setShowComments(true)}
-            >
-              <View style={styles.actionIconContainer}>
-                <Ionicons
-                  name="chatbubble-outline"
-                  size={30}
-                  color={COLORS.white}
-                />
-              </View>
-              <Text style={styles.actionText}>{item.comments}</Text>
-            </TouchableOpacity>
-
-            {/* Share button */}
-            <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-              <View style={styles.actionIconContainer}>
-                <Ionicons
-                  name="share-social-outline"
-                  size={28}
-                  color={COLORS.white}
-                />
-              </View>
-              <Text style={styles.actionText}>Share</Text>
-            </TouchableOpacity>
+            <ActionButtons
+              feedItemId={item.id}
+              feedItemType="reel"
+              initialLikes={item.likes}
+              comments={item.comments}
+              userId={currentUserId}
+              onCommentClick={() => setShowComments(true)}
+              orientation="vertical"
+              tintColor={COLORS.white}
+              shareTitle={item.content || "Mira este reel"}
+              shareDescription={item.content}
+              shareImageUrl={item.images?.[0]}
+              authorId={item.user.id}
+            />
           </View>
         </View>
 
@@ -394,28 +332,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 10,
     alignItems: "center",
-    gap: 20,
-  },
-  actionButton: {
-    alignItems: "center",
-    gap: 4,
-  },
-  actionIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    // Se eliminó la sombra y elevación según solicitud del usuario
-    elevation: 0,
-  },
-  actionText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: "600",
-    textShadowColor: COLORS.blackTransparent80,
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
 });
 

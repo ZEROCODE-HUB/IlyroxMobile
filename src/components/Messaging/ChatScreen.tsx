@@ -14,7 +14,6 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
-  StatusBar,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import MessageBubble from "./MessageBubble";
@@ -134,23 +133,6 @@ export default function ChatScreen({
 
     return result;
   };
-
-  // Restaurar StatusBar
-  useEffect(() => {
-    const restoreStatusBar = () => {
-      StatusBar.setHidden(false);
-      if (Platform.OS === "android") {
-        StatusBar.setTranslucent(false);
-        StatusBar.setBackgroundColor("#06D5B4");
-      }
-      StatusBar.setBarStyle("light-content");
-    };
-    restoreStatusBar();
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") setTimeout(restoreStatusBar, 100);
-    });
-    return () => subscription.remove();
-  }, []);
 
   // Auto-scroll al recibir nuevos mensajes
   useEffect(() => {

@@ -29,6 +29,7 @@ interface AppointmentCardProps {
   onMarkCancel: (id: string) => void;
   onOpenRating: (id: string) => void;
   onContact?: (id: string) => void;
+  activeTab?: string;
 }
 
 export const AppointmentCard: React.FC<AppointmentCardProps> = ({
@@ -37,6 +38,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onMarkCancel,
   onOpenRating,
   onContact,
+  activeTab,
 }) => {
   // Verificar si la fecha y hora de la cita ya pasaron
   const canMarkAsCompleted = () => {
@@ -110,7 +112,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
                 <View style={styles.cancelBtn}>
                   <Text style={styles.completeBtnText}>Cita Cancelada</Text>
                 </View>
-              ) : (
+              ) : activeTab === "past" ? null : (
                 <TouchableOpacity
                   onPress={() => onMarkCancel(appointment.id)}
                   style={styles.cancelBtn}
@@ -149,7 +151,10 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
               <Text style={styles.rateLabel}>Calificar:</Text>
               <TouchableOpacity
                 onPress={() => onOpenRating(appointment.id)}
-                style={[styles.completeBtn, { marginLeft: 8 }]}
+                style={[
+                  styles.completeBtn,
+                  { marginLeft: 8, paddingHorizontal: 8 },
+                ]}
               >
                 <Ionicons name="star" size={16} color={COLORS.white} />
                 <Text style={styles.completeBtnText}>Abrir calificación</Text>

@@ -71,7 +71,6 @@ interface AppointmentItem {
 }
 
 const Appointments: React.FC = () => {
-  const navigation = useNavigation<any>();
   const { profile } = useAuth();
   const { showToast } = useToast();
   const { handleContact } = useChatInitiator();
@@ -395,6 +394,7 @@ const Appointments: React.FC = () => {
                 onMarkCancel={handleMarkCancel}
                 onOpenRating={handleOpenRating}
                 onContact={handleContactPress}
+                activeTab={activeTab}
               />
             ))}
           </View>

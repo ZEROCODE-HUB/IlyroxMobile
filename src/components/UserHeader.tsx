@@ -8,7 +8,6 @@ import {
   FlatList,
   ActivityIndicator,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { User } from "../types";
 import Avatar from "./shared/Avatar";
 import { COLORS } from "../constants/colors";
@@ -30,12 +29,8 @@ const UserHeader: React.FC<UserHeaderProps> = ({
   user,
   timestamp,
   onUserClick,
-  showOptions,
-  setShowOptions,
-  onReport,
   totalRatings,
   showRecommendedPreview = true,
-  feedItemType,
 }) => {
   const displayName = user.name || user.nombre || "Usuario";
   const ratingsCount = totalRatings ?? user.totalRatings ?? 0;
@@ -69,6 +64,7 @@ const UserHeader: React.FC<UserHeaderProps> = ({
     setShowRecommendedModal(true);
     setLoadingRecommended(true);
     setRecommendedList([]);
+    console.log("Prueba de bucle");
 
     // CORRECCIÓN: Una sola consulta con relación (inner join implícito al pedir datos anidados)
     const { data: recs } = await supabase
@@ -133,7 +129,18 @@ const UserHeader: React.FC<UserHeaderProps> = ({
             </View>
           </View>
           <Text style={styles.timestamp}>
-            {new Date(timestamp).toLocaleDateString()} • {user.role}
+            {isNaN(new Date(timestamp).getTime()) ? (
+              `${timestamp} ${user.role}`
+            ) : (
+              <>
+                {new Date(timestamp).toLocaleDateString("es-MX", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })}{" "}
+                • {user.role}
+              </>
+            )}
           </Text>
           {showRecommendedPreview && positiveRecommendations > 0 && (
             <TouchableOpacity

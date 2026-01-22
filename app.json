@@ -8,9 +8,9 @@
     "userInterfaceStyle": "light",
     "scheme": "i360realestate",
     "splash": {
-      "image": "./src/assets/splash.png",
+      "image": "./src/assets/adaptive-icon.png",
       "resizeMode": "cover",
-      "backgroundColor": "#fff"
+      "backgroundColor": "#FFFFFF"
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
@@ -37,13 +37,13 @@
       "largeHeap": true,
       "statusBar": {
         "barStyle": "light-content",
-        "backgroundColor": "#fff",
+        "backgroundColor": "#FFFFFF",
         "translucent": false,
         "hidden": false
       },
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/adaptive-icon.png",
-        "backgroundColor": "#fff"
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.i360.realestateapp",
       "config": {

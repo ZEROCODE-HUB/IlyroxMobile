@@ -59,8 +59,9 @@ function RootLayoutNav() {
   useEffect(() => {
     StatusBar.setHidden(false);
     if (Platform.OS === "android") {
-      StatusBar.setBackgroundColor(COLORS.primary);
-      StatusBar.setTranslucent(false);
+      StatusBar.setBackgroundColor("transparent");
+      StatusBar.setTranslucent(true);
+      StatusBar.setBarStyle("light-content");
     }
     StatusBar.setBarStyle("dark-content");
   }, []);

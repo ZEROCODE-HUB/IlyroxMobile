@@ -26,7 +26,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         )}
       </TouchableOpacity>
 
-      <Text style={styles.title}>{isOwnProfile ? "Mi Perfil" : ""}</Text>
+      <Text style={styles.title}>{isOwnProfile ? "Mi Perfil" : "Perfil"}</Text>
 
       <TouchableOpacity
         onPress={onSettings}

@@ -51,6 +51,7 @@ import { useStableSafeInsets } from "../../context/SafeInsetsContext";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
 import { ViewImage } from "../modals/ViewImage";
 import { usePropertyMutation } from "@/hooks/hooks/usePropertyMutation";
+import { AppHeader } from "../AppHeader";
 
 interface CreatePropertyProps {
   onBack: () => void;
@@ -1046,7 +1047,7 @@ export default function CreateProperty({
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      {/* <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
@@ -1054,7 +1055,13 @@ export default function CreateProperty({
           {propertyId ? "Editar Propiedad" : "Crear Propiedad"}
         </Text>
         <View style={{ width: 40 }} />
-      </View>
+      </View> */}
+
+      <AppHeader
+        title={propertyId ? "Editar Propiedad" : "Crear Propiedad"}
+        showBackButton={true}
+        onBack={onBack}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -1884,7 +1891,7 @@ export default function CreateProperty({
       {/* ============================================ */}
       {/* FOOTER - BOTÓN PUBLICAR */}
       {/* ============================================ */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, propertyId ? { paddingBottom: 50 } : {}]}>
         <TouchableOpacity
           style={[styles.publishBtn, uploading && styles.publishBtnDisabled]}
           onPress={handlePublish}
@@ -2182,7 +2189,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
-    paddingBottom: 50,
   },
   publishBtn: {
     backgroundColor: COLORS.primary,

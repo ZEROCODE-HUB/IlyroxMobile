@@ -29,6 +29,7 @@ import { decode } from "base64-arraybuffer";
 import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useCreateContent } from "@/hooks/hooks/useCreateContent";
+import { AppHeader } from "../AppHeader";
 
 interface CreatePostProps {
   post?: Post;
@@ -225,15 +226,11 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {isEditing ? "Editar Post" : "Crear Post"}
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <AppHeader
+        title={isEditing ? "Editar Post" : "Crear Post"}
+        showBackButton={true}
+        onBack={onBack}
+      />
 
       <ScrollView
         style={styles.scrollView}

@@ -21,6 +21,7 @@ import * as Burnt from "burnt";
 import { supabase } from "../../lib/supabase";
 import { useCreateContent } from "@/hooks/hooks/useCreateContent";
 import { useVideoUpload } from "@/hooks/hooks";
+import { AppHeader } from "../AppHeader";
 
 interface CreateReelProps {
   reelId?: string;
@@ -200,13 +201,11 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Crear Reel</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <AppHeader
+        title={isEditing ? "Editar Reel" : "Crear Reel"}
+        showBackButton={true}
+        onBack={onBack}
+      />
 
       <ScrollView
         style={styles.scrollView}

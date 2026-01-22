@@ -2,8 +2,6 @@ import React from "react";
 import { useRouter } from "expo-router";
 import { useRoute } from "@react-navigation/native";
 import MessagingScreen from "../../components/MessagingScreen";
-import { StatusBar } from "expo-status-bar";
-import { COLORS } from "@/constants";
 
 export default function MessagesRoute() {
   const router = useRouter();
