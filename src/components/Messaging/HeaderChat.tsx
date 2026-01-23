@@ -178,6 +178,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
     gap: 8,
+    marginTop: 10,
   },
   backButton: {
     width: 40,

@@ -179,7 +179,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
       <View style={styles.metaRow}>
         <Text style={styles.metaText}>
-          ID: {property.code ?? property.id} •{" "}
+          ID: {property.code ? property.code : property.codigo_propiedad} •{" "}
           {property.createdAt
             ? new Date(property.createdAt).toLocaleDateString("es-MX", {
                 day: "2-digit",

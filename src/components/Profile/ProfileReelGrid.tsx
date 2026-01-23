@@ -176,6 +176,7 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
           onBack={() => {
             setShowModalEdit(false);
             if (userId) getReels(userId);
+            if (onDelete) onDelete();
           }}
         />
       </Modal>

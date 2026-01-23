@@ -108,6 +108,7 @@ export type Property = {
   municipio?: string;
   ciudad?: string;
   subtipo?: string;
+  codigo_propiedad?: string;
 };
 
 export type Comment = {
@@ -132,6 +133,7 @@ export type FeedItem = {
   commentsList?: Comment[];
   timestamp: string;
   status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
+  codigo_propiedad?: string;
 };
 
 export type Lead = {

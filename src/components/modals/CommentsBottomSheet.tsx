@@ -21,19 +21,19 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   StyleSheet,
-  Image,
   ActivityIndicator,
-  Keyboard,
   Platform,
   Modal,
   FlatList,
   TextInput,
-  Animated,
   Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as ImagePicker from "expo-image-picker";
+import {
+  KeyboardProvider,
+  KeyboardAvoidingView,
+} from "react-native-keyboard-controller";
 
 import { useComments } from "../../hooks/hooks";
 import { COLORS } from "../../constants";
@@ -41,6 +41,7 @@ import { Avatar } from "../shared";
 import { ViewImage } from "./ViewImage";
 import { Comment } from "../../types";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
+import MessageInput from "../Messaging/MessageInput";
 
 // ============================================================================
 // Types
@@ -66,7 +67,7 @@ interface CommentItemProps {
 // ============================================================================
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-const MODAL_HEIGHT = SCREEN_HEIGHT * 0.75;
+const MODAL_HEIGHT = SCREEN_HEIGHT * 0.95;
 
 // ============================================================================
 // Subcomponents
@@ -158,16 +159,12 @@ export default function CommentsBottomSheet({
   const insets = useSafeAreaInsets();
 
   // State
-  const [commentText, setCommentText] = useState("");
   const [replyTo, setReplyTo] = useState<string | null>(null);
-  const [imageUri, setImageUri] = useState("");
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
 
   // Refs
   const inputRef = useRef<TextInput>(null);
   const flatListRef = useRef<FlatList>(null);
-  const translateY = useRef(new Animated.Value(0)).current;
-  const keyboardHeightRef = useRef(0);
 
   // Data
   const { comments, loading, posting, addComment, toggleCommentLike } =
@@ -190,75 +187,9 @@ export default function CommentsBottomSheet({
     [replyTo, comments],
   );
 
-  const canSend = Boolean(commentText.trim() || imageUri);
-
   // ============================================================================
   // Effects
   // ============================================================================
-
-  // Global keyboard listener - register early to capture all events
-  useEffect(() => {
-    // iOS uses "will" events (before animation), Android uses "did" events (after)
-    const showEvent =
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent =
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-
-    const onShow = Keyboard.addListener(showEvent, (e) => {
-      keyboardHeightRef.current = e.endCoordinates.height;
-      if (visible) {
-        if (Platform.OS === "ios") {
-          // iOS: animate smoothly with keyboard
-          Animated.timing(translateY, {
-            toValue: -e.endCoordinates.height,
-            duration: e.duration || 250,
-            useNativeDriver: true,
-          }).start();
-        } else {
-          // Android: instant change since keyboard already visible
-          translateY.setValue(-e.endCoordinates.height);
-        }
-      }
-    });
-
-    const onHide = Keyboard.addListener(hideEvent, (e) => {
-      keyboardHeightRef.current = 0;
-      if (visible) {
-        if (Platform.OS === "ios") {
-          Animated.timing(translateY, {
-            toValue: 0,
-            duration: e.duration || 250,
-            useNativeDriver: true,
-          }).start();
-        } else {
-          // Android: instant change
-          translateY.setValue(0);
-        }
-      }
-    });
-
-    return () => {
-      onShow.remove();
-      onHide.remove();
-    };
-  }, [visible, translateY]);
-
-  // Apply cached keyboard height when modal becomes visible
-  useEffect(() => {
-    if (visible && keyboardHeightRef.current > 0) {
-      translateY.setValue(-keyboardHeightRef.current);
-    }
-  }, [visible, translateY]);
-
-  // Reset state when modal closes
-  useEffect(() => {
-    if (!visible) {
-      setCommentText("");
-      setImageUri("");
-      setReplyTo(null);
-      translateY.setValue(0);
-    }
-  }, [visible, translateY]);
 
   // Focus input when replying
   useEffect(() => {
@@ -267,52 +198,50 @@ export default function CommentsBottomSheet({
     }
   }, [replyTo, visible]);
 
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setReplyTo(null);
+    }
+  }, [visible]);
+
   // ============================================================================
   // Handlers
   // ============================================================================
 
   const handleClose = useCallback(() => {
-    Keyboard.dismiss();
     onClose();
   }, [onClose]);
 
-  const handlePostComment = useCallback(async () => {
-    if (!canSend) return;
+  const handleSendText = useCallback(
+    async (text: string) => {
+      const success = await addComment(text, undefined, replyTo || undefined);
 
-    const success = await addComment(
-      commentText,
-      imageUri,
-      replyTo || undefined,
-    );
+      if (success) {
+        setReplyTo(null);
+        setTimeout(
+          () => flatListRef.current?.scrollToEnd({ animated: true }),
+          100,
+        );
+      }
+    },
+    [replyTo, addComment],
+  );
 
-    if (success) {
-      setCommentText("");
-      setImageUri("");
-      setReplyTo(null);
-      Keyboard.dismiss();
-      setTimeout(
-        () => flatListRef.current?.scrollToEnd({ animated: true }),
-        100,
-      );
-    }
-  }, [commentText, imageUri, replyTo, canSend, addComment]);
+  const handleSendImage = useCallback(
+    async (uri: string) => {
+      const success = await addComment(undefined, uri, replyTo || undefined);
 
-  const handlePickImage = useCallback(async () => {
-    if (Platform.OS !== "web") {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets?.[0]?.uri) {
-      setImageUri(result.assets[0].uri);
-    }
-  }, []);
+      if (success) {
+        setReplyTo(null);
+        setTimeout(
+          () => flatListRef.current?.scrollToEnd({ animated: true }),
+          100,
+        );
+      }
+    },
+    [replyTo, addComment],
+  );
 
   const handleLikeComment = useCallback(
     (commentId: string) => {
@@ -377,69 +306,58 @@ export default function CommentsBottomSheet({
         </TouchableWithoutFeedback>
 
         {/* Sheet */}
-        <Animated.View
+        <View
           style={[
             styles.sheet,
             {
               height: MODAL_HEIGHT,
-              paddingBottom: insets.bottom,
-              transform: [{ translateY }],
+              // paddingBottom: insets.bottom, // MessageInput handles this
             },
           ]}
         >
-          {/* Handle */}
-          <View style={styles.handleContainer}>
-            <View style={styles.handle} />
-          </View>
+          <KeyboardProvider>
+            <KeyboardAvoidingView
+              style={styles.container}
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              keyboardVerticalOffset={100}
+            >
+              {/* Handle */}
+              <View style={styles.handleContainer}>
+                <View style={styles.handle} />
+              </View>
 
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>Comentarios ({comments.length})</Text>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={COLORS.textPrimary} />
-            </TouchableOpacity>
-          </View>
+              {/* Header */}
+              <View style={styles.header}>
+                <Text style={styles.title}>
+                  Comentarios ({comments.length})
+                </Text>
+                <TouchableOpacity
+                  onPress={handleClose}
+                  style={styles.closeButton}
+                >
+                  <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+                </TouchableOpacity>
+              </View>
 
-          {/* Comments List */}
-          <FlatList
-            ref={flatListRef}
-            data={parentComments}
-            renderItem={renderComment}
-            keyExtractor={(item) => item.id}
-            style={styles.list}
-            contentContainerStyle={[
-              styles.listContent,
-              parentComments.length === 0 && styles.listContentEmpty,
-            ]}
-            ListEmptyComponent={ListEmptyComponent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          />
+              {/* Comments List */}
+              <FlatList
+                ref={flatListRef}
+                data={parentComments}
+                renderItem={renderComment}
+                keyExtractor={(item) => item.id}
+                style={styles.list}
+                contentContainerStyle={[
+                  styles.listContent,
+                  parentComments.length === 0 && styles.listContentEmpty,
+                ]}
+                ListEmptyComponent={ListEmptyComponent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              />
 
-          {/* Input Area */}
-          <View style={styles.inputArea}>
-            {/* Context bar (reply / image preview) */}
-            {(replyTo || imageUri) && (
-              <View style={styles.contextBar}>
-                {!!imageUri && (
-                  <View style={styles.previewContainer}>
-                    <Image
-                      source={{ uri: imageUri }}
-                      style={styles.previewImage}
-                    />
-                    <TouchableOpacity
-                      onPress={() => setImageUri("")}
-                      style={styles.removePreview}
-                    >
-                      <Ionicons
-                        name="close-circle"
-                        size={20}
-                        color={COLORS.white}
-                      />
-                    </TouchableOpacity>
-                  </View>
-                )}
-                {!!replyTo && (
+              {/* Context bar (reply) */}
+              {replyTo && (
+                <View style={styles.contextBar}>
                   <View style={styles.replyBadge}>
                     <Text style={styles.replyBadgeText}>
                       Respondiendo a:{" "}
@@ -453,61 +371,32 @@ export default function CommentsBottomSheet({
                       />
                     </TouchableOpacity>
                   </View>
-                )}
-              </View>
-            )}
+                </View>
+              )}
 
-            {/* Input row */}
-            <View style={styles.inputRow}>
-              <View style={styles.inputWrapper}>
-                <TextInput
+              {/* MessageInput */}
+              <View style={{ marginBottom: 30 }}>
+                <MessageInput
                   ref={inputRef}
-                  style={styles.textInput}
-                  placeholder="Escribe un comentario..."
-                  placeholderTextColor={COLORS.textTertiary}
-                  value={commentText}
-                  onChangeText={setCommentText}
-                  multiline
-                  maxLength={500}
-                  autoCapitalize="sentences"
+                  onSendText={handleSendText}
+                  onSendImage={handleSendImage}
+                  sending={posting}
+                  // onFocusChange logic internal to MessageInput for padding
                 />
               </View>
-
-              <TouchableOpacity
-                onPress={handlePickImage}
-                disabled={posting}
-                style={styles.iconButton}
-              >
-                <Ionicons
-                  name="images-outline"
-                  size={24}
-                  color={imageUri ? COLORS.primary : COLORS.textTertiary}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handlePostComment}
-                disabled={!canSend || posting}
-                style={[
-                  styles.sendButton,
-                  !canSend && styles.sendButtonDisabled,
-                ]}
-              >
-                {posting ? (
-                  <ActivityIndicator size="small" color={COLORS.white} />
-                ) : (
-                  <Ionicons name="send" size={18} color={COLORS.white} />
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Animated.View>
+            </KeyboardAvoidingView>
+          </KeyboardProvider>
+        </View>
       </View>
     </Modal>
   );
 }
 const styles = StyleSheet.create({
   // Modal structure
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+  },
   overlay: {
     flex: 1,
     backgroundColor: COLORS.overlay,
@@ -646,33 +535,11 @@ const styles = StyleSheet.create({
     paddingLeft: 48,
   },
 
-  // Input area
-  inputArea: {
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.cardBorder,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-  },
+  // Input area (legacy styles removed, keeping contextBar for reply)
   contextBar: {
-    marginBottom: 12,
-  },
-  previewContainer: {
-    marginBottom: 8,
-    alignSelf: "flex-start",
-  },
-  previewImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-  },
-  removePreview: {
-    position: "absolute",
-    top: -8,
-    right: -8,
-    backgroundColor: COLORS.error,
-    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    backgroundColor: COLORS.white,
   },
   replyBadge: {
     flexDirection: "row",
@@ -689,41 +556,5 @@ const styles = StyleSheet.create({
   },
   replyBadgeName: {
     fontWeight: "bold",
-  },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 10,
-  },
-  inputWrapper: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: Platform.OS === "ios" ? 10 : 6,
-    minHeight: 40,
-    maxHeight: 100,
-  },
-  textInput: {
-    fontSize: 15,
-    color: COLORS.textPrimary,
-    maxHeight: 80,
-    padding: 0,
-    margin: 0,
-  },
-  iconButton: {
-    padding: 8,
-    marginBottom: 2,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sendButtonDisabled: {
-    backgroundColor: COLORS.textDisabled,
   },
 });

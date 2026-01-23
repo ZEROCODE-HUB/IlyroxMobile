@@ -175,6 +175,7 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
             setShowPostModal(false);
             setPostToEdit(null);
             if (userId) getPosts(userId);
+            if (onDelete) onDelete();
           }}
         />
       </Modal>

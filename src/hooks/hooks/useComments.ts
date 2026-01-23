@@ -114,7 +114,7 @@ export function useComments({
       imageUri,
       parentCommentId,
     }: {
-      text: string;
+      text?: string;
       imageUri?: string;
       parentCommentId?: string;
     }) => {
@@ -145,7 +145,7 @@ export function useComments({
         .insert({
           feed_item_id: feedItemId,
           publicado_por: userId,
-          contenido: text.trim() || "",
+          contenido: text?.trim() || "",
           imagenes: imageUrl ? [imageUrl] : null,
           parent_comentario_id: parentCommentId || null,
           nivel_anidacion: nivelAnidacion,
@@ -188,7 +188,7 @@ export function useComments({
           isFollowing: false,
           role: "User" as const,
         },
-        text: text.trim(),
+        text: text?.trim() || "",
         timestamp: "Enviando...", // ⬅️ Indicador visual
         imageUrl: imageUri, // Mostrar imagen local temporalmente
         parentId: parentCommentId,
@@ -259,7 +259,7 @@ export function useComments({
    * Agregar comentario (función helper)
    */
   const addComment = async (
-    text: string,
+    text?: string,
     imageUri?: string,
     parentCommentId?: string,
   ): Promise<boolean> => {
@@ -268,13 +268,17 @@ export function useComments({
       return false;
     }
 
-    if (!text.trim() && !imageUri) {
+    if (!text?.trim() && !imageUri) {
       showToast("El comentario debe tener texto o imagen", "warning");
       return false;
     }
 
     try {
-      await addCommentMutation.mutateAsync({ text, imageUri, parentCommentId });
+      await addCommentMutation.mutateAsync({
+        text: text || "",
+        imageUri,
+        parentCommentId,
+      });
       return true;
     } catch {
       return false;

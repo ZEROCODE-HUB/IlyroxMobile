@@ -121,6 +121,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(
     null,
   );
+  const [editProperty, setEditProperty] = useState<Property | null>(null);
   const [showRatingDetails, setShowRatingDetails] = useState(false);
   const [showRecommendedByModal, setShowRecommendedByModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<FeedItem | null>(null);
@@ -822,10 +823,10 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             onPropertyPress={(property) => setSelectedProperty(property)}
             isOwnProfile={isMe}
             onEditPress={(property) => {
+              setEditProperty(property);
               setShowModal(true);
-              setSelectedProperty(property);
             }}
-            onDelete={fetchProfileData}
+            onDelete={handleRefresh}
           />
         )}
 
@@ -842,7 +843,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
               })
             }
             isOwnProfile={isMe}
-            onDelete={fetchProfileData}
+            onDelete={handleRefresh}
             refreshTrigger={refreshTrigger}
           />
         )}
@@ -860,7 +861,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
               })
             }
             isOwnProfile={isMe}
-            onDelete={fetchProfileData}
+            onDelete={handleRefresh}
             refreshTrigger={refreshTrigger}
           />
         )}
@@ -919,8 +920,11 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
           onRequestClose={() => setShowModal(false)}
         >
           <CreateProperty
-            onBack={() => setShowModal(false)}
-            propertyId={selectedProperty?.id}
+            onBack={() => {
+              setShowModal(false);
+              handleRefresh();
+            }}
+            propertyId={editProperty?.id}
           />
         </Modal>
       )}

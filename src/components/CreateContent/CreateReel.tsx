@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,16 +8,17 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
 import * as ImagePicker from "expo-image-picker";
 import * as VideoThumbnails from "expo-video-thumbnails";
+import { useVideoPlayer, VideoView } from "expo-video"; // Asegúrate de tener expo-video instalado
 
 import { useAuth } from "../../context/AuthContext";
 import { COLORS } from "../../constants/colors";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
-import * as Burnt from "burnt";
 import { supabase } from "../../lib/supabase";
 import { useCreateContent } from "@/hooks/hooks/useCreateContent";
 import { useVideoUpload } from "@/hooks/hooks";
@@ -27,6 +28,74 @@ interface CreateReelProps {
   reelId?: string;
   onBack: () => void;
 }
+
+const VideoPreview = ({
+  uri,
+  thumbnail,
+  onRemove,
+}: {
+  uri: string;
+  thumbnail?: string;
+  onRemove: () => void;
+}) => {
+  const [isMuted, setIsMuted] = useState(true);
+
+  // Inicializamos el player.
+  // Importante: Este componente se remontará gracias a la 'key' en el padre.
+  const player = useVideoPlayer(uri, (player) => {
+    player.loop = true;
+    player.muted = true;
+    player.play();
+  });
+
+  useEffect(() => {
+    player.muted = isMuted;
+  }, [isMuted, player]);
+
+  return (
+    <View style={styles.videoPreview}>
+      <View style={styles.playerContainer}>
+        {/* Mostramos el thumbnail de fondo mientras el video carga para evitar el gris */}
+        {thumbnail && (
+          <Image
+            source={{ uri: thumbnail }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+          />
+        )}
+
+        <VideoView
+          player={player}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          nativeControls={false}
+        />
+      </View>
+
+      {/* Controles de mute y borrado */}
+      <View style={styles.previewOverlayControls}>
+        <TouchableOpacity
+          onPress={() => setIsMuted(!isMuted)}
+          style={styles.controlIconBadge}
+        >
+          <Ionicons
+            name={isMuted ? "volume-mute" : "volume-high"}
+            size={20}
+            color={COLORS.white}
+          />
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity
+        onPress={onRemove}
+        style={styles.removeVideoBtnFloating}
+      >
+        <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+        <Text style={styles.removeVideoText}>Eliminar</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 export default function CreateReel({ onBack, reelId }: CreateReelProps) {
   const { user } = useAuth();
@@ -69,8 +138,9 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
       if (error) throw error;
 
       if (data) {
-        setDescription(data.description || "");
+        setDescription(data.descripcion || "");
         setVideoUri(data.video_url);
+        setThumbnailUri(data.thumbnail_url || "");
       }
     } catch (error) {
       console.error("Error loading reel:", error);
@@ -200,119 +270,79 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
 
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>
-      {/* Header */}
       <AppHeader
-        title={isEditing ? "Editar Reel" : "Crear Reel"}
-        showBackButton={true}
+        title={isEditing ? "Editar Reel" : "Nuevo Reel"}
+        showBackButton
         onBack={onBack}
       />
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Video */}
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.card}>
-          <Text style={styles.label}>Video *</Text>
-          <Text style={styles.hint}>Máximo 60 segundos</Text>
+          <Text style={styles.label}>Video del Reel</Text>
 
           {videoUri ? (
-            <View style={styles.videoPreview}>
-              <Ionicons name="videocam" size={48} color={COLORS.primary} />
-              <Text style={styles.videoText}>Video seleccionado</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setVideoUri("");
-                  setThumbnailUri("");
-                  if (errors.video) {
-                    setErrors({ ...errors, video: "" });
-                  }
-                }}
-                style={styles.removeVideoBtn}
-              >
-                <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-                <Text style={styles.removeVideoText}>Eliminar</Text>
-              </TouchableOpacity>
-            </View>
+            /* CLAVE: Usamos 'key={videoUri}'. 
+               Si el usuario cambia de video, React destruye el componente anterior 
+               y crea uno nuevo, reiniciando el Player de expo-video sin errores de memoria o pantalla gris.
+            */
+            <VideoPreview
+              key={videoUri}
+              uri={videoUri}
+              thumbnail={thumbnailUri}
+              onRemove={() => setVideoUri("")}
+            />
           ) : (
-            <>
-              <TouchableOpacity
-                onPress={handlePickVideo}
-                style={[
-                  styles.uploadVideoBtn,
-                  errors.video && styles.inputError,
-                ]}
-              >
-                <Ionicons
-                  name="videocam-outline"
-                  size={56}
-                  color={COLORS.textTertiary}
-                />
-                <Text style={styles.uploadText}>Seleccionar video</Text>
-              </TouchableOpacity>
-              {errors.video && (
-                <Text style={styles.errorText}>{errors.video}</Text>
-              )}
-            </>
+            <TouchableOpacity
+              onPress={handlePickVideo}
+              style={[
+                styles.uploadPlaceholder,
+                errors.video && { borderColor: COLORS.error },
+              ]}
+            >
+              <Ionicons name="videocam" size={48} color={COLORS.textTertiary} />
+              <Text style={styles.uploadText}>
+                Presiona para elegir un video
+              </Text>
+            </TouchableOpacity>
           )}
+          {errors.video && <Text style={styles.errorText}>{errors.video}</Text>}
         </View>
 
-        {/* Descripción */}
         <View style={styles.card}>
           <AppInput
             label="Descripción"
-            placeholder="¿De qué trata tu reel?"
+            placeholder="Escribe algo sobre tu video..."
             value={description}
-            onChangeText={(text) => {
-              setDescription(text);
-              if (errors.description) {
-                setErrors({ ...errors, description: "" });
-              }
-            }}
+            onChangeText={setDescription}
             multiline
-            numberOfLines={4}
             maxLength={500}
-            error={errors.description}
           />
         </View>
       </ScrollView>
 
-      {/* Botón Publicar */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.publishBtn, uploading && styles.publishBtnDisabled]}
+          style={[styles.publishBtn, uploading && { opacity: 0.7 }]}
           onPress={handlePublish}
           disabled={uploading}
         >
           {uploading ? (
-            <>
-              <ActivityIndicator color={COLORS.white} />
-              <Text style={styles.publishText}>Publicando...</Text>
-            </>
+            <ActivityIndicator color={COLORS.white} />
           ) : (
-            <>
-              <Ionicons
-                name="checkmark-circle"
-                size={24}
-                color={COLORS.white}
-              />
-              <Text style={styles.publishText}>
-                {isEditing ? "Editar Reel" : "Publicar Reel"}
-              </Text>
-            </>
+            <Text style={styles.publishText}>
+              {isEditing ? "Guardar Cambios" : "Publicar Ahora"}
+            </Text>
           )}
         </TouchableOpacity>
       </View>
 
       {/* Modal de Progreso */}
-      <Modal visible={uploading} transparent animationType="fade">
+      <Modal visible={uploading} transparent>
         <View style={styles.uploadModalOverlay}>
           <View style={styles.uploadModalContent}>
             <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.uploadModalTitle}>Subiendo reel...</Text>
-            <Text style={styles.uploadModalSubtitle}>
-              {uploadProgress}% completado
-            </Text>
+            <Text style={styles.uploadModalTitle}>Subiendo Video...</Text>
+            <Text style={styles.uploadModalSubtitle}>{uploadProgress}%</Text>
             <View style={styles.progressBarContainer}>
               <View
                 style={[styles.progressBar, { width: `${uploadProgress}%` }]}
@@ -341,6 +371,16 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
+  },
+  uploadPlaceholder: {
+    height: 250,
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: COLORS.cardBorder,
+    borderStyle: "dashed",
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 18,
@@ -384,30 +424,63 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     marginTop: 6,
   },
+  muteBtn: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    backgroundColor: COLORS.blackTransparent60,
+    padding: 8,
+    borderRadius: 20,
+    zIndex: 10,
+  },
   videoPreview: {
-    height: 200,
+    height: 350,
     backgroundColor: COLORS.background,
     borderRadius: 12,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
+  },
+  thumbnailPreview: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 12,
+  },
+  videoInfoContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.blackTransparent60,
+    padding: 16,
+    alignItems: "center",
+    gap: 8,
   },
   videoText: {
     fontSize: 14,
-    color: COLORS.textSecondary,
-    fontWeight: "500",
+    color: COLORS.white,
+    fontWeight: "600",
+  },
+  miniThumbnailContainer: {
+    marginBottom: 8,
+    alignItems: "center",
+  },
+  miniThumbnail: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: COLORS.whiteTransparent50,
+    backgroundColor: COLORS.background,
   },
   removeVideoBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginTop: 8,
     padding: 8,
     paddingHorizontal: 16,
     backgroundColor: COLORS.white,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
   },
   removeVideoText: {
     fontSize: 14,
@@ -439,16 +512,72 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
-    paddingBottom: 50,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 20,
+    zIndex: 100,
   },
   publishBtn: {
     backgroundColor: COLORS.primary,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    padding: 16,
+    padding: 18,
+    borderRadius: 16,
+    gap: 10,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  charCounter: {
+    alignItems: "flex-end",
+    marginTop: 4,
+  },
+  charCounterText: {
+    fontSize: 12,
+    color: COLORS.textTertiary,
+    fontWeight: "500",
+  },
+  removeVideoBtnFloating: {
+    position: "absolute",
+    bottom: 12,
+    right: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    padding: 8,
+    paddingHorizontal: 16,
+    backgroundColor: COLORS.white,
     borderRadius: 12,
-    gap: 8,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  playerContainer: {
+    width: "100%",
+    height: "100%",
+  },
+  pauseOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  playIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.3)",
   },
   publishBtnDisabled: {
     opacity: 0.6,
@@ -499,5 +628,29 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: COLORS.primary,
     borderRadius: 4,
+  },
+  controlBadge: {
+    backgroundColor: "rgba(0,0,0,0.6)",
+    padding: 10,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  previewControls: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    gap: 8,
+  },
+  previewOverlayControls: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 20,
+  },
+  controlIconBadge: {
+    backgroundColor: "rgba(0,0,0,0.6)",
+    padding: 8,
+    borderRadius: 20,
   },
 });

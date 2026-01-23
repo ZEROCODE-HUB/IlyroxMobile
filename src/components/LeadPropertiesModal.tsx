@@ -15,6 +15,7 @@ import { COLORS } from "../constants";
 import { FeedItem, User } from "../types";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
 import CommentsModalV2 from "./modals/CommentsModalV2";
+import { CommentsBottomSheet } from "./modals";
 
 interface LeadPropertiesModalProps {
   visible: boolean;
@@ -42,6 +43,7 @@ interface LeadPropertiesModalProps {
     metros_construccion?: number;
     estado?: string;
     genero?: string;
+    codigo_propiedad?: string;
   };
   onPropertyClick: (propertyId: string) => void;
   onUserClick: (user: User) => void;
@@ -298,7 +300,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
 
           {/* Comments Modal */}
           {selectedFeedItemId && (
-            <CommentsModalV2
+            <CommentsBottomSheet
               visible={showCommentsModal}
               onClose={() => {
                 setShowCommentsModal(false);

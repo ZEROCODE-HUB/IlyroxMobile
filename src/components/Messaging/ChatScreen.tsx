@@ -226,7 +226,7 @@ export default function ChatScreen({
           keyboardDismissMode="interactive"
         />
 
-        <View style={{ backgroundColor: COLORS.white, marginBottom: 25 }}>
+        <View style={isInputFocused ? { marginBottom: 25 } : {}}>
           <MessageInput
             onSendText={(text) => sendMessage(text, messageMetadata)}
             onSendImage={async (uri) => {

@@ -199,6 +199,22 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
         <View style={styles.content}>
           {/* Header Principal */}
           <View style={styles.headerInfo}>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaText}>
+                ID: {propertyDetails.codigo_propiedad || propertyDetails.id} •{" "}
+                {propertyDetails.created_at
+                  ? new Date(propertyDetails.created_at).toLocaleDateString(
+                      "es-MX",
+                      {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      },
+                    )
+                  : ""}
+              </Text>
+            </View>
+
             <View style={styles.tagRow}>
               <View style={styles.typeTag}>
                 <Text style={styles.typeTagText}>
@@ -695,6 +711,14 @@ const styles = StyleSheet.create({
   },
   headerInfo: {
     marginBottom: 16,
+  },
+  metaRow: {
+    marginBottom: 8,
+  },
+  metaText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: "600",
   },
   tagRow: {
     flexDirection: "row",

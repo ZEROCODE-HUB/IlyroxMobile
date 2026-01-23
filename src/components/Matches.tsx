@@ -68,6 +68,7 @@ interface LeadGroup {
     estacionamientos?: string;
     metros_terreno?: number;
     metros_construccion?: number;
+    codigo_propiedad?: string;
   };
 }
 
@@ -262,6 +263,7 @@ const Matches: React.FC = () => {
             estacionamientos: search.estacionamientos,
             metros_terreno: search.metros_terreno,
             metros_construccion: search.metros_construccion,
+            codigo_propiedad: search.codigo_propiedad,
           },
         });
       }
@@ -307,6 +309,7 @@ const Matches: React.FC = () => {
             estacionamientos: match.busqueda?.estacionamientos,
             metros_terreno: match.busqueda?.metros_terreno,
             metros_construccion: match.busqueda?.metros_construccion,
+            codigo_propiedad: match.busqueda?.codigo_propiedad,
           },
         });
       }
@@ -415,6 +418,7 @@ const Matches: React.FC = () => {
           operation: operacion?.tipo_operacion === "venta" ? "Sale" : "Rent",
           status: "Publicada",
           amenities: [],
+          codigo_propiedad: prop.codigo_propiedad,
         },
       };
 
@@ -560,11 +564,9 @@ const Matches: React.FC = () => {
           similars={selectedLead.similars}
           searchCriteria={selectedLead.searchCriteria}
           onPropertyClick={(propertyId) => {
-            setSelectedLeadId(null);
             setSelectedPropertyId(propertyId);
           }}
           onUserClick={(user) => {
-            setSelectedLeadId(null);
             navigation.navigate("user/[id]", { id: user.id });
           }}
           onDeleteSearch={handleDeleteSearch}
