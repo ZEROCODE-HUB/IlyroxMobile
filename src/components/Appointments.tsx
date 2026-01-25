@@ -43,6 +43,7 @@ interface AppointmentItem {
   cliente_id: string;
   propiedad_id: string;
   user: {
+    id: string;
     name: string;
     avatar: string | null;
     role: string;
@@ -144,12 +145,14 @@ const Appointments: React.FC = () => {
           return {
             ...cita,
             user: {
+              id: otherUser.id,
               name: `${otherUser.nombre || ""} ${
                 otherUser.apellido_paterno || ""
               }`.trim(),
               avatar: otherUser.foto,
               role: isAgente ? "Cliente" : "Agente",
             },
+            propertyId: cita.propiedad_id,
             propertyTitle: cita.propiedad
               ? `${cita.propiedad.tipo} en ${cita.propiedad.ciudad}`
               : undefined,
@@ -175,6 +178,7 @@ const Appointments: React.FC = () => {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
+    date.setDate(date.getDate() + 1);
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -323,6 +327,15 @@ const Appointments: React.FC = () => {
     );
   };
 
+  const handlePropertyPress = (id: string) => {
+    router.push(`/property/${id}`);
+  };
+
+  const handleUserPress = (id: string) => {
+    console.log(id);
+    router.push(`/user/${id}`);
+  };
+
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>
       <AppHeader
@@ -395,6 +408,8 @@ const Appointments: React.FC = () => {
                 onOpenRating={handleOpenRating}
                 onContact={handleContactPress}
                 activeTab={activeTab}
+                onPropertyPress={handlePropertyPress}
+                onUserPress={handleUserPress}
               />
             ))}
           </View>

@@ -24,6 +24,7 @@ import { COLORS } from "../../constants";
 import { supabase } from "../../lib/supabase";
 import { useToast } from "../../context/ToastContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 interface CreateAppointmentModalProps {
   visible: boolean;
@@ -58,6 +59,8 @@ export default function CreateAppointmentModal({
   const [tipo, setTipo] = useState<string>("visita");
   const [descripcion, setDescripcion] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   React.useEffect(() => {
     if (visible) {
@@ -244,19 +247,62 @@ export default function CreateAppointmentModal({
                   />
                   {"  "}Fecha
                 </Text>
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={COLORS.textTertiary}
-                    value={fechaText}
-                    onChangeText={setFechaText}
-                    editable={!isCreating}
-                    keyboardType="numbers-and-punctuation"
-                    onFocus={() => handleInputFocus(0)}
+                <TouchableOpacity
+                  onPress={() => setShowDatePicker(true)}
+                  style={styles.inputContainer}
+                  activeOpacity={0.7}
+                  disabled={isCreating}
+                >
+                  <Text style={styles.inputText}>
+                    {fechaText
+                      ? fechaText.split("-").reverse().join("/")
+                      : "Seleccionar fecha"}
+                  </Text>
+                  <View style={styles.iconBadge}>
+                    <Ionicons
+                      name="calendar"
+                      size={18}
+                      color={COLORS.primary}
+                    />
+                  </View>
+                </TouchableOpacity>
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={(() => {
+                      const parts = fechaText.split("-");
+                      if (parts.length === 3) {
+                        return new Date(
+                          parseInt(parts[0]),
+                          parseInt(parts[1]) - 1,
+                          parseInt(parts[2]),
+                        );
+                      }
+                      return new Date();
+                    })()}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    minimumDate={new Date()}
+                    onChange={(event, selectedDate) => {
+                      if (Platform.OS === "android") setShowDatePicker(false);
+                      if (selectedDate) {
+                        const y = selectedDate.getFullYear();
+                        const m = String(selectedDate.getMonth() + 1).padStart(
+                          2,
+                          "0",
+                        );
+                        const d = String(selectedDate.getDate()).padStart(
+                          2,
+                          "0",
+                        );
+                        setFechaText(`${y}-${m}-${d}`);
+                        if (Platform.OS === "ios") setShowDatePicker(false);
+                      } else if (event.type === "dismissed") {
+                        setShowDatePicker(false);
+                      }
+                    }}
                   />
-                </View>
-                <Text style={styles.hint}>Ejemplo: 2024-12-25</Text>
+                )}
               </View>
 
               {/* Hora */}
@@ -269,18 +315,52 @@ export default function CreateAppointmentModal({
                   />
                   {"  "}Hora
                 </Text>
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="HH:MM"
-                    placeholderTextColor={COLORS.textTertiary}
-                    value={horaText}
-                    onChangeText={setHoraText}
-                    editable={!isCreating}
-                    keyboardType="numbers-and-punctuation"
-                    onFocus={() => handleInputFocus(80)}
+                <TouchableOpacity
+                  onPress={() => setShowTimePicker(true)}
+                  style={styles.inputContainer}
+                  activeOpacity={0.7}
+                  disabled={isCreating}
+                >
+                  <Text style={styles.inputText}>
+                    {horaText || "Seleccionar hora"}
+                  </Text>
+                  <View style={styles.iconBadge}>
+                    <Ionicons name="time" size={18} color={COLORS.primary} />
+                  </View>
+                </TouchableOpacity>
+
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={(() => {
+                      const [h, m] = (horaText || "09:00")
+                        .split(":")
+                        .map(Number);
+                      const d = new Date();
+                      d.setHours(h, m, 0, 0);
+                      return d;
+                    })()}
+                    mode="time"
+                    is24Hour={true}
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    onChange={(event, selectedDate) => {
+                      if (Platform.OS === "android") setShowTimePicker(false);
+                      if (selectedDate) {
+                        const h = String(selectedDate.getHours()).padStart(
+                          2,
+                          "0",
+                        );
+                        const m = String(selectedDate.getMinutes()).padStart(
+                          2,
+                          "0",
+                        );
+                        setHoraText(`${h}:${m}`);
+                        if (Platform.OS === "ios") setShowTimePicker(false);
+                      } else if (event.type === "dismissed") {
+                        setShowTimePicker(false);
+                      }
+                    }}
                   />
-                </View>
+                )}
                 <Text style={styles.hint}>Formato 24h (ej: 09:00, 14:30)</Text>
               </View>
 
@@ -474,23 +554,29 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: "#F9FAFB",
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: "#E5E5E5",
-    overflow: "hidden",
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 15,
-    color: COLORS.textPrimary,
+    borderColor: "#E5E7EB",
     paddingHorizontal: 16,
     paddingVertical: 14,
+  },
+  inputText: {
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    fontWeight: "500",
+  },
+  iconBadge: {
+    backgroundColor: "rgba(37, 99, 235, 0.1)", // Primary with low opacity
+    padding: 6,
+    borderRadius: 8,
   },
   hint: {
     fontSize: 12,
     color: COLORS.textTertiary,
     marginTop: 6,
+    marginLeft: 4,
   },
   typeGrid: {
     gap: 10,

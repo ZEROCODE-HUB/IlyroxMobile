@@ -1,5 +1,12 @@
 import React from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  Pressable,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../constants/colors";
 
@@ -12,10 +19,12 @@ interface AppointmentCardProps {
     hora: string; // HH:MM:SS
     estado: string;
     user: {
+      id: string;
       name: string;
       avatar: string | null;
       role: string;
     };
+    propertyId?: string;
     propertyTitle?: string;
     propertyImage?: string;
     location: string;
@@ -30,6 +39,8 @@ interface AppointmentCardProps {
   onOpenRating: (id: string) => void;
   onContact?: (id: string) => void;
   activeTab?: string;
+  onPropertyPress?: (id: string) => void;
+  onUserPress?: (id: string) => void;
 }
 
 export const AppointmentCard: React.FC<AppointmentCardProps> = ({
@@ -39,6 +50,8 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onOpenRating,
   onContact,
   activeTab,
+  onPropertyPress,
+  onUserPress,
 }) => {
   // Verificar si la fecha y hora de la cita ya pasaron
   const canMarkAsCompleted = () => {
@@ -63,7 +76,10 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
       <View style={styles.cardContent}>
         <View style={styles.cardHeader}>
-          <View style={styles.userInfo}>
+          <Pressable
+            onPress={() => onUserPress(appointment.user.id)}
+            style={styles.userInfo}
+          >
             {appointment.user.avatar ? (
               <Image
                 source={{ uri: appointment.user.avatar }}
@@ -80,7 +96,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
                 <Text style={styles.roleText}>{appointment.user.role}</Text>
               </View>
             </View>
-          </View>
+          </Pressable>
           {onContact && (
             <TouchableOpacity
               style={styles.msgButton}
@@ -97,10 +113,15 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
         <View style={styles.details}>
           {appointment.propertyImage && (
-            <Image
-              source={{ uri: appointment.propertyImage }}
+            <Pressable
+              onPress={() => onPropertyPress(appointment.propertyId)}
               style={styles.propertyImage}
-            />
+            >
+              <Image
+                source={{ uri: appointment.propertyImage }}
+                style={styles.propertyImage}
+              />
+            </Pressable>
           )}
           {appointment.propertyTitle && (
             <View style={styles.propertyContainer}>
