@@ -22,7 +22,7 @@ import CascadeLocationSelector from "../common/CascadeLocationSelector";
 
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
-import { useImageUpload } from "@/hooks/hooks";
+import { uploadImage as uploadImageService } from "../../../services/uploadService";
 import LocationPicker from "./LocationPicker";
 import { COLORS } from "../../constants/colors";
 
@@ -68,7 +68,6 @@ export default function CreateProperty({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isLoadingProperty, setIsLoadingProperty] = useState(false);
-  const { uploadImage } = useImageUpload();
 
   const [status, setStatus] = useState<string>("Publicada");
 
@@ -674,7 +673,7 @@ export default function CreateProperty({
           continue;
         }
 
-        const url = await uploadImage(images[i], "feed-images", "properties");
+        const url = await uploadImageService(images[i], "propiedades");
         if (url) {
           uploadedUrls.push(url);
         }

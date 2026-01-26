@@ -23,12 +23,11 @@ import { COLORS } from "../../constants/colors";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
 import ReordenableImages from "./ReordenableImages";
 import { Post } from "../../types";
-import { supabase } from "../../lib/supabase";
-import * as Burnt from "burnt";
-import { decode } from "base64-arraybuffer";
-import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import * as Burnt from "burnt";
+import { supabase } from "../../lib/supabase";
 import { useCreateContent } from "@/hooks/hooks/useCreateContent";
+import { uploadImage as uploadImageService } from "../../../services/uploadService";
 import { AppHeader } from "../AppHeader";
 
 interface CreatePostProps {
@@ -38,15 +37,16 @@ interface CreatePostProps {
 
 export default function CreatePost({ post, onBack }: CreatePostProps) {
   const { user } = useAuth();
-  const { createPost, uploading } = useCreateContent(user?.id);
+  const { createPost, uploading: creatingPost } = useCreateContent(user?.id);
 
   const [content, setContent] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploadProgress, setUploadProgress] = useState(0);
-  // // const { getPostById } = useGridProfile(); // Removed
 
   const isEditing = !!post;
+  const [isUploadingManual, setIsUploadingManual] = useState(false);
+  const uploading = creatingPost || isUploadingManual;
 
   useEffect(() => {
     if (isEditing) {
@@ -66,7 +66,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
         if (error) throw error;
 
         if (data) {
-          setContent(data.contenido); // DB uses 'contenido'
+          setContent(data.contenido);
           setImages(data.imagenes || []);
         }
       } catch (err) {
@@ -77,51 +77,10 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   };
 
   /**
-   * Helper to upload a single image
-   */
-  const uploadImage = async (uri: string): Promise<string | null> => {
-    if (uri.startsWith("http")) return uri; // Already remote
-
-    try {
-      const userPath = user?.id ? `${user.id}/` : "anon/";
-      const fileName = `post_${Date.now()}_${Math.random()
-        .toString(36)
-        .substring(7)}.jpg`;
-      const filePath = `${userPath}${fileName}`;
-
-      let fileBody;
-      if (Platform.OS === "web") {
-        const res = await fetch(uri);
-        fileBody = await res.blob();
-      } else {
-        const { readAsStringAsync } = require("expo-file-system/legacy");
-        const base64 = await readAsStringAsync(uri, { encoding: "base64" });
-        fileBody = decode(base64);
-      }
-
-      const { data, error } = await supabase.storage
-        .from("feed-images")
-        .upload(filePath, fileBody, { contentType: "image/jpeg" });
-
-      if (error) throw error;
-
-      const { data: urlData } = supabase.storage
-        .from("feed-images")
-        .getPublicUrl(filePath);
-
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error("Upload error:", error);
-      return null;
-    }
-  };
-
-  /**
    * Seleccionar imagen de la galería
    */
   const handlePickImage = async () => {
     // Pedir permisos
-    //
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("Permiso denegado", "Necesitamos acceso a tu galería");
@@ -174,14 +133,23 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
     }
 
     try {
+      setIsUploadingManual(true);
       setUploadProgress(10);
 
       const uploadedImages: string[] = [];
       if (images.length > 0) {
         if (isEditing) {
-          for (const img of images) {
-            const url = await uploadImage(img);
-            if (url) uploadedImages.push(url);
+          for (let i = 0; i < images.length; i++) {
+            const img = images[i];
+            // Si ya es remota, simplemente agregarla
+            if (img.startsWith("http")) {
+              uploadedImages.push(img);
+            } else {
+              // Si es local, subir usando el servicio directo
+              const url = await uploadImageService(img, "posts");
+              if (url) uploadedImages.push(url);
+            }
+            setUploadProgress(10 + ((i + 1) / images.length) * 40);
           }
         }
       }
@@ -194,7 +162,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
           .from("posts")
           .update({
             contenido: content,
-            imagenes: uploadedImages,
+            imagenes: uploadedImages.length > 0 ? uploadedImages : null,
             updated_at: new Date(),
           })
           .eq("id", post?.id);
@@ -214,12 +182,14 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
         setContent("");
         setImages([]);
         setUploadProgress(0);
+        setIsUploadingManual(false);
         onBack();
       }, 500);
     } catch (error) {
       console.error("Error publishing:", error);
       Alert.alert("Error", "No se pudo guardar el post");
       setUploadProgress(0);
+      setIsUploadingManual(false);
     }
   };
 

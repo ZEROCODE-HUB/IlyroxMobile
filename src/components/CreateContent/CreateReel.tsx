@@ -227,23 +227,16 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
     }
 
     try {
-      // 1. Subir video a Supabase Storage
-      const videoUrl = await uploadVideo(videoUri, "feed-images", "reels");
+      // 1. Subir video al servicio (ahora nos devuelve videoUrl y thumbnailUrl)
+      const uploadResult = await uploadVideo(videoUri);
 
-      if (!videoUrl) {
+      if (!uploadResult) {
         Alert.alert("Error", "No se pudo subir el video. Intenta de nuevo.");
         return;
       }
 
-      // 2. Subir thumbnail si existe
-      let thumbnailUrl = null;
-      if (thumbnailUri) {
-        thumbnailUrl = await uploadVideo(
-          thumbnailUri,
-          "feed-images",
-          "thumbnails",
-        );
-      }
+      const videoUrl = uploadResult.videoUrl;
+      const thumbnailUrl = uploadResult.thumbnailUrl || null;
 
       // 3. Crear o Actualizar el reel
       let success = false;

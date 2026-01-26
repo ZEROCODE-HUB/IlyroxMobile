@@ -24,6 +24,7 @@ import ConfirmDialog from "../shared/ConfirmDialog";
 
 import CreateReel from "../CreateContent/CreateReel";
 import { useGridProfile } from "@/hooks/hooks/profile/useGridProfile";
+import * as VideoThumbnails from "expo-video-thumbnails";
 
 const { width } = Dimensions.get("window");
 const ITEM_SIZE = (width - 24) / 3; // 3 items per row with padding
@@ -82,6 +83,58 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
     }
   };
 
+  /**
+   * Componente para manejar la carga de miniaturas, incluyendo la generación fallback
+   */
+  const ReelThumbnail = ({ item }: { item: Reel }) => {
+    const [thumbUri, setThumbUri] = useState<string | null>(
+      item.thumbnail_url || null,
+    );
+
+    React.useEffect(() => {
+      let isMounted = true;
+
+      const generateFallback = async () => {
+        if (!item.thumbnail_url && item.video_url) {
+          try {
+            const { uri } = await VideoThumbnails.getThumbnailAsync(
+              item.video_url,
+              {
+                time: 1000,
+                quality: 0.6,
+              },
+            );
+            if (isMounted) setThumbUri(uri);
+          } catch (e) {
+            console.warn(
+              "No se pudo generar miniatura para:",
+              item.video_url,
+              e,
+            );
+          }
+        }
+      };
+
+      generateFallback();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [item.thumbnail_url, item.video_url]);
+
+    return (
+      <Image
+        source={{
+          uri:
+            thumbUri ||
+            "https://placehold.co/400x600/45a0a5/white?text=Cargando...",
+        }}
+        style={styles.gridImage}
+        resizeMode="cover"
+      />
+    );
+  };
+
   const renderReel = ({ item }: { item: Reel }) => {
     const menuOptions: MenuOption[] = [
       {
@@ -107,15 +160,7 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
         onPress={() => onReelPress(item)}
         activeOpacity={0.8}
       >
-        <Image
-          source={{
-            uri:
-              item.thumbnail_url ||
-              "https://placehold.co/400x600/45a0a5/white?text=Video",
-          }}
-          style={styles.gridImage}
-          resizeMode="cover"
-        />
+        <ReelThumbnail item={item} />
 
         {/* Play Icon Overlay (Bottom Left) */}
         <View style={styles.playOverlay}>
