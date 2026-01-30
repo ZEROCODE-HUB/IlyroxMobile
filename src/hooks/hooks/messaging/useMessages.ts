@@ -147,6 +147,36 @@ export function useMessages(conversationId: string | null, userId?: string) {
         uploadPath = `conversaciones/${folder}/${fileName}`;
       }
 
+      // Check File Size Limits
+      const sizeInBytes =
+        Platform.OS === "web"
+          ? (fileContent as Blob).size
+          : (fileContent as ArrayBuffer).byteLength;
+
+      const isVideo =
+        contentType?.startsWith("video/") ||
+        fileUri.match(/\.(mp4|mov|avi|mkv)$/i);
+      const isImage =
+        contentType?.startsWith("image/") ||
+        fileUri.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+
+      let limit = 20 * 1024 * 1024; // Default: 20MB (Files)
+      let typeLabel = "archivo";
+
+      if (isVideo) {
+        limit = 40 * 1024 * 1024; // 40MB
+        typeLabel = "video";
+      } else if (isImage) {
+        limit = 5 * 1024 * 1024; // 5MB
+        typeLabel = "imagen";
+      }
+
+      if (sizeInBytes > limit) {
+        throw new Error(
+          `El ${typeLabel} excede el límite permitido de ${limit / (1024 * 1024)}MB.`,
+        );
+      }
+
       const { data, error } = await supabase.storage
         .from("fotos")
         .upload(uploadPath, fileContent, {

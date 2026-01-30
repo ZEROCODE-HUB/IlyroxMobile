@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
-import { pdfService } from "../../../services/pdfService";
+import { pdfService } from "../../services/pdfService";
 
 //////////////////////////////////////
 // URL a futuro:

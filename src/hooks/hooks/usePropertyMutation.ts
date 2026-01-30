@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { propertyService } from "../../../services/propertyService";
+import { propertyService } from "../../services/propertyService";
 
 export const usePropertyMutation = () => {
   const [isSaving, setIsSaving] = useState(false);

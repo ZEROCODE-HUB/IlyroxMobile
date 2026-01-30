@@ -176,10 +176,7 @@ export function useAuthForm() {
       }
       return true;
     } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error.message || "Ocurrió un error al iniciar sesión",
-      );
+      Alert.alert("Error", "Credenciales incorrectas");
       return false;
     } finally {
       setLoading(false);

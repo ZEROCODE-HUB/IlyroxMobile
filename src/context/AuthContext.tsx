@@ -68,13 +68,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  /**
-   * Cerrar sesión
-   * //  DELETE /apps/{app_id}/users/by/{alias_label}/{alias_id}/identity/external_id
-   * // alias_label = el tipo de alias para identificar al usuario (ej: onesignal_id)
-   * // alias_id = el identificador del usuario
-   * // El último parámetro es external_id (el alias a eliminar)
-   */
   const signOut = async () => {
     try {
       console.log("Cerrar sesión presionado");

@@ -11,6 +11,7 @@ import {
   Alert,
   Platform,
   Modal,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
@@ -25,6 +26,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MapDetails } from "./MapDetails";
 import CreateProperty from "../CreateContent/CreateProperty";
 import { useChatInitiator } from "@/hooks/hooks/messaging/useChatInitiator";
+import { fetchPropertyData } from "@/services/pdfService";
 
 const { width } = Dimensions.get("window");
 
@@ -32,23 +34,43 @@ interface PropertyDetailProps {
   propertyId: string;
   navigation: any;
   onContact?: (ownerId: string, propertyId: string) => void;
+  onRefresh?: () => void;
 }
 
 const PropertyDetail: React.FC<PropertyDetailProps> = ({
   propertyId,
   navigation,
   onContact,
+  onRefresh,
 }) => {
   const { user } = useAuth();
-  const { propertyDetails, loading } = usePropertyDetails(propertyId || "");
+  const { propertyDetails, loading, refetch } = usePropertyDetails(
+    propertyId || "",
+  );
   const [property, setProperty] = useState<any>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showComments, setShowComments] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [propertyIdModal, setPropertyIdModal] = useState<string | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   const { handleContact } = useChatInitiator();
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await refetch();
+      setHasChanges(true);
+      if (onRefresh) onRefresh();
+    } catch (error) {
+      console.error("Error refreshing property detail:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Hook de view tracking
   const { trackInteraction } = useViewTracking({
@@ -76,7 +98,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
       <View style={styles.errorContainer}>
         <Text>No se encontró la propiedad</Text>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.goBack(hasChanges)}
           style={styles.backButton}
         >
           <Text style={styles.backButtonText}>Regresar</Text>
@@ -133,6 +155,13 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
         removeClippedSubviews={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[COLORS.primary]}
+          />
+        }
       >
         <View style={styles.imageContainer}>
           <ScrollView
@@ -181,7 +210,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           </View>
 
           <TouchableOpacity
-            onPress={() => navigation.goBack()}
+            onPress={() => navigation.goBack(hasChanges)}
             style={styles.backFloating}
           >
             <Ionicons name="arrow-back" size={24} color={COLORS.white} />
@@ -472,6 +501,16 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                       {op.tipo_operacion === "venta" ? "Venta" : "Renta"}
                     </Text>
                     <View style={styles.commissionRow}>
+                      <Text style={styles.commissionLabel}>Comisión:</Text>
+                      <Text style={styles.commissionValue}>
+                        {op.comision_porcentaje
+                          ? `${op.comision_porcentaje}%`
+                          : op.comision_monto_fijo
+                            ? `$${op.comision_monto_fijo}`
+                            : "No especificado"}
+                      </Text>
+                    </View>
+                    <View style={styles.commissionRow}>
                       <Text style={styles.commissionLabel}>Comparte:</Text>
                       <Text style={styles.commissionValue}>
                         {op.porcentaje_comision_compartida
@@ -606,9 +645,10 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
 
       <Modal visible={showModal} onRequestClose={() => setShowModal(false)}>
         <CreateProperty
-          onBack={() => {
+          onBack={(shouldRefresh) => {
             setShowModal(false);
             setLoadingEdit(false);
+            if (shouldRefresh) handleRefresh();
           }}
           propertyId={propertyIdModal}
         />

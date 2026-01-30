@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { chartService } from "../../../services/chartService";
+import { chartService } from "@/services/chartService";
 
 export interface CombinedData {
   properties: any[];

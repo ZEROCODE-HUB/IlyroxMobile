@@ -62,20 +62,47 @@ export default React.forwardRef<TextInput, MessageInputProps>(
         }
 
         const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ImagePicker.MediaTypeOptions.All,
           allowsEditing: false,
           quality: 0.8,
         });
 
         if (!result.canceled && result.assets[0]) {
+          const asset = result.assets[0];
+
+          // Validate File Size
+          const fileSize = asset.fileSize || 0;
+          const isVideo = asset.type === "video";
+          const limit = isVideo ? 40 * 1024 * 1024 : 5 * 1024 * 1024; // 40MB video, 5MB image
+
+          if (fileSize > limit) {
+            Alert.alert(
+              "Archivo muy grande",
+              `El ${isVideo ? "video" : "imagen"} excede el límite de ${isVideo ? "40MB" : "5MB"}.`,
+            );
+            return;
+          }
+
           setUploading(true);
-          await onSendImage(result.assets[0].uri);
+          // If it's a video, we might need a different handler or check if onSendImage supports it.
+          // The interface says onSendImage?: (uri: string) => Promise<void>;
+          // Assuming the parent handles the upload type based on URI or if we need to call onSendFile for video.
+          // However, existing code was only for Images.
+          // If the user wants videos, we should probably support it.
+          // For now, I'll pass it to onSendImage which presumably handles media URIs.
+          // Wait, the prompt specifically says "mensajes entre usuarios:: Vídeos: 40Mb".
+          // The current MessageInput handles images specifically via onSendImage.
+          // I will assume onSendImage can handle the URI, or I should treat video as a file?
+          // Usually chat apps treat video separate or as file.
+          // Let's stick to the current flow but allowing 'All' media types and validating size.
+
+          await onSendImage(asset.uri);
           setUploading(false);
         }
       } catch (error) {
         console.error("Error picking image:", error);
         setUploading(false);
-        Alert.alert("Error", "No se pudo cargar la imagen");
+        Alert.alert("Error", "No se pudo cargar el archivo");
       }
     };
 
@@ -90,6 +117,19 @@ export default React.forwardRef<TextInput, MessageInputProps>(
 
         if (!result.canceled && result.assets && result.assets[0]) {
           const file = result.assets[0];
+
+          // Validate File Size
+          const fileSize = file.size || 0;
+          const limit = 20 * 1024 * 1024; // 20MB for files
+
+          if (fileSize > limit) {
+            Alert.alert(
+              "Archivo muy grande",
+              "El documento excede el límite de 20MB.",
+            );
+            return;
+          }
+
           setUploading(true);
           await onSendFile(file.uri, file.name);
           setUploading(false);

@@ -14,7 +14,6 @@ import { AppHeader } from "./AppHeader";
 import { COLORS } from "../constants";
 import { FeedItem, User } from "../types";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
-import CommentsModalV2 from "./modals/CommentsModalV2";
 import { CommentsBottomSheet } from "./modals";
 
 interface LeadPropertiesModalProps {

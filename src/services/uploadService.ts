@@ -9,8 +9,8 @@ const r2Client = new S3Client({
   },
 });
 
-const BUCKET_NAME = "i360-app";
-const PUBLIC_URL = "https://pub-a75a90b289c3448f848e994600596035.r2.dev";
+const VIDEO_API_URL =
+  "https://celebrated-celebration-production.up.railway.app";
 
 export async function uploadImage(
   uri: string,
@@ -21,7 +21,7 @@ export async function uploadImage(
     | "propiedades"
     | "comentarios"
     | "reels",
-) {
+): Promise<string> {
   try {
     const formData = new FormData();
 
@@ -31,20 +31,21 @@ export async function uploadImage(
       name: `image-${Date.now()}.jpg`,
     } as any);
 
+    formData.append("folder", folder);
+
     const response = await fetch(`${VIDEO_API_URL}/upload-image`, {
       method: "POST",
       body: formData,
     });
 
     if (!response.ok) {
-      throw new Error("Upload failed");
+      throw new Error(`Upload failed: ${response.status}`);
     }
 
     const data = await response.json();
-
     return data.url || data.image_url;
   } catch (error) {
-    console.error("Error uploading file to R2:", error);
+    console.error("Error uploading image:", error);
     throw error;
   }
 }
@@ -56,9 +57,6 @@ export async function uploadMultipleImages(
   const uploadPromises = uris.map((uri) => uploadImage(uri, folder));
   return await Promise.all(uploadPromises);
 }
-
-const VIDEO_API_URL =
-  "https://celebrated-celebration-production.up.railway.app";
 
 export async function uploadVideo(
   uri: string,

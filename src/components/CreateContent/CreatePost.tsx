@@ -27,7 +27,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Burnt from "burnt";
 import { supabase } from "../../lib/supabase";
 import { useCreateContent } from "@/hooks/hooks/useCreateContent";
-import { uploadImage as uploadImageService } from "../../../services/uploadService";
+import { uploadImage as uploadImageService } from "../../services/uploadService";
 import { AppHeader } from "../AppHeader";
 
 interface CreatePostProps {

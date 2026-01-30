@@ -22,7 +22,7 @@ import CascadeLocationSelector from "../common/CascadeLocationSelector";
 
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
-import { uploadImage as uploadImageService } from "../../../services/uploadService";
+import { uploadImage as uploadImageService } from "../../services/uploadService";
 import LocationPicker from "./LocationPicker";
 import { COLORS } from "../../constants/colors";
 
@@ -54,7 +54,7 @@ import { usePropertyMutation } from "@/hooks/hooks/usePropertyMutation";
 import { AppHeader } from "../AppHeader";
 
 interface CreatePropertyProps {
-  onBack: () => void;
+  onBack: (shouldRefresh?: boolean) => void;
   propertyId?: string;
 }
 
@@ -837,15 +837,11 @@ export default function CreateProperty({
           {
             text: "OK",
             onPress: () => {
-              if (onBack) onBack();
+              if (onBack) onBack(true);
             },
           },
         ],
       );
-
-      setTimeout(() => {
-        onBack();
-      }, 500);
     } catch (error: any) {
       console.error("Error publishing property:", error);
       Alert.alert("Error", error.message || "No se pudo publicar la propiedad");
@@ -1059,7 +1055,7 @@ export default function CreateProperty({
       <AppHeader
         title={propertyId ? "Editar Propiedad" : "Crear Propiedad"}
         showBackButton={true}
-        onBack={onBack}
+        onBack={() => onBack(false)}
       />
 
       <ScrollView

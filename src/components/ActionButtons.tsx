@@ -18,7 +18,7 @@ import SharePropertyModal from "./modals/SharePropertyModal";
 import { useReportProperty } from "@/hooks/hooks/useReportProperty";
 import { useLikes, useShare } from "@/hooks/hooks";
 import { useCommentCount } from "@/hooks/hooks/useCommentCount";
-import { propertyService } from "../../services/propertyService";
+import { propertyService } from "../services/propertyService";
 
 interface ActionButtonsProps {
   feedItemId: string;

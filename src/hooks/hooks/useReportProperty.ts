@@ -1,6 +1,6 @@
-import { reportService } from "../../../services/reportService";
+import { reportService } from "@/services/reportService";
 import { useState } from "react";
-import { ReportesPropiedades } from "../../types";
+import { ReportesPropiedades } from "@/types";
 import * as Burnt from "burnt";
 
 export const useReportProperty = () => {

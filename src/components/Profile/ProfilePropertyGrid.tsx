@@ -106,7 +106,7 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
         <Image source={{ uri: item.images[0] }} style={styles.gridImage} />
 
         {/* Status Badge  getStatusStyle(item.status) */}
-        <View style={[styles.statusBadge, { backgroundColor: "#ffffff69" }]}>
+        <View style={[styles.statusBadge, { backgroundColor: "#aab9d761" }]}>
           {commissionText ? (
             <Text style={styles.statusText}>{commissionText} comisión</Text>
           ) : (
@@ -309,16 +309,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 4,
-    elevation: 2,
     shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
   },
   statusText: {
-    color: COLORS.textQuinary,
-    fontSize: 10,
-    fontWeight: "700",
+    color: "#4a4d55ff",
+    fontSize: 11,
+    fontWeight: "500",
     letterSpacing: 0.3,
   },
   commissionBadge: {

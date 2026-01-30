@@ -66,7 +66,11 @@ const providerConfigs: ProviderButtonConfig[] = [
 ];
 
 export const AuthProviderButtons = memo(
-  ({ onProviderPress, onEmailPress, loading = false }: AuthProviderButtonsProps) => {
+  ({
+    onProviderPress,
+    onEmailPress,
+    loading = false,
+  }: AuthProviderButtonsProps) => {
     const handlePress = (config: ProviderButtonConfig) => {
       if (config.provider === "email") {
         onEmailPress();
@@ -77,32 +81,47 @@ export const AuthProviderButtons = memo(
 
     return (
       <View style={styles.container}>
-        {providerConfigs.map((config) => (
-          <TouchableOpacity
-            key={config.provider}
-            style={[styles.button, { backgroundColor: config.backgroundColor }]}
-            onPress={() => handlePress(config)}
-            disabled={loading}
-            activeOpacity={0.8}
-          >
-            {loading && config.provider !== "email" ? (
-              <ActivityIndicator color={config.iconColor} size="small" />
-            ) : (
-              <Ionicons name={config.icon} size={24} color={config.iconColor} />
-            )}
-            <Text style={[styles.buttonText, { color: config.textColor }]}>
-              {config.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        <View style={styles.buttonContainer}>
+          {providerConfigs.map((config) => (
+            <TouchableOpacity
+              key={config.provider}
+              style={[
+                styles.button,
+                { backgroundColor: config.backgroundColor },
+              ]}
+              onPress={() => handlePress(config)}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              {loading && config.provider !== "email" ? (
+                <ActivityIndicator color={config.iconColor} size="small" />
+              ) : (
+                <Ionicons
+                  name={config.icon}
+                  size={24}
+                  color={config.iconColor}
+                />
+              )}
+              <Text style={[styles.buttonText, { color: config.textColor }]}>
+                {config.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
     );
-  }
+  },
 );
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    justifyContent: "center",
     gap: 12,
+  },
+  buttonContainer: {
+    gap: 12,
+    marginBottom: 30,
   },
   button: {
     flexDirection: "row",

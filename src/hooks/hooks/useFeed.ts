@@ -12,7 +12,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../lib/supabase";
 import { FeedItem, RecommendedByPreviewUser, User } from "../../types";
-import { profileService } from "../../../services/profileService";
+import { profileService } from "../../services/profileService";
 
 type ReviewStatsRow = {
   profesional_id: string;

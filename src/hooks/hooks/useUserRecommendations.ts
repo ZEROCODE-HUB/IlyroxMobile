@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { profileService } from "../../../services/profileService";
+import { profileService } from "../../services/profileService";
 
 export interface RecommendedUser {
   id: string;

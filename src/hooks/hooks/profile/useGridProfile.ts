@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-import { postsService } from "../../../../services/postsService";
-import { reelService } from "../../../../services/reelService";
+import { postsService } from "../../../services/postsService";
+import { reelService } from "../../../services/reelService";
 import { Post, Reel } from "@/types";
 
 export const useGridProfile = () => {

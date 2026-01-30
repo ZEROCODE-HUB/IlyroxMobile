@@ -11,7 +11,7 @@
  * - Rating Details completo con todas las estadísticas
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -105,12 +105,17 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     setRefreshTrigger((prev) => prev + 1);
     await fetchProfileData();
     setRefreshing(false);
-  };
+  }, [fetchProfileData]);
+
+  const handleSilentRefresh = useCallback(async () => {
+    setRefreshTrigger((prev) => prev + 1);
+    await fetchProfileData();
+  }, [fetchProfileData]);
 
   // State - Content
   const [activeTab, setActiveTab] = useState<ProfileContentType>("properties");
@@ -134,9 +139,14 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   const isMe = !userId || targetUserId === authUser?.id;
 
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       setSelectedProperty(null);
-    }, []),
+      // Small delay to ensure any DB updates are finished
+      const timer = setTimeout(() => {
+        fetchProfileData();
+      }, 300);
+      return () => clearTimeout(timer);
+    }, [fetchProfileData]),
   );
 
   /**
@@ -904,12 +914,18 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             propertyId={selectedProperty.id}
             navigation={{
               ...navigation,
-              goBack: () => setSelectedProperty(null),
+              goBack: (shouldRefresh?: boolean) => {
+                setSelectedProperty(null);
+                // Si hubo cambios, actualizamos (aunque onRefresh ya lo hace en tiempo real)
+                // Se verifica si es necesario para asegurar consistencia
+                if (shouldRefresh) handleSilentRefresh();
+              },
               navigate: (screen: string, params: any) => {
                 setSelectedProperty(null);
                 navigation.navigate(screen, params);
               },
             }}
+            onRefresh={handleSilentRefresh}
           />
         </Modal>
       )}
@@ -920,9 +936,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
           onRequestClose={() => setShowModal(false)}
         >
           <CreateProperty
-            onBack={() => {
+            onBack={(shouldRefresh) => {
               setShowModal(false);
-              handleRefresh();
+              if (shouldRefresh) handleRefresh();
             }}
             propertyId={editProperty?.id}
           />

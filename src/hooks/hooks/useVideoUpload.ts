@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { uploadVideo as uploadVideoService } from "../../../services/uploadService";
+import { uploadVideo as uploadVideoService } from "../../services/uploadService";
 
 export const useVideoUpload = () => {
   const [uploading, setUploading] = useState(false);

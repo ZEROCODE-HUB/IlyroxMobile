@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { BaseChartProps, AvgPriceByNeighborhoodData } from "./types";
 import { COLORS } from "../../constants/colors";
-import { statsService } from "../../../services/statsService";
+import { statsService } from "../../services/statsService";
 
 const Chart07_AvgPriceByNeighborhood: React.FC<BaseChartProps> = ({
   onPress,

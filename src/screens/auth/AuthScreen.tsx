@@ -286,7 +286,7 @@ export default function AuthScreen() {
           <View
             style={[
               styles.modalContent,
-              { paddingBottom: Math.max(24, bottom) },
+              { paddingBottom: Math.max(30, bottom) },
             ]}
           >
             {/* Header del modal */}
@@ -397,6 +397,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
+
     minHeight: "40%",
     maxHeight: "90%",
     width: "100%",

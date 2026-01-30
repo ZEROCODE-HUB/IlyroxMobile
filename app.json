@@ -4,11 +4,11 @@
     "slug": "i360",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./src/assets/icon.png",
+    "icon": "./src/assets/Icon-size.png",
     "userInterfaceStyle": "light",
     "scheme": "i360realestate",
     "splash": {
-      "image": "./src/assets/adaptive-icon.png",
+      "image": "./src/assets/Icon-size.png",
       "resizeMode": "cover",
       "backgroundColor": "#FFFFFF"
     },
@@ -42,7 +42,7 @@
         "hidden": false
       },
       "adaptiveIcon": {
-        "foregroundImage": "./src/assets/adaptive-icon.png",
+        "foregroundImage": "./src/assets/Icon-size.png",
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.i360.realestateapp",
@@ -70,9 +70,21 @@
       ]
     },
     "web": {
-      "favicon": "./src/assets/favicon.png"
+      "favicon": "./src/assets/Icon-size.png"
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "image": "./src/assets/Icon-size.png",
+          "dark": {
+            "image": "./src/assets/Icon-size.png",
+            "backgroundColor": "#FFFFFF"
+          },
+          "imageWidth": 200
+        }
+      ],
       [
         "onesignal-expo-plugin",
         {

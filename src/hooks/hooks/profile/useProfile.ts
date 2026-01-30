@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { profileService } from "../../../../services/profileService";
-import { propertyService } from "../../../../services/propertyService";
-import { postsService } from "../../../../services/postsService";
-import { reelService } from "../../../../services/reelService";
+import { profileService } from "../../../services/profileService";
+import { propertyService } from "../../../services/propertyService";
+import { postsService } from "../../../services/postsService";
+import { reelService } from "../../../services/reelService";
 import { perfiles, EstadisticasResenas, Property, Post, Reel } from "@/types";
 
 export type RecommendedByUser = {

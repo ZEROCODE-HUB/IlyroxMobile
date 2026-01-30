@@ -42,7 +42,7 @@ export const useAuthListener = ({
       const emergencyTimeoutId = setTimeout(() => {
         if (mounted) {
           console.warn(
-            "⏰ Auth init emergency timeout (15s), forcing loading false"
+            "⏰ Auth init emergency timeout (15s), forcing loading false",
           );
           onLoadingChange(false);
         }
@@ -146,11 +146,6 @@ export const useAuthListener = ({
         }
       }
     };
-
-    /**
-     * ✅ DESHABILITADO: Configurar suscripción de perfil Realtime
-     * Razón: Reducir requests innecesarios. Los perfiles se recargan al navegar.
-     */
     /*
     const setupProfileSubscription = async (userId: string) => {
       // Si ya existe una suscripción para este usuario, no crear otra
@@ -187,10 +182,6 @@ export const useAuthListener = ({
       currentUserIdRef.current = userId;
     };
     */
-
-    /**
-     * ✅ DESHABILITADO: Limpiar suscripción de perfil
-     */
     /*
     const cleanupProfileSubscription = async () => {
       if (profileSubscriptionRef.current) {
@@ -224,7 +215,6 @@ export const useAuthListener = ({
           onSessionChange(null);
           onUserChange(null);
           onProfileChange(null);
-          // await cleanupProfileSubscription(); // DESHABILITADO
           onLoadingChange(false);
           return;
         }

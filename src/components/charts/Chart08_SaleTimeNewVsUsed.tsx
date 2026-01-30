@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { BaseChartProps, SaleTimeData, Chart08Props } from "./types";
 import { COLORS } from "../../constants/colors";
-import { statsService } from "../../../services/statsService";
+import { statsService } from "../../services/statsService";
 
 const Chart08_SaleTimeNewVsUsed: React.FC<BaseChartProps> = ({
   onPress,

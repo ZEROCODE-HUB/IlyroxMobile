@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { BaseChartProps, SearchesByNeighborhoodData } from "./types";
 import { COLORS } from "../../constants/colors";
-import { statsService, FilterOptions } from "../../../services/statsService";
+import { statsService, FilterOptions } from "../../services/statsService";
 
 interface Chart10Props extends BaseChartProps {
   filters?: FilterOptions;

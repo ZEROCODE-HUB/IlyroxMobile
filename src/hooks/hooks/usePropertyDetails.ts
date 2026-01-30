@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 const usePropertyDetails = (feedItemId: string) => {
@@ -6,11 +6,7 @@ const usePropertyDetails = (feedItemId: string) => {
   const [propertyDetails, setPropertyDetails] = useState<any>(null);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchPropertyDetails();
-  }, [feedItemId]);
-
-  const fetchPropertyDetails = async () => {
+  const fetchPropertyDetails = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -48,9 +44,13 @@ const usePropertyDetails = (feedItemId: string) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [feedItemId]);
 
-  return { propertyDetails, loading, error };
+  useEffect(() => {
+    fetchPropertyDetails();
+  }, [fetchPropertyDetails]);
+
+  return { propertyDetails, loading, error, refetch: fetchPropertyDetails };
 };
 
 export default usePropertyDetails;

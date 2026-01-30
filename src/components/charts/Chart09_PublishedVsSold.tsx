@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { BaseChartProps, PublishedVsSoldData } from "./types";
 import { COLORS } from "../../constants/colors";
-import { statsService } from "../../../services/statsService";
+import { statsService } from "../../services/statsService";
 
 interface Chart09Props extends BaseChartProps {}
 

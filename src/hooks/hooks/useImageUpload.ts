@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { uploadImage as uploadImageService } from "../../../services/uploadService";
+import { uploadImage as uploadImageService } from "../../services/uploadService";
 
 export const useImageUpload = () => {
   const [uploading, setUploading] = useState(false);
