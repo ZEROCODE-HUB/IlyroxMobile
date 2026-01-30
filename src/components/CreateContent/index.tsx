@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -7,40 +7,20 @@ import {
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { AppHeader } from "../AppHeader";
-import CreatePost from "./CreatePost";
-import CreateReel from "./CreateReel";
-import CreateProperty from "./CreateProperty";
-import { COLORS } from "../../constants/colors";
-import { ScreenWrapper } from "../../screens/ScreenWrapper";
-
-type ContentType = "post" | "reel" | "property" | null;
+import { COLORS } from "@/constants/colors";
+import { ScreenWrapper } from "@/screens/ScreenWrapper";
 
 export default function CreateContent() {
-  const navigation = useNavigation<any>();
-  const [contentType, setContentType] = useState<ContentType>(null);
+  const router = useRouter();
 
-  // Si se seleccionó un tipo, mostrar el formulario correspondiente
-  if (contentType === "post") {
-    return <CreatePost onBack={() => setContentType(null)} />;
-  }
-
-  if (contentType === "reel") {
-    return <CreateReel onBack={() => setContentType(null)} />;
-  }
-
-  if (contentType === "property") {
-    return <CreateProperty onBack={() => setContentType(null)} />;
-  }
-
-  // Pantalla de selección
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>
       <AppHeader
         title="Crear contenido"
         showBackButton
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
 
       <ScrollView
@@ -52,7 +32,7 @@ export default function CreateContent() {
           {/* Opción: Post */}
           <TouchableOpacity
             style={styles.optionCard}
-            onPress={() => setContentType("post")}
+            onPress={() => router.push("/create/post")}
             accessibilityLabel="Publicar post"
             accessibilityRole="button"
           >
@@ -80,7 +60,7 @@ export default function CreateContent() {
           {/* Opción: Reel */}
           <TouchableOpacity
             style={styles.optionCard}
-            onPress={() => setContentType("reel")}
+            onPress={() => router.push("/create/reel")}
             accessibilityLabel="Publicar reel"
             accessibilityRole="button"
           >
@@ -108,7 +88,7 @@ export default function CreateContent() {
           {/* Opción: Propiedad */}
           <TouchableOpacity
             style={styles.optionCard}
-            onPress={() => setContentType("property")}
+            onPress={() => router.push("/create/property")}
             accessibilityLabel="Publicar propiedad"
             accessibilityRole="button"
           >

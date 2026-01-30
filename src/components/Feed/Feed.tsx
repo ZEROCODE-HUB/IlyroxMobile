@@ -8,7 +8,7 @@ import {
   RefreshControl,
   Platform,
 } from "react-native";
-import { FlatList } from "react-native-gesture-handler";
+import { FlashList } from "@shopify/flash-list";
 import { FeedItem, User } from "../../types";
 import UsersSlider from "../UsersSlider";
 import { ReelCard, PropertyCard, PostCard } from "../cards";
@@ -41,7 +41,7 @@ const Feed: React.FC<FeedProps> = ({
   const [activeCommentItem, setActiveCommentItem] = useState<FeedItem | null>(
     null,
   );
-  const flatListRef = useRef<FlatList<FeedItem>>(null);
+  const flatListRef = useRef<any>(null);
 
   // Hooks de datos reales
   const {
@@ -134,12 +134,12 @@ const Feed: React.FC<FeedProps> = ({
   const handleCloseDetail = useCallback(() => {
     setSelectedItem(null);
     // Restaurar posición del scroll
-    setTimeout(() => {
-      flatListRef.current?.scrollToOffset({
-        offset: scrollOffset,
-        animated: false,
-      });
-    }, 100);
+    // setTimeout(() => {
+    //   flatListRef.current?.scrollToOffset({
+    //     offset: scrollOffset,
+    //     animated: false,
+    //   });
+    // }, 100);
   }, [scrollOffset]);
 
   const handleScroll = useCallback(
@@ -298,7 +298,7 @@ const Feed: React.FC<FeedProps> = ({
 
   return (
     <>
-      <FlatList
+      <FlashList
         ref={flatListRef}
         data={items}
         keyExtractor={keyExtractor}
@@ -317,7 +317,6 @@ const Feed: React.FC<FeedProps> = ({
         viewabilityConfig={viewabilityConfig}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
-        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -327,11 +326,6 @@ const Feed: React.FC<FeedProps> = ({
             progressViewOffset={dynamicPaddingTop}
           />
         }
-        // Optimizaciones de rendimiento
-        removeClippedSubviews={false}
-        maxToRenderPerBatch={5}
-        windowSize={5}
-        initialNumToRender={3}
       />
 
       {/* Modal de comentarios */}

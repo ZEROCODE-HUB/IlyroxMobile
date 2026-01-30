@@ -101,7 +101,7 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
               item.video_url,
               {
                 time: 1000,
-                quality: 0.6,
+                quality: 0.5,
               },
             );
             if (isMounted) setThumbUri(uri);

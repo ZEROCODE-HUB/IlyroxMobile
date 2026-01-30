@@ -2,11 +2,11 @@ import React from "react";
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   StyleSheet,
   Pressable,
 } from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../constants/colors";
 
@@ -43,169 +43,184 @@ interface AppointmentCardProps {
   onUserPress?: (id: string) => void;
 }
 
-export const AppointmentCard: React.FC<AppointmentCardProps> = ({
-  appointment,
-  onMarkComplete,
-  onMarkCancel,
-  onOpenRating,
-  onContact,
-  activeTab,
-  onPropertyPress,
-  onUserPress,
-}) => {
-  // Verificar si la fecha y hora de la cita ya pasaron
-  const canMarkAsCompleted = () => {
-    if (appointment.estado !== "pendiente") return false;
+export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
+  ({
+    appointment,
+    onMarkComplete,
+    onMarkCancel,
+    onOpenRating,
+    onContact,
+    activeTab,
+    onPropertyPress,
+    onUserPress,
+  }) => {
+    // Verificar si la fecha y hora de la cita ya pasaron
+    const canMarkAsCompleted = () => {
+      if (appointment.estado !== "pendiente") return false;
 
-    // Combinar fecha y hora para comparar con el momento actual
-    const appointmentDateTime = new Date(
-      `${appointment.fecha}T${appointment.hora}`,
-    );
-    const now = new Date();
+      // Combinar fecha y hora para comparar con el momento actual
+      const appointmentDateTime = new Date(
+        `${appointment.fecha}T${appointment.hora}`,
+      );
+      const now = new Date();
 
-    return appointmentDateTime <= now;
-  };
+      return appointmentDateTime <= now;
+    };
 
-  return (
-    <View style={styles.card}>
-      <View style={styles.dateColumn}>
-        <Ionicons name="calendar" size={20} color={COLORS.primaryDark} />
-        <Text style={styles.dateText}>{appointment.date}</Text>
-        <Text style={styles.timeText}>{appointment.time}</Text>
-      </View>
+    return (
+      <View style={styles.card}>
+        <View style={styles.dateColumn}>
+          <Ionicons name="calendar" size={20} color={COLORS.primaryDark} />
+          <Text style={styles.dateText}>{appointment.date}</Text>
+          <Text style={styles.timeText}>{appointment.time}</Text>
+        </View>
 
-      <View style={styles.cardContent}>
-        <View style={styles.cardHeader}>
-          <Pressable
-            onPress={() => onUserPress(appointment.user.id)}
-            style={styles.userInfo}
-          >
-            {appointment.user.avatar ? (
-              <Image
-                source={{ uri: appointment.user.avatar }}
-                style={styles.avatar}
-              />
-            ) : (
-              <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                <Ionicons name="person" size={16} color={COLORS.textTertiary} />
+        <View style={styles.cardContent}>
+          <View style={styles.cardHeader}>
+            <Pressable
+              onPress={() => onUserPress(appointment.user.id)}
+              style={styles.userInfo}
+            >
+              {appointment.user.avatar ? (
+                <Image
+                  source={{ uri: appointment.user.avatar }}
+                  style={styles.avatar}
+                  contentFit="cover"
+                  transition={200}
+                />
+              ) : (
+                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                  <Ionicons
+                    name="person"
+                    size={16}
+                    color={COLORS.textTertiary}
+                  />
+                </View>
+              )}
+              <View>
+                <Text style={styles.userName}>{appointment.user.name}</Text>
+                <View style={styles.roleBadge}>
+                  <Text style={styles.roleText}>{appointment.user.role}</Text>
+                </View>
+              </View>
+            </Pressable>
+            {onContact && (
+              <TouchableOpacity
+                style={styles.msgButton}
+                onPress={() => onContact(appointment.id)}
+              >
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={16}
+                  color={COLORS.textTertiary}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.details}>
+            {appointment.propertyImage && (
+              <Pressable
+                onPress={() => onPropertyPress(appointment.propertyId)}
+                style={styles.propertyImage}
+              >
+                <Image
+                  source={{ uri: appointment.propertyImage }}
+                  style={styles.propertyImage}
+                  contentFit="cover"
+                  transition={200}
+                />
+              </Pressable>
+            )}
+            {appointment.propertyTitle && (
+              <View style={styles.propertyContainer}>
+                <Text style={styles.propertyTitle}>
+                  {appointment.propertyTitle.charAt(0).toUpperCase() +
+                    appointment.propertyTitle.slice(1)}
+                </Text>
+                {appointment.estado === "cancelada" ? (
+                  <View style={styles.cancelBtn}>
+                    <Text style={styles.completeBtnText}>Cita Cancelada</Text>
+                  </View>
+                ) : activeTab === "past" ? null : (
+                  <TouchableOpacity
+                    onPress={() => onMarkCancel(appointment.id)}
+                    style={styles.cancelBtn}
+                  >
+                    <Ionicons
+                      name="close-circle-outline"
+                      size={16}
+                      color={COLORS.white}
+                    />
+                    <Text style={styles.completeBtnText}>Cancelar Cita</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
-            <View>
-              <Text style={styles.userName}>{appointment.user.name}</Text>
-              <View style={styles.roleBadge}>
-                <Text style={styles.roleText}>{appointment.user.role}</Text>
-              </View>
-            </View>
-          </Pressable>
-          {onContact && (
-            <TouchableOpacity
-              style={styles.msgButton}
-              onPress={() => onContact(appointment.id)}
-            >
-              <Ionicons
-                name="chatbubble-outline"
-                size={16}
-                color={COLORS.textTertiary}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
+          </View>
 
-        <View style={styles.details}>
-          {appointment.propertyImage && (
-            <Pressable
-              onPress={() => onPropertyPress(appointment.propertyId)}
-              style={styles.propertyImage}
-            >
-              <Image
-                source={{ uri: appointment.propertyImage }}
-                style={styles.propertyImage}
-              />
-            </Pressable>
-          )}
-          {appointment.propertyTitle && (
-            <View style={styles.propertyContainer}>
-              <Text style={styles.propertyTitle}>
-                {appointment.propertyTitle.charAt(0).toUpperCase() +
-                  appointment.propertyTitle.slice(1)}
-              </Text>
-              {appointment.estado === "cancelada" ? (
-                <View style={styles.cancelBtn}>
-                  <Text style={styles.completeBtnText}>Cita Cancelada</Text>
-                </View>
-              ) : activeTab === "past" ? null : (
-                <TouchableOpacity
-                  onPress={() => onMarkCancel(appointment.id)}
-                  style={styles.cancelBtn}
-                >
-                  <Ionicons
-                    name="close-circle-outline"
-                    size={16}
-                    color={COLORS.white}
-                  />
-                  <Text style={styles.completeBtnText}>Cancelar Cita</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </View>
-
-        <View style={styles.actions}>
-          {/* Mostrar botón "Marcar como completada" solo si está pendiente y fecha+hora ya pasaron */}
-          {canMarkAsCompleted() && (
-            <TouchableOpacity
-              onPress={() => onMarkComplete(appointment.id)}
-              style={styles.completeBtn}
-            >
-              <Ionicons
-                name="checkmark-circle"
-                size={16}
-                color={COLORS.white}
-              />
-              <Text style={styles.completeBtnText}>Marcar como completada</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Mostrar botón "Calificar" si está completada y el usuario NO ha calificado */}
-          {appointment.estado === "completada" && !appointment.hasUserRated && (
-            <View style={styles.rateContainer}>
-              <Text style={styles.rateLabel}>Calificar:</Text>
+          <View style={styles.actions}>
+            {/* Mostrar botón "Marcar como completada" solo si está pendiente y fecha+hora ya pasaron */}
+            {canMarkAsCompleted() && (
               <TouchableOpacity
-                onPress={() => onOpenRating(appointment.id)}
-                style={[
-                  styles.completeBtn,
-                  { marginLeft: 8, paddingHorizontal: 8 },
-                ]}
+                onPress={() => onMarkComplete(appointment.id)}
+                style={styles.completeBtn}
               >
-                <Ionicons name="star" size={16} color={COLORS.white} />
-                <Text style={styles.completeBtnText}>Abrir calificación</Text>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={16}
+                  color={COLORS.white}
+                />
+                <Text style={styles.completeBtnText}>
+                  Marcar como completada
+                </Text>
               </TouchableOpacity>
-            </View>
-          )}
+            )}
 
-          {/* Mostrar estrellas si el usuario ya calificó */}
-          {appointment.hasUserRated && (
-            <View style={styles.ratedContainer}>
-              <View style={styles.stars}>
-                {[...Array(5)].map((_, i) => (
-                  <Ionicons
-                    key={i}
-                    name={
-                      i < (appointment.rating || 0) ? "star" : "star-outline"
-                    }
-                    size={16}
-                    color={COLORS.warning}
-                  />
-                ))}
+            {/* Mostrar botón "Calificar" si está completada y el usuario NO ha calificado */}
+            {appointment.estado === "completada" &&
+              !appointment.hasUserRated && (
+                <View style={styles.rateContainer}>
+                  <Text style={styles.rateLabel}>Calificar:</Text>
+                  <TouchableOpacity
+                    onPress={() => onOpenRating(appointment.id)}
+                    style={[
+                      styles.completeBtn,
+                      { marginLeft: 8, paddingHorizontal: 8 },
+                    ]}
+                  >
+                    <Ionicons name="star" size={16} color={COLORS.white} />
+                    <Text style={styles.completeBtnText}>
+                      Abrir calificación
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+            {/* Mostrar estrellas si el usuario ya calificó */}
+            {appointment.hasUserRated && (
+              <View style={styles.ratedContainer}>
+                <View style={styles.stars}>
+                  {[...Array(5)].map((_, i) => (
+                    <Ionicons
+                      key={i}
+                      name={
+                        i < (appointment.rating || 0) ? "star" : "star-outline"
+                      }
+                      size={16}
+                      color={COLORS.warning}
+                    />
+                  ))}
+                </View>
+                <Text style={styles.ratedText}>(Has calificado esta cita)</Text>
               </View>
-              <Text style={styles.ratedText}>(Has calificado esta cita)</Text>
-            </View>
-          )}
+            )}
+          </View>
         </View>
       </View>
-    </View>
-  );
-};
+    );
+  },
+);
 
 const styles = StyleSheet.create({
   card: {

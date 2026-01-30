@@ -9,6 +9,8 @@
  * - Colores centralizados (no hardcoded)
  * - useEffects optimizados (sin duplicados)
  * - Rating Details completo con todas las estadísticas
+ * - OPTIMIZACION DE MEMORIA: Uso de FlatList en lugar de ScrollView + FlatList anidados.
+ * - Uso de expo-image para mejor gestión de memoria de imágenes.
  */
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -16,12 +18,13 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
   Modal,
   ActivityIndicator,
   FlatList,
   RefreshControl,
+  ListRenderItem,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -47,19 +50,24 @@ import { Avatar } from "../shared";
 import { ProfileHeader } from "./ProfileHeader";
 import ProfileAvatarPicker from "./ProfileAvatarPicker";
 import ProfileTabs from "./ProfileTabs";
-import ProfilePropertyGrid from "./ProfilePropertyGrid";
-import ProfilePostGrid from "./ProfilePostGrid";
-import ProfileReelGrid from "./ProfileReelGrid";
 import PropertyDetail from "../Details/PropertyDetail";
 import SelectionModal from "../modals/SelectionModal";
 import { useProfile } from "../../hooks/hooks/profile/useProfile";
+import { useGridProfile } from "../../hooks/hooks/profile/useGridProfile";
 import ReelDetail from "../Reel/ReelDetail";
 import FeedDetail from "../Feed/FeedDetail";
 import CreateProperty from "../CreateContent/CreateProperty";
+import CreatePost from "../CreateContent/CreatePost";
+import CreateReel from "../CreateContent/CreateReel";
 import { ThumbsUp } from "lucide-react-native";
 import AnimatedLike from "../../design-system/components/AnimatedLike";
 import { useChatInitiator } from "@/hooks/hooks/messaging/useChatInitiator";
 import { router } from "expo-router";
+import ProfileReelItem from "./ProfileReelItem";
+import ProfilePostItem from "./ProfilePostItem";
+import ProfilePropertyItem from "./ProfilePropertyItem";
+import ConfirmDialog from "../shared/ConfirmDialog";
+import { supabase } from "../../lib/supabase";
 
 interface ProfileProps {
   userId?: string | null;
@@ -99,6 +107,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     updateProfilePhoto,
   } = useProfile(userId);
 
+  const { deletePost, deleteReel } = useGridProfile();
+
   const { handleContact } = useChatInitiator();
 
   // Refresh Control
@@ -127,12 +137,24 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     null,
   );
   const [editProperty, setEditProperty] = useState<Property | null>(null);
+  const [editPost, setEditPost] = useState<Post | null>(null);
+  const [editReel, setEditReel] = useState<Reel | null>(null);
+
   const [showRatingDetails, setShowRatingDetails] = useState(false);
   const [showRecommendedByModal, setShowRecommendedByModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<FeedItem | null>(null);
   const [selectedReel, setSelectedReel] = useState<FeedItem | null>(null);
 
-  const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal] = useState(false); // Property Modal
+  const [showPostModal, setShowPostModal] = useState(false); // Post Modal
+  const [showReelModal, setShowReelModal] = useState(false); // Reel Modal
+
+  // Deletion State
+  const [itemToDelete, setItemToDelete] = useState<{
+    type: "property" | "post" | "reel";
+    item: any;
+  } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Computed
   const targetUserId = userId || authUser?.id;
@@ -288,6 +310,33 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     }
   };
 
+  const handleDeleteItem = async () => {
+    if (!itemToDelete) return;
+
+    try {
+      setDeleting(true);
+      if (itemToDelete.type === "property") {
+        const { error } = await supabase
+          .from("propiedades")
+          .update({ deleted_at: new Date().toISOString() })
+          .eq("id", itemToDelete.item.id);
+        if (error) throw error;
+      } else if (itemToDelete.type === "post") {
+        await deletePost(itemToDelete.item);
+      } else if (itemToDelete.type === "reel") {
+        await deleteReel(itemToDelete.item);
+      }
+
+      await handleRefresh();
+      setItemToDelete(null);
+    } catch (error: any) {
+      console.error("Error deleting item:", error);
+      Alert.alert("Error", error.message || "No se pudo eliminar el elemento");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const profileData = {
     name: formatFullName(profile),
     avatar: profile?.foto || undefined,
@@ -324,7 +373,457 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     reels: reels.length,
   };
 
-  if (loading) {
+  const renderHeader = () => (
+    <>
+      <ProfileHeader
+        isOwnProfile={isMe}
+        onBack={onBack}
+        onSettings={() => router.push("/settings")}
+      />
+      {/* Profile Info */}
+      <View style={styles.infoContainer}>
+        <View style={styles.infoRow}>
+          <ProfileAvatarPicker
+            uri={profileData.avatar}
+            name={profileData.name}
+            size={100}
+            userId={targetUserId!}
+            isOwnProfile={isMe}
+            onPhotoUpdated={(newUrl) => {
+              updateProfilePhoto(newUrl);
+            }}
+          />
+
+          <View style={styles.infoRight}>
+            <Text style={styles.name}>{profileData.name}</Text>
+            {profileData.role === "Cliente" ? (
+              <></>
+            ) : (
+              <View style={styles.roleBadge}>
+                <Text style={styles.roleText}>{profileData.role}</Text>
+              </View>
+            )}
+            <View style={styles.metaList}>
+              <View style={styles.metaItem}>
+                <Ionicons
+                  name="location"
+                  size={12}
+                  color={COLORS.textTertiary}
+                />
+                <Text style={styles.metaText}>{profileData.location}</Text>
+              </View>
+              <View style={styles.metaItem}>
+                <Ionicons name="school" size={12} color={COLORS.textTertiary} />
+                <Text style={styles.metaText}>
+                  {`+${profileData.anos_experiencia} años de experiencia`}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {!isMe && (
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={styles.messageBtn}
+              onPress={() => {
+                handleContact(targetUserId!, null, {
+                  id: targetUserId!,
+                  nombre: profile?.nombre || "",
+                  apellido_paterno: profile?.apellido_paterno || "",
+                  foto: profile?.foto || null,
+                });
+              }}
+            >
+              <Ionicons
+                name="chatbubble-outline"
+                size={16}
+                color={COLORS.textPrimary}
+              />
+              <Text style={styles.messageBtnText}>Mensaje</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      {/* ========== RATING SECTION - COMPLETA ========== */}
+      <View style={styles.ratingSection}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => setShowRatingDetails(!showRatingDetails)}
+          style={styles.ratingCard}
+        >
+          {/* Rating Info Group (Left) */}
+          <View style={styles.ratingInfoGroup}>
+            <View style={styles.ratingHeader}>
+              <Text style={styles.ratingValue}>
+                {profileData.rating.toFixed(1)}
+              </Text>
+              <View style={styles.starsRow}>
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Ionicons
+                    key={s}
+                    name="star"
+                    size={14}
+                    color={COLORS.warning}
+                  />
+                ))}
+              </View>
+            </View>
+            <Text style={styles.reviewCount}>
+              {profileData.reviewCount} reseñas
+            </Text>
+          </View>
+
+          {/* Details Group (Right) */}
+          <View style={styles.ratingRight}>
+            <Text style={styles.viewDetailsText}>Ver Detalles</Text>
+            <Ionicons
+              name={showRatingDetails ? "chevron-up" : "chevron-down"}
+              size={14}
+              color={COLORS.primary}
+              style={styles.chevronIcon}
+            />
+          </View>
+        </TouchableOpacity>
+
+        {showRatingDetails && (
+          <View style={styles.statsPanel}>
+            {/* Recommends Row moved here */}
+            <View style={styles.recommendsRow}>
+              <TouchableOpacity
+                style={[
+                  styles.recItem,
+                  isMe && styles.recItemDisabled,
+                  { borderRightWidth: 1 },
+                ]}
+                onPress={() => handleRecommendation(true)}
+                disabled={isMe || submittingRecommendation}
+              >
+                <AnimatedLike
+                  isActive={userRecommendation === true}
+                  onPress={() => handleRecommendation(true)}
+                  activeColor={COLORS.primary}
+                  inactiveColor={COLORS.textSecondary}
+                  variant="thumbs-up"
+                />
+                <Text style={styles.recVal}>
+                  {profileData.positiveRecommendations}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.recItem, isMe && styles.recItemDisabled]}
+                onPress={() => handleRecommendation(false)}
+                disabled={isMe || submittingRecommendation}
+              >
+                <AnimatedLike
+                  isActive={userRecommendation === false}
+                  onPress={() => handleRecommendation(false)}
+                  activeColor={COLORS.error}
+                  inactiveColor={COLORS.textSecondary}
+                  variant="thumbs-down"
+                />
+                <Text style={styles.recVal}>
+                  {profileData.negativeRecommendations}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Recommended By Section */}
+            <View style={styles.recommendedBySection}>
+              <View style={styles.recommendedByHeader}>
+                <Text style={styles.recommendedByTitle}>Recomendado por</Text>
+                <Text style={styles.recommendedByCount}>
+                  {profileData.positiveRecommendations} usuarios
+                </Text>
+              </View>
+
+              {loadingRecommendedBy ? (
+                <View style={styles.recommendedByLoading}>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                </View>
+              ) : recommendedByError ? (
+                <Text style={styles.recommendedByEmptyText}>
+                  {recommendedByError}
+                </Text>
+              ) : recommendedByUsers.length === 0 ? (
+                <Text style={styles.recommendedByEmptyText}>
+                  Aún no hay recomendaciones
+                </Text>
+              ) : (
+                <TouchableOpacity
+                  style={styles.recommendedByPreviewRow}
+                  onPress={() => setShowRecommendedByModal(true)}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.recommendedByAvatars}>
+                    {recommendedByUsers.slice(0, 2).map((u, idx) => {
+                      const fullName = [
+                        u.nombre,
+                        u.apellido_paterno,
+                        u.apellido_materno,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")
+                        .trim();
+
+                      return (
+                        <View
+                          key={u.id}
+                          style={[
+                            styles.recommendedByAvatarWrap,
+                            idx === 1 && styles.recommendedByAvatarWrapSecond,
+                          ]}
+                        >
+                          <Avatar
+                            uri={u.foto || undefined}
+                            name={fullName || "Usuario"}
+                            size={26}
+                            style={styles.recommendedByAvatarSmall}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  <Text
+                    style={styles.recommendedByPreviewText}
+                    numberOfLines={1}
+                  >
+                    {(() => {
+                      const first = recommendedByUsers[0];
+                      const firstName = first
+                        ? [first.nombre, first.apellido_paterno]
+                            .filter(Boolean)
+                            .join(" ")
+                            .trim()
+                        : "Usuario";
+                      const total = profileData.positiveRecommendations || 0;
+                      const rest = Math.max(0, total - 1);
+                      return rest > 0
+                        ? `${firstName} y ${rest} más`
+                        : firstName;
+                    })()}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Progress Section */}
+            <View style={styles.progressSection}>
+              {[5, 4, 3, 2, 1].map((stars) => {
+                const starCounts = {
+                  5: reviewStats?.total_5_estrellas || 0,
+                  4: reviewStats?.total_4_estrellas || 0,
+                  3: reviewStats?.total_3_estrellas || 0,
+                  2: reviewStats?.total_2_estrellas || 0,
+                  1: reviewStats?.total_1_estrella || 0,
+                };
+
+                const count = starCounts[stars as keyof typeof starCounts];
+                const totalReviews = reviewStats?.total_resenas || 0;
+                const percentage =
+                  totalReviews > 0 ? (count / totalReviews) * 100 : 0;
+
+                return (
+                  <View key={stars} style={styles.progressRow}>
+                    <Text style={styles.progressLabel}>{stars} estrellas</Text>
+                    <View style={styles.progressBar}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          { width: `${Math.round(percentage)}%` },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.progressPerc}>
+                      {Math.round(percentage)}%
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Features Section */}
+            <View style={styles.featuresSection}>
+              <Text style={styles.featuresTitle}>
+                Calificación de características
+              </Text>
+              {[
+                {
+                  label: "Disponibilidad",
+                  rating: profileData.disponibilidad,
+                },
+                {
+                  label: "Profesionalismo",
+                  rating: profileData.profesionalismo,
+                },
+                { label: "Comunicación", rating: profileData.comunicacion },
+                {
+                  label: "Conocimiento del Mercado",
+                  rating: profileData.conocimientoMercado,
+                },
+              ].map((f) => (
+                <View key={f.label} style={styles.featureRow}>
+                  <Text style={styles.featureLabel}>{f.label}</Text>
+                  <View style={styles.featureStars}>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Ionicons
+                        key={i}
+                        name={
+                          i < Math.round(f.rating) ? "star" : "star-outline"
+                        }
+                        size={16}
+                        color={
+                          i < Math.round(f.rating)
+                            ? COLORS.primary
+                            : COLORS.textDisabled
+                        }
+                      />
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+      </View>
+
+      <ProfileTabs
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        counts={contentCounts}
+      />
+
+      {/* Filter Toolbar */}
+      {activeTab === "properties" && (
+        <View style={styles.toolbar}>
+          <TouchableOpacity
+            onPress={() => setShowFilterModal(true)}
+            style={styles.filterBtn}
+          >
+            <Ionicons name="funnel" size={16} color={COLORS.textPrimary} />
+            <Text style={styles.filterBtnText}>{activeFilter}</Text>
+            <Ionicons
+              name="chevron-down"
+              size={16}
+              color={COLORS.textPrimary}
+            />
+          </TouchableOpacity>
+          <Text style={styles.countText}>
+            {filteredProperties.length}{" "}
+            {filteredProperties.length === 1 ? "Propiedad" : "Propiedades"}
+          </Text>
+        </View>
+      )}
+    </>
+  );
+
+  const getListData = () => {
+    switch (activeTab) {
+      case "properties":
+        return filteredProperties;
+      case "posts":
+        return posts;
+      case "reels":
+        return reels;
+      default:
+        return [];
+    }
+  };
+
+  const renderItem: ListRenderItem<any> = ({ item, index }) => {
+    switch (activeTab) {
+      case "properties":
+        return (
+          <ProfilePropertyItem
+            item={item}
+            onPress={(property) => setSelectedProperty(property)}
+            isOwnProfile={isMe}
+            onEdit={(property) => {
+              setEditProperty(property);
+              setShowModal(true);
+            }}
+            onDelete={(property) =>
+              setItemToDelete({ type: "property", item: property })
+            }
+            isLastInRow={(index + 1) % 3 === 0}
+          />
+        );
+      case "posts":
+        return (
+          <ProfilePostItem
+            item={item}
+            onPress={(post) =>
+              router.push({
+                pathname: "/(stack)/post/[id]",
+                params: {
+                  id: post.id,
+                  item: JSON.stringify(mapPostToFeedItem(post)),
+                },
+              })
+            }
+            isOwnProfile={isMe}
+            onEdit={(post) => {
+              setEditPost(post);
+              setShowPostModal(true);
+            }}
+            onDelete={(post) => setItemToDelete({ type: "post", item: post })}
+          />
+        );
+      case "reels":
+        return (
+          <ProfileReelItem
+            item={item}
+            onPress={(reel) =>
+              router.push({
+                pathname: "/(stack)/reel/[id]",
+                params: {
+                  id: reel.id,
+                  item: JSON.stringify(mapReelToFeedItem(reel)),
+                },
+              })
+            }
+            isOwnProfile={isMe}
+            onEdit={(reel) => {
+              setEditReel(reel);
+              setShowReelModal(true);
+            }}
+            onDelete={(reel) => setItemToDelete({ type: "reel", item: reel })}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  const getEmptyMessage = () => {
+    switch (activeTab) {
+      case "properties":
+        return "No hay propiedades aún";
+      case "posts":
+        return "No hay posts aún";
+      case "reels":
+        return "No hay reels aún";
+      default:
+        return "No hay contenido";
+    }
+  };
+
+  const getEmptyIcon = () => {
+    switch (activeTab) {
+      case "properties":
+        return "home-outline";
+      case "posts":
+        return "images-outline";
+      case "reels":
+        return "film-outline";
+      default:
+        return "alert-circle-outline";
+    }
+  };
+
+  if (loading && !refreshing) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -335,13 +834,16 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>
-      <ProfileHeader
-        isOwnProfile={isMe}
-        onBack={onBack}
-        onSettings={() => router.push("/settings")}
-      />
-
-      <ScrollView
+      <FlatList
+        data={getListData()}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        numColumns={3}
+        key={activeTab} // Forces refresh of FlatList config when tab changes
+        ListHeaderComponent={renderHeader}
+        columnWrapperStyle={
+          activeTab === "properties" ? styles.columnWrapper : undefined
+        }
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
@@ -350,532 +852,138 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             colors={[COLORS.primary]}
           />
         }
-      >
-        {/* Profile Info */}
-        <View style={styles.infoContainer}>
-          <View style={styles.infoRow}>
-            <ProfileAvatarPicker
-              uri={profileData.avatar}
-              name={profileData.name}
-              size={100}
-              userId={targetUserId!}
-              isOwnProfile={isMe}
-              onPhotoUpdated={(newUrl) => {
-                updateProfilePhoto(newUrl);
-              }}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons
+              name={getEmptyIcon()}
+              size={48}
+              color={COLORS.textTertiary}
             />
-
-            <View style={styles.infoRight}>
-              <Text style={styles.name}>{profileData.name}</Text>
-              {profileData.role === "Cliente" ? (
-                <></>
-              ) : (
-                <View style={styles.roleBadge}>
-                  <Text style={styles.roleText}>{profileData.role}</Text>
-                </View>
-              )}
-              <View style={styles.metaList}>
-                <View style={styles.metaItem}>
-                  <Ionicons
-                    name="location"
-                    size={12}
-                    color={COLORS.textTertiary}
-                  />
-                  <Text style={styles.metaText}>{profileData.location}</Text>
-                </View>
-                <View style={styles.metaItem}>
-                  <Ionicons
-                    name="school"
-                    size={12}
-                    color={COLORS.textTertiary}
-                  />
-                  <Text style={styles.metaText}>
-                    {`+${profileData.anos_experiencia} años de experiencia`}
-                  </Text>
-                </View>
-                {/* <View style={styles.metaItem}>
-                  <Ionicons name="call" size={12} color={COLORS.textTertiary} />
-                  <Text style={styles.metaText}>{profileData.phone}</Text>
-                </View> */}
-              </View>
-            </View>
+            <Text style={styles.emptyText}>{getEmptyMessage()}</Text>
           </View>
+        }
+      />
 
-          {!isMe && (
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                style={styles.messageBtn}
-                onPress={() => {
-                  handleContact(targetUserId!, null, {
-                    id: targetUserId!,
-                    nombre: profile?.nombre || "",
-                    apellido_paterno: profile?.apellido_paterno || "",
-                    foto: profile?.foto || null,
-                  });
-                }}
-              >
-                <Ionicons
-                  name="chatbubble-outline"
-                  size={16}
-                  color={COLORS.textPrimary}
-                />
-                <Text style={styles.messageBtnText}>Mensaje</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* ========== RATING SECTION - COMPLETA ========== */}
-        <View style={styles.ratingSection}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setShowRatingDetails(!showRatingDetails)}
-            style={styles.ratingCard}
-          >
-            {/* Rating Info Group (Left) */}
-            <View style={styles.ratingInfoGroup}>
-              <View style={styles.ratingHeader}>
-                <Text style={styles.ratingValue}>
-                  {profileData.rating.toFixed(1)}
-                </Text>
-                <View style={styles.starsRow}>
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Ionicons
-                      key={s}
-                      name="star"
-                      size={14}
-                      color={COLORS.warning}
-                    />
-                  ))}
-                </View>
-              </View>
-              <Text style={styles.reviewCount}>
-                {profileData.reviewCount} reseñas
-              </Text>
-            </View>
-
-            {/* Details Group (Right) */}
-            <View style={styles.ratingRight}>
-              <Text style={styles.viewDetailsText}>Ver Detalles</Text>
-              <Ionicons
-                name={showRatingDetails ? "chevron-up" : "chevron-down"}
-                size={14}
-                color={COLORS.primary}
-                style={styles.chevronIcon}
-              />
-            </View>
-          </TouchableOpacity>
-
-          {showRatingDetails && (
-            <View style={styles.statsPanel}>
-              {/* Recommends Row moved here */}
-              <View style={styles.recommendsRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.recItem,
-                    isMe && styles.recItemDisabled,
-                    { borderRightWidth: 1 },
-                  ]}
-                  onPress={() => handleRecommendation(true)}
-                  disabled={isMe || submittingRecommendation}
-                >
-                  <AnimatedLike
-                    isActive={userRecommendation === true}
-                    onPress={() => handleRecommendation(true)}
-                    activeColor={COLORS.primary}
-                    inactiveColor={COLORS.textSecondary}
-                    variant="thumbs-up"
-                  />
-                  <Text style={styles.recVal}>
-                    {profileData.positiveRecommendations}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.recItem, isMe && styles.recItemDisabled]}
-                  onPress={() => handleRecommendation(false)}
-                  disabled={isMe || submittingRecommendation}
-                >
-                  <AnimatedLike
-                    isActive={userRecommendation === false}
-                    onPress={() => handleRecommendation(false)}
-                    activeColor={COLORS.error}
-                    inactiveColor={COLORS.textSecondary}
-                    variant="thumbs-down"
-                  />
-                  <Text style={styles.recVal}>
-                    {profileData.negativeRecommendations}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Recommended By Section */}
-              <View style={styles.recommendedBySection}>
-                <View style={styles.recommendedByHeader}>
-                  <Text style={styles.recommendedByTitle}>Recomendado por</Text>
-                  <Text style={styles.recommendedByCount}>
-                    {profileData.positiveRecommendations} usuarios
-                  </Text>
-                </View>
-
-                {loadingRecommendedBy ? (
-                  <View style={styles.recommendedByLoading}>
-                    <ActivityIndicator size="small" color={COLORS.primary} />
-                  </View>
-                ) : recommendedByError ? (
-                  <Text style={styles.recommendedByEmptyText}>
-                    {recommendedByError}
-                  </Text>
-                ) : recommendedByUsers.length === 0 ? (
-                  <Text style={styles.recommendedByEmptyText}>
-                    Aún no hay recomendaciones
-                  </Text>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.recommendedByPreviewRow}
-                    onPress={() => setShowRecommendedByModal(true)}
-                    activeOpacity={0.85}
-                  >
-                    <View style={styles.recommendedByAvatars}>
-                      {recommendedByUsers.slice(0, 2).map((u, idx) => {
-                        const fullName = [
-                          u.nombre,
-                          u.apellido_paterno,
-                          u.apellido_materno,
-                        ]
-                          .filter(Boolean)
-                          .join(" ")
-                          .trim();
-
-                        return (
-                          <View
-                            key={u.id}
-                            style={[
-                              styles.recommendedByAvatarWrap,
-                              idx === 1 && styles.recommendedByAvatarWrapSecond,
-                            ]}
-                          >
-                            <Avatar
-                              uri={u.foto || undefined}
-                              name={fullName || "Usuario"}
-                              size={26}
-                              style={styles.recommendedByAvatarSmall}
-                            />
-                          </View>
-                        );
-                      })}
-                    </View>
-
-                    <Text
-                      style={styles.recommendedByPreviewText}
-                      numberOfLines={1}
-                    >
-                      {(() => {
-                        const first = recommendedByUsers[0];
-                        const firstName = first
-                          ? [first.nombre, first.apellido_paterno]
-                              .filter(Boolean)
-                              .join(" ")
-                              .trim()
-                          : "Usuario";
-                        const total = profileData.positiveRecommendations || 0;
-                        const rest = Math.max(0, total - 1);
-                        return rest > 0
-                          ? `${firstName} y ${rest} más`
-                          : firstName;
-                      })()}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* Progress Section */}
-              <View style={styles.progressSection}>
-                {[5, 4, 3, 2, 1].map((stars) => {
-                  const starCounts = {
-                    5: reviewStats?.total_5_estrellas || 0,
-                    4: reviewStats?.total_4_estrellas || 0,
-                    3: reviewStats?.total_3_estrellas || 0,
-                    2: reviewStats?.total_2_estrellas || 0,
-                    1: reviewStats?.total_1_estrella || 0,
-                  };
-
-                  const count = starCounts[stars as keyof typeof starCounts];
-                  const totalReviews = reviewStats?.total_resenas || 0;
-                  const percentage =
-                    totalReviews > 0 ? (count / totalReviews) * 100 : 0;
-
-                  return (
-                    <View key={stars} style={styles.progressRow}>
-                      <Text style={styles.progressLabel}>
-                        {stars} estrellas
-                      </Text>
-                      <View style={styles.progressBar}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            { width: `${Math.round(percentage)}%` },
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.progressPerc}>
-                        {Math.round(percentage)}%
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-
-              {/* Features Section */}
-              <View style={styles.featuresSection}>
-                <Text style={styles.featuresTitle}>
-                  Calificación de características
-                </Text>
-                {[
-                  {
-                    label: "Disponibilidad",
-                    rating: profileData.disponibilidad,
-                  },
-                  {
-                    label: "Profesionalismo",
-                    rating: profileData.profesionalismo,
-                  },
-                  { label: "Comunicación", rating: profileData.comunicacion },
-                  {
-                    label: "Conocimiento del Mercado",
-                    rating: profileData.conocimientoMercado,
-                  },
-                ].map((f) => (
-                  <View key={f.label} style={styles.featureRow}>
-                    <Text style={styles.featureLabel}>{f.label}</Text>
-                    <View style={styles.featureStars}>
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Ionicons
-                          key={i}
-                          name={
-                            i < Math.round(f.rating) ? "star" : "star-outline"
-                          }
-                          size={16}
-                          color={
-                            i < Math.round(f.rating)
-                              ? COLORS.primary
-                              : COLORS.textDisabled
-                          }
-                        />
-                      ))}
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-        </View>
-
-        {/* Modal de "Recomendado por" Completo */}
-        <Modal
-          visible={showRecommendedByModal}
-          animationType="slide"
-          onRequestClose={() => setShowRecommendedByModal(false)}
-        >
-          <SafeAreaView style={styles.recommendedByModalContainer}>
-            <View style={styles.recommendedByModalHeader}>
-              <TouchableOpacity
-                onPress={() => setShowRecommendedByModal(false)}
-                style={styles.recommendedByModalBackBtn}
-              >
-                <Ionicons
-                  name="chevron-back"
-                  size={22}
-                  color={COLORS.textPrimary}
-                />
-              </TouchableOpacity>
-
-              <View style={styles.recommendedByModalTitleWrap}>
-                <Text style={styles.recommendedByModalTitle}>
-                  Recomendado por
-                </Text>
-                <Text style={styles.recommendedByModalSubtitle}>
-                  {profileData.positiveRecommendations} usuarios
-                </Text>
-              </View>
-              <View style={styles.recommendedByModalBackBtn} />
-            </View>
-
-            {recommendedByError ? (
-              <View style={styles.recommendedByModalEmpty}>
-                <Text style={styles.recommendedByEmptyText}>
-                  {recommendedByError}
-                </Text>
-              </View>
-            ) : (
-              <FlatList
-                data={recommendedByUsers}
-                keyExtractor={(u, idx) => `${u.id}-${idx}`}
-                contentContainerStyle={styles.recommendedByModalList}
-                onEndReached={() => {
-                  if (loadingRecommendedBy || !recommendedByHasMore) return;
-                  loadRecommendedByUsers();
-                }}
-                onEndReachedThreshold={0.6}
-                ListEmptyComponent={
-                  loadingRecommendedBy ? (
-                    <View style={styles.recommendedByLoading}>
-                      <ActivityIndicator size="small" color={COLORS.primary} />
-                    </View>
-                  ) : (
-                    <View style={styles.recommendedByModalEmpty}>
-                      <Text style={styles.recommendedByEmptyText}>
-                        Aún no hay recomendaciones
-                      </Text>
-                    </View>
-                  )
-                }
-                renderItem={({ item: u }) => {
-                  const fullName = [
-                    u.nombre,
-                    u.apellido_paterno,
-                    u.apellido_materno,
-                  ]
-                    .filter(Boolean)
-                    .join(" ")
-                    .trim();
-
-                  return (
-                    <TouchableOpacity
-                      style={styles.recommendedByModalItem}
-                      onPress={() => {
-                        setShowRecommendedByModal(false);
-                        navigation.navigate("user/[id]", { id: u.id });
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <Avatar
-                        uri={u.foto || undefined}
-                        name={fullName || "Usuario"}
-                        size={44}
-                        style={styles.recommendedByAvatar}
-                      />
-                      <View style={styles.recommendedByInfo}>
-                        <Text
-                          style={styles.recommendedByName}
-                          numberOfLines={1}
-                        >
-                          {fullName || "Usuario"}
-                        </Text>
-                        <Text
-                          style={styles.recommendedByRole}
-                          numberOfLines={1}
-                        >
-                          {formatRole(u.rol)}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                }}
-                ListFooterComponent={
-                  loadingRecommendedBy ? (
-                    <View style={styles.recommendedByModalFooter}>
-                      <ActivityIndicator size="small" color={COLORS.primary} />
-                    </View>
-                  ) : recommendedByHasMore ? (
-                    <View style={styles.recommendedByModalFooter}>
-                      <TouchableOpacity
-                        style={styles.recommendedByLoadMoreBtn}
-                        onPress={() => loadRecommendedByUsers()}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={styles.recommendedByLoadMoreText}>
-                          Cargar más
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <View style={styles.recommendedByModalFooter} />
-                  )
-                }
-              />
-            )}
-          </SafeAreaView>
-        </Modal>
-
-        {/* Tabs */}
-        <ProfileTabs
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          counts={contentCounts}
-        />
-
-        {/* Filter Toolbar */}
-        {activeTab === "properties" && (
-          <View style={styles.toolbar}>
+      {/* Modal de "Recomendado por" Completo */}
+      <Modal
+        visible={showRecommendedByModal}
+        animationType="slide"
+        onRequestClose={() => setShowRecommendedByModal(false)}
+      >
+        <SafeAreaView style={styles.recommendedByModalContainer}>
+          <View style={styles.recommendedByModalHeader}>
             <TouchableOpacity
-              onPress={() => setShowFilterModal(true)}
-              style={styles.filterBtn}
+              onPress={() => setShowRecommendedByModal(false)}
+              style={styles.recommendedByModalBackBtn}
             >
-              <Ionicons name="funnel" size={16} color={COLORS.textPrimary} />
-              <Text style={styles.filterBtnText}>{activeFilter}</Text>
               <Ionicons
-                name="chevron-down"
-                size={16}
+                name="chevron-back"
+                size={22}
                 color={COLORS.textPrimary}
               />
             </TouchableOpacity>
-            <Text style={styles.countText}>
-              {filteredProperties.length}{" "}
-              {filteredProperties.length === 1 ? "Propiedad" : "Propiedades"}
-            </Text>
+
+            <View style={styles.recommendedByModalTitleWrap}>
+              <Text style={styles.recommendedByModalTitle}>
+                Recomendado por
+              </Text>
+              <Text style={styles.recommendedByModalSubtitle}>
+                {profileData.positiveRecommendations} usuarios
+              </Text>
+            </View>
+            <View style={styles.recommendedByModalBackBtn} />
           </View>
-        )}
 
-        {/* Content Grids */}
-        {activeTab === "properties" && (
-          <ProfilePropertyGrid
-            properties={filteredProperties}
-            onPropertyPress={(property) => setSelectedProperty(property)}
-            isOwnProfile={isMe}
-            onEditPress={(property) => {
-              setEditProperty(property);
-              setShowModal(true);
-            }}
-            onDelete={handleRefresh}
-          />
-        )}
+          {recommendedByError ? (
+            <View style={styles.recommendedByModalEmpty}>
+              <Text style={styles.recommendedByEmptyText}>
+                {recommendedByError}
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={recommendedByUsers}
+              keyExtractor={(u, idx) => `${u.id}-${idx}`}
+              contentContainerStyle={styles.recommendedByModalList}
+              onEndReached={() => {
+                if (loadingRecommendedBy || !recommendedByHasMore) return;
+                loadRecommendedByUsers();
+              }}
+              onEndReachedThreshold={0.6}
+              ListEmptyComponent={
+                loadingRecommendedBy ? (
+                  <View style={styles.recommendedByLoading}>
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                  </View>
+                ) : (
+                  <View style={styles.recommendedByModalEmpty}>
+                    <Text style={styles.recommendedByEmptyText}>
+                      Aún no hay recomendaciones
+                    </Text>
+                  </View>
+                )
+              }
+              renderItem={({ item: u }) => {
+                const fullName = [
+                  u.nombre,
+                  u.apellido_paterno,
+                  u.apellido_materno,
+                ]
+                  .filter(Boolean)
+                  .join(" ")
+                  .trim();
 
-        {activeTab === "posts" && (
-          <ProfilePostGrid
-            userId={targetUserId || ""}
-            onPostPress={(post) =>
-              router.push({
-                pathname: "/(stack)/post/[id]",
-                params: {
-                  id: post.id,
-                  item: JSON.stringify(mapPostToFeedItem(post)),
-                },
-              })
-            }
-            isOwnProfile={isMe}
-            onDelete={handleRefresh}
-            refreshTrigger={refreshTrigger}
-          />
-        )}
-
-        {activeTab === "reels" && (
-          <ProfileReelGrid
-            userId={targetUserId || ""}
-            onReelPress={(reel: any) =>
-              router.push({
-                pathname: "/(stack)/reel/[id]",
-                params: {
-                  id: reel.id,
-                  item: JSON.stringify(mapReelToFeedItem(reel)),
-                },
-              })
-            }
-            isOwnProfile={isMe}
-            onDelete={handleRefresh}
-            refreshTrigger={refreshTrigger}
-          />
-        )}
-      </ScrollView>
+                return (
+                  <TouchableOpacity
+                    style={styles.recommendedByModalItem}
+                    onPress={() => {
+                      setShowRecommendedByModal(false);
+                      navigation.navigate("user/[id]", { id: u.id });
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Avatar
+                      uri={u.foto || undefined}
+                      name={fullName || "Usuario"}
+                      size={44}
+                      style={styles.recommendedByAvatar}
+                    />
+                    <View style={styles.recommendedByInfo}>
+                      <Text style={styles.recommendedByName} numberOfLines={1}>
+                        {fullName || "Usuario"}
+                      </Text>
+                      <Text style={styles.recommendedByRole} numberOfLines={1}>
+                        {formatRole(u.rol)}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
+              ListFooterComponent={
+                loadingRecommendedBy ? (
+                  <View style={styles.recommendedByModalFooter}>
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                  </View>
+                ) : recommendedByHasMore ? (
+                  <View style={styles.recommendedByModalFooter}>
+                    <TouchableOpacity
+                      style={styles.recommendedByLoadMoreBtn}
+                      onPress={() => loadRecommendedByUsers()}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.recommendedByLoadMoreText}>
+                        Cargar más
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.recommendedByModalFooter} />
+                )
+              }
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
 
       {/* Modal Rating Details */}
       {selectedPost && (
@@ -916,8 +1024,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
               ...navigation,
               goBack: (shouldRefresh?: boolean) => {
                 setSelectedProperty(null);
-                // Si hubo cambios, actualizamos (aunque onRefresh ya lo hace en tiempo real)
-                // Se verifica si es necesario para asegurar consistencia
+                // Si hubo cambios, actualizamos
                 if (shouldRefresh) handleSilentRefresh();
               },
               navigate: (screen: string, params: any) => {
@@ -929,6 +1036,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
           />
         </Modal>
       )}
+
+      {/* Edit Modals */}
       {showModal && (
         <Modal
           animationType="slide"
@@ -938,12 +1047,51 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
           <CreateProperty
             onBack={(shouldRefresh) => {
               setShowModal(false);
+              setEditProperty(null);
               if (shouldRefresh) handleRefresh();
             }}
             propertyId={editProperty?.id}
           />
         </Modal>
       )}
+
+      {showPostModal && (
+        <Modal visible={showPostModal}>
+          <CreatePost
+            post={editPost || undefined}
+            onBack={() => {
+              setShowPostModal(false);
+              setEditPost(null);
+              handleRefresh();
+            }}
+          />
+        </Modal>
+      )}
+
+      {showReelModal && (
+        <Modal visible={showReelModal}>
+          <CreateReel
+            reelId={editReel?.id}
+            onBack={() => {
+              setShowReelModal(false);
+              setEditReel(null);
+              handleRefresh();
+            }}
+          />
+        </Modal>
+      )}
+
+      <ConfirmDialog
+        visible={!!itemToDelete}
+        title="Eliminar elemento"
+        message="¿Estás seguro de que deseas eliminar este elemento? Esta acción no se puede deshacer."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        onConfirm={handleDeleteItem}
+        onCancel={() => setItemToDelete(null)}
+        danger
+        loading={deleting}
+      />
     </ScreenWrapper>
   );
 };
@@ -964,6 +1112,12 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 100,
+    // Note: ProfileReelItem and ProfilePostItem use internal padding calculation.
+    // The FlatList is the main container now.
+  },
+  columnWrapper: {
+    justifyContent: "flex-start",
+    paddingHorizontal: 12, // Apply padding here for Property rows
   },
   infoContainer: {
     paddingHorizontal: 16,
@@ -1348,6 +1502,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textTertiary,
     fontWeight: "500",
+  },
+  emptyState: {
+    padding: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: COLORS.textTertiary,
   },
 });
 

@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Modal,
   TextInput,
+  FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -17,7 +18,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { FeedItem, User } from "../types";
 import PropertyDetail from "./Details/PropertyDetail";
-import { LeadMatchCard } from "./LeadMatchCard";
+
 import { LeadPropertiesModal } from "./LeadPropertiesModal";
 import { AppHeader } from "./AppHeader";
 import { COLORS } from "../constants";
@@ -73,6 +74,7 @@ interface LeadGroup {
 }
 
 import { usePropertyFeedItems } from "../hooks/hooks/usePropertyFeedItems";
+import { LeadMatchCard } from "./LeadMatchCard";
 // ... (keep existing imports)
 
 const Matches: React.FC = () => {
@@ -472,6 +474,19 @@ const Matches: React.FC = () => {
     );
   }
 
+  const renderItem = ({ item }: { item: LeadGroup }) => (
+    <LeadMatchCard
+      leadName={item.leadName}
+      leadPhone={item.leadPhone}
+      minPrice={item.minPrice}
+      maxPrice={item.maxPrice}
+      currency={item.currency}
+      matchCount={item.matchCount}
+      similarCount={item.similarCount}
+      onPress={() => setSelectedLeadId(item.leadId)}
+    />
+  );
+
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>
       {/* Header */}
@@ -507,7 +522,10 @@ const Matches: React.FC = () => {
       </View>
 
       {/* Content */}
-      <ScrollView
+      <FlatList
+        data={leadGroups}
+        keyExtractor={(item) => item.leadId}
+        renderItem={renderItem}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
@@ -516,40 +534,31 @@ const Matches: React.FC = () => {
             colors={[COLORS.primary]}
           />
         }
-      >
-        {loading ? ( // Show loading inside if initial load
-          <ActivityIndicator
-            size="large"
-            color={COLORS.primary}
-            style={{ marginTop: 50 }}
-          />
-        ) : leadGroups.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons
-              name="search-outline"
-              size={64}
-              color={COLORS.cardBorder}
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator
+              size="large"
+              color={COLORS.primary}
+              style={{ marginTop: 50 }}
             />
-            <Text style={styles.emptyText}>
-              No hay matches en esta categoría
-            </Text>
-          </View>
-        ) : (
-          leadGroups.map((lead) => (
-            <LeadMatchCard
-              key={lead.leadId}
-              leadName={lead.leadName}
-              leadPhone={lead.leadPhone}
-              minPrice={lead.minPrice}
-              maxPrice={lead.maxPrice}
-              currency={lead.currency}
-              matchCount={lead.matchCount}
-              similarCount={lead.similarCount}
-              onPress={() => setSelectedLeadId(lead.leadId)}
-            />
-          ))
-        )}
-      </ScrollView>
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons
+                name="search-outline"
+                size={64}
+                color={COLORS.cardBorder}
+              />
+              <Text style={styles.emptyText}>
+                No hay matches en esta categoría
+              </Text>
+            </View>
+          )
+        }
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
+        windowSize={5}
+        removeClippedSubviews={true}
+      />
 
       {/* Modal de todas las propiedades del lead */}
       {selectedLead && (

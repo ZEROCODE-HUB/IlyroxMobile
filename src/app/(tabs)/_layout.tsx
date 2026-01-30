@@ -62,7 +62,6 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
                 size={24}
                 color={isFocused ? COLORS.primary : COLORS.textTertiary}
               />
-              {/* Optional: Add labels if desired, BottomTabNavigator had them */}
             </TouchableOpacity>
           );
         })}

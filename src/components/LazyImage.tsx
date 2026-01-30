@@ -1,22 +1,21 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
-  Image,
   StyleSheet,
   ActivityIndicator,
   ImageStyle,
   StyleProp,
   FlatList,
   Dimensions,
-  Text,
 } from "react-native";
+import { Image, ImageContentFit } from "expo-image";
 import { COLORS } from "../constants/colors";
 
 interface LazyImageProps {
-  source: { uri: string };
+  source: { uri: string } | { uri: string }[];
   style?: StyleProp<ImageStyle>;
   borderRadius?: number;
-  resizeMode?: "cover" | "contain" | "stretch" | "repeat" | "center";
+  resizeMode?: ImageContentFit;
 }
 
 const LazyImage: React.FC<LazyImageProps> = ({
@@ -27,8 +26,6 @@ const LazyImage: React.FC<LazyImageProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  // Removed artificial delay for immediate responsiveness
-  const [shouldLoad, setShouldLoad] = useState(true);
   const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
   const isArray = Array.isArray(source);
@@ -47,14 +44,6 @@ const LazyImage: React.FC<LazyImageProps> = ({
     setHasError(true);
   };
 
-  if (!shouldLoad) {
-    return (
-      <View style={[styles.placeholder, style, { borderRadius }]}>
-        <View style={styles.skeletonShimmer} />
-      </View>
-    );
-  }
-
   return (
     <View style={[style, { borderRadius, overflow: "hidden" }]}>
       {isLoading && (
@@ -70,15 +59,17 @@ const LazyImage: React.FC<LazyImageProps> = ({
         <>
           {isArray ? (
             <FlatList
-              data={source}
+              data={source as { uri: string }[]}
               renderItem={({ item }) => (
                 <Image
                   source={item}
                   style={[style, { borderRadius }]}
                   onLoadStart={handleLoadStart}
-                  onLoadEnd={handleLoadEnd}
+                  onLoad={handleLoadEnd}
                   onError={handleError}
-                  resizeMode={resizeMode}
+                  contentFit={resizeMode}
+                  cachePolicy="memory-disk"
+                  transition={200}
                 />
               )}
               horizontal={true}
@@ -87,22 +78,20 @@ const LazyImage: React.FC<LazyImageProps> = ({
               snapToInterval={SCREEN_WIDTH}
               snapToAlignment="center"
               decelerationRate={0}
-              onMomentumScrollEnd={(e) => {
-                const index = Math.round(
-                  e.nativeEvent.contentOffset.x / SCREEN_WIDTH,
-                );
-                handleLoadStart();
-                handleLoadEnd();
+              onMomentumScrollEnd={() => {
+                // Simplified for array handling in legacy mode
               }}
             />
           ) : (
             <Image
-              source={source}
+              source={source as { uri: string }}
               style={[style, { borderRadius }]}
               onLoadStart={handleLoadStart}
-              onLoadEnd={handleLoadEnd}
+              onLoad={handleLoadEnd}
               onError={handleError}
-              resizeMode={resizeMode}
+              contentFit={resizeMode}
+              cachePolicy="memory-disk"
+              transition={200}
             />
           )}
         </>
@@ -111,37 +100,18 @@ const LazyImage: React.FC<LazyImageProps> = ({
   );
 };
 
-/* 
-<Image
-          source={source}
-          style={[style, { borderRadius }]}
-          onLoadStart={handleLoadStart}
-          onLoadEnd={handleLoadEnd}
-          onError={handleError}
-          resizeMode={resizeMode}
-        />
-*/
-
 const styles = StyleSheet.create({
-  placeholder: {
-    backgroundColor: COLORS.background,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  skeletonShimmer: {
-    flex: 1,
-    backgroundColor: COLORS.shimmer,
-    opacity: 0.5,
-  },
   loadingContainer: {
     backgroundColor: COLORS.background,
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 1,
   },
   errorContainer: {
     backgroundColor: COLORS.errorLight,
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 1,
   },
   errorPlaceholder: {
     width: "100%",
