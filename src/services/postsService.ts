@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { Post } from "@/types";
+import * as Burnt from "burnt";
 
 export const postsService = {
   async postsByUser(targetUserId: string) {
@@ -50,7 +51,10 @@ export const postsService = {
 
     if (error) throw error;
 
-    return alert("Post eliminado correctamente");
+    return Burnt.toast({
+      title: "Post eliminado correctamente",
+      preset: "done",
+    });
   },
 
   async getPostById(postId: string) {

@@ -1,6 +1,6 @@
 // hooks/index.ts - Export all custom hooks
 
-export { useFeed } from "./useFeed";
+export { useFeed, useFeedItem } from "./useFeed";
 export { useLikes } from "./useLikes";
 export { useComments } from "./useComments";
 export { useShare } from "./useShare";

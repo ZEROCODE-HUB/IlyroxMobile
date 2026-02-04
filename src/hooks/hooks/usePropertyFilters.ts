@@ -65,31 +65,12 @@ export const usePropertyFilters = (
     const filtered = properties.filter((p, index) => {
       const anyP = p as any;
 
-      // Log de cada propiedad
-      if (index < 3) {
-        console.log(`\nPropiedad ${index + 1}:`, {
-          id: p.id,
-          title: p.title,
-          type: p.type,
-          ciudad: anyP.ciudad,
-          municipio: anyP.municipio,
-          price: p.price,
-          operacion: anyP.operacion,
-          operation: anyP.operation,
-          operaciones: anyP.operaciones,
-        });
-      }
-
       // Validar status/estado de forma robusta
       const rawStatus = (p as any).status || (p as any).estado;
       if (rawStatus) {
         const s = String(rawStatus).toLowerCase().trim();
         // Excluir si es vendida o suspendida (o cualquier cosa que no sea publicada/disponible)
         if (s === "Vendida" || s === "Suspendida" || s === "Baja") {
-          if (index < 3)
-            console.log(
-              `  ❌ Rechazada por status no disponible: ${rawStatus}`,
-            );
           return false;
         }
         // Opcional: Ser estricto y solo permitir "publicada" / "disponible"
@@ -111,11 +92,6 @@ export const usePropertyFilters = (
           lng >= geofenceBounds.minLng &&
           lng <= geofenceBounds.maxLng;
         if (!valid) {
-          if (index < 3)
-            console.log(
-              `  ❌ Fuera de geocerca: (${lat}, ${lng}) no dentro de`,
-              geofenceBounds,
-            );
           return false;
         }
       }
@@ -137,14 +113,8 @@ export const usePropertyFilters = (
           pOperacion &&
           pOperacion.toLowerCase() !== filters.operacion.toLowerCase()
         ) {
-          if (index < 3)
-            console.log(
-              `  ❌ Rechazada por operación: ${pOperacion} !== ${filters.operacion}`,
-            );
           return false;
         } else if (!pOperacion) {
-          if (index < 3)
-            console.log(`  ℹ️ Propiedad sin campo operación definido`);
           // No rechazar, permitir pasar
         }
       }
@@ -160,10 +130,6 @@ export const usePropertyFilters = (
           .trim()
           .toLowerCase();
         if (pEstado !== fEstado) {
-          if (index < 3)
-            console.log(
-              `  ❌ Rechazada por estado: ${pEstado} !== ${filters.locationFilter.estado}`,
-            );
           return false;
         }
       }
@@ -179,10 +145,6 @@ export const usePropertyFilters = (
           .trim()
           .toLowerCase();
         if (pCiudad !== fCiudad) {
-          if (index < 3)
-            console.log(
-              `  ❌ Rechazada por ciudad: ${pCiudad} !== ${filters.locationFilter.ciudad}`,
-            );
           return false;
         }
       }
@@ -197,10 +159,6 @@ export const usePropertyFilters = (
         pMunicipio !==
           filters.locationFilter.municipio.toString().trim().toLowerCase()
       ) {
-        if (index < 3)
-          console.log(
-            `  ❌ Rechazada por municipio: ${pMunicipio} !== ${filters.locationFilter.municipio}`,
-          );
         return false;
       }
 
@@ -215,27 +173,15 @@ export const usePropertyFilters = (
           .trim()
           .toLowerCase();
         if (pColonia !== fColonia) {
-          if (index < 3)
-            console.log(
-              `  ❌ Rechazada por colonia: ${pColonia} !== ${filters.locationFilter.colonia}`,
-            );
           return false;
         }
       }
 
       if (filters.tipoPropiedad && p.type !== filters.tipoPropiedad) {
-        if (index < 3)
-          console.log(
-            `  ❌ Rechazada por tipo: ${p.type} !== ${filters.tipoPropiedad}`,
-          );
         return false;
       }
 
       if (filters.subtipo && anyP.subtipo !== filters.subtipo) {
-        if (index < 3)
-          console.log(
-            `  ❌ Rechazada por subtipo: ${anyP.subtipo} !== ${filters.subtipo}`,
-          );
         return false;
       }
 
@@ -257,10 +203,6 @@ export const usePropertyFilters = (
       const maxP = parseFloat(filters.precioMax) || Infinity;
 
       if (finalPrice < minP || finalPrice > maxP) {
-        if (index < 3)
-          console.log(
-            `  ❌ Rechazada por precio: ${finalPrice} no está entre ${minP} y ${maxP}`,
-          );
         return false;
       }
 

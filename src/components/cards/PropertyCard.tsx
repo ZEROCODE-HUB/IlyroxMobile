@@ -262,7 +262,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         )}
 
         <View style={styles.statItem}>
-          <Ionicons name="cube-outline" size={14} color={COLORS.textTertiary} />
+          <Ionicons name="home-outline" size={14} color={COLORS.textTertiary} />
           <Text style={styles.statValue}>
             {property.features.constructionSqft}m²
           </Text>

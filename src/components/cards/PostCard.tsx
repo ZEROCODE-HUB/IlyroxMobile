@@ -4,26 +4,25 @@
  */
 
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  ActivityIndicator,
-  FlatList,
-} from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { FeedItem, User } from "../../types";
 
 import { DIMENSIONS, COLORS } from "../../constants";
 import { commonStyles } from "../../../styles";
-import { UserHeader, ImageGallery, ReportModal, Avatar } from "../shared";
+import {
+  UserHeader,
+  ImageGallery,
+  ReportModal,
+  Avatar,
+  RichText,
+} from "../shared";
 import ActionButtons from "../ActionButtons";
 // import { supabase } from "../../lib/supabase"; // Removed direct usage
 
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
 import { useFeedInteractions, useViewTracking } from "@/hooks/hooks";
 import { useUserRecommendations } from "@/hooks/hooks/useUserRecommendations";
+import { SpecialPostCard } from "../Feed/SpecialPostCard";
 
 interface PostCardProps {
   item: FeedItem;
@@ -55,9 +54,16 @@ const PostCard: React.FC<PostCardProps> = ({
     userId: currentUserId,
     isVisible: true,
   });
+  const isSpecialPost = ["openhouse", "aniversario", "sold"].includes(
+    item.postType,
+  );
 
   const images = item.images || [];
   const hasImages = images.length > 0;
+  const isOpenHouse = item.postType === "openhouse";
+  const isAniversary = item.postType === "aniversario";
+  const isSold = item.postType === "sold";
+  const isSearchPost = item.postType === "busqueda";
   const isShortContent = item.content.length < 100;
   const positiveRecommendations = item.user.positiveRecommendations ?? 0;
   const recommendedByPreview = item.user.recommendedByPreview ?? [];
@@ -127,20 +133,28 @@ const PostCard: React.FC<PostCardProps> = ({
       )}
       {/* Imágenes o Contenido de Texto */}
       <View style={styles.contentContainer}>
-        {!hasImages ? (
+        {isSpecialPost ? (
+          <SpecialPostCard item={item} mode="preview" />
+        ) : !hasImages ? (
           <View
             style={[
               styles.textPostContainer,
               isShortContent && styles.textPostGradient,
+              isSearchPost && commonStyles.cardDetail,
             ]}
           >
-            <Text
-              style={
-                isShortContent ? styles.textPostLarge : styles.textPostNormal
-              }
-            >
-              {item.content}
-            </Text>
+            <RichText
+              style={[
+                isShortContent ? styles.textPostLarge : styles.textPostNormal,
+                isSearchPost && commonStyles.textDetail,
+                isOpenHouse && commonStyles.textDetail,
+                isAniversary && commonStyles.textDetail,
+                isSold && commonStyles.textDetail,
+              ]}
+              content={item.content}
+              iconSize={isSearchPost ? 18 : 16}
+              iconColor={isSearchPost ? COLORS.primaryDark : COLORS.textPrimary}
+            />
           </View>
         ) : (
           <ImageGallery
@@ -248,9 +262,10 @@ const styles = StyleSheet.create({
   },
   textPostNormal: {
     fontSize: 14,
-    color: COLORS.textSecondary,
+    color: COLORS.textPrimary,
     lineHeight: 22,
   },
+
   recommendedRow: {
     paddingHorizontal: 12,
     paddingVertical: 6,

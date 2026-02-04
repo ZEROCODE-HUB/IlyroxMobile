@@ -16,9 +16,11 @@ import { FeedItem, User } from "../../types";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import UserHeader from "../UserHeader";
 import ActionButtons from "../ActionButtons";
-import { ImageGallery } from "../shared";
+import { ImageGallery, RichText } from "../shared";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
 import { AppHeader } from "../AppHeader";
+import { commonStyles } from "styles";
+import { SpecialPostCard } from "./SpecialPostCard";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -40,7 +42,12 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
   const [showOptions, setShowOptions] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
 
+  const isSpecialPost = ["openhouse", "aniversario", "sold"].includes(
+    item.postType,
+  );
+
   const hasImages = images.length > 0;
+  const isSearchPost = item.postType === "busqueda";
   const isShortContent = item.content.length < 100;
 
   // Ref para el estado de comentarios (para el PanResponder)
@@ -90,40 +97,151 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
   ).current;
 
   return (
-    <ScreenWrapper withHeader={false}>
-      <Animated.View
-        style={[styles.container, { transform: [{ translateY: panY }] }]}
-        {...(!showComments ? panResponder.panHandlers : {})}
-      >
-        <AppHeader
-          title={item.type === "property" ? "Propiedad" : "Publicación"}
-          showBackButton={true}
-          onBack={onClose}
+    <ScreenWrapper withHeader={false} style={styles.container}>
+      <AppHeader
+        title={item.type === "property" ? "Propiedad" : "Publicación"}
+        showBackButton={true}
+        onBack={onClose}
+      />
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <UserHeader
+          user={item.user}
+          timestamp={item.timestamp}
+          onUserClick={onUserClick}
+          showOptions={showOptions}
+          setShowOptions={setShowOptions}
+          onReport={() => setShowReportModal(true)}
         />
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <UserHeader
-            user={item.user}
-            timestamp={item.timestamp}
-            onUserClick={onUserClick}
-            showOptions={showOptions}
-            setShowOptions={setShowOptions}
-            onReport={() => setShowReportModal(true)}
+        {/* Galería de imágenes - AHORA RESPONSIVA */}
+        {images.length > 0 && !isSpecialPost && (
+          <ImageGallery
+            images={images}
+            aspectRatio={1}
+            showDots={true}
+            showImageCount={false}
           />
+        )}
 
-          {/* Galería de imágenes - AHORA RESPONSIVA */}
-          {images.length > 0 && (
-            <ImageGallery
-              images={images}
-              aspectRatio={1}
-              showDots={true}
-              showImageCount={false}
+        {/* Botones de acción - Estilo Instagram */}
+        {images.length > 0 && !isSpecialPost && (
+          <View style={styles.actionsContainer}>
+            <ActionButtons
+              feedItemId={item.id}
+              feedItemType={item.type}
+              initialLikes={item.likes}
+              comments={item.comments}
+              userId={currentUserId}
+              onCommentClick={() => setShowComments(true)}
+              shareTitle={
+                item.propertyDetails?.title ||
+                `Post de ${item.user.nombre || item.user.name}`
+              }
+              shareDescription={item.content.substring(0, 100)}
+              shareImageUrl={images[0]}
+              showContactButton={false}
+              orientation="horizontal"
+              authorId={item.user.id}
             />
+          </View>
+        )}
+
+        {/* Área de contenido principal */}
+        {isSpecialPost ? (
+          <View style={styles.specialCardWrapper}>
+            <SpecialPostCard item={item} mode="detail" />
+          </View>
+        ) : null}
+
+        <View style={styles.body}>
+          {/* Detalles de propiedad */}
+          {item.propertyDetails && (
+            <View style={styles.propertyCard}>
+              <Text style={styles.price}>
+                ${item.propertyDetails.price.toLocaleString()}
+                {item.propertyDetails.currency}
+              </Text>
+              <Text style={styles.propertyTitle}>
+                {item.propertyDetails.title}
+              </Text>
+              <View style={styles.locationContainer}>
+                <Ionicons name="location" size={14} color={COLORS.primary} />
+                <Text style={styles.locationAddress}>
+                  {item.propertyDetails.location.address}
+                </Text>
+              </View>
+
+              {/* Stats de la propiedad */}
+              <View style={styles.statsGrid}>
+                <View style={styles.statBox}>
+                  <Text style={styles.statValue}>
+                    {item.propertyDetails.features.beds}
+                  </Text>
+                  <Text style={styles.statLabel}>Recámaras</Text>
+                </View>
+                <View style={styles.statBox}>
+                  <Text style={styles.statValue}>
+                    {item.propertyDetails.features.baths}
+                  </Text>
+                  <Text style={styles.statLabel}>Baños</Text>
+                </View>
+                <View style={styles.statBox}>
+                  <Text style={styles.statValue}>
+                    {item.propertyDetails.features.constructionSqft}
+                  </Text>
+                  <Text style={styles.statLabel}>m²</Text>
+                </View>
+              </View>
+            </View>
           )}
 
-          {/* Botones de acción - Estilo Instagram */}
-          {images.length > 0 && (
-            <View style={styles.actionsContainer}>
+          {/* Contenido del post (si no es especial) */}
+          {!isSpecialPost &&
+            (!hasImages && !item.propertyDetails ? (
+              <View
+                style={[
+                  styles.textPostContainer,
+                  isShortContent && styles.textPostGradient,
+                  isSearchPost && commonStyles.cardDetail,
+                ]}
+              >
+                <RichText
+                  style={[
+                    isShortContent
+                      ? styles.textPostLarge
+                      : styles.textPostNormal,
+                    isSearchPost && commonStyles.textDetail,
+                  ]}
+                  content={item.content}
+                  iconSize={isSearchPost ? 18 : 16}
+                  iconColor={
+                    isSearchPost ? COLORS.primaryDark : COLORS.textPrimary
+                  }
+                />
+              </View>
+            ) : (
+              <RichText style={styles.content} content={item.content} />
+            ))}
+
+          {/* Amenidades */}
+          {item.propertyDetails?.amenities &&
+            item.propertyDetails.amenities.length > 0 && (
+              <View style={styles.amenitiesSection}>
+                <Text style={styles.sectionTitle}>Amenidades</Text>
+                <View style={styles.amenitiesContainer}>
+                  {item.propertyDetails.amenities.map((amenity) => (
+                    <View key={amenity} style={styles.amenityChip}>
+                      <Text style={styles.amenityText}>{amenity}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+          {/* BOTONES DE ACCIÓN - (Para todos los casos excepto cuando ya se mostraron arriba) */}
+          {(!hasImages || isSpecialPost) && (
+            <View style={styles.actionButtonsContainer}>
               <ActionButtons
                 feedItemId={item.id}
                 feedItemType={item.type}
@@ -131,126 +249,23 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
                 comments={item.comments}
                 userId={currentUserId}
                 onCommentClick={() => setShowComments(true)}
-                shareTitle={
-                  item.propertyDetails?.title ||
-                  `Post de ${item.user.nombre || item.user.name}`
-                }
+                shareTitle={`Post de ${item.user.nombre || item.user.name}`}
                 shareDescription={item.content.substring(0, 100)}
-                shareImageUrl={images[0]}
                 showContactButton={false}
-                orientation="horizontal"
                 authorId={item.user.id}
               />
             </View>
           )}
+        </View>
+      </ScrollView>
 
-          <View style={styles.body}>
-            {/* Detalles de propiedad */}
-            {item.propertyDetails && (
-              <View style={styles.propertyCard}>
-                <Text style={styles.price}>
-                  ${item.propertyDetails.price.toLocaleString()}
-                  {item.propertyDetails.currency}
-                </Text>
-                <Text style={styles.propertyTitle}>
-                  {item.propertyDetails.title}
-                </Text>
-                <View style={styles.locationContainer}>
-                  <Ionicons name="location" size={14} color={COLORS.primary} />
-                  <Text style={styles.locationAddress}>
-                    {item.propertyDetails.location.address}
-                  </Text>
-                </View>
-
-                {/* Stats de la propiedad */}
-                <View style={styles.statsGrid}>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statValue}>
-                      {item.propertyDetails.features.beds}
-                    </Text>
-                    <Text style={styles.statLabel}>Recámaras</Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statValue}>
-                      {item.propertyDetails.features.baths}
-                    </Text>
-                    <Text style={styles.statLabel}>Baños</Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statValue}>
-                      {item.propertyDetails.features.constructionSqft}
-                    </Text>
-                    <Text style={styles.statLabel}>m²</Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* Contenido del post */}
-            {!hasImages && !item.propertyDetails ? (
-              <View
-                style={[
-                  styles.textPostContainer,
-                  isShortContent && styles.textPostGradient,
-                ]}
-              >
-                <Text
-                  style={
-                    isShortContent
-                      ? styles.textPostLarge
-                      : styles.textPostNormal
-                  }
-                >
-                  {item.content}
-                </Text>
-              </View>
-            ) : (
-              <Text style={styles.content}>{item.content}</Text>
-            )}
-
-            {/* Amenidades */}
-            {item.propertyDetails?.amenities &&
-              item.propertyDetails.amenities.length > 0 && (
-                <View style={styles.amenitiesSection}>
-                  <Text style={styles.sectionTitle}>Amenidades</Text>
-                  <View style={styles.amenitiesContainer}>
-                    {item.propertyDetails.amenities.map((amenity) => (
-                      <View key={amenity} style={styles.amenityChip}>
-                        <Text style={styles.amenityText}>{amenity}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-            {/* BOTONES DE ACCIÓN - (Solo para posts sin imágenes) */}
-            {!hasImages && (
-              <View style={styles.actionButtonsContainer}>
-                <ActionButtons
-                  feedItemId={item.id}
-                  feedItemType={item.type}
-                  initialLikes={item.likes}
-                  comments={item.comments}
-                  userId={currentUserId}
-                  onCommentClick={() => setShowComments(true)}
-                  shareTitle={`Post de ${item.user.nombre || item.user.name}`}
-                  shareDescription={item.content.substring(0, 100)}
-                  showContactButton={false}
-                  authorId={item.user.id}
-                />
-              </View>
-            )}
-          </View>
-        </ScrollView>
-
-        {/* Modal de comentarios */}
-        <CommentsBottomSheet
-          visible={showComments}
-          onClose={() => setShowComments(false)}
-          feedItemId={item.id}
-          currentUserId={currentUserId}
-        />
-      </Animated.View>
+      {/* Modal de comentarios */}
+      <CommentsBottomSheet
+        visible={showComments}
+        onClose={() => setShowComments(false)}
+        feedItemId={item.id}
+        currentUserId={currentUserId}
+      />
     </ScreenWrapper>
   );
 };
@@ -267,7 +282,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
-    marginTop: 20,
   },
   backButton: {
     padding: 4,
@@ -358,7 +372,6 @@ const styles = StyleSheet.create({
   textPostContainer: {
     paddingVertical: 16,
     minHeight: 100,
-    justifyContent: "center",
   },
   textPostGradient: {
     backgroundColor: COLORS.gradientBackground,
@@ -416,6 +429,10 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: COLORS.white,
     paddingVertical: 4,
+  },
+  specialCardWrapper: {
+    width: "100%",
+    backgroundColor: COLORS.white,
   },
 });
 

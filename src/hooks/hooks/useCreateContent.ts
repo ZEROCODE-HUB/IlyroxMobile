@@ -22,7 +22,11 @@ export function useCreateContent(userId?: string) {
   /**
    * Crear POST
    */
-  const createPost = async (content: string, images: string[]) => {
+  const createPost = async (
+    content: string,
+    images: string[],
+    type: "post" | "busqueda" | "openhouse" | "aniversario" | "sold" = "post",
+  ) => {
     if (!userId) {
       Alert.alert("Error", "Debes iniciar sesión");
       return false;
@@ -40,6 +44,7 @@ export function useCreateContent(userId?: string) {
         .insert({
           publicado_por: userId,
           contenido: content,
+          tipo: type, // Agregado tipo
           imagenes: uploadedUrls.length > 0 ? uploadedUrls : null,
         })
         .select()

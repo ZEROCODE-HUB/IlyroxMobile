@@ -435,11 +435,19 @@ export function useFeed(options: UseFeedOptions = {}) {
                 type: "post" as const,
                 user,
                 content: post.contenido || "",
+                postType: post.tipo?.toLowerCase().trim() ?? "post",
                 images: post.imagenes || [],
                 likes: item.likes_count,
                 comments: item.comentarios_count,
                 timestamp: formatTimestamp(item.publicado_en),
                 commentsList: [],
+                foto_perfil: post.foto_perfil,
+                fecha_hora: post.fecha_hora,
+                nombre_asesor: post.nombre_asesor,
+                ubicacion: post.ubicacion,
+                foto_propiedad: post.foto_propiedad,
+                antiguedad: post.antiguedad,
+                status: post.status,
               };
             }
 
@@ -631,4 +639,192 @@ function formatTimestamp(timestamp: string): string {
     day: "numeric",
     month: "short",
   });
+}
+
+export function useFeedItem(feedItemId: string) {
+  const [item, setItem] = useState<FeedItem | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchItem = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data: feedData, error: feedError } = await supabase
+        .from("feed_items")
+        .select(
+          `
+          id,
+          tipo_contenido,
+          contenido_id,
+          publicado_por,
+          publicado_en,
+          engagement_score,
+          vistas_count,
+          likes_count,
+          comentarios_count,
+          estado_moderacion,
+          perfiles!feed_items_publicado_por_fkey (
+            id,
+            nombre,
+            foto,
+            rol
+          )
+        `,
+        )
+        .eq("id", feedItemId)
+        .single();
+
+      if (feedError) throw feedError;
+      if (!feedData) return;
+
+      const { tipo_contenido, contenido_id } = feedData;
+
+      let contentData: any = null;
+      if (tipo_contenido === "post") {
+        const { data } = await supabase
+          .from("posts")
+          .select("*")
+          .eq("id", contenido_id)
+          .single();
+        contentData = data;
+      } else if (tipo_contenido === "reel") {
+        const { data } = await supabase
+          .from("reels")
+          .select("*")
+          .eq("id", contenido_id)
+          .single();
+        contentData = data;
+      } else if (tipo_contenido === "propiedad") {
+        const { data } = await supabase
+          .from("propiedades")
+          .select(
+            `
+            id,
+            created_at,
+            created_by,
+            codigo_propiedad,
+            tipo,
+            subtipo,
+            ciudad,
+            municipio,
+            fotos,
+            habitaciones,
+            banos,
+            estacionamientos,
+            metros_cuadrados_construccion,
+            metros_cuadrados_terreno,
+            descripcion,
+            operaciones_propiedad!inner (
+              tipo_operacion,
+              precio,
+              moneda
+            )
+          `,
+          )
+          .eq("id", contenido_id)
+          .single();
+        contentData = data;
+      }
+
+      const perfil = feedData.perfiles as any;
+      const user: User = {
+        id: perfil?.id || "",
+        nombre: perfil?.nombre || "Usuario",
+        name: perfil?.nombre || "Usuario",
+        avatar: perfil?.foto || "https://placehold.co/100x100",
+        isFollowing: false,
+        role: (perfil?.rol === "agente" ? "Agent" : "User") as any,
+      };
+
+      let feedItem: FeedItem | null = null;
+      if (tipo_contenido === "post" && contentData) {
+        feedItem = {
+          id: feedData.id,
+          type: "post",
+          user,
+          content: contentData.contenido || "",
+          postType: contentData.tipo?.toLowerCase().trim() ?? "post",
+          images: contentData.imagenes || [],
+          likes: feedData.likes_count,
+          comments: feedData.comentarios_count,
+          timestamp: formatTimestamp(feedData.publicado_en),
+          foto_perfil: contentData.foto_perfil,
+          fecha_hora: contentData.fecha_hora,
+          nombre_asesor: contentData.nombre_asesor,
+          ubicacion: contentData.ubicacion,
+          foto_propiedad: contentData.foto_propiedad,
+          antiguedad: contentData.antiguedad,
+          status: contentData.status,
+        };
+      } else if (tipo_contenido === "reel" && contentData) {
+        feedItem = {
+          id: feedData.id,
+          type: "reel",
+          user,
+          content: contentData.descripcion || "",
+          videoUrl: contentData.video_url,
+          likes: feedData.likes_count,
+          comments: feedData.comentarios_count,
+          timestamp: formatTimestamp(feedData.publicado_en),
+        };
+      } else if (tipo_contenido === "propiedad" && contentData) {
+        const operation = Array.isArray(contentData.operaciones_propiedad)
+          ? contentData.operaciones_propiedad[0]
+          : contentData.operaciones_propiedad;
+
+        feedItem = {
+          id: feedData.id,
+          type: "property",
+          user,
+          content: contentData.descripcion || "",
+          likes: feedData.likes_count,
+          comments: feedData.comentarios_count,
+          timestamp: formatTimestamp(feedData.publicado_en),
+          propertyDetails: {
+            id: contentData.id,
+            creado_por: contentData.created_by,
+            code: contentData.codigo_propiedad || undefined,
+            title: `${contentData.tipo} en ${contentData.ciudad}`,
+            description: contentData.descripcion,
+            price: operation?.precio || 0,
+            currency: (operation?.moneda || "MXN") as "USD" | "MXN",
+            createdAt: contentData.created_at,
+            location: {
+              address: `${contentData.municipio}, ${contentData.ciudad}`,
+              country: "México",
+              state: contentData.ciudad || "",
+              city: contentData.municipio || "",
+              colony: "",
+            },
+            images: contentData.fotos || [],
+            features: {
+              beds: contentData.habitaciones || 0,
+              baths: contentData.banos || 0,
+              parking: contentData.estacionamientos,
+              constructionSqft: contentData.metros_cuadrados_construccion || 0,
+              landSqft: contentData.metros_cuadrados_terreno || 0,
+            },
+            amenities: [],
+            type: "habitacional",
+            subtype: contentData.subtipo || contentData.tipo,
+            operation:
+              operation?.tipo_operacion === "venta" ? "Publicada" : "Rentada",
+            status: "Publicada",
+          } as any,
+        };
+      }
+
+      setItem(feedItem);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [feedItemId]);
+
+  useEffect(() => {
+    if (feedItemId) fetchItem();
+  }, [feedItemId, fetchItem]);
+
+  return { item, loading, error };
 }

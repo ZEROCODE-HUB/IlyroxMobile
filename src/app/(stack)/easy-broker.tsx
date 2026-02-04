@@ -19,6 +19,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -309,7 +311,7 @@ const EasyBrokerSettingsScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <ScreenWrapper withHeader={false} style={styles.container}>
         <AppHeader
           title="EasyBroker"
           showBackButton
@@ -318,7 +320,7 @@ const EasyBrokerSettingsScreen: React.FC = () => {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
-      </View>
+      </ScreenWrapper>
     );
   }
 
@@ -332,110 +334,121 @@ const EasyBrokerSettingsScreen: React.FC = () => {
           onBack={() => navigation.goBack()}
         />
 
-        <ScrollView contentContainerStyle={styles.onboardingContainer}>
-          <View style={styles.onboardingContent}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="cloud-upload" size={48} color={COLORS.primary} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <ScrollView contentContainerStyle={styles.onboardingContainer}>
+            <View style={styles.onboardingContent}>
+              <View style={styles.iconCircle}>
+                <Ionicons
+                  name="cloud-upload"
+                  size={48}
+                  color={COLORS.primary}
+                />
+              </View>
+
+              <Text style={styles.onboardingTitle}>
+                Sincroniza tus propiedades
+              </Text>
+
+              <Text style={styles.onboardingSubtitle}>
+                Conecta tu cuenta de EasyBroker para importar automáticamente
+                todas tus propiedades publicadas
+              </Text>
+
+              <View style={styles.benefitsList}>
+                <View style={styles.benefitItem}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={24}
+                    color={COLORS.success}
+                  />
+                  <Text style={styles.benefitText}>
+                    Sincronización automática
+                  </Text>
+                </View>
+                <View style={styles.benefitItem}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={24}
+                    color={COLORS.success}
+                  />
+                  <Text style={styles.benefitText}>
+                    Actualización en tiempo real
+                  </Text>
+                </View>
+                <View style={styles.benefitItem}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={24}
+                    color={COLORS.success}
+                  />
+                  <Text style={styles.benefitText}>100% seguro</Text>
+                </View>
+              </View>
             </View>
 
-            <Text style={styles.onboardingTitle}>
-              Sincroniza tus propiedades
-            </Text>
+            <View style={styles.onboardingForm}>
+              <Text style={styles.inputLabel}>API Key de EasyBroker</Text>
 
-            <Text style={styles.onboardingSubtitle}>
-              Conecta tu cuenta de EasyBroker para importar automáticamente
-              todas tus propiedades publicadas
-            </Text>
-
-            <View style={styles.benefitsList}>
-              <View style={styles.benefitItem}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={24}
-                  color={COLORS.success}
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Pega tu API Key aquí"
+                  value={apiKey}
+                  onChangeText={setApiKey}
+                  secureTextEntry={!showApiKey}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholderTextColor={COLORS.textTertiary}
                 />
-                <Text style={styles.benefitText}>
-                  Sincronización automática
-                </Text>
+                <TouchableOpacity
+                  style={styles.inputIcon}
+                  onPress={() => setShowApiKey(!showApiKey)}
+                >
+                  <Ionicons
+                    name={showApiKey ? "eye-off" : "eye"}
+                    size={22}
+                    color={COLORS.textSecondary}
+                  />
+                </TouchableOpacity>
               </View>
-              <View style={styles.benefitItem}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={24}
-                  color={COLORS.success}
-                />
-                <Text style={styles.benefitText}>
-                  Actualización en tiempo real
-                </Text>
-              </View>
-              <View style={styles.benefitItem}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={24}
-                  color={COLORS.success}
-                />
-                <Text style={styles.benefitText}>100% seguro</Text>
-              </View>
-            </View>
-          </View>
 
-          <View style={styles.onboardingForm}>
-            <Text style={styles.inputLabel}>API Key de EasyBroker</Text>
-
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                placeholder="Pega tu API Key aquí"
-                value={apiKey}
-                onChangeText={setApiKey}
-                secureTextEntry={!showApiKey}
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholderTextColor={COLORS.textTertiary}
-              />
               <TouchableOpacity
-                style={styles.inputIcon}
-                onPress={() => setShowApiKey(!showApiKey)}
+                style={styles.primaryButton}
+                onPress={handleSaveAndSync}
+                disabled={loading}
               >
+                {loading ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <>
+                    <Text style={styles.primaryButtonText}>
+                      Conectar y Sincronizar
+                    </Text>
+                    <Ionicons
+                      name="arrow-forward"
+                      size={20}
+                      color={COLORS.white}
+                    />
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.helpButton}>
                 <Ionicons
-                  name={showApiKey ? "eye-off" : "eye"}
-                  size={22}
-                  color={COLORS.textSecondary}
+                  name="help-circle-outline"
+                  size={18}
+                  color={COLORS.primary}
                 />
+                <Text style={styles.helpText}>
+                  ¿Dónde encuentro mi API Key?
+                </Text>
               </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={handleSaveAndSync}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <>
-                  <Text style={styles.primaryButtonText}>
-                    Conectar y Sincronizar
-                  </Text>
-                  <Ionicons
-                    name="arrow-forward"
-                    size={20}
-                    color={COLORS.white}
-                  />
-                </>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.helpButton}>
-              <Ionicons
-                name="help-circle-outline"
-                size={18}
-                color={COLORS.primary}
-              />
-              <Text style={styles.helpText}>¿Dónde encuentro mi API Key?</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </ScreenWrapper>
     );
   }

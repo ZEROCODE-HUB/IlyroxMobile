@@ -85,15 +85,22 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
     const hasImages = item.imagenes && item.imagenes.length > 0;
     const hasMultipleImages = item.imagenes && item.imagenes.length > 1;
 
+    const isStandardPost =
+      (item.tipo || "post").toLowerCase().replace(/\s+/g, "") === "post";
+
     const menuOptions: MenuOption[] = [
-      {
-        icon: "pencil-outline",
-        label: "Editar",
-        onPress: () => {
-          setPostToEdit(item);
-          setShowPostModal(true);
-        },
-      },
+      ...(isStandardPost
+        ? [
+            {
+              icon: "pencil-outline",
+              label: "Editar",
+              onPress: () => {
+                setPostToEdit(item);
+                setShowPostModal(true);
+              },
+            } as MenuOption,
+          ]
+        : []),
       {
         icon: "trash-outline",
         label: "Eliminar",

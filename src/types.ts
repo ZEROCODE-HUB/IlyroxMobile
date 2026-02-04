@@ -7,6 +7,38 @@ export type Post = {
   updated_at: string;
   deleted_at: string | null;
   status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
+  tipo?: "post" | "busqueda" | "openhouse" | "aniversario" | "sold";
+  foto_perfil?: string;
+  fecha_hora?: string;
+  nombre_asesor?: string;
+  ubicacion?: string;
+  foto_propiedad?: string;
+  antiguedad?: number;
+};
+
+export type FeedItem = {
+  id: string;
+  type: "post" | "reel" | "property";
+  user: User;
+  content: string;
+  images?: string[];
+  videoUrl?: string;
+  propertyDetails?: Property;
+  postDetails?: Post;
+  reelDetails?: Reel;
+  likes: number;
+  comments: number;
+  commentsList?: Comment[];
+  timestamp: string;
+  status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
+  codigo_propiedad?: string;
+  postType?: "post" | "busqueda" | "openhouse" | "aniversario" | "sold";
+  foto_perfil?: string;
+  fecha_hora?: string;
+  nombre_asesor?: string;
+  ubicacion?: string;
+  foto_propiedad?: string;
+  antiguedad?: number;
 };
 
 export type Reel = {
@@ -118,22 +150,6 @@ export type Comment = {
   timestamp: string;
   imageUrl?: string;
   parentId?: string;
-};
-
-export type FeedItem = {
-  id: string;
-  type: "post" | "reel" | "property";
-  user: User;
-  content: string;
-  images?: string[];
-  videoUrl?: string;
-  propertyDetails?: Property;
-  likes: number;
-  comments: number;
-  commentsList?: Comment[];
-  timestamp: string;
-  status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
-  codigo_propiedad?: string;
 };
 
 export type Lead = {

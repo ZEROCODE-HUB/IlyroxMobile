@@ -59,7 +59,6 @@ import FeedDetail from "../Feed/FeedDetail";
 import CreateProperty from "../CreateContent/CreateProperty";
 import CreatePost from "../CreateContent/CreatePost";
 import CreateReel from "../CreateContent/CreateReel";
-import { ThumbsUp } from "lucide-react-native";
 import AnimatedLike from "../../design-system/components/AnimatedLike";
 import { useChatInitiator } from "@/hooks/hooks/messaging/useChatInitiator";
 import { router } from "expo-router";
@@ -163,12 +162,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   useFocusEffect(
     useCallback(() => {
       setSelectedProperty(null);
-      // Small delay to ensure any DB updates are finished
-      const timer = setTimeout(() => {
-        fetchProfileData();
-      }, 300);
-      return () => clearTimeout(timer);
-    }, [fetchProfileData]),
+      // Removed auto-fetch to prevent refreshing every time we go back
+      // fetchProfileData();
+    }, []),
   );
 
   /**
@@ -245,11 +241,18 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       type: "post",
       user: profile ? mapProfileToUser(profile) : defaultUser,
       content: post.contenido || "",
+      postType: post.tipo?.toLowerCase().trim() || "post",
       images: post.imagenes || [],
       likes: post.likes_count || 0,
       comments: post.comentarios_count || 0,
       timestamp: post.created_at,
       status: post.status,
+      foto_perfil: post.foto_perfil,
+      fecha_hora: post.fecha_hora,
+      nombre_asesor: post.nombre_asesor,
+      ubicacion: post.ubicacion,
+      foto_propiedad: post.foto_propiedad,
+      antiguedad: post.antiguedad,
     };
   };
 
@@ -371,6 +374,18 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     properties: properties.length,
     posts: posts.length,
     reels: reels.length,
+  };
+
+  const handlePostPress = (post: Post) => {
+    const targetId = (post as any).feed_item_id || post.id;
+
+    navigation.push("(stack)", {
+      screen: "post/[id]",
+      params: {
+        id: targetId,
+        item: JSON.stringify(mapPostToFeedItem(post)),
+      },
+    });
   };
 
   const renderHeader = () => (
@@ -754,15 +769,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         return (
           <ProfilePostItem
             item={item}
-            onPress={(post) =>
-              router.push({
-                pathname: "/(stack)/post/[id]",
-                params: {
-                  id: post.id,
-                  item: JSON.stringify(mapPostToFeedItem(post)),
-                },
-              })
-            }
+            user={profile ? mapProfileToUser(profile) : undefined}
+            onPress={(post) => handlePostPress(post)}
             isOwnProfile={isMe}
             onEdit={(post) => {
               setEditPost(post);

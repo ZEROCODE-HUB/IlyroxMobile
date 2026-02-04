@@ -90,6 +90,7 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
     const [thumbUri, setThumbUri] = useState<string | null>(
       item.thumbnail_url || null,
     );
+    const [loading, setLoading] = useState(true);
 
     React.useEffect(() => {
       let isMounted = true;
@@ -97,6 +98,7 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
       const generateFallback = async () => {
         if (!item.thumbnail_url && item.video_url) {
           try {
+            setLoading(true);
             const { uri } = await VideoThumbnails.getThumbnailAsync(
               item.video_url,
               {
@@ -105,12 +107,14 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
               },
             );
             if (isMounted) setThumbUri(uri);
+            setLoading(false);
           } catch (e) {
             console.warn(
               "No se pudo generar miniatura para:",
               item.video_url,
               e,
             );
+            setLoading(false);
           }
         }
       };
@@ -123,15 +127,21 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
     }, [item.thumbnail_url, item.video_url]);
 
     return (
-      <Image
-        source={{
-          uri:
-            thumbUri ||
-            "https://placehold.co/400x600/45a0a5/white?text=Cargando...",
-        }}
-        style={styles.gridImage}
-        resizeMode="cover"
-      />
+      <>
+        {loading ? (
+          <ActivityIndicator size="small" color={COLORS.primary} />
+        ) : (
+          <Image
+            source={{
+              uri:
+                thumbUri ||
+                "https://placehold.co/400x600/45a0a5/white?text=Cargando",
+            }}
+            style={styles.gridImage}
+            resizeMode="cover"
+          />
+        )}
+      </>
     );
   };
 

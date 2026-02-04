@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useStableSafeInsets } from "../../context/SafeInsetsContext";
 import { router } from "expo-router";
+import { ScreenWrapper } from "@/screens/ScreenWrapper";
 
 interface MapSearchProps {
   properties: Property[];
@@ -87,7 +88,6 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         newLocationFilter.estado = selectedLocation.name;
       } else {
         // Por defecto, asumir que es ciudad
-        console.log("Tipo desconocido, asumiendo ciudad");
         newLocationFilter.ciudad = selectedLocation.name;
       }
 
@@ -229,7 +229,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <AppHeader
         title="Buscar Propiedades"
         showBackButton
@@ -291,7 +291,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         filteredPropertiesCount={filteredProperties.length}
         userId={user?.id}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -2,15 +2,17 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { COLORS } from "../../constants/colors";
+import Svg, { Circle, Line } from "react-native-svg";
 
 interface AvatarProps {
   uri?: string;
   name?: string;
   size?: number;
   style?: any;
+  isWithBorder?: boolean;
 }
 
-const Avatar: React.FC<AvatarProps> = ({
+export const Avatar: React.FC<AvatarProps> = ({
   uri,
   name = "U",
   size = 40,
@@ -58,10 +60,87 @@ const Avatar: React.FC<AvatarProps> = ({
   );
 };
 
+export const CircularImageWithRays = ({
+  uri,
+  imageSize = 180,
+  numberOfRays = 30,
+  rayLength = 30,
+  rayColor = "white",
+  rayWidth = 2,
+}: {
+  uri: string;
+  imageSize?: number;
+  numberOfRays?: number;
+  rayLength?: number;
+  rayColor?: string;
+  rayWidth?: number;
+}) => {
+  const containerSize = imageSize + rayLength * 2;
+  const center = containerSize / 2;
+  const innerRadius = imageSize / 2;
+  const outerRadius = innerRadius + rayLength;
+
+  const rays = Array.from({ length: numberOfRays }).map((_, index) => {
+    const angle = (index * 360) / numberOfRays;
+    const radian = (angle * Math.PI) / 180;
+
+    return {
+      x1: center + innerRadius * Math.cos(radian),
+      y1: center + innerRadius * Math.sin(radian),
+      x2: center + outerRadius * Math.cos(radian),
+      y2: center + outerRadius * Math.sin(radian),
+    };
+  });
+  return (
+    <View
+      style={[
+        styles.container,
+        { width: containerSize, height: containerSize },
+      ]}
+    >
+      <Svg height={containerSize} width={containerSize} style={styles.svg}>
+        {rays.map((ray, index) => (
+          <Line
+            key={index}
+            x1={ray.x1}
+            y1={ray.y1}
+            x2={ray.x2}
+            y2={ray.y2}
+            stroke={rayColor}
+            strokeWidth={rayWidth}
+          />
+        ))}
+      </Svg>
+      <Image
+        source={uri}
+        style={[
+          styles.image,
+          {
+            width: imageSize,
+            height: imageSize,
+            borderRadius: imageSize / 2,
+          },
+        ]}
+      />
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
   initials: {
     color: COLORS.white,
     fontWeight: "bold",
+  },
+  container: {
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  svg: {
+    position: "absolute",
+  },
+  image: {
+    position: "absolute",
   },
 });
 

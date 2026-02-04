@@ -21,33 +21,61 @@ export async function uploadImage(
     | "propiedades"
     | "comentarios"
     | "reels",
+  retries = 3,
 ): Promise<string> {
-  try {
-    const formData = new FormData();
+  let attempt = 0;
+  while (attempt < retries) {
+    try {
+      const formData = new FormData();
 
-    formData.append("image", {
-      uri,
-      type: "image/jpeg",
-      name: `image-${Date.now()}.jpg`,
-    } as any);
+      formData.append("image", {
+        uri,
+        type: "image/jpeg",
+        name: `image-${Date.now()}.jpg`,
+      } as any);
 
-    formData.append("folder", folder);
+      formData.append("folder", folder);
 
-    const response = await fetch(`${VIDEO_API_URL}/upload-image`, {
-      method: "POST",
-      body: formData,
-    });
+      const response = await fetch(`${VIDEO_API_URL}/upload-image`, {
+        method: "POST",
+        body: formData,
+      });
 
-    if (!response.ok) {
-      throw new Error(`Upload failed: ${response.status}`);
+      if (!response.ok) {
+        // Si es error 5xx, reintentamos
+        if (response.status >= 500 && attempt < retries - 1) {
+          console.warn(
+            `Upload failed with status ${response.status}. Retrying (${
+              attempt + 1
+            }/${retries})...`,
+          );
+          attempt++;
+          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+          continue;
+        }
+        throw new Error(`Upload failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.url || data.image_url;
+    } catch (error: any) {
+      console.error(
+        `Error uploading image (attempt ${attempt + 1}/${retries}):`,
+        error,
+      );
+
+      // Si es el último intento o no es un error que queramos reintentar (opcional), lanzamos
+      if (attempt >= retries - 1) {
+        throw error;
+      }
+
+      // Reintentar en caso de error de red o timeout
+      attempt++;
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
     }
-
-    const data = await response.json();
-    return data.url || data.image_url;
-  } catch (error) {
-    console.error("Error uploading image:", error);
-    throw error;
   }
+
+  throw new Error("Upload failed after multiple retries");
 }
 
 export async function uploadMultipleImages(

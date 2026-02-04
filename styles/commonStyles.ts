@@ -21,6 +21,20 @@ export const commonStyles = StyleSheet.create({
     padding: DIMENSIONS.CARD_PADDING,
   },
 
+  cardDetail: {
+    backgroundColor: COLORS.infoLight,
+    borderRadius: 12,
+    marginTop: 8,
+    padding: 14,
+    alignItems: "flex-start",
+  },
+  textDetail: {
+    textAlign: "left",
+    fontWeight: "700",
+    fontSize: 18,
+    color: COLORS.primaryDark,
+    lineHeight: 28,
+  },
   // Carrusel de imágenes
   carouselDots: {
     position: "absolute",

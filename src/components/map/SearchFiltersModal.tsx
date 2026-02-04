@@ -11,6 +11,7 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Bath } from "lucide-react-native";
 import { AppInput } from "../../design-system/components/AppInput";
 import RadioGroupSelector from "../common/RadioGroupSelector";
 import CascadeLocationSelector from "../common/CascadeLocationSelector";
@@ -31,6 +32,8 @@ import {
   getCamposVisibles,
 } from "../../constants/propertyData";
 import { KeyboardAvoidingView } from "react-native";
+import { useCreateContent } from "@/hooks/hooks/useCreateContent";
+import { useAuth } from "../../context/AuthContext";
 
 const { height } = Dimensions.get("window");
 
@@ -75,6 +78,9 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   const [leadPhone, setLeadPhone] = useState("");
   const [leadEmail, setLeadEmail] = useState("");
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  const { user } = useAuth();
+  const { createPost, uploading: creatingPost } = useCreateContent(user?.id);
 
   const openNumberInput = (title: string, onSave: (val: string) => void) => {
     setNumberInputConfig({ title, onSave });
@@ -144,6 +150,124 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
           estado: "nuevo",
           activo: true,
         };
+
+        const parts = [` 🔍  BUSCO PROPIEDAD:`];
+
+        if (
+          filters.operacion &&
+          filters.operacion !== "Todas" &&
+          filters.operacion !== ""
+        ) {
+          const opLabel =
+            filters.operacion.charAt(0).toUpperCase() +
+            filters.operacion.slice(1);
+          parts.push(`• Operación: ${opLabel}`);
+        }
+
+        if (filters.tipoPropiedad) {
+          parts.push(
+            `• Tipo: ${filters.tipoPropiedad.charAt(0).toUpperCase() + filters.tipoPropiedad.slice(1)}`,
+          );
+        }
+
+        if (filters.subtipo && filters.subtipo !== "Todas") {
+          parts.push(`• Subtipo: ${filters.subtipo}`);
+        }
+
+        const locationParts = [
+          filters.locationFilter.estado,
+          filters.locationFilter.ciudad,
+          filters.locationFilter.municipio,
+          filters.locationFilter.colonia,
+        ].filter((p) => p && p !== "Cualquiera" && p !== "Seleccionar");
+
+        if (locationParts.length > 0) {
+          parts.push(
+            `• [ICON:location] Ubicación: ${locationParts.join(", ")}`,
+          );
+        }
+
+        if (
+          filters.precioMin ||
+          (filters.precioMax && filters.precioMax !== "Sin límite")
+        ) {
+          const min =
+            filters.precioMin && filters.precioMin !== "0"
+              ? filters.precioMin
+              : "Mín";
+          const max =
+            filters.precioMax && filters.precioMax !== "Sin límite"
+              ? filters.precioMax
+              : "Máx";
+          if (min !== "Mín" || max !== "Máx") {
+            parts.push(
+              `• [ICON:cash] Precio: ${filters.moneda} ${min} - ${max}`,
+            );
+          }
+        }
+
+        // Características
+        if (
+          filters.habitaciones &&
+          filters.habitaciones !== "Cualquiera" &&
+          filters.habitaciones !== "No indicado" &&
+          filters.habitaciones !== "0"
+        ) {
+          parts.push(`• [ICON:bed] Recámaras: ${filters.habitaciones}`);
+        }
+        if (
+          filters.banos &&
+          filters.banos !== "Cualquiera" &&
+          filters.banos !== "No indicado" &&
+          filters.banos !== "0"
+        ) {
+          parts.push(`• [ICON:bath] Baños: ${filters.banos}`);
+        }
+        if (
+          filters.estacionamientos &&
+          filters.estacionamientos !== "Cualquiera" &&
+          filters.estacionamientos !== "No indicado" &&
+          filters.estacionamientos !== "0"
+        ) {
+          parts.push(`• [ICON:car] Estac.: ${filters.estacionamientos}`);
+        }
+        if (
+          filters.niveles &&
+          filters.niveles !== "Cualquiera" &&
+          filters.niveles !== "No indicado" &&
+          filters.niveles !== "0"
+        ) {
+          parts.push(`• [ICON:business] Niveles: ${filters.niveles}`);
+        }
+        if (
+          filters.antiguedad &&
+          filters.antiguedad !== "Cualquiera" &&
+          filters.antiguedad !== "No indicado" &&
+          filters.antiguedad !== "0"
+        ) {
+          parts.push(`• [ICON:time] Antigüedad: ${filters.antiguedad}`);
+        }
+        if (
+          filters.m2TerrenoMin &&
+          parseFloat(filters.m2TerrenoMin.replace(/,/g, "")) > 0
+        ) {
+          parts.push(`• [ICON:resize] Terreno: ${filters.m2TerrenoMin} m²`);
+        }
+        if (
+          filters.m2ConstruccionMin &&
+          parseFloat(filters.m2ConstruccionMin.replace(/,/g, "")) > 0
+        ) {
+          parts.push(`• [ICON:home] Const.: ${filters.m2ConstruccionMin} m²`);
+        }
+
+        const messagePost = parts.join("\n");
+
+        const postSuccess = await createPost(messagePost, [], "busqueda");
+
+        if (!postSuccess) {
+          showToast("Error al crear el post de la búsqueda", "error");
+          return;
+        }
 
         const { data: leadData, error: leadError } = await supabase
           .from("leads")
@@ -297,12 +421,6 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
         .maybeSingle();
 
       if (searchError) {
-        console.error("❌ Error Supabase (busquedas_guardadas):", {
-          message: searchError.message,
-          details: searchError.details,
-          hint: searchError.hint,
-          code: searchError.code,
-        });
         showToast("Error al guardar la búsqueda", "error");
         throw searchError;
       }
@@ -317,6 +435,22 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
       onClose();
     } catch (error: any) {
       showToast(error.message || "Error al procesar el guardado", "error");
+    }
+  };
+
+  const handleCurrencyChange = (
+    text: string,
+    setter: (val: string) => void,
+  ) => {
+    // Eliminar comas para obtener el valor numérico crudo
+    const rawValue = text.replace(/,/g, "");
+
+    // Validar formato numérico (acepta decimales)
+    if (/^\d*\.?\d*$/.test(rawValue)) {
+      const parts = rawValue.split(".");
+      // Formatear parte entera con comas
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      setter(parts.join("."));
     }
   };
 
@@ -401,7 +535,11 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
                   <Text style={styles.label}>Mínimo ({filters.moneda})</Text>
                   <AppInput
                     value={filters.precioMin}
-                    onChangeText={(val) => onUpdateFilter("precioMin", val)}
+                    onChangeText={(val) =>
+                      handleCurrencyChange(val, (v) =>
+                        onUpdateFilter("precioMin", v),
+                      )
+                    }
                     keyboardType="numeric"
                     placeholder="0"
                   />
@@ -410,7 +548,11 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
                   <Text style={styles.label}>Máximo ({filters.moneda})</Text>
                   <AppInput
                     value={filters.precioMax}
-                    onChangeText={(val) => onUpdateFilter("precioMax", val)}
+                    onChangeText={(val) =>
+                      handleCurrencyChange(val, (v) =>
+                        onUpdateFilter("precioMax", v),
+                      )
+                    }
                     keyboardType="numeric"
                     placeholder="Sin límite"
                   />

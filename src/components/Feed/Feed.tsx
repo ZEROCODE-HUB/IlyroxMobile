@@ -1,4 +1,10 @@
-import React, { useState, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+  useEffect,
+} from "react";
 import {
   View,
   Text,
@@ -124,6 +130,11 @@ const Feed: React.FC<FeedProps> = ({
           screen: "property/[id]",
           params: { id: item.propertyDetails.id },
         });
+      } else if (item.type === "post") {
+        navigation.push("(stack)", {
+          screen: "post/[id]",
+          params: { id: item.id },
+        });
       } else {
         setSelectedItem(item);
       }
@@ -199,7 +210,9 @@ const Feed: React.FC<FeedProps> = ({
           return (
             <PropertyCard
               item={item}
-              onClick={() => handleOpenDetail(item)}
+              onClick={() => {
+                handleOpenDetail(item);
+              }}
               onUserClick={onUserClick}
               onCommentClick={() => handleOpenComments(item)}
               currentUserId={currentUserId}
@@ -209,7 +222,9 @@ const Feed: React.FC<FeedProps> = ({
           return (
             <PostCard
               item={item}
-              onClick={() => handleOpenDetail(item)}
+              onClick={() => {
+                handleOpenDetail(item);
+              }}
               onUserClick={onUserClick}
               onCommentClick={() => handleOpenComments(item)}
               currentUserId={currentUserId}
@@ -275,19 +290,10 @@ const Feed: React.FC<FeedProps> = ({
   }, [loading]);
 
   // Si hay un item seleccionado, mostrar el detalle
-  if (selectedItem) {
-    if (selectedItem.type === "reel") {
-      return (
-        <ReelDetail
-          item={selectedItem}
-          onClose={handleCloseDetail}
-          onUserClick={onUserClick}
-          currentUserId={currentUserId}
-        />
-      );
-    }
+
+  if (selectedItem?.type === "reel") {
     return (
-      <FeedDetail
+      <ReelDetail
         item={selectedItem}
         onClose={handleCloseDetail}
         onUserClick={onUserClick}
@@ -295,6 +301,13 @@ const Feed: React.FC<FeedProps> = ({
       />
     );
   }
+
+  // <FeedDetail
+  //       item={selectedItem}
+  //       onClose={handleCloseDetail}
+  //       onUserClick={onUserClick}
+  //       currentUserId={currentUserId}
+  //     />
 
   return (
     <>
