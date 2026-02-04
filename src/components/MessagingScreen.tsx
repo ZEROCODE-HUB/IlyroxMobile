@@ -8,9 +8,9 @@
  * - Logs de debug removidos para producción
  */
 
-import React, { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { View, Text, StyleSheet, BackHandler } from "react-native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import ConversationsList from "./Messaging/ConversationsList";
 import ChatScreen from "./Messaging/ChatScreen";
 import { useAuth } from "../context/AuthContext";
@@ -55,10 +55,9 @@ export default function MessagingScreen({
   // FIX: Solo llamar useConversations cuando NO estamos en un chat activo
   const isInChatView = !!(activeConversationId && otherUser);
 
-  // Este hook se ejecuta condicionalmente
-  const conversationsHook = useConversations(
-    !isInChatView ? profile?.id : undefined,
-  );
+  // Mantener el hook siempre activo para recibir actualizaciones en tiempo real
+  // incluso mientras estamos dentro de un chat, así al volver la lista ya está actualizada.
+  const conversationsHook = useConversations(profile?.id);
 
   const { conversations = [], getConversationsForUser } = conversationsHook;
 
@@ -70,6 +69,63 @@ export default function MessagingScreen({
       navigation.goBack();
     }
   };
+
+  // Determine if we started the screen as a list or a direct chat
+  const startedAtList = useRef(
+    !initialUser && !conversationId && !activeConversationId,
+  ).current;
+
+  const handleBack = useCallback(() => {
+    // Si entramos a un chat desde la lista interna de MessagingScreen,
+    // al volver queremos ver la lista de nuevo.
+    if (startedAtList && (activeConversationId || otherUser)) {
+      setActiveConversationId(null);
+      setOtherUser(null);
+      setActivePropertyId(null);
+      isInitializedRef.current = false;
+    } else {
+      // Si entramos directamente a un chat (desde afuera: Appointments, Profile, etc.)
+      // o ya estamos en la vista de la lista, salimos de la pantalla.
+      if (isAppointment) {
+        router.push("/(stack)/appointments");
+      } else if (onBack) {
+        onBack();
+      } else {
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        } else {
+          router.replace("/(tabs)/feed");
+        }
+      }
+    }
+  }, [
+    startedAtList,
+    activeConversationId,
+    otherUser,
+    isAppointment,
+    onBack,
+    navigation,
+  ]);
+
+  // Manejar botón físico de atrás en Android
+  useEffect(() => {
+    const onBackPress = () => {
+      if (isInChatView) {
+        handleBack();
+        return true; // Prevenir comportamiento por defecto (salir de la app/pantalla)
+      }
+      return false; // Dejar pasar el evento si no estamos en chat
+    };
+
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      onBackPress,
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isInChatView, handleBack]);
 
   // Manejar initialUser y navigation params
   useEffect(() => {
@@ -201,30 +257,6 @@ export default function MessagingScreen({
     setActiveConversationId(conversationId);
     setOtherUser(otherUserData);
     setActivePropertyId(propertyId || null);
-  };
-
-  // Determine if we started the screen as a list or a direct chat
-  const startedAtList = useRef(!initialUser && !conversationId).current;
-
-  const handleBack = () => {
-    // Si entramos a un chat desde la lista interna de MessagingScreen,
-    // al volver queremos ver la lista de nuevo.
-    if (startedAtList && (activeConversationId || otherUser)) {
-      setActiveConversationId(null);
-      setOtherUser(null);
-      setActivePropertyId(null);
-      isInitializedRef.current = false;
-    } else {
-      // Si entramos directamente a un chat (desde afuera: Appointments, Profile, etc.)
-      // o ya estamos en la vista de la lista, salimos de la pantalla.
-      if (isAppointment) {
-        router.push("/(stack)/appointments");
-      } else if (onBack) {
-        onBack();
-      } else {
-        router.back();
-      }
-    }
   };
 
   const handleViewPropertyDetails = (propertyId: string) => {

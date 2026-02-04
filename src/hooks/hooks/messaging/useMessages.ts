@@ -255,7 +255,7 @@ export function useMessages(conversationId: string | null, userId?: string) {
   };
 
   /**
-   * Enviar mensaje de texto
+   * Enviar mensaje de texto (Optimistic UI)
    */
   const sendMessage = async (
     text: string,
@@ -265,12 +265,14 @@ export function useMessages(conversationId: string | null, userId?: string) {
       return false;
     }
 
+    // 1. Validar/Obtener conversación ID
     if (!conversationId && !metadata) {
       console.error("Missing metadata for new conversation message");
       return false;
     }
 
     setSending(true);
+    const tempId = `temp-${Date.now()}`;
 
     try {
       // Asegurar ID de conversación
@@ -281,6 +283,27 @@ export function useMessages(conversationId: string | null, userId?: string) {
         if (!finalConversationId) throw new Error("No se pudo crear el chat");
       }
 
+      // 2. Crear mensaje temporal y añadirlo al estado (Optimistic)
+      const tempMessage: Message = {
+        id: tempId,
+        conversacion_id: finalConversationId,
+        emisor_id: userId,
+        contenido: text.trim(),
+        tipo: "texto",
+        leido: false,
+        fecha_leido: null,
+        created_at: new Date().toISOString(),
+        imagen_url: null,
+        archivo_url: null,
+        archivo_nombre: null,
+        propiedad_id: null,
+      };
+
+      if (isMountedRef.current) {
+        setMessages((prev) => [...prev, tempMessage]);
+      }
+
+      // 3. Insertar en Supabase
       const messageData: any = {
         conversacion_id: finalConversationId,
         emisor_id: userId,
@@ -299,40 +322,49 @@ export function useMessages(conversationId: string | null, userId?: string) {
 
       if (error) throw error;
 
-      // ✅ Optimistic update: agregar inmediatamente al estado
+      // 4. Confirmar éxito
+      // Si el mensaje real ya llegó por Realtime (tiene data[0].id),
+      // solo removemos el temporal. Si no, reemplazamos el temporal con el real.
       if (data && data.length > 0 && isMountedRef.current) {
         const newMessage = data[0];
         setMessages((prev) => {
-          // Evitar duplicados si ya llegó por Realtime
-          if (prev.some((msg) => msg.id === newMessage.id)) {
-            return prev;
-          }
-          return [...prev, newMessage];
+          const exists = prev.some((msg) => msg.id === newMessage.id);
+          // Filtramos el tempId y añadimos el real si no existía
+          const filtered = prev.filter((msg) => msg.id !== tempId);
+          return exists ? filtered : [...filtered, newMessage];
         });
       }
 
-      if (conversationId) {
+      // Actualizar vista previa de conversación
+      if (finalConversationId) {
         await supabase
           .from("conversaciones")
           .update({
             ultimo_mensaje_preview: text.trim().substring(0, 100),
             ultimo_mensaje_en: new Date().toISOString(),
           })
-          .eq("id", conversationId);
+          .eq("id", finalConversationId);
       }
 
       return data?.[0] || true;
     } catch (err: any) {
       console.error("Error sending message:", err);
-      setError(err.message);
+      // Revertir optimistic update
+      if (isMountedRef.current) {
+        setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+        // Mostrar alerta
+        const { Alert } = require("react-native");
+        Alert.alert("Error", "No se pudo enviar el mensaje.");
+        setError(err.message);
+      }
       return false;
     } finally {
-      setSending(false);
+      if (isMountedRef.current) setSending(false);
     }
   };
 
   /**
-   * Enviar imagen
+   * Enviar imagen (Optimistic UI)
    */
   const sendImage = async (
     imageUri: string,
@@ -341,9 +373,9 @@ export function useMessages(conversationId: string | null, userId?: string) {
     if (!userId) return false;
 
     setSending(true);
+    const tempId = `temp-${Date.now()}`;
 
     try {
-      // Asegurar ID de conversación
       let finalConversationId = conversationId;
       if (!finalConversationId || finalConversationId === "new") {
         if (!metadata) throw new Error("Metadata requerida para nuevo chat");
@@ -351,9 +383,31 @@ export function useMessages(conversationId: string | null, userId?: string) {
         if (!finalConversationId) throw new Error("No se pudo crear el chat");
       }
 
+      // 2. Optimistic Update (mostrando imagen local)
+      const tempMessage: Message = {
+        id: tempId,
+        conversacion_id: finalConversationId,
+        emisor_id: userId,
+        contenido: "📷 Imagen",
+        tipo: "imagen",
+        leido: false,
+        fecha_leido: null,
+        created_at: new Date().toISOString(),
+        imagen_url: imageUri, // Usamos URI local
+        archivo_url: null,
+        archivo_nombre: null,
+        propiedad_id: null,
+      };
+
+      if (isMountedRef.current) {
+        setMessages((prev) => [...prev, tempMessage]);
+      }
+
+      // 3. Subir imagen
       const uploadedUrl = await uploadFile(imageUri, "images");
       if (!uploadedUrl) throw new Error("Failed to upload image");
 
+      // 4. Insertar mensaje
       const messageData: any = {
         conversacion_id: finalConversationId,
         emisor_id: userId,
@@ -373,39 +427,43 @@ export function useMessages(conversationId: string | null, userId?: string) {
 
       if (error) throw error;
 
-      // ✅ Optimistic update: agregar inmediatamente al estado
+      // 5. Confirmar éxito (reemplazar temp por real)
       if (data && data.length > 0 && isMountedRef.current) {
         const newMessage = data[0];
         setMessages((prev) => {
-          if (prev.some((msg) => msg.id === newMessage.id)) {
-            return prev;
-          }
-          return [...prev, newMessage];
+          const exists = prev.some((msg) => msg.id === newMessage.id);
+          const filtered = prev.filter((msg) => msg.id !== tempId);
+          return exists ? filtered : [...filtered, newMessage];
         });
       }
 
-      if (conversationId) {
+      if (finalConversationId) {
         await supabase
           .from("conversaciones")
           .update({
             ultimo_mensaje_preview: "📷 Imagen",
             ultimo_mensaje_en: new Date().toISOString(),
           })
-          .eq("id", conversationId);
+          .eq("id", finalConversationId);
       }
 
       return true;
     } catch (err: any) {
       console.error("Error sending image:", err);
-      setError(err.message);
+      if (isMountedRef.current) {
+        setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+        const { Alert } = require("react-native");
+        Alert.alert("Error", "No se pudo enviar la imagen.");
+        setError(err.message);
+      }
       return false;
     } finally {
-      setSending(false);
+      if (isMountedRef.current) setSending(false);
     }
   };
 
   /**
-   * Enviar archivo
+   * Enviar archivo (Optimistic UI)
    */
   const sendFile = async (
     fileUri: string,
@@ -415,9 +473,9 @@ export function useMessages(conversationId: string | null, userId?: string) {
     if (!userId) return false;
 
     setSending(true);
+    const tempId = `temp-${Date.now()}`;
 
     try {
-      // Asegurar ID de conversación
       let finalConversationId = conversationId;
       if (!finalConversationId || finalConversationId === "new") {
         if (!metadata) throw new Error("Metadata requerida para nuevo chat");
@@ -425,9 +483,31 @@ export function useMessages(conversationId: string | null, userId?: string) {
         if (!finalConversationId) throw new Error("No se pudo crear el chat");
       }
 
+      // 2. Optimistic Update
+      const tempMessage: Message = {
+        id: tempId,
+        conversacion_id: finalConversationId,
+        emisor_id: userId,
+        contenido: `📎 ${fileName}`,
+        tipo: "archivo",
+        leido: false,
+        fecha_leido: null,
+        created_at: new Date().toISOString(),
+        imagen_url: null,
+        archivo_url: null, // No tenemos URL remota aún
+        archivo_nombre: fileName,
+        propiedad_id: null,
+      };
+
+      if (isMountedRef.current) {
+        setMessages((prev) => [...prev, tempMessage]);
+      }
+
+      // 3. Subir archivo
       const uploadedUrl = await uploadFile(fileUri, "files");
       if (!uploadedUrl) throw new Error("Failed to upload file");
 
+      // 4. Insertar mensaje
       const messageData: any = {
         conversacion_id: finalConversationId,
         emisor_id: userId,
@@ -448,73 +528,151 @@ export function useMessages(conversationId: string | null, userId?: string) {
 
       if (error) throw error;
 
-      // ✅ Optimistic update: agregar inmediatamente al estado
+      // 5. Confirmar éxito
       if (data && data.length > 0 && isMountedRef.current) {
         const newMessage = data[0];
         setMessages((prev) => {
-          if (prev.some((msg) => msg.id === newMessage.id)) {
-            return prev;
-          }
-          return [...prev, newMessage];
+          const exists = prev.some((msg) => msg.id === newMessage.id);
+          const filtered = prev.filter((msg) => msg.id !== tempId);
+          return exists ? filtered : [...filtered, newMessage];
         });
       }
 
-      if (conversationId) {
+      if (finalConversationId) {
         await supabase
           .from("conversaciones")
           .update({
             ultimo_mensaje_preview: `📎 ${fileName}`,
             ultimo_mensaje_en: new Date().toISOString(),
           })
-          .eq("id", conversationId);
+          .eq("id", finalConversationId);
       }
 
       return true;
     } catch (err: any) {
       console.error("Error sending file:", err);
-      setError(err.message);
+      if (isMountedRef.current) {
+        setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+        const { Alert } = require("react-native");
+        Alert.alert("Error", "No se pudo enviar el archivo.");
+        setError(err.message);
+      }
       return false;
     } finally {
-      setSending(false);
+      if (isMountedRef.current) setSending(false);
     }
   };
 
   /**
-   * Enviar propiedad
+   * Enviar propiedad (Optimistic UI)
    */
-  const sendProperty = async (propertyId: string, note?: string) => {
-    if (!conversationId || !userId) return false;
+  const sendProperty = async (
+    propertyId: string,
+    note?: string,
+    metadata?: { destinatario_id: string; propiedad_id: string | null },
+  ) => {
+    if (!userId) return false;
+
+    if (!conversationId && !metadata) {
+      console.error("Missing metadata for new conversation property share");
+      return false;
+    }
 
     setSending(true);
+    const tempId = `temp-${Date.now()}`;
 
     try {
-      const { error } = await supabase.from("mensajes").insert({
-        conversacion_id: conversationId,
+      // 1. Asegurar ID de conversación
+      let finalConversationId = conversationId;
+      if (!finalConversationId || finalConversationId === "new") {
+        if (!metadata) throw new Error("Metadata requerida para nuevo chat");
+        finalConversationId = await getOrCreateConversation(metadata);
+        if (!finalConversationId) throw new Error("No se pudo crear el chat");
+      }
+
+      // 2. Optimistic Update
+      const tempMessage: Message = {
+        id: tempId,
+        conversacion_id: finalConversationId,
         emisor_id: userId,
         tipo: "propiedad",
         propiedad_id: propertyId,
         contenido: note || "📍 Propiedad compartida",
-      });
+        leido: false,
+        fecha_leido: null,
+        created_at: new Date().toISOString(),
+        imagen_url: null,
+        archivo_url: null,
+        archivo_nombre: null,
+      };
+
+      if (isMountedRef.current) {
+        setMessages((prev) => [...prev, tempMessage]);
+      }
+
+      // 3. Insertar
+      const { data, error } = await supabase
+        .from("mensajes")
+        .insert({
+          conversacion_id: finalConversationId,
+          emisor_id: userId,
+          tipo: "propiedad",
+          propiedad_id: propertyId,
+          contenido: note || "📍 Propiedad compartida",
+        })
+        .select(
+          `
+          *,
+          propiedad:propiedades(
+            id,
+            tipo,
+            subtipo,
+            descripcion,
+            fotos,
+            ciudad,
+            operaciones:operaciones_propiedad(
+              tipo_operacion,
+              precio,
+              moneda
+            )
+          )
+        `,
+        );
 
       if (error) throw error;
 
-      // NO agregamos al estado local - Realtime lo hará
+      // 4. Confirmar éxito
+      if (data && data.length > 0 && isMountedRef.current) {
+        const newMessage = data[0];
+        setMessages((prev) => {
+          const exists = prev.some((msg) => msg.id === newMessage.id);
+          const filtered = prev.filter((msg) => msg.id !== tempId);
+          return exists ? filtered : [...filtered, newMessage];
+        });
+      }
 
-      await supabase
-        .from("conversaciones")
-        .update({
-          ultimo_mensaje_preview: "📍 Propiedad",
-          ultimo_mensaje_en: new Date().toISOString(),
-        })
-        .eq("id", conversationId);
+      if (finalConversationId) {
+        await supabase
+          .from("conversaciones")
+          .update({
+            ultimo_mensaje_preview: "📍 Propiedad",
+            ultimo_mensaje_en: new Date().toISOString(),
+          })
+          .eq("id", finalConversationId);
+      }
 
       return true;
     } catch (err: any) {
       console.error("Error sending property:", err);
-      setError(err.message);
+      if (isMountedRef.current) {
+        setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+        const { Alert } = require("react-native");
+        Alert.alert("Error", "No se pudo compartir la propiedad.");
+        setError(err.message);
+      }
       return false;
     } finally {
-      setSending(false);
+      if (isMountedRef.current) setSending(false);
     }
   };
 
@@ -632,13 +790,13 @@ export function useMessages(conversationId: string | null, userId?: string) {
    * Configurar suscripción Realtime
    * FIX: Solo se crea UNA vez por conversación
    */
+  /**
+   * Configurar suscripción Realtime
+   * FIX: Solo se crea UNA vez por conversación y maneja reconexiones
+   */
   const setupRealtimeSubscription = async (convId: string) => {
     // Si ya existe para esta conversación, no crear otra
     if (channelRef.current && currentConversationIdRef.current === convId) {
-      console.log(
-        "✅ Messages subscription already exists for",
-        convId.substring(0, 8),
-      );
       return;
     }
 
@@ -658,45 +816,71 @@ export function useMessages(conversationId: string | null, userId?: string) {
           event: "INSERT",
           schema: "public",
           table: "mensajes",
+          // Nota: Filtramos en el cliente para evitar problemas con la sintaxis del filtro del servidor
+          // si el UUID tiene formatos inconsistentes, aunque RLS ya debería filtrar.
           filter: `conversacion_id=eq.${convId}`,
         },
         async (payload) => {
           if (!isMountedRef.current) return;
 
+          const newMessage = payload.new as Message;
+          if (newMessage.conversacion_id !== convId) return;
+
           console.log("📨 New message received via Realtime");
 
-          // Cargar mensaje completo con relaciones
-          const { data } = await supabase
-            .from("mensajes")
-            .select(
-              `
-              *,
-              propiedad:propiedades(
-                id,
-                tipo,
-                subtipo,
-                descripcion,
-                fotos,
-                ciudad,
-                operaciones:operaciones_propiedad(
-                  tipo_operacion,
-                  precio,
-                  moneda
+          // Intentar cargar mensaje completo con relaciones (propiedades, etc.)
+          try {
+            const { data, error } = await supabase
+              .from("mensajes")
+              .select(
+                `
+                *,
+                propiedad:propiedades(
+                  id,
+                  tipo,
+                  subtipo,
+                  descripcion,
+                  fotos,
+                  ciudad,
+                  operaciones:operaciones_propiedad(
+                    tipo_operacion,
+                    precio,
+                    moneda
+                  )
                 )
+              `,
               )
-            `,
-            )
-            .eq("id", payload.new.id)
-            .single();
+              .eq("id", newMessage.id)
+              .single();
 
-          if (data && isMountedRef.current) {
-            setMessages((prev) => {
-              // Evitar duplicados
-              if (prev.some((msg) => msg.id === data.id)) {
-                return prev;
-              }
-              return [...prev, data];
-            });
+            if (data && isMountedRef.current) {
+              setMessages((prev) => {
+                // Evitar duplicados (por si ya estaba via optimistic ui o carga)
+                if (prev.some((msg) => msg.id === data.id)) {
+                  // Si existe pero es temporal (optimistic), reemplazarlo?
+                  // (La lógica optimistic usa IDs temporales, así que id real no coincidirá salvo que ya haya sido reemplazado)
+                  return prev;
+                }
+                return [...prev, data];
+              });
+              return;
+            } else if (error) {
+              throw error;
+            }
+          } catch (fetchError) {
+            console.warn(
+              "⚠️ Error fetching full message details, using payload:",
+              fetchError,
+            );
+            // Fallback: usar el payload directo
+            if (isMountedRef.current) {
+              setMessages((prev) => {
+                if (prev.some((msg) => msg.id === newMessage.id)) {
+                  return prev;
+                }
+                return [...prev, newMessage];
+              });
+            }
           }
         },
       )
@@ -712,16 +896,21 @@ export function useMessages(conversationId: string | null, userId?: string) {
           if (!isMountedRef.current) return;
 
           console.log("📝 Message updated via Realtime");
+          const updatedMsg = payload.new as Message;
 
           setMessages((prev) =>
             prev.map((msg) =>
-              msg.id === payload.new.id ? { ...msg, ...payload.new } : msg,
+              msg.id === updatedMsg.id ? { ...msg, ...updatedMsg } : msg,
             ),
           );
         },
       )
-      .subscribe((status) => {
-        console.log("📡 Messages subscription status:", status);
+      .subscribe((status, err) => {
+        console.log(`📡 Messages subscription status: ${status}`);
+        if (status === "CHANNEL_ERROR") {
+          console.error("❌ Realtime channel error:", err);
+          // Opcional: Reintentar conexión?
+        }
       });
 
     channelRef.current = newChannel;

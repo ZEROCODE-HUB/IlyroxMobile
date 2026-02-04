@@ -78,11 +78,11 @@ export function useConversations(userId?: string) {
 
       if (fetchError) throw fetchError;
 
-      // Cargar etiquetas de todas las conversaciones del usuario
+      // Cargar todas las conversaciones del usuario para calcular no leídos y actividad real
       const { data: allConversations } = await supabase
         .from("conversaciones")
         .select(
-          "id, usuario1_id, usuario2_id, mensajes_no_leidos_usuario1, mensajes_no_leidos_usuario2",
+          "id, usuario1_id, usuario2_id, mensajes_no_leidos_usuario1, mensajes_no_leidos_usuario2, ultimo_mensaje_en, ultimo_mensaje_preview",
         )
         .or(`usuario1_id.eq.${userId},usuario2_id.eq.${userId}`);
 
@@ -118,10 +118,8 @@ export function useConversations(userId?: string) {
       const processed = (agrupaciones || []).map((group: any) => {
         const isUsuario1 = group.usuario1_id === userId;
         const otherUser = isUsuario1 ? group.usuario2 : group.usuario1;
-        const lastConv = group.conversacion_mas_reciente;
 
-        // Calcular conteo de no leídos directamente de las conversaciones (Source of Truth)
-        // en lugar de confiar en la vista/tabla de agrupaciones que puede estar desactualizada
+        // Buscar todas las conversaciones pertenecientes a este grupo (misma pareja de usuarios)
         const groupConvs = (allConversations || []).filter(
           (c: any) =>
             (c.usuario1_id === group.usuario1_id &&
@@ -130,10 +128,23 @@ export function useConversations(userId?: string) {
               c.usuario2_id === group.usuario1_id),
         );
 
-        const unreadCount = groupConvs.reduce((total: number, conv: any) => {
-          // Determine my role in THIS specific conversation
-          const amInConvUsuario1 = conv.usuario1_id === userId;
+        // Encontrar la conversación realmente más reciente en este grupo
+        const latestConvInGroup = groupConvs.reduce(
+          (latest: any, current: any) => {
+            if (!latest) return current;
+            if (!current.ultimo_mensaje_en) return latest;
+            if (!latest.ultimo_mensaje_en) return current;
+            return new Date(current.ultimo_mensaje_en) >
+              new Date(latest.ultimo_mensaje_en)
+              ? current
+              : latest;
+          },
+          null,
+        );
 
+        // Calcular conteo de no leídos directamente de las conversaciones (Source of Truth)
+        const unreadCount = groupConvs.reduce((total: number, conv: any) => {
+          const amInConvUsuario1 = conv.usuario1_id === userId;
           const count = amInConvUsuario1
             ? conv.mensajes_no_leidos_usuario1
             : conv.mensajes_no_leidos_usuario2;
@@ -157,9 +168,13 @@ export function useConversations(userId?: string) {
           usuario2_id: group.usuario2_id,
           total_conversaciones: group.total_conversaciones,
           total_mensajes_no_leidos: unreadCount,
-          conversacion_mas_reciente_id: group.conversacion_mas_reciente_id,
-          ultimo_mensaje_preview: lastConv?.ultimo_mensaje_preview,
-          ultima_actividad: lastConv?.ultimo_mensaje_en,
+          conversacion_mas_reciente_id:
+            latestConvInGroup?.id || group.conversacion_mas_reciente_id,
+          ultimo_mensaje_preview:
+            latestConvInGroup?.ultimo_mensaje_preview ||
+            group.conversacion_mas_reciente?.ultimo_mensaje_preview,
+          ultima_actividad:
+            latestConvInGroup?.ultimo_mensaje_en || group.ultima_actividad,
           other_user: otherUser,
           etiquetas: Array.from(allTags.values()),
         };
@@ -198,13 +213,13 @@ export function useConversations(userId?: string) {
       clearTimeout(reloadTimerRef.current);
     }
 
-    // Programar nueva recarga en 500ms
+    // Programar nueva recarga en 100ms
     reloadTimerRef.current = setTimeout(() => {
       if (isMountedRef.current) {
         console.log("🔄 Reloading conversations (debounced)");
         loadConversations();
       }
-    }, 500);
+    }, 100);
   }, [loadConversations]);
 
   /**

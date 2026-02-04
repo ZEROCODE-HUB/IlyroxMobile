@@ -14,6 +14,7 @@ export type Post = {
   ubicacion?: string;
   foto_propiedad?: string;
   antiguedad?: number;
+  busquedas_json?: any;
 };
 
 export type FeedItem = {

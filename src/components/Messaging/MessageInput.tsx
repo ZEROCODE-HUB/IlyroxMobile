@@ -142,7 +142,11 @@ export default React.forwardRef<TextInput, MessageInputProps>(
     };
 
     const insets = useSafeAreaInsets();
-    const isDisabled = sending || uploading;
+    // Solo bloqueamos input si se está subiendo un archivo pesado (uploading),
+    // pero permitimos escribir mientras se envía mensaje de texto (sending)
+    // para no cerrar el teclado.
+    const isInputDisabled = uploading;
+    const isButtonDisabled = (!text.trim() && !uploading) || uploading;
 
     return (
       <View
@@ -160,12 +164,12 @@ export default React.forwardRef<TextInput, MessageInputProps>(
           <TouchableOpacity
             onPress={handlePickImage}
             style={styles.iconButton}
-            disabled={isDisabled}
+            disabled={uploading}
           >
             <Ionicons
               name="image"
               size={24}
-              color={isDisabled ? COLORS.textDisabled : COLORS.primary}
+              color={uploading ? COLORS.textDisabled : COLORS.primary}
             />
           </TouchableOpacity>
         )}
@@ -174,12 +178,12 @@ export default React.forwardRef<TextInput, MessageInputProps>(
           <TouchableOpacity
             onPress={handlePickFile}
             style={styles.iconButton}
-            disabled={isDisabled}
+            disabled={uploading}
           >
             <Ionicons
               name="attach"
               size={24}
-              color={isDisabled ? COLORS.textDisabled : COLORS.primary}
+              color={uploading ? COLORS.textDisabled : COLORS.primary}
             />
           </TouchableOpacity>
         )}
@@ -193,16 +197,16 @@ export default React.forwardRef<TextInput, MessageInputProps>(
           onChangeText={setText}
           multiline
           maxLength={1000}
-          editable={!isDisabled}
+          editable={!isInputDisabled}
         />
 
         <TouchableOpacity
           onPress={handleSend}
           style={[
             styles.sendButton,
-            (!text.trim() || isDisabled) && styles.sendButtonDisabled,
+            isButtonDisabled && styles.sendButtonDisabled,
           ]}
-          disabled={!text.trim() || isDisabled}
+          disabled={isButtonDisabled || sending}
         >
           {sending || uploading ? (
             <ActivityIndicator size="small" color={COLORS.white} />
