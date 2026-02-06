@@ -144,12 +144,6 @@ export default function MessagingScreen({
       return;
     }
 
-    console.log("🔄 MessagingScreen update detected:", {
-      targetUserId,
-      targetConvId,
-      previous: lastProcessedUserId.current,
-    });
-
     // Reset de estado para nueva inicialización
     isInitializedRef.current = true;
     lastProcessedUserId.current = targetUserId;
@@ -259,11 +253,6 @@ export default function MessagingScreen({
     setActivePropertyId(propertyId || null);
   };
 
-  const handleViewPropertyDetails = (propertyId: string) => {
-    console.log("Ver detalles de propiedad:", propertyId);
-    // TODO: Navegar a PropertyDetails
-  };
-
   const handleConversationCreated = (id: string) => {
     setActiveConversationId(id);
   };
@@ -313,7 +302,6 @@ export default function MessagingScreen({
             otherUser={otherUser}
             propertyId={activePropertyId}
             onBack={handleBack}
-            onViewPropertyDetails={handleViewPropertyDetails}
             onConversationCreated={handleConversationCreated}
             keyboardOffset={headerHeight + top}
           />

@@ -224,9 +224,9 @@ export const useProfile = (userId?: string | null): UseProfileReturn => {
   /**
    * Optimistic Update for Profile Photo
    */
-  const updateProfilePhoto = (newUrl: string) => {
+  const updateProfilePhoto = useCallback((newUrl: string) => {
     setProfile((prev) => (prev ? { ...prev, foto: newUrl } : null));
-  };
+  }, []);
 
   useEffect(() => {
     fetchProfileData();

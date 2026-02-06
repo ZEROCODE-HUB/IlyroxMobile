@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   statusText: {
-    color: "#4a4d55ff",
+    color: "#686a6fff",
     fontSize: 11,
     fontWeight: "500",
     letterSpacing: 0.3,

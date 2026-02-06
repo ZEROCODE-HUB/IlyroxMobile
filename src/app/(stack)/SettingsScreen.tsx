@@ -24,13 +24,9 @@ const SettingsScreen: React.FC = () => {
   const { signOut } = useAuth();
 
   const handleLogout = () => {
-    console.log("Cerrar sesión presionado");
-
     const performLogout = async () => {
       try {
-        console.log("Iniciando signOut...");
         await signOut();
-        console.log("signOut completado");
       } catch (error) {
         console.error("Error en signOut:", error);
         if (Platform.OS === "web") {

@@ -435,7 +435,12 @@ export function useFeed(options: UseFeedOptions = {}) {
                 type: "post" as const,
                 user,
                 content: post.contenido || "",
-                postType: post.tipo?.toLowerCase().trim() ?? "post",
+                postType:
+                  post.tipo
+                    ?.toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .replace(/\s+/g, "") ?? "post",
                 images: post.imagenes || [],
                 likes: item.likes_count,
                 comments: item.comentarios_count,
@@ -448,6 +453,8 @@ export function useFeed(options: UseFeedOptions = {}) {
                 foto_propiedad: post.foto_propiedad,
                 antiguedad: post.antiguedad,
                 status: post.status,
+                postDetails: post,
+                busquedas_json: post.busquedas_json,
               };
             }
 
@@ -530,11 +537,36 @@ export function useFeed(options: UseFeedOptions = {}) {
           .filter((item) => item !== null) as FeedItem[];
 
         // 6. Actualizar estado
+        // 6. Actualizar estado deduplicando por contenido real
         if (isRefresh) {
-          setItems(feedItems);
+          // Deduplicar ya en el primer lote por si acaso
+          const seen = new Set<string>();
+          const uniqueItems = feedItems.filter((i) => {
+            const cId = i.postDetails?.id || i.propertyDetails?.id || i.id;
+            const key = `${i.type}_${cId}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          setItems(uniqueItems);
           setPage(0);
         } else {
-          setItems((prev) => [...prev, ...feedItems]);
+          setItems((prev) => {
+            const existingContentKeys = new Set(
+              prev.map((i) => {
+                const cId = i.postDetails?.id || i.propertyDetails?.id || i.id;
+                return `${i.type}_${cId}`;
+              }),
+            );
+            const newItems = feedItems.filter((i) => {
+              const cId = i.postDetails?.id || i.propertyDetails?.id || i.id;
+              const key = `${i.type}_${cId}`;
+              if (existingContentKeys.has(key)) return false;
+              existingContentKeys.add(key); // Evitar duplicados dentro del mismo lote nuevo
+              return true;
+            });
+            return [...prev, ...newItems];
+          });
         }
         const userIds = feedItems
           .map((it) => it.user?.id)
@@ -590,8 +622,9 @@ export function useFeed(options: UseFeedOptions = {}) {
    * Cargar inicial
    */
   useEffect(() => {
+    // Carga inicial
     loadFeed(0, false);
-  }, []);
+  }, []); // Solo al montar
 
   /**
    * Auto-refresh cada 30 segundos (opcional)
@@ -743,7 +776,12 @@ export function useFeedItem(feedItemId: string) {
           type: "post",
           user,
           content: contentData.contenido || "",
-          postType: contentData.tipo?.toLowerCase().trim() ?? "post",
+          postType:
+            contentData.tipo
+              ?.toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .replace(/\s+/g, "") ?? "post",
           images: contentData.imagenes || [],
           likes: feedData.likes_count,
           comments: feedData.comentarios_count,
@@ -755,6 +793,7 @@ export function useFeedItem(feedItemId: string) {
           foto_propiedad: contentData.foto_propiedad,
           antiguedad: contentData.antiguedad,
           status: contentData.status,
+          postDetails: contentData,
         };
       } else if (tipo_contenido === "reel" && contentData) {
         feedItem = {

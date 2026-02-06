@@ -10,14 +10,16 @@ import { perfiles } from "../../types";
 export const useProfileLoader = () => {
   // Cache para evitar llamadas redundantes
   const profileCacheRef = useRef<{ [userId: string]: perfiles }>({});
-  const loadingProfileRef = useRef<{ [userId: string]: Promise<perfiles | null> }>({});
+  const loadingProfileRef = useRef<{
+    [userId: string]: Promise<perfiles | null>;
+  }>({});
 
   /**
    * Cargar perfil con reintentos inteligentes y cache
    */
   const loadProfile = async (
     userId: string,
-    maxRetries = 3
+    maxRetries = 3,
   ): Promise<perfiles | null> => {
     if (!userId) {
       console.warn("⚠️ loadProfile: No userId provided");
@@ -26,13 +28,11 @@ export const useProfileLoader = () => {
 
     // Verificar cache primero
     if (profileCacheRef.current[userId]) {
-      console.log("✅ Using cached profile for", userId.substring(0, 8));
       return profileCacheRef.current[userId];
     }
 
     // Si ya está cargando, retornar la promesa existente
     if (loadingProfileRef.current[userId]) {
-      console.log("⏳ Profile already loading for", userId.substring(0, 8));
       return loadingProfileRef.current[userId];
     }
 
@@ -45,12 +45,8 @@ export const useProfileLoader = () => {
           if (attempt > 0) {
             // Backoff exponencial: 2s, 4s, 8s
             const delay = Math.pow(2, attempt) * 1000;
-            console.log(`🔄 Retrying profile load (attempt ${attempt}/${maxRetries}) in ${delay}ms...`);
             await new Promise((resolve) => setTimeout(resolve, delay));
           }
-
-          console.log(`📡 Attempting to fetch profile... (attempt ${attempt + 1})`);
-          const startTime = Date.now();
 
           const { data, error } = await supabase
             .from("perfiles")
@@ -58,13 +54,9 @@ export const useProfileLoader = () => {
             .eq("id", userId)
             .maybeSingle();
 
-          const endTime = Date.now();
-          console.log(`⏱️ Query took ${endTime - startTime}ms`);
-
           if (error) {
             // Si no existe el perfil, no reintentamos
             if (error.code === "PGRST116") {
-              console.log("ℹ️ Profile not found for", userId.substring(0, 8));
               return null;
             }
             throw error;
@@ -73,7 +65,6 @@ export const useProfileLoader = () => {
           if (data) {
             // Guardar en cache
             profileCacheRef.current[userId] = data;
-            console.log("✅ Profile loaded successfully for", userId.substring(0, 8));
             return data;
           }
 
@@ -82,10 +73,7 @@ export const useProfileLoader = () => {
           lastError = err;
 
           const errorMsg = err.message || err.toString();
-          console.warn(
-            `⚠️ Attempt ${attempt}/${maxRetries} failed:`,
-            errorMsg
-          );
+          console.warn(`⚠️ Attempt ${attempt}/${maxRetries} failed:`, errorMsg);
 
           // Si es el último intento, no esperar más
           if (attempt === maxRetries) {
@@ -106,7 +94,7 @@ export const useProfileLoader = () => {
 
       console.error(
         `❌ All attempts failed to load profile for ${userId.substring(0, 8)}:`,
-        lastError?.message || lastError
+        lastError?.message || lastError,
       );
 
       return null;

@@ -125,7 +125,6 @@ const EasyBrokerSettingsScreen: React.FC = () => {
    */
   const cleanupChannel = async () => {
     if (channelRef.current) {
-      console.log("🧹 Cleaning up sync subscription");
       try {
         await supabase.removeChannel(channelRef.current);
       } catch (err) {
@@ -144,8 +143,6 @@ const EasyBrokerSettingsScreen: React.FC = () => {
     // Limpiar suscripción anterior si existe
     await cleanupChannel();
 
-    console.log("📡 Setting up sync subscription");
-
     const channel = supabase
       .channel(`sync-updates-${user.id}`)
       .on(
@@ -160,8 +157,6 @@ const EasyBrokerSettingsScreen: React.FC = () => {
           if (!isMountedRef.current) return;
 
           const sync = payload.new;
-          console.log("📨 Sync update received:", sync.status);
-
           if (sync.status === "completada") {
             setSyncing(false);
             loadInitialData();
@@ -185,9 +180,7 @@ const EasyBrokerSettingsScreen: React.FC = () => {
           }
         },
       )
-      .subscribe((status) => {
-        console.log("📡 Sync subscription status:", status);
-      });
+      .subscribe((status) => {});
 
     channelRef.current = channel;
   };

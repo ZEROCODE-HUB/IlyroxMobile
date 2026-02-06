@@ -46,6 +46,7 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.i360.realestateapp",
+      "launchMode": "singleTask",
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyB2SD7BpH4ms3h3N4FiXcTv1CZdlElhRGg"
@@ -93,7 +94,8 @@
       ],
       "expo-video",
       "@react-native-community/datetimepicker",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-router"
     ],
     "extra": {
       "eas": {

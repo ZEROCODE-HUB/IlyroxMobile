@@ -120,15 +120,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   buttonContainer: {
-    gap: 12,
-    marginBottom: 30,
+    gap: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 20,
   },
   button: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    borderRadius: 12,
-    gap: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    gap: 16,
   },
   buttonText: {
     fontSize: 16,

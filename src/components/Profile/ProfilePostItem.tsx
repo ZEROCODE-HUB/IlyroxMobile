@@ -28,115 +28,122 @@ interface ProfilePostItemProps {
   onDelete?: (item: Post) => void;
 }
 
-const ProfilePostItem: React.FC<ProfilePostItemProps> = ({
-  item,
-  user,
-  onPress,
-  isOwnProfile,
-  onEdit,
-  onDelete,
-}) => {
-  const hasImages = item.imagenes && item.imagenes.length > 0;
-  const hasMultipleImages = item.imagenes && item.imagenes.length > 1;
-  const isSearchPost = item.tipo === "busqueda";
+const ProfilePostItem: React.FC<ProfilePostItemProps> = React.memo(
+  ({ item, user, onPress, isOwnProfile, onEdit, onDelete }) => {
+    const hasImages = item.imagenes && item.imagenes.length > 0;
+    const hasMultipleImages = item.imagenes && item.imagenes.length > 1;
+    const isSearchPost = item.tipo === "busqueda";
 
-  const cleanPostType = (item.tipo || "").toLowerCase().replace(/\s+/g, "");
+    const cleanPostType = (item.tipo || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, "");
 
-  const isSpecialPost = ["openhouse", "aniversario", "sold"].includes(
-    cleanPostType,
-  );
+    const isSpecialPost = [
+      "openhouse",
+      "aniversario",
+      "sold",
+      "busqueda",
+    ].includes(cleanPostType);
 
-  const menuOptions: MenuOption[] = [
-    ...(cleanPostType === "post"
-      ? [
-          {
-            icon: "pencil-outline",
-            label: "Editar",
-            onPress: () => onEdit && onEdit(item),
-          } as MenuOption,
-        ]
-      : []),
-    {
-      icon: "trash-outline",
-      label: "Eliminar",
-      onPress: () => onDelete && onDelete(item),
-      danger: true,
-    },
-  ];
+    const menuOptions: MenuOption[] = [
+      ...(cleanPostType === "post"
+        ? [
+            {
+              icon: "pencil-outline",
+              label: "Editar",
+              onPress: () => onEdit && onEdit(item),
+            } as MenuOption,
+          ]
+        : []),
+      {
+        icon: "trash-outline",
+        label: "Eliminar",
+        onPress: () => onDelete && onDelete(item),
+        danger: true,
+      },
+    ];
 
-  return (
-    <TouchableOpacity
-      style={styles.gridItem}
-      onPress={() => onPress(item)}
-      activeOpacity={0.8}
-    >
-      {isSpecialPost ? (
-        <SpecialPostCard
-          item={{
-            id: item.id,
-            type: "post",
-            user: user || {
-              id: item.publicado_por,
-              name: "Usuario",
-              avatar: "",
-              role: "Cliente",
-              isFollowing: false,
-            },
-            content: item.contenido || "",
-            images: item.imagenes || [],
-            likes: 0,
-            comments: 0,
-            timestamp: item.created_at,
-            postType: cleanPostType as any,
-            foto_perfil: item.foto_perfil,
-            fecha_hora: item.fecha_hora,
-            nombre_asesor: item.nombre_asesor,
-            ubicacion: item.ubicacion,
-            foto_propiedad: item.foto_propiedad,
-            antiguedad: item.antiguedad,
-            status: item.status,
-          }}
-          mode="grid"
-        />
-      ) : hasImages ? (
-        <>
-          <Image
-            source={{ uri: item.imagenes![0] }}
-            style={styles.gridImage}
-            contentFit="cover"
-            transition={200}
-            cachePolicy="memory-disk"
+    return (
+      <TouchableOpacity
+        style={styles.gridItem}
+        onPress={() => onPress(item)}
+        activeOpacity={0.8}
+      >
+        {isSpecialPost ? (
+          <SpecialPostCard
+            item={{
+              id: item.id,
+              type: "post",
+              user: user || {
+                id: item.publicado_por,
+                name: "Usuario",
+                avatar: "",
+                role: "Cliente",
+                isFollowing: false,
+              },
+              content: item.contenido || "",
+              images: item.imagenes || [],
+              likes: (item as any).likes_count || 0,
+              comments: (item as any).comentarios_count || 0,
+              timestamp: item.created_at,
+              postType: cleanPostType as any,
+              foto_perfil: item.foto_perfil,
+              fecha_hora: item.fecha_hora,
+              nombre_asesor: item.nombre_asesor,
+              ubicacion: item.ubicacion,
+              foto_propiedad: item.foto_propiedad,
+              antiguedad: item.antiguedad,
+              status: item.status,
+              postDetails: item,
+              busquedas_json: item.busquedas_json,
+            }}
+            mode="grid"
           />
-          {hasMultipleImages && (
-            <View style={styles.multipleIndicator}>
-              <Ionicons name="copy-outline" size={16} color={COLORS.white} />
-            </View>
-          )}
-        </>
-      ) : (
-        <View
-          style={[styles.textOnlyPost, isSearchPost && commonStyles.cardDetail]}
-        >
-          <RichText
+        ) : hasImages ? (
+          <>
+            <Image
+              source={{ uri: item.imagenes![0] }}
+              style={styles.gridImage}
+              contentFit="cover"
+              transition={0}
+              cachePolicy="memory-disk"
+            />
+            {hasMultipleImages && (
+              <View style={styles.multipleIndicator}>
+                <Ionicons name="copy-outline" size={16} color={COLORS.white} />
+              </View>
+            )}
+          </>
+        ) : (
+          <View
             style={[
-              styles.textOnlyContent,
-              isSearchPost && styles.searchPostText,
+              styles.textOnlyPost,
+              isSearchPost && commonStyles.cardDetail,
             ]}
-            content={item.contenido}
-            iconSize={10}
-            iconColor={isSearchPost ? COLORS.primaryDark : COLORS.textPrimary}
-          />
-        </View>
-      )}
+          >
+            <RichText
+              style={[
+                styles.textOnlyContent,
+                isSearchPost && styles.searchPostText,
+              ]}
+              content={item.contenido}
+              iconSize={10}
+              iconColor={isSearchPost ? COLORS.primaryDark : COLORS.textPrimary}
+            />
+          </View>
+        )}
 
-      {isOwnProfile && (
-        <View style={styles.menuContainer}>
-          <ThreeDotsMenu options={menuOptions} />
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-};
+        {isOwnProfile && (
+          <View style={styles.menuContainer}>
+            <ThreeDotsMenu options={menuOptions} />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  },
+);
 
 const styles = StyleSheet.create({
   gridItem: {

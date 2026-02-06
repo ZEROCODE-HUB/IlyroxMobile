@@ -9,6 +9,7 @@ import {
   Dimensions,
   Platform,
   Alert,
+  Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Bath } from "lucide-react-native";
@@ -73,7 +74,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   });
 
   // Prospecto states
-  const [createLead, setCreateLead] = useState(true);
+  const [createLead, setCreateLead] = useState(false);
   const [leadName, setLeadName] = useState("");
   const [leadPhone, setLeadPhone] = useState("");
   const [leadEmail, setLeadEmail] = useState("");
@@ -151,118 +152,67 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
           activo: true,
         };
 
-        const parts = [` 🔍  BUSCO PROPIEDAD:`];
+        // Preparar Metadata JSON para el Post con Iconos
+        const busquedaMetadata = {
+          titulo: "SE BUSCA",
+          icon: "search-outline",
+          filtros: {
+            operacion: filters.operacion,
+            icon_operacion: "cash-outline",
+            tipo_propiedad: filters.tipoPropiedad,
+            icon_tipo: "business-outline",
+            subtipo: filters.subtipo,
+            moneda: filters.moneda,
+            precio_min:
+              filters.precioMin && filters.precioMin !== "0"
+                ? parseFloat(filters.precioMin.replace(/,/g, ""))
+                : 0,
+            precio_max:
+              filters.precioMax && filters.precioMax !== "Sin límite"
+                ? parseFloat(filters.precioMax.replace(/,/g, ""))
+                : null,
+            ubicacion: {
+              estado: filters.locationFilter.estado,
+              ciudad: filters.locationFilter.ciudad,
+              municipio: filters.locationFilter.municipio,
+              colonia: filters.locationFilter.colonia,
+              icon: "location-outline",
+            },
+            caracteristicas: {
+              habitaciones: filters.habitaciones,
+              icon_bed: "bed-outline",
+              banos: filters.banos,
+              icon_bath: "water-outline",
+              estacionamientos: filters.estacionamientos,
+              icon_car: "car-outline",
+              niveles: filters.niveles,
+              icon_layers: "layers-outline",
+              antiguedad: filters.antiguedad,
+              icon_time: "time-outline",
+            },
+            superficies: {
+              m2_terreno_min: filters.m2TerrenoMin
+                ? parseFloat(filters.m2TerrenoMin.replace(/,/g, ""))
+                : 0,
+              m2_construccion_min: filters.m2ConstruccionMin
+                ? parseFloat(filters.m2ConstruccionMin.replace(/,/g, ""))
+                : 0,
+              icon: "resize-outline",
+            },
+          },
+          prospecto: {
+            nombre: leadName.trim(),
+            telefono: leadPhone.trim(),
+            email: leadEmail.trim(),
+          },
+        };
 
-        if (
-          filters.operacion &&
-          filters.operacion !== "Todas" &&
-          filters.operacion !== ""
-        ) {
-          const opLabel =
-            filters.operacion.charAt(0).toUpperCase() +
-            filters.operacion.slice(1);
-          parts.push(`• Operación: ${opLabel}`);
-        }
-
-        if (filters.tipoPropiedad) {
-          parts.push(
-            `• Tipo: ${filters.tipoPropiedad.charAt(0).toUpperCase() + filters.tipoPropiedad.slice(1)}`,
-          );
-        }
-
-        if (filters.subtipo && filters.subtipo !== "Todas") {
-          parts.push(`• Subtipo: ${filters.subtipo}`);
-        }
-
-        const locationParts = [
-          filters.locationFilter.estado,
-          filters.locationFilter.ciudad,
-          filters.locationFilter.municipio,
-          filters.locationFilter.colonia,
-        ].filter((p) => p && p !== "Cualquiera" && p !== "Seleccionar");
-
-        if (locationParts.length > 0) {
-          parts.push(
-            `• [ICON:location] Ubicación: ${locationParts.join(", ")}`,
-          );
-        }
-
-        if (
-          filters.precioMin ||
-          (filters.precioMax && filters.precioMax !== "Sin límite")
-        ) {
-          const min =
-            filters.precioMin && filters.precioMin !== "0"
-              ? filters.precioMin
-              : "Mín";
-          const max =
-            filters.precioMax && filters.precioMax !== "Sin límite"
-              ? filters.precioMax
-              : "Máx";
-          if (min !== "Mín" || max !== "Máx") {
-            parts.push(
-              `• [ICON:cash] Precio: ${filters.moneda} ${min} - ${max}`,
-            );
-          }
-        }
-
-        // Características
-        if (
-          filters.habitaciones &&
-          filters.habitaciones !== "Cualquiera" &&
-          filters.habitaciones !== "No indicado" &&
-          filters.habitaciones !== "0"
-        ) {
-          parts.push(`• [ICON:bed] Recámaras: ${filters.habitaciones}`);
-        }
-        if (
-          filters.banos &&
-          filters.banos !== "Cualquiera" &&
-          filters.banos !== "No indicado" &&
-          filters.banos !== "0"
-        ) {
-          parts.push(`• [ICON:bath] Baños: ${filters.banos}`);
-        }
-        if (
-          filters.estacionamientos &&
-          filters.estacionamientos !== "Cualquiera" &&
-          filters.estacionamientos !== "No indicado" &&
-          filters.estacionamientos !== "0"
-        ) {
-          parts.push(`• [ICON:car] Estac.: ${filters.estacionamientos}`);
-        }
-        if (
-          filters.niveles &&
-          filters.niveles !== "Cualquiera" &&
-          filters.niveles !== "No indicado" &&
-          filters.niveles !== "0"
-        ) {
-          parts.push(`• [ICON:business] Niveles: ${filters.niveles}`);
-        }
-        if (
-          filters.antiguedad &&
-          filters.antiguedad !== "Cualquiera" &&
-          filters.antiguedad !== "No indicado" &&
-          filters.antiguedad !== "0"
-        ) {
-          parts.push(`• [ICON:time] Antigüedad: ${filters.antiguedad}`);
-        }
-        if (
-          filters.m2TerrenoMin &&
-          parseFloat(filters.m2TerrenoMin.replace(/,/g, "")) > 0
-        ) {
-          parts.push(`• [ICON:resize] Terreno: ${filters.m2TerrenoMin} m²`);
-        }
-        if (
-          filters.m2ConstruccionMin &&
-          parseFloat(filters.m2ConstruccionMin.replace(/,/g, "")) > 0
-        ) {
-          parts.push(`• [ICON:home] Const.: ${filters.m2ConstruccionMin} m²`);
-        }
-
-        const messagePost = parts.join("\n");
-
-        const postSuccess = await createPost(messagePost, [], "busqueda");
+        const postSuccess = await createPost(
+          "🔍  BUSCO PROPIEDAD:",
+          [],
+          "busqueda",
+          busquedaMetadata,
+        );
 
         if (!postSuccess) {
           showToast("Error al crear el post de la búsqueda", "error");
@@ -455,11 +405,18 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onClose}
+    >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.modalContainer}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
+        <Pressable style={styles.modalOverlay} onPress={onClose} />
         <View style={styles.modalContent}>
           {/* Header */}
           <View style={styles.modalHeader}>
@@ -476,8 +433,10 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
 
           <ScrollView
             showsVerticalScrollIndicator={false}
-            style={[styles.modalScroll]}
-            contentContainerStyle={{ paddingBottom: 100 }}
+            style={styles.modalScroll}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
           >
             {/* 1. TIPO DE OPERACIÓN */}
             <View style={styles.formSection}>
@@ -846,18 +805,44 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
               onChangeLeadName={setLeadName}
               onChangeLeadPhone={setLeadPhone}
               onChangeLeadEmail={setLeadEmail}
-              onSave={handleSaveSearch}
               errors={errors}
+              filters={filters}
             />
           </ScrollView>
 
-          {/* Footer */}
+          {/* Footer Dinámico */}
           <View style={styles.modalFooter}>
-            <TouchableOpacity style={styles.applyBtn} onPress={onClose}>
-              <Text style={styles.applyBtnText}>
-                Ver {filteredPropertiesCount} propiedades
-              </Text>
-            </TouchableOpacity>
+            {createLead ? (
+              <View style={styles.footerActions}>
+                <TouchableOpacity
+                  style={styles.secondaryBtn}
+                  onPress={() => {
+                    setCreateLead(false);
+                    onClose();
+                  }}
+                >
+                  <Text style={styles.secondaryBtnText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.applyBtn, { flex: 2 }]}
+                  onPress={handleSaveSearch}
+                >
+                  <Ionicons
+                    name="save-outline"
+                    size={20}
+                    color={COLORS.white}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text style={styles.applyBtnText}>Guardar y Registrar</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.applyBtn} onPress={onClose}>
+                <Text style={styles.applyBtnText}>
+                  Ver {filteredPropertiesCount} propiedades
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -874,17 +859,25 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  container: {
     flex: 1,
     backgroundColor: COLORS.blackTransparent50,
     justifyContent: "flex-end",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "transparent",
+    justifyContent: "flex-end",
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: COLORS.blackTransparent50,
   },
   modalContent: {
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     height: height * 0.85,
-    paddingBottom: Platform.OS === "ios" ? 40 : 20,
   },
   modalHeader: {
     flexDirection: "row",
@@ -914,7 +907,10 @@ const styles = StyleSheet.create({
   },
   modalScroll: {
     flex: 1,
+  },
+  scrollContent: {
     padding: 24,
+    paddingBottom: Platform.OS === "ios" ? 140 : 100,
   },
   formSection: {
     marginBottom: 32,
@@ -985,21 +981,44 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   modalFooter: {
-    padding: 24,
+    padding: 20,
     borderTopWidth: 1,
     borderTopColor: COLORS.background,
     backgroundColor: COLORS.white,
+    paddingBottom: Platform.OS === "ios" ? 140 : 50,
   },
   applyBtn: {
     backgroundColor: COLORS.primary,
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
   },
   applyBtnText: {
     color: COLORS.white,
     fontSize: 16,
     fontWeight: "bold",
+  },
+  footerActions: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "center",
+  },
+  secondaryBtn: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: COLORS.background,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  secondaryBtnText: {
+    color: COLORS.textSecondary,
+    fontSize: 15,
+    fontWeight: "600",
   },
   divider: {
     height: 1,

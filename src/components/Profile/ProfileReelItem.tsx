@@ -28,88 +28,84 @@ interface ProfileReelItemProps {
   onDelete?: (item: Reel) => void;
 }
 
-const ProfileReelItem: React.FC<ProfileReelItemProps> = ({
-  item,
-  onPress,
-  isOwnProfile,
-  onEdit,
-  onDelete,
-}) => {
-  // We'll use expo-image for main thumbnail.
-  // If thumbnail_url is missing, we try to use video_url.
-  // Expo Image can handle some video formats as thumbnails on iOS/Android depending on config,
-  // but let's stick to the generated thumbnail logic if needed, but optimized.
+const ProfileReelItem: React.FC<ProfileReelItemProps> = React.memo(
+  ({ item, onPress, isOwnProfile, onEdit, onDelete }) => {
+    // We'll use expo-image for main thumbnail.
+    // If thumbnail_url is missing, we try to use video_url.
+    // Expo Image can handle some video formats as thumbnails on iOS/Android depending on config,
+    // but let's stick to the generated thumbnail logic if needed, but optimized.
 
-  // Actually, for better performance, if no thumbnail, show a placeholder or try to cache the thumbnail generation.
-  // But let's first trust the item.thumbnail_url.
+    // Actually, for better performance, if no thumbnail, show a placeholder or try to cache the thumbnail generation.
+    // But let's first trust the item.thumbnail_url.
 
-  const [thumbSource, setThumbSource] = useState<string | null>(
-    item.thumbnail_url,
-  );
+    const [thumbSource, setThumbSource] = useState<string | null>(
+      item.thumbnail_url,
+    );
 
-  React.useEffect(() => {
-    if (!item.thumbnail_url && item.video_url && !thumbSource) {
-      VideoThumbnails.getThumbnailAsync(item.video_url, {
-        time: 1000,
-        quality: 0.3, // Lower quality for grid
-      })
-        .then(({ uri }) => setThumbSource(uri))
-        .catch((e) => console.warn("Thumbnail generation failed", e));
-    }
-  }, [item.thumbnail_url, item.video_url]);
+    React.useEffect(() => {
+      if (!item.thumbnail_url && item.video_url && !thumbSource) {
+        VideoThumbnails.getThumbnailAsync(item.video_url, {
+          time: 1000,
+          quality: 0.3, // Lower quality for grid
+        })
+          .then(({ uri }) => setThumbSource(uri))
+          .catch((e) => console.warn("Thumbnail generation failed", e));
+      }
+    }, [item.thumbnail_url, item.video_url]);
 
-  const menuOptions: MenuOption[] = [
-    {
-      icon: "pencil-outline",
-      label: "Editar",
-      onPress: () => onEdit && onEdit(item),
-    },
-    {
-      icon: "trash-outline",
-      label: "Eliminar",
-      onPress: () => onDelete && onDelete(item),
-      danger: true,
-    },
-  ];
+    const menuOptions: MenuOption[] = [
+      {
+        icon: "pencil-outline",
+        label: "Editar",
+        onPress: () => onEdit && onEdit(item),
+      },
+      {
+        icon: "trash-outline",
+        label: "Eliminar",
+        onPress: () => onDelete && onDelete(item),
+        danger: true,
+      },
+    ];
 
-  return (
-    <TouchableOpacity
-      style={styles.gridItem}
-      onPress={() => onPress(item)}
-      activeOpacity={0.8}
-    >
-      <Image
-        source={
-          thumbSource || {
-            uri: "https://placehold.co/400x600/202020/white?text=No+Preview",
+    return (
+      <TouchableOpacity
+        style={styles.gridItem}
+        onPress={() => onPress(item)}
+        activeOpacity={0.8}
+      >
+        <Image
+          source={
+            thumbSource || {
+              uri: "https://placehold.co/400x600/202020/white?text=No+Preview",
+            }
           }
-        }
-        style={styles.gridImage}
-        contentFit="cover"
-        transition={200}
-        cachePolicy="memory-disk"
-      />
+          style={styles.gridImage}
+          contentFit="cover"
+          transition={0}
+          cachePolicy="memory-disk"
+        />
 
-      <View style={styles.playOverlay}>
-        <Ionicons name="play" size={16} color={COLORS.white} />
-      </View>
-
-      {item.duracion_segundos && (
-        <View style={styles.durationBadge}>
-          <Text style={styles.durationText}>
-            {formatDuration(item.duracion_segundos)}
-          </Text>
+        <View style={styles.playOverlay}>
+          <Ionicons name="play" size={16} color={COLORS.white} />
         </View>
-      )}
 
-      {isOwnProfile && (
-        <View style={styles.menuContainer}>
-          <ThreeDotsMenu options={menuOptions} />
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-};
+        {item.duracion_segundos && (
+          <View style={styles.durationBadge}>
+            <Text style={styles.durationText}>
+              {formatDuration(item.duracion_segundos)}
+            </Text>
+          </View>
+        )}
+
+        {isOwnProfile && (
+          <View style={styles.menuContainer}>
+            <ThreeDotsMenu options={menuOptions} />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  },
+);
 
 const formatDuration = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);

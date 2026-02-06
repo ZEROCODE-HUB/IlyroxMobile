@@ -26,133 +26,132 @@ interface ProfilePropertyItemProps {
   isLastInRow?: boolean;
 }
 
-const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = ({
-  item,
-  onPress,
-  isOwnProfile,
-  onEdit,
-  onDelete,
-  isLastInRow,
-}) => {
-  const commissionText = formatCommission(item.commission);
+const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
+  ({ item, onPress, isOwnProfile, onEdit, onDelete, isLastInRow }) => {
+    const commissionText = formatCommission(item.commission);
 
-  const menuOptions: MenuOption[] = [
-    {
-      icon: "pencil-outline",
-      label: "Editar",
-      onPress: () => onEdit && onEdit(item),
-    },
-    {
-      icon: "trash-outline",
-      label: "Eliminar",
-      onPress: () => onDelete && onDelete(item),
-      danger: true,
-    },
-  ];
+    const menuOptions: MenuOption[] = [
+      {
+        icon: "pencil-outline",
+        label: "Editar",
+        onPress: () => onEdit && onEdit(item),
+      },
+      {
+        icon: "trash-outline",
+        label: "Eliminar",
+        onPress: () => onDelete && onDelete(item),
+        danger: true,
+      },
+    ];
 
-  return (
-    <TouchableOpacity
-      style={[styles.gridItem, isLastInRow && { marginRight: 0 }]}
-      onPress={() => onPress(item)}
-      activeOpacity={0.8}
-    >
-      <Image
-        source={{ uri: item.images[0] }}
-        style={styles.gridImage}
-        contentFit="cover"
-        transition={200}
-        cachePolicy="memory-disk"
-      />
+    return (
+      <TouchableOpacity
+        style={[styles.gridItem, isLastInRow && { marginRight: 0 }]}
+        onPress={() => onPress(item)}
+        activeOpacity={0.8}
+      >
+        <Image
+          source={{ uri: item.images[0] }}
+          style={styles.gridImage}
+          contentFit="cover"
+          transition={0}
+          cachePolicy="memory-disk"
+        />
 
-      <View style={[styles.statusBadge, { backgroundColor: "#aab9d761" }]}>
-        {commissionText ? (
-          <Text style={styles.statusText}>{commissionText} comisión</Text>
-        ) : (
-          <Text style={styles.statusText}>{item.status}</Text>
-        )}
-      </View>
-
-      {isOwnProfile && (
-        <View style={styles.menuContainer}>
-          <ThreeDotsMenu options={menuOptions} />
-        </View>
-      )}
-
-      <View style={styles.infoContainer}>
-        <View style={styles.priceRow}>
-          <Text style={styles.propertyPrice}>
-            $
-            {item.price >= 1000000
-              ? `${(item.price / 1000000).toFixed(1)}M`
-              : `${(item.price / 1000).toFixed(0)}k`}
-          </Text>
-          <Text style={styles.propertyCurrency}>{item.currency}</Text>
-        </View>
-        <Text style={styles.propertyLocation} numberOfLines={1}>
-          {item.location.city}
-        </Text>
-
-        <View style={styles.propertyFeatures}>
-          {item.features.beds > 0 && (
-            <View
-              style={{
-                ...styles.featureBadge,
-                borderRightWidth: 1,
-                paddingRight: 5,
-                borderRightColor: "#cccccc",
-              }}
-            >
-              <Ionicons
-                name="bed-outline"
-                size={10}
-                color={COLORS.textPrimary}
-              />
-              <Text style={styles.featureBadgeText}>{item.features.beds}</Text>
-            </View>
-          )}
-          {item.features.baths > 0 && (
-            <View
-              style={{
-                ...styles.featureBadge,
-                borderRightWidth: 1,
-                paddingRight: 5,
-                borderRightColor: "#cccccc",
-              }}
-            >
-              <Bath size={10} color={COLORS.textPrimary} />
-              <Text style={styles.featureBadgeText}>{item.features.baths}</Text>
-            </View>
-          )}
-          {item.features.constructionSqft > 0 ? (
-            <View
-              style={{
-                ...styles.featureBadge,
-                paddingHorizontal: 3,
-                borderRightColor: "#cccccc",
-              }}
-            >
-              <Text style={styles.featureBadgeText}>
-                {item.features.constructionSqft} m²
-              </Text>
-            </View>
+        <View style={[styles.statusBadge, { backgroundColor: "#aab9d761" }]}>
+          {commissionText ? (
+            <Text style={styles.statusText}>{commissionText} comisión</Text>
           ) : (
-            <View
-              style={{
-                ...styles.featureBadge,
-                paddingHorizontal: 3,
-                borderRightColor: "#cccccc",
-              }}
-            >
-              <Text style={styles.featureBadgeText}>
-                {item.features.landSqft} m²
-              </Text>
-            </View>
+            <Text style={styles.statusText}>{item.status}</Text>
           )}
         </View>
-      </View>
-    </TouchableOpacity>
-  );
-};
+
+        {isOwnProfile && (
+          <View style={styles.menuContainer}>
+            <ThreeDotsMenu options={menuOptions} />
+          </View>
+        )}
+
+        <View style={styles.infoContainer}>
+          <View style={styles.priceRow}>
+            <Text style={styles.propertyPrice}>
+              $
+              {item.price >= 1000000
+                ? `${(item.price / 1000000).toFixed(1)}M`
+                : `${(item.price / 1000).toFixed(0)}k`}
+            </Text>
+            <Text style={styles.propertyCurrency}>{item.currency}</Text>
+          </View>
+          <Text style={styles.propertyLocation} numberOfLines={1}>
+            {item.location.city}
+          </Text>
+
+          <View style={styles.propertyFeatures}>
+            {item.features.beds > 0 && (
+              <View
+                style={{
+                  ...styles.featureBadge,
+                  borderRightWidth: 1,
+                  paddingRight: 5,
+                  borderRightColor: "#cccccc",
+                }}
+              >
+                <Ionicons
+                  name="bed-outline"
+                  size={10}
+                  color={COLORS.textPrimary}
+                />
+                <Text style={styles.featureBadgeText}>
+                  {item.features.beds}
+                </Text>
+              </View>
+            )}
+            {item.features.baths > 0 && (
+              <View
+                style={{
+                  ...styles.featureBadge,
+                  borderRightWidth: 1,
+                  paddingRight: 5,
+                  borderRightColor: "#cccccc",
+                }}
+              >
+                <Bath size={10} color={COLORS.textPrimary} />
+                <Text style={styles.featureBadgeText}>
+                  {item.features.baths}
+                </Text>
+              </View>
+            )}
+            {item.features.constructionSqft > 0 ? (
+              <View
+                style={{
+                  ...styles.featureBadge,
+                  paddingHorizontal: 3,
+                  borderRightColor: "#cccccc",
+                }}
+              >
+                <Text style={styles.featureBadgeText}>
+                  {item.features.constructionSqft} m²
+                </Text>
+              </View>
+            ) : (
+              <View
+                style={{
+                  ...styles.featureBadge,
+                  paddingHorizontal: 3,
+                  borderRightColor: "#cccccc",
+                }}
+              >
+                <Text style={styles.featureBadgeText}>
+                  {item.features.landSqft} m²
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  },
+);
 
 const formatCommission = (commission?: {
   shared: boolean;

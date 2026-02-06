@@ -17,6 +17,7 @@ import {
   RichText,
 } from "../shared";
 import ActionButtons from "../ActionButtons";
+import { Ionicons } from "@expo/vector-icons";
 // import { supabase } from "../../lib/supabase"; // Removed direct usage
 
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
@@ -54,9 +55,9 @@ const PostCard: React.FC<PostCardProps> = ({
     userId: currentUserId,
     isVisible: true,
   });
-  const isSpecialPost = ["openhouse", "aniversario", "sold"].includes(
-    item.postType,
-  );
+  const isSpecialPost =
+    ["openhouse", "aniversario", "sold"].includes(item.postType) ||
+    (item.postType === "busqueda" && !!item.postDetails?.busquedas_json);
 
   const images = item.images || [];
   const hasImages = images.length > 0;
@@ -344,6 +345,89 @@ const styles = StyleSheet.create({
   recommendedModalEmptyText: {
     fontSize: 12,
     color: COLORS.textSecondary,
+  },
+  searchPostContainer: {
+    padding: 16,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    marginHorizontal: 12,
+    marginVertical: 8,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  searchHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.background,
+    paddingBottom: 8,
+  },
+  searchTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: COLORS.primaryDark,
+    letterSpacing: 1,
+  },
+  searchInfoContent: {
+    gap: 10,
+  },
+  searchMainRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  searchBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  searchBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  searchLocationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  searchLocationText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    fontWeight: "500",
+  },
+  searchPriceRow: {
+    backgroundColor: COLORS.background,
+    padding: 12,
+    borderRadius: 10,
+  },
+  searchPriceText: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+  },
+  searchCharacteristicsGrid: {
+    flexDirection: "row",
+    gap: 16,
+    paddingTop: 4,
+  },
+  searchCharItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  searchCharText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: "600",
   },
 });
 

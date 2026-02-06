@@ -69,7 +69,6 @@ export const useAuthListener = ({
             error.message?.includes("expired") ||
             error.message?.includes("invalid")
           ) {
-            console.log("🔄 Session expired/invalid, clearing auth state");
             onSessionChange(null);
             onUserChange(null);
             onProfileChange(null);
@@ -83,7 +82,6 @@ export const useAuthListener = ({
           const expiresAt = session.expires_at * 1000;
           const now = Date.now();
           if (now >= expiresAt) {
-            console.log("🔄 Session expired, clearing auth state");
             onSessionChange(null);
             onUserChange(null);
             onProfileChange(null);
@@ -135,7 +133,6 @@ export const useAuthListener = ({
           err.message?.includes("timeout") ||
           err.message?.includes("Network")
         ) {
-          console.log("🔄 Network/timeout error, clearing auth state");
           onSessionChange(null);
           onUserChange(null);
           onProfileChange(null);
@@ -202,8 +199,6 @@ export const useAuthListener = ({
      * FIX: Realtime deshabilitado
      */
     const handleAuthChange = async (event: string, session: Session | null) => {
-      console.log("🔐 Auth event:", event);
-
       if (!mounted) return;
 
       // Verificar expiración
@@ -211,7 +206,6 @@ export const useAuthListener = ({
         const expiresAt = session.expires_at * 1000;
         const now = Date.now();
         if (now >= expiresAt) {
-          console.log("🔄 Session expired in onAuthStateChange");
           onSessionChange(null);
           onUserChange(null);
           onProfileChange(null);

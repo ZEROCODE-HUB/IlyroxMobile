@@ -13,7 +13,7 @@
  * - Uso de expo-image para mejor gestión de memoria de imágenes.
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -81,6 +81,94 @@ const FILTER_OPTIONS = [
   "Reservada",
   "Vendida",
 ];
+
+/**
+ * Helper: Map entities to FeedItem
+ */
+const mapProfileToUser = (p: perfiles): User => {
+  const name = [p.nombre, p.apellido_paterno, p.apellido_materno]
+    .filter(Boolean)
+    .join(" ");
+
+  return {
+    id: p.id,
+    nombre: p.nombre,
+    name: p.nombre_completo || name || "Usuario",
+    avatar: p.foto,
+    role: (p.rol.charAt(0).toUpperCase() + p.rol.slice(1)) as any,
+    rating: parseFloat(p.calificacion_promedio || "0"),
+    totalRatings: parseInt(p.total_calificaciones || "0"),
+    positiveRecommendations: parseInt(p.total_recomendaciones_positivas || "0"),
+    negativeRecommendations: parseInt(p.total_recomendaciones_negativas || "0"),
+    isFollowing: false,
+  };
+};
+
+const mapPostToFeedItem = (
+  post: any,
+  profile: perfiles | null,
+  targetUserId?: string,
+): FeedItem => {
+  const defaultUser: User = {
+    id: targetUserId || "",
+    name: "Usuario",
+    avatar: "",
+    role: "Cliente",
+    isFollowing: false,
+  };
+
+  return {
+    id: post.feed_item_id || post.id,
+    type: "post",
+    user: profile ? mapProfileToUser(profile) : defaultUser,
+    content: post.contenido || "",
+    postType:
+      post.tipo
+        ?.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, "") || "post",
+    images: post.imagenes || [],
+    likes: post.likes_count || 0,
+    comments: post.comentarios_count || 0,
+    timestamp: post.created_at,
+    status: post.status,
+    foto_perfil: post.foto_perfil,
+    fecha_hora: post.fecha_hora,
+    nombre_asesor: post.nombre_asesor,
+    ubicacion: post.ubicacion,
+    foto_propiedad: post.foto_propiedad,
+    antiguedad: post.antiguedad,
+    postDetails: post,
+    busquedas_json: post.busquedas_json,
+  };
+};
+
+const mapReelToFeedItem = (
+  reel: any,
+  profile: perfiles | null,
+  targetUserId?: string,
+): FeedItem => {
+  const defaultUser: User = {
+    id: targetUserId || "",
+    name: "Usuario",
+    avatar: "",
+    role: "Cliente",
+    isFollowing: false,
+  };
+
+  return {
+    id: reel.feed_item_id || reel.id, // Prefer feed_item_id for likes/comments
+    type: "reel",
+    user: profile ? mapProfileToUser(profile) : defaultUser,
+    content: reel.descripcion || "",
+    videoUrl: reel.video_url,
+    images: reel.thumbnail_url ? [reel.thumbnail_url] : [],
+    likes: reel.likes_count || 0,
+    comments: reel.comentarios_count || 0,
+    timestamp: reel.created_at,
+  };
+};
 
 const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   const { user: authUser } = useAuth();
@@ -162,121 +250,45 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   useFocusEffect(
     useCallback(() => {
       setSelectedProperty(null);
-      // Removed auto-fetch to prevent refreshing every time we go back
-      // fetchProfileData();
     }, []),
   );
 
   /**
-   * Helper: Format full name
+   * Helpers
    */
-  const formatFullName = (p: perfiles | null): string => {
+  const formatFullName = useCallback((p: perfiles | null): string => {
     if (!p) return "Usuario";
     const parts = [p.nombre, p.apellido_paterno, p.apellido_materno].filter(
       Boolean,
     );
     return parts.length > 0 ? parts.join(" ") : p.nombre_completo || "Usuario";
-  };
+  }, []);
 
-  const formatPhoneNumber = (
-    prefix: string | null,
-    number: string | null,
-  ): string => {
-    if (!number) return "No especificado";
-    if (prefix) return `${prefix} ${number}`;
-    return number;
-  };
+  const formatPhoneNumber = useCallback(
+    (prefix: string | null, number: string | null): string => {
+      if (!number) return "No especificado";
+      if (prefix) return `${prefix} ${number}`;
+      return number;
+    },
+    [],
+  );
 
-  const formatLocation = (estado: string | null, pais: string): string => {
-    if (!estado) return pais || "No especificada";
-    return `${estado}, ${pais}`;
-  };
+  const formatLocation = useCallback(
+    (estado: string | null, pais: string): string => {
+      if (!estado) return pais || "No especificada";
+      return `${estado}, ${pais}`;
+    },
+    [],
+  );
 
-  const formatRole = (rol: string): string => {
+  const formatRole = useCallback((rol: string): string => {
     const roleMap: Record<string, string> = {
       agente: "Agente",
       cliente: "Cliente",
       admin: "Admin",
     };
     return roleMap[rol] || rol;
-  };
-
-  /**
-   * Helper: Map entities to FeedItem
-   */
-  const mapProfileToUser = (p: perfiles): User => {
-    const name = [p.nombre, p.apellido_paterno, p.apellido_materno]
-      .filter(Boolean)
-      .join(" ");
-
-    return {
-      id: p.id,
-      nombre: p.nombre,
-      name: p.nombre_completo || name || "Usuario",
-      avatar: p.foto,
-      role: (p.rol.charAt(0).toUpperCase() + p.rol.slice(1)) as any,
-      rating: parseFloat(p.calificacion_promedio || "0"),
-      totalRatings: parseInt(p.total_calificaciones || "0"),
-      positiveRecommendations: parseInt(
-        p.total_recomendaciones_positivas || "0",
-      ),
-      negativeRecommendations: parseInt(
-        p.total_recomendaciones_negativas || "0",
-      ),
-      isFollowing: false,
-    };
-  };
-
-  const mapPostToFeedItem = (post: any): FeedItem => {
-    const defaultUser: User = {
-      id: targetUserId || "",
-      name: "Usuario",
-      avatar: "",
-      role: "Cliente",
-      isFollowing: false,
-    };
-
-    return {
-      id: post.feed_item_id || post.id,
-      type: "post",
-      user: profile ? mapProfileToUser(profile) : defaultUser,
-      content: post.contenido || "",
-      postType: post.tipo?.toLowerCase().trim() || "post",
-      images: post.imagenes || [],
-      likes: post.likes_count || 0,
-      comments: post.comentarios_count || 0,
-      timestamp: post.created_at,
-      status: post.status,
-      foto_perfil: post.foto_perfil,
-      fecha_hora: post.fecha_hora,
-      nombre_asesor: post.nombre_asesor,
-      ubicacion: post.ubicacion,
-      foto_propiedad: post.foto_propiedad,
-      antiguedad: post.antiguedad,
-    };
-  };
-
-  const mapReelToFeedItem = (reel: any): FeedItem => {
-    const defaultUser: User = {
-      id: targetUserId || "",
-      name: "Usuario",
-      avatar: "",
-      role: "Cliente",
-      isFollowing: false,
-    };
-
-    return {
-      id: reel.feed_item_id || reel.id, // Prefer feed_item_id for likes/comments
-      type: "reel",
-      user: profile ? mapProfileToUser(profile) : defaultUser,
-      content: reel.descripcion || "",
-      videoUrl: reel.video_url,
-      images: reel.thumbnail_url ? [reel.thumbnail_url] : [],
-      likes: reel.likes_count || 0,
-      comments: reel.comentarios_count || 0,
-      timestamp: reel.created_at,
-    };
-  };
+  }, []);
 
   /**
    * useEffect ÚNICO optimizado for Recommended Users
@@ -313,7 +325,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     }
   };
 
-  const handleDeleteItem = async () => {
+  const handleDeleteItem = useCallback(async () => {
     if (!itemToDelete) return;
 
     try {
@@ -338,37 +350,56 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     } finally {
       setDeleting(false);
     }
-  };
+  }, [itemToDelete, supabase, deletePost, deleteReel, handleRefresh]);
 
-  const profileData = {
-    name: formatFullName(profile),
-    avatar: profile?.foto || undefined,
-    role: formatRole(profile?.rol || "cliente"),
-    location: formatLocation(
-      profile?.estado || null,
-      profile?.pais || "México",
-    ),
-    phone: formatPhoneNumber(
-      profile?.prefijo_celular || null,
-      profile?.celular || null,
-    ),
-    anos_experiencia: profile?.anos_experiencia || 0,
-    rating: reviewStats?.calificacion_promedio || 0,
-    reviewCount: reviewStats?.total_resenas || 0,
-    positiveRecommendations: reviewStats?.total_recomiendan || 0,
-    negativeRecommendations: reviewStats?.total_no_recomiendan || 0,
-    biography: profile?.biografia,
-    website: profile?.sitio_web,
-    disponibilidad: reviewStats?.promedio_disponibilidad || 0,
-    profesionalismo: reviewStats?.promedio_profesionalismo || 0,
-    comunicacion: reviewStats?.promedio_comunicacion || 0,
-    conocimientoMercado: reviewStats?.promedio_conocimiento_mercado || 0,
-  };
+  const profileData = useMemo(
+    () => ({
+      name: formatFullName(profile),
+      avatar: profile?.foto || undefined,
+      role: formatRole(profile?.rol || "cliente"),
+      location: formatLocation(
+        profile?.estado || null,
+        profile?.pais || "México",
+      ),
+      phone: formatPhoneNumber(
+        profile?.prefijo_celular || null,
+        profile?.celular || null,
+      ),
+      anos_experiencia: profile?.anos_experiencia || 0,
+      rating: reviewStats?.calificacion_promedio || 0,
+      reviewCount: reviewStats?.total_resenas || 0,
+      positiveRecommendations: reviewStats?.total_recomiendan || 0,
+      negativeRecommendations: reviewStats?.total_no_recomiendan || 0,
+      biography: profile?.biografia,
+      website: profile?.sitio_web,
+      disponibilidad: reviewStats?.promedio_disponibilidad || 0,
+      profesionalismo: reviewStats?.promedio_profesionalismo || 0,
+      comunicacion: reviewStats?.promedio_comunicacion || 0,
+      conocimientoMercado: reviewStats?.promedio_conocimiento_mercado || 0,
+    }),
+    [profile, reviewStats],
+  );
 
-  const filteredProperties =
-    activeFilter === "Todas"
-      ? properties
-      : properties.filter((p) => p.status === activeFilter);
+  const filteredProperties = useMemo(
+    () =>
+      activeFilter === "Todas"
+        ? properties
+        : properties.filter((p) => p.status === activeFilter),
+    [properties, activeFilter],
+  );
+
+  const listData = useMemo(() => {
+    switch (activeTab) {
+      case "properties":
+        return filteredProperties;
+      case "posts":
+        return posts;
+      case "reels":
+        return reels;
+      default:
+        return [];
+    }
+  }, [activeTab, filteredProperties, posts, reels]);
 
   const contentCounts = {
     properties: properties.length,
@@ -376,17 +407,64 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     reels: reels.length,
   };
 
-  const handlePostPress = (post: Post) => {
-    const targetId = (post as any).feed_item_id || post.id;
+  const handlePostPress = useCallback(
+    (post: Post) => {
+      const targetId = (post as any).feed_item_id || post.id;
 
-    navigation.push("(stack)", {
-      screen: "post/[id]",
-      params: {
-        id: targetId,
-        item: JSON.stringify(mapPostToFeedItem(post)),
-      },
-    });
-  };
+      navigation.push("(stack)", {
+        screen: "post/[id]",
+        params: {
+          id: targetId,
+          item: JSON.stringify(mapPostToFeedItem(post, profile, targetUserId)),
+        },
+      });
+    },
+    [navigation, profile, targetUserId],
+  );
+
+  const handlePropertyPress = useCallback((property: Property) => {
+    setSelectedProperty(property);
+  }, []);
+
+  const handleEditProperty = useCallback((property: Property) => {
+    setEditProperty(property);
+    setShowModal(true);
+  }, []);
+
+  const handleDeleteProperty = useCallback((property: Property) => {
+    setItemToDelete({ type: "property", item: property });
+  }, []);
+
+  const handleEditPost = useCallback((post: Post) => {
+    setEditPost(post);
+    setShowPostModal(true);
+  }, []);
+
+  const handleDeletePost = useCallback((post: Post) => {
+    setItemToDelete({ type: "post", item: post });
+  }, []);
+
+  const handleEditReel = useCallback((reel: Reel) => {
+    setEditReel(reel);
+    setShowReelModal(true);
+  }, []);
+
+  const handleDeleteReel = useCallback((reel: Reel) => {
+    setItemToDelete({ type: "reel", item: reel });
+  }, []);
+
+  const handleReelPress = useCallback(
+    (reel: Reel) => {
+      router.push({
+        pathname: "/(stack)/reel/[id]",
+        params: {
+          id: reel.id,
+          item: JSON.stringify(mapReelToFeedItem(reel, profile, targetUserId)),
+        },
+      });
+    },
+    [router, profile, targetUserId],
+  );
 
   const renderHeader = () => (
     <>
@@ -404,9 +482,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
             size={100}
             userId={targetUserId!}
             isOwnProfile={isMe}
-            onPhotoUpdated={(newUrl) => {
-              updateProfilePhoto(newUrl);
-            }}
+            onPhotoUpdated={updateProfilePhoto}
           />
 
           <View style={styles.infoRight}>
@@ -734,76 +810,65 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     </>
   );
 
-  const getListData = () => {
-    switch (activeTab) {
-      case "properties":
-        return filteredProperties;
-      case "posts":
-        return posts;
-      case "reels":
-        return reels;
-      default:
-        return [];
-    }
-  };
+  const userProfileMapped = useMemo(
+    () => (profile ? mapProfileToUser(profile) : undefined),
+    [profile],
+  );
 
-  const renderItem: ListRenderItem<any> = ({ item, index }) => {
-    switch (activeTab) {
-      case "properties":
-        return (
-          <ProfilePropertyItem
-            item={item}
-            onPress={(property) => setSelectedProperty(property)}
-            isOwnProfile={isMe}
-            onEdit={(property) => {
-              setEditProperty(property);
-              setShowModal(true);
-            }}
-            onDelete={(property) =>
-              setItemToDelete({ type: "property", item: property })
-            }
-            isLastInRow={(index + 1) % 3 === 0}
-          />
-        );
-      case "posts":
-        return (
-          <ProfilePostItem
-            item={item}
-            user={profile ? mapProfileToUser(profile) : undefined}
-            onPress={(post) => handlePostPress(post)}
-            isOwnProfile={isMe}
-            onEdit={(post) => {
-              setEditPost(post);
-              setShowPostModal(true);
-            }}
-            onDelete={(post) => setItemToDelete({ type: "post", item: post })}
-          />
-        );
-      case "reels":
-        return (
-          <ProfileReelItem
-            item={item}
-            onPress={(reel) =>
-              router.push({
-                pathname: "/(stack)/reel/[id]",
-                params: {
-                  id: reel.id,
-                  item: JSON.stringify(mapReelToFeedItem(reel)),
-                },
-              })
-            }
-            isOwnProfile={isMe}
-            onEdit={(reel) => {
-              setEditReel(reel);
-              setShowReelModal(true);
-            }}
-            onDelete={(reel) => setItemToDelete({ type: "reel", item: reel })}
-          />
-        );
-      default:
-        return null;
-    }
-  };
+  const renderItem: ListRenderItem<any> = useCallback(
+    ({ item, index }) => {
+      switch (activeTab) {
+        case "properties":
+          return (
+            <ProfilePropertyItem
+              item={item}
+              onPress={handlePropertyPress}
+              isOwnProfile={isMe}
+              onEdit={handleEditProperty}
+              onDelete={handleDeleteProperty}
+              isLastInRow={(index + 1) % 3 === 0}
+            />
+          );
+        case "posts":
+          return (
+            <ProfilePostItem
+              item={item}
+              user={userProfileMapped}
+              onPress={handlePostPress}
+              isOwnProfile={isMe}
+              onEdit={handleEditPost}
+              onDelete={handleDeletePost}
+            />
+          );
+        case "reels":
+          return (
+            <ProfileReelItem
+              item={item}
+              onPress={handleReelPress}
+              isOwnProfile={isMe}
+              onEdit={handleEditReel}
+              onDelete={handleDeleteReel}
+            />
+          );
+        default:
+          return null;
+      }
+    },
+    [
+      activeTab,
+      isMe,
+      handlePropertyPress,
+      handleEditProperty,
+      handleDeleteProperty,
+      userProfileMapped,
+      handlePostPress,
+      handleEditPost,
+      handleDeletePost,
+      handleReelPress,
+      handleEditReel,
+      handleDeleteReel,
+    ],
+  );
 
   const getEmptyMessage = () => {
     switch (activeTab) {
@@ -831,7 +896,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     }
   };
 
-  if (loading && !refreshing) {
+  if (loading && !refreshing && !profile) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -843,7 +908,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>
       <FlatList
-        data={getListData()}
+        data={listData}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         numColumns={3}

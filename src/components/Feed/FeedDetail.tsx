@@ -42,9 +42,9 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
   const [showOptions, setShowOptions] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
 
-  const isSpecialPost = ["openhouse", "aniversario", "sold"].includes(
-    item.postType,
-  );
+  const isSpecialPost =
+    ["openhouse", "aniversario", "sold"].includes(item.postType) ||
+    (item.postType === "busqueda" && !!item.postDetails?.busquedas_json);
 
   const hasImages = images.length > 0;
   const isSearchPost = item.postType === "busqueda";

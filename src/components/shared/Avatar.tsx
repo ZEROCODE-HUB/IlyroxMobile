@@ -12,53 +12,50 @@ interface AvatarProps {
   isWithBorder?: boolean;
 }
 
-export const Avatar: React.FC<AvatarProps> = ({
-  uri,
-  name = "U",
-  size = 40,
-  style,
-}) => {
-  const getInitials = (fullName: string) => {
-    const parts = fullName.trim().split(/\s+/);
-    if (parts.length === 0) return "U";
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-    return (
-      parts[0].charAt(0) + parts[parts.length - 1].charAt(0)
-    ).toUpperCase();
-  };
+export const Avatar: React.FC<AvatarProps> = React.memo(
+  ({ uri, name = "U", size = 40, style }) => {
+    const getInitials = (fullName: string) => {
+      const parts = fullName.trim().split(/\s+/);
+      if (parts.length === 0) return "U";
+      if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+      return (
+        parts[0].charAt(0) + parts[parts.length - 1].charAt(0)
+      ).toUpperCase();
+    };
 
-  const containerStyle = {
-    width: size,
-    height: size,
-    borderRadius: size / 2,
-    backgroundColor: COLORS.primary, // Verde principal i360
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    overflow: "hidden" as const,
-  };
+    const containerStyle = {
+      width: size,
+      height: size,
+      borderRadius: size / 2,
+      backgroundColor: COLORS.primary, // Verde principal i360
+      justifyContent: "center" as const,
+      alignItems: "center" as const,
+      overflow: "hidden" as const,
+    };
 
-  if (uri && uri.trim() !== "" && !uri.includes("placehold.co")) {
+    if (uri && uri.trim() !== "" && !uri.includes("placehold.co")) {
+      return (
+        <View style={[containerStyle, style]}>
+          <Image
+            source={{ uri }}
+            style={{ width: "100%", height: "100%" }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={0} // Reducir o quitar transición para evitar parpadeo en re-renders
+          />
+        </View>
+      );
+    }
+
     return (
       <View style={[containerStyle, style]}>
-        <Image
-          source={{ uri }}
-          style={{ width: "100%", height: "100%" }}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          transition={200}
-        />
+        <Text style={[styles.initials, { fontSize: size * 0.4 }]}>
+          {getInitials(name)}
+        </Text>
       </View>
     );
-  }
-
-  return (
-    <View style={[containerStyle, style]}>
-      <Text style={[styles.initials, { fontSize: size * 0.4 }]}>
-        {getInitials(name)}
-      </Text>
-    </View>
-  );
-};
+  },
+);
 
 export const CircularImageWithRays = ({
   uri,

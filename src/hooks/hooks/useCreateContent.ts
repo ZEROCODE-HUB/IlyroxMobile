@@ -26,6 +26,7 @@ export function useCreateContent(userId?: string) {
     content: string,
     images: string[],
     type: "post" | "busqueda" | "openhouse" | "aniversario" | "sold" = "post",
+    metadata: any = null,
   ) => {
     if (!userId) {
       Alert.alert("Error", "Debes iniciar sesión");
@@ -46,6 +47,7 @@ export function useCreateContent(userId?: string) {
           contenido: content,
           tipo: type, // Agregado tipo
           imagenes: uploadedUrls.length > 0 ? uploadedUrls : null,
+          busquedas_json: metadata,
         })
         .select()
         .single();
