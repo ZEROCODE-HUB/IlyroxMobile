@@ -210,6 +210,9 @@ export type perfiles = {
   celular?: string;
   pais: string;
   estado: string;
+  ciudad?: string;
+  municipio?: string;
+  colonia?: string;
   email: string;
   foto: string;
   estado_registro: string;

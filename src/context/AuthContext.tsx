@@ -24,7 +24,7 @@ interface AuthContextType {
   profile: perfiles | null;
   loading: boolean;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: (newData?: perfiles) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -55,13 +55,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   // Hook personalizado para cargar perfiles con cache
-  const { loadProfile, clearCache } = useProfileLoader();
+  const { loadProfile, clearCache, updateCache } = useProfileLoader();
 
   /**
-   * Refrescar perfil manualmente
+   * Refrescar perfil manualmente o actualizarlo con datos conocidos
    */
-  const refreshProfile = async () => {
-    if (user) {
+  const refreshProfile = async (newData?: perfiles) => {
+    if (!user) return;
+
+    if (newData) {
+      // Actualizar localmente sin llamar a la red
+      setProfile(newData);
+      updateCache(user.id, newData);
+    } else {
+      // Forzar carga desde la red
       clearCache(user.id);
       const profileData = await loadProfile(user.id);
       setProfile(profileData);

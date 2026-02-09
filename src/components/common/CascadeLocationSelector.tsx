@@ -25,13 +25,15 @@ interface LocationData {
 interface CascadeLocationSelectorProps {
   initialData?: Partial<LocationData>;
   onChange: (data: LocationData) => void;
-  showColonia?: boolean; // Opcional: mostrar selector de colonia
+  showColonia?: boolean;
+  isMandatory?: boolean;
 }
 
 export default function CascadeLocationSelector({
   initialData,
   onChange,
-  showColonia = true,
+  showColonia = false,
+  isMandatory = true,
 }: CascadeLocationSelectorProps) {
   const [estado, setEstado] = useState(initialData?.estado || "");
   const [ciudad, setCiudad] = useState(initialData?.ciudad || "");
@@ -47,7 +49,7 @@ export default function CascadeLocationSelector({
   // Opciones disponibles según selección
   const [ciudadesDisponibles, setCiudadesDisponibles] = useState<string[]>([]);
   const [municipiosDisponibles, setMunicipiosDisponibles] = useState<string[]>(
-    []
+    [],
   );
   const [coloniasDisponibles, setColoniasDisponibles] = useState<string[]>([]);
 
@@ -119,9 +121,12 @@ export default function CascadeLocationSelector({
     <View style={styles.container}>
       {/* Estado */}
       <View style={styles.field}>
-        <Text style={styles.label}>Estado *</Text>
+        <Text style={styles.label}>Estado{isMandatory ? " *" : ""}</Text>
         <TouchableOpacity
-          style={[styles.selector, !estado && styles.selectorEmpty]}
+          style={[
+            styles.selector,
+            isMandatory && !estado && styles.selectorEmpty,
+          ]}
           onPress={() => setShowEstadoModal(true)}
         >
           <Text
@@ -129,7 +134,11 @@ export default function CascadeLocationSelector({
           >
             {estado || "Selecciona un estado..."}
           </Text>
-          <Ionicons name="chevron-down" size={20} color={COLORS.textSecondary} />
+          <Ionicons
+            name="chevron-down"
+            size={20}
+            color={COLORS.textSecondary}
+          />
         </TouchableOpacity>
       </View>
 
@@ -144,107 +153,121 @@ export default function CascadeLocationSelector({
       />
 
       {/* Ciudad */}
-      {estado && (
-        <>
-          <View style={styles.field}>
-            <Text style={styles.label}>Ciudad *</Text>
-            <TouchableOpacity
-              style={[styles.selector, !ciudad && styles.selectorEmpty]}
-              onPress={() => {
-                if (ciudadesDisponibles.length > 0) {
-                  setShowCiudadModal(true);
-                }
-              }}
-              disabled={ciudadesDisponibles.length === 0}
-            >
-              <Text
-                style={
-                  ciudad ? styles.selectorText : styles.selectorPlaceholder
-                }
-              >
-                {ciudadesDisponibles.length === 0
-                  ? "No hay ciudades disponibles"
-                  : ciudad || "Selecciona una ciudad..."}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color={COLORS.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          <SelectionModal
-            visible={showCiudadModal}
-            onClose={() => setShowCiudadModal(false)}
-            onSelect={(val) => setCiudad(val)}
-            title="Selecciona una Ciudad"
-            options={ciudadesDisponibles}
-            currentValue={ciudad}
-            searchable
+      <View style={styles.field}>
+        <Text style={styles.label}>Ciudad{isMandatory ? " *" : ""}</Text>
+        <TouchableOpacity
+          style={[
+            styles.selector,
+            isMandatory && estado && !ciudad && styles.selectorEmpty,
+            !estado && styles.selectorDisabled,
+          ]}
+          onPress={() => {
+            if (ciudadesDisponibles.length > 0) {
+              setShowCiudadModal(true);
+            }
+          }}
+          disabled={!estado || ciudadesDisponibles.length === 0}
+        >
+          <Text
+            style={ciudad ? styles.selectorText : styles.selectorPlaceholder}
+          >
+            {!estado
+              ? "Primero selecciona un estado"
+              : ciudadesDisponibles.length === 0
+                ? "No hay ciudades disponibles"
+                : ciudad || "Selecciona una ciudad..."}
+          </Text>
+          <Ionicons
+            name="chevron-down"
+            size={20}
+            color={COLORS.textSecondary}
           />
-        </>
-      )}
+        </TouchableOpacity>
+      </View>
+
+      <SelectionModal
+        visible={showCiudadModal}
+        onClose={() => setShowCiudadModal(false)}
+        onSelect={(val) => setCiudad(val)}
+        title="Selecciona una Ciudad"
+        options={ciudadesDisponibles}
+        currentValue={ciudad}
+        searchable
+      />
 
       {/* Municipio */}
-      {ciudad && (
-        <>
-          <View style={styles.field}>
-            <Text style={styles.label}>Municipio *</Text>
-            <TouchableOpacity
-              style={[styles.selector, !municipio && styles.selectorEmpty]}
-              onPress={() => {
-                if (municipiosDisponibles.length > 0) {
-                  setShowMunicipioModal(true);
-                }
-              }}
-              disabled={municipiosDisponibles.length === 0}
-            >
-              <Text
-                style={
-                  municipio ? styles.selectorText : styles.selectorPlaceholder
-                }
-              >
-                {municipiosDisponibles.length === 0
-                  ? "No hay municipios disponibles"
-                  : municipio || "Selecciona un municipio..."}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color={COLORS.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          <SelectionModal
-            visible={showMunicipioModal}
-            onClose={() => setShowMunicipioModal(false)}
-            onSelect={(val) => setMunicipio(val)}
-            title="Selecciona un Municipio"
-            options={municipiosDisponibles}
-            currentValue={municipio}
-            searchable
+      <View style={styles.field}>
+        <Text style={styles.label}>Municipio{isMandatory ? " *" : ""}</Text>
+        <TouchableOpacity
+          style={[
+            styles.selector,
+            isMandatory && ciudad && !municipio && styles.selectorEmpty,
+            !ciudad && styles.selectorDisabled,
+          ]}
+          onPress={() => {
+            if (municipiosDisponibles.length > 0) {
+              setShowMunicipioModal(true);
+            }
+          }}
+          disabled={!ciudad || municipiosDisponibles.length === 0}
+        >
+          <Text
+            style={municipio ? styles.selectorText : styles.selectorPlaceholder}
+          >
+            {!ciudad
+              ? "Primero selecciona una ciudad"
+              : municipiosDisponibles.length === 0
+                ? "No hay municipios disponibles"
+                : municipio || "Selecciona un municipio..."}
+          </Text>
+          <Ionicons
+            name="chevron-down"
+            size={20}
+            color={COLORS.textSecondary}
           />
-        </>
-      )}
+        </TouchableOpacity>
+      </View>
+
+      <SelectionModal
+        visible={showMunicipioModal}
+        onClose={() => setShowMunicipioModal(false)}
+        onSelect={(val) => setMunicipio(val)}
+        title="Selecciona un Municipio"
+        options={municipiosDisponibles}
+        currentValue={municipio}
+        searchable
+      />
 
       {/* Colonia (Opcional) */}
-      {showColonia && municipio && (
+      {showColonia && (
         <>
           <View style={styles.field}>
             <Text style={styles.label}>Colonia</Text>
             <TouchableOpacity
-              style={styles.selector}
+              style={[styles.selector, !municipio && styles.selectorDisabled]}
               onPress={() => {
                 if (coloniasDisponibles.length > 0) {
                   setShowColoniaModal(true);
                 }
               }}
-              disabled={coloniasDisponibles.length === 0}
+              disabled={!municipio || coloniasDisponibles.length === 0}
             >
               <Text
                 style={
                   colonia ? styles.selectorText : styles.selectorPlaceholder
                 }
               >
-                {coloniasDisponibles.length === 0
-                  ? "No hay colonias disponibles"
-                  : colonia || "Selecciona una colonia..."}
+                {!municipio
+                  ? "Primero selecciona un municipio"
+                  : coloniasDisponibles.length === 0
+                    ? "No hay colonias disponibles"
+                    : colonia || "Selecciona una colonia..."}
               </Text>
-              <Ionicons name="chevron-down" size={20} color={COLORS.textSecondary} />
+              <Ionicons
+                name="chevron-down"
+                size={20}
+                color={COLORS.textSecondary}
+              />
             </TouchableOpacity>
           </View>
 
@@ -262,7 +285,6 @@ export default function CascadeLocationSelector({
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     gap: 0,
@@ -290,6 +312,10 @@ const styles = StyleSheet.create({
   selectorEmpty: {
     borderColor: COLORS.primary,
     backgroundColor: COLORS.primaryTransparent,
+  },
+  selectorDisabled: {
+    opacity: 0.6,
+    backgroundColor: COLORS.cardBorder,
   },
   selectorText: {
     fontSize: 15,

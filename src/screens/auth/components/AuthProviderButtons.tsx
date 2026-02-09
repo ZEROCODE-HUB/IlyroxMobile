@@ -10,6 +10,7 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../../constants/colors";
@@ -80,49 +81,42 @@ export const AuthProviderButtons = memo(
     };
 
     return (
-      <View style={styles.container}>
-        <View style={styles.buttonContainer}>
-          {providerConfigs.map((config) => (
-            <TouchableOpacity
-              key={config.provider}
-              style={[
-                styles.button,
-                { backgroundColor: config.backgroundColor },
-              ]}
-              onPress={() => handlePress(config)}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              {loading && config.provider !== "email" ? (
-                <ActivityIndicator color={config.iconColor} size="small" />
-              ) : (
-                <Ionicons
-                  name={config.icon}
-                  size={24}
-                  color={config.iconColor}
-                />
-              )}
-              <Text style={[styles.buttonText, { color: config.textColor }]}>
-                {config.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.buttonContainer}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {providerConfigs.map((config) => (
+          <TouchableOpacity
+            key={config.provider}
+            style={[styles.button, { backgroundColor: config.backgroundColor }]}
+            onPress={() => handlePress(config)}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            {loading && config.provider !== "email" ? (
+              <ActivityIndicator color={config.iconColor} size="small" />
+            ) : (
+              <Ionicons name={config.icon} size={24} color={config.iconColor} />
+            )}
+            <Text style={[styles.buttonText, { color: config.textColor }]}>
+              {config.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
     );
   },
 );
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    justifyContent: "center",
-    gap: 12,
+    width: "100%",
   },
   buttonContainer: {
     gap: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 20,
+    paddingVertical: 10,
   },
   button: {
     flexDirection: "row",

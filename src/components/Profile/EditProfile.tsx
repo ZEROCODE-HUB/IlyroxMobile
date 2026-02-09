@@ -19,7 +19,8 @@ import { AppInput } from "../../design-system/components/AppInput";
 import { perfiles } from "../../types";
 import * as ImagePicker from "expo-image-picker";
 import { decode } from "base64-arraybuffer";
-import CascadeLocationSelector from "../common/CascadeLocationSelector";
+import { SelectionModal } from "../modals";
+import { ESTADOS_MEXICO } from "../../constants/locations";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
 interface EditProfileProps {
@@ -35,27 +36,12 @@ const EditProfile: React.FC<EditProfileProps> = ({
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // Form State
   const [formData, setFormData] = useState<Partial<perfiles>>({});
   const [imageUri, setImageUri] = useState<string | null>(null);
-
+  const [showEstadoModal, setShowEstadoModal] = useState(false);
   useEffect(() => {
     if (authProfile) {
-      setFormData({
-        nombre: authProfile.nombre || "",
-        apellido_paterno: authProfile.apellido_paterno || "",
-        apellido_materno: authProfile.apellido_materno || "",
-        biografia: authProfile.biografia || "",
-        sitio_web: authProfile.sitio_web || "",
-        celular: authProfile.celular || "",
-        prefijo_celular: authProfile.prefijo_celular || "+52",
-        pais: authProfile.pais || "México",
-        estado: authProfile.estado || "",
-        ocupacion: authProfile.ocupacion || "",
-        modalidad: authProfile.modalidad || "",
-        nombre_inmobiliaria: authProfile.nombre_inmobiliaria || "",
-        anos_experiencia: authProfile.anos_experiencia || "",
-      });
+      setFormData({ ...authProfile });
       setImageUri(authProfile.foto || null);
     }
   }, [authProfile]);
@@ -170,16 +156,19 @@ const EditProfile: React.FC<EditProfileProps> = ({
         ocupacion: cleanValue(formData.ocupacion),
         biografia: cleanValue(formData.biografia),
         apellido_materno: cleanValue(formData.apellido_materno),
+        estado: cleanValue(formData.estado),
       };
 
-      const { error } = await supabase
+      const { data: updatedData, error } = await supabase
         .from("perfiles")
         .update(updates)
-        .eq("id", user.id);
+        .eq("id", user.id)
+        .select()
+        .single();
 
       if (error) throw error;
 
-      await refreshProfile(); // Refresh context
+      await refreshProfile(updatedData); // Optimización: pasar datos directamente
 
       Alert.alert("Éxito", "Perfil actualizado correctamente");
       if (onProfileUpdate) onProfileUpdate();
@@ -315,6 +304,15 @@ const EditProfile: React.FC<EditProfileProps> = ({
               placeholder="Ej. Agente Inmobiliario, Arquitecto..."
             />
 
+            {formData.ocupacion === "Otro" && (
+              <AppInput
+                label="Especifique Ocupación"
+                value={formData.otro_ocupacion}
+                onChangeText={(t) => handleInputChange("otro_ocupacion", t)}
+                placeholder="Escriba su ocupación"
+              />
+            )}
+
             <AppInput
               label="Empresa / Inmobiliaria"
               value={formData.nombre_inmobiliaria}
@@ -336,29 +334,53 @@ const EditProfile: React.FC<EditProfileProps> = ({
               placeholder="Ej. 5 años"
               keyboardType="numeric"
             />
+
+            <AppInput
+              label="Cursos / Certificaciones"
+              value={formData.curso_certificacion}
+              onChangeText={(t) => handleInputChange("curso_certificacion", t)}
+              placeholder="Ej. Certificación AMPI, Curso Real Estate 101"
+              multiline
+            />
           </View>
 
-          {/* Location - Using a simplified approach or reusable component if valid */}
+          {/* Location */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Ubicación</Text>
-            {/* Note: CascadeLocationSelector handles state internally mostly, 
-                 we might need to adapt it or just use simple inputs if keeping context simple.
-                 Given CascadeLocationSelector expects a specific state structure, let's try to reuse it
-                 or just use text inputs if it's too coupled to creating properties.
-                 
-                 Looking at CreateProperty.tsx, it uses setUbicacionData and passes initialData.
-             */}
-            <CascadeLocationSelector
-              initialData={{
-                estado: formData.estado || "",
-              }}
-              onChange={(data) => {
-                handleInputChange("estado", data.estado);
-                // We might not be saving city/municipality in profile according to type 'perfiles'
-                // Type has 'pais', 'estado', but not 'ciudad' explicitly unless it's just missing from type def but in DB.
-                // The type definition shows: pais: string; estado: string;
-              }}
-              showColonia={false}
+            <TouchableOpacity
+              style={styles.locationSelector}
+              onPress={() => setShowEstadoModal(true)}
+            >
+              <View style={styles.locationSelectorContent}>
+                <Ionicons
+                  name="location-outline"
+                  size={20}
+                  color={COLORS.primary}
+                />
+                <Text
+                  style={[
+                    styles.locationText,
+                    !formData.estado && styles.locationPlaceholder,
+                  ]}
+                >
+                  {formData.estado || "Selecciona tu estado"}
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={COLORS.textTertiary}
+              />
+            </TouchableOpacity>
+
+            <SelectionModal
+              visible={showEstadoModal}
+              onClose={() => setShowEstadoModal(false)}
+              onSelect={(val) => handleInputChange("estado", val)}
+              title="Selecciona un Estado"
+              options={[...ESTADOS_MEXICO]}
+              currentValue={formData.estado}
+              searchable
             />
           </View>
         </ScrollView>
@@ -455,6 +477,28 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: COLORS.textPrimary,
     marginBottom: 16,
+  },
+  locationSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    borderRadius: 12,
+    padding: 14,
+  },
+  locationSelectorContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  locationText: {
+    fontSize: 15,
+    color: COLORS.textPrimary,
+    marginLeft: 12,
+  },
+  locationPlaceholder: {
+    color: COLORS.textTertiary,
   },
 });
 

@@ -4,8 +4,9 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
+  ScrollView,
 } from "react-native";
+import { FlatList } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../design-system/components/AppInput";
 import { COLORS } from "../constants/colors";
@@ -13,12 +14,16 @@ import { getUniqueLocations, LocationSuggestion } from "../lib/locationService";
 
 interface LocationSearchBarProps {
   onLocationSelect: (location: LocationSuggestion | null) => void;
+  onSearchingChange?: (val: boolean) => void;
+  isHeaderVisible?: boolean;
   containerStyle?: any;
   topOffset?: number;
 }
 
 export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
   onLocationSelect,
+  onSearchingChange,
+  isHeaderVisible = true,
   containerStyle,
   topOffset = 75,
 }) => {
@@ -45,8 +50,19 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
   };
 
   const filteredSuggestions = suggestions.filter((s) =>
-    s.name.toLowerCase().includes(query.toLowerCase())
+    s.name.toLowerCase().includes(query.toLowerCase()),
   );
+
+  useEffect(() => {
+    onSearchingChange?.(showSuggestions);
+  }, [showSuggestions, onSearchingChange]);
+
+  // Cerrar sugerencias si el header desaparece
+  useEffect(() => {
+    if (!isHeaderVisible) {
+      setShowSuggestions(false);
+    }
+  }, [isHeaderVisible]);
 
   const handleSelectLocation = (location: LocationSuggestion) => {
     setQuery(location.name);
@@ -112,11 +128,16 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
       />
 
       {showSuggestions && query.trim() && (
-        <View style={[styles.suggestionsContainer, { top: topOffset }]}>
+        <View
+          pointerEvents="auto"
+          style={[styles.suggestionsContainer, { top: topOffset }]}
+        >
           <FlatList
-            data={filteredSuggestions.slice(0, 8)}
+            data={filteredSuggestions}
             keyExtractor={(item, index) => `${item.type}-${item.name}-${index}`}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
+            nestedScrollEnabled={true}
+            style={{ flexGrow: 0 }}
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={styles.suggestionItem}
@@ -183,10 +204,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 15,
     elevation: 10,
-    maxHeight: 320,
+    maxHeight: 350,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
-    zIndex: 2000,
+    zIndex: 3000,
   },
   suggestionItem: {
     flexDirection: "row",
@@ -194,6 +215,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
+    width: "100%",
   },
   suggestionIconContainer: {
     width: 36,

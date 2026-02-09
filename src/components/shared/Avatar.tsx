@@ -12,17 +12,16 @@ interface AvatarProps {
   isWithBorder?: boolean;
 }
 
+const getInitials = (fullName: string) => {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 0) return "U";
+  if (parts.length === 1)
+    return parts[0].charAt(0).toUpperCase() + parts[parts.length - 1].charAt(1);
+  return parts[0].charAt(0).toUpperCase() + parts[parts.length - 1].charAt(1);
+};
+
 export const Avatar: React.FC<AvatarProps> = React.memo(
   ({ uri, name = "U", size = 40, style }) => {
-    const getInitials = (fullName: string) => {
-      const parts = fullName.trim().split(/\s+/);
-      if (parts.length === 0) return "U";
-      if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-      return (
-        parts[0].charAt(0) + parts[parts.length - 1].charAt(0)
-      ).toUpperCase();
-    };
-
     const containerStyle = {
       width: size,
       height: size,
@@ -41,7 +40,7 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
             cachePolicy="memory-disk"
-            transition={0} // Reducir o quitar transición para evitar parpadeo en re-renders
+            transition={0}
           />
         </View>
       );
@@ -59,13 +58,15 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
 
 export const CircularImageWithRays = ({
   uri,
+  name = "U",
   imageSize = 180,
   numberOfRays = 30,
   rayLength = 30,
   rayColor = "white",
   rayWidth = 2,
 }: {
-  uri: string;
+  uri?: string;
+  name?: string;
   imageSize?: number;
   numberOfRays?: number;
   rayLength?: number;
@@ -88,6 +89,39 @@ export const CircularImageWithRays = ({
       y2: center + outerRadius * Math.sin(radian),
     };
   });
+
+  const renderContent = () => {
+    const contentStyle = [
+      styles.image,
+      {
+        width: imageSize,
+        height: imageSize,
+        borderRadius: imageSize / 2,
+      },
+    ];
+
+    if (uri && uri.trim() !== "" && !uri.includes("placehold.co")) {
+      return <Image source={{ uri }} style={contentStyle} contentFit="cover" />;
+    }
+
+    return (
+      <View
+        style={[
+          contentStyle,
+          {
+            backgroundColor: COLORS.primary,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
+      >
+        <Text style={[styles.initials, { fontSize: imageSize * 0.4 }]}>
+          {getInitials(name)}
+        </Text>
+      </View>
+    );
+  };
+
   return (
     <View
       style={[
@@ -108,17 +142,7 @@ export const CircularImageWithRays = ({
           />
         ))}
       </Svg>
-      <Image
-        source={uri}
-        style={[
-          styles.image,
-          {
-            width: imageSize,
-            height: imageSize,
-            borderRadius: imageSize / 2,
-          },
-        ]}
-      />
+      {renderContent()}
     </View>
   );
 };

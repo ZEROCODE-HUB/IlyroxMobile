@@ -606,7 +606,16 @@ export function useFeed(options: UseFeedOptions = {}) {
     loadFeed(0, true);
   }, [loadFeed]);
 
+  // Ref para throttler de stats (60s)
+  const lastStatsUpdateRef = useRef<number>(0);
+
   const refreshUserStats = useCallback(() => {
+    const now = Date.now();
+    // Throttle: No refrescar más de una vez por minuto
+    if (now - lastStatsUpdateRef.current < 60000) {
+      return;
+    }
+
     // Usar itemsRef para no depender de 'items' y evitar ciclos infinitos en useFocusEffect
     const currentItems = itemsRef.current;
     if (currentItems.length === 0) return;
@@ -614,8 +623,10 @@ export function useFeed(options: UseFeedOptions = {}) {
     const ids = currentItems
       .map((it) => it.user?.id)
       .filter(Boolean) as string[];
+
     refreshStatsForUsers(ids);
     fetchRecommendedByPreviewForUsers(ids, { force: true });
+    lastStatsUpdateRef.current = now;
   }, [refreshStatsForUsers, fetchRecommendedByPreviewForUsers]);
 
   /**
@@ -627,14 +638,14 @@ export function useFeed(options: UseFeedOptions = {}) {
   }, []); // Solo al montar
 
   /**
-   * Auto-refresh cada 30 segundos (opcional)
+   * Auto-refresh cada 2 minutos (antes 30s) para optimizar consumo
    */
   useEffect(() => {
     if (!enableAutoRefresh) return;
 
     const interval = setInterval(() => {
       refresh();
-    }, 30000);
+    }, 120000);
 
     return () => clearInterval(interval);
   }, [enableAutoRefresh, refresh]);

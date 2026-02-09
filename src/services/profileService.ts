@@ -101,88 +101,62 @@ export const profileService = {
     const ids = Array.from(new Set(userIds.filter(Boolean)));
     if (ids.length === 0) return {};
 
-    const recIdsByUserId = new Map<string, string[]>();
+    try {
+      // 1. Obtener recomendaciones y sus perfiles en una sola consulta batch
+      // Limitamos a un número razonable para evitar traer miles si un usuario es muy popular,
+      // ya que solo necesitamos unos pocos para el "preview".
+      const { data, error } = await supabase
+        .from("recomendaciones_usuarios")
+        .select(
+          `
+          usuario_recomendado_id,
+          recomendado_por,
+          perfil:perfiles!recomendado_por (
+            id,
+            nombre,
+            apellido_paterno,
+            apellido_materno,
+            foto
+          )
+        `,
+        )
+        .in("usuario_recomendado_id", ids)
+        .eq("recomienda", true)
+        .limit(1000); // Tope generoso para cubrir múltiples usuarios populares en un solo viaje
 
-    // TODO: Si Supabase permitiera RPC o queries más complejas, esto sería una sola llamada.
-    // get_recommendation_previews(user_ids)
-    // Por ahora, limitamos la concurrencia para no saturar.
+      if (error) throw error;
 
-    let i = 0;
-    const concurrency = 5;
-    const workers = Array.from({ length: concurrency }, () =>
-      (async () => {
-        while (i < ids.length) {
-          const current = ids[i];
-          i += 1;
+      // 2. Agrupar resultados por usuario recomendado
+      const result: Record<string, any[]> = {};
 
-          // Solo necesitamos 1 para el preview
-          const { data, error: recError } = await supabase
-            .from("recomendaciones_usuarios")
-            .select("recomendado_por")
-            .eq("usuario_recomendado_id", current)
-            .eq("recomienda", true)
-            .limit(1);
+      // Inicializar el objeto con los IDs solicitados
+      ids.forEach((id) => {
+        result[id] = [];
+      });
 
-          if (recError) {
-            recIdsByUserId.set(current, []);
-            continue;
-          }
+      (data || []).forEach((row: any) => {
+        const uId = row.usuario_recomendado_id;
+        const p = row.perfil;
 
-          const recommenderIds = (data || [])
-            .map((r: any) => r?.recomendado_por)
-            .filter(Boolean) as string[];
-          recIdsByUserId.set(current, recommenderIds);
-        }
-      })(),
-    );
-
-    await Promise.all(workers);
-
-    const allRecommenderIds = Array.from(
-      new Set(Array.from(recIdsByUserId.values()).flat()),
-    );
-
-    const profilesById = new Map<
-      string,
-      { name: string; avatar: string | null }
-    >();
-
-    if (allRecommenderIds.length > 0) {
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("perfiles")
-        .select("id,nombre,apellido_paterno,apellido_materno,foto")
-        .in("id", allRecommenderIds);
-
-      if (!profilesError) {
-        (profilesData || []).forEach((p: any) => {
-          const name = [p?.nombre, p?.apellido_paterno, p?.apellido_materno]
+        if (p && result[uId].length < 3) {
+          // Solo guardamos hasta 3 para el preview
+          const name = [p.nombre, p.apellido_paterno, p.apellido_materno]
             .filter(Boolean)
             .join(" ")
             .trim();
-          profilesById.set(p.id, {
+
+          result[uId].push({
+            id: p.id,
             name: name || "Usuario",
-            avatar: p?.foto ?? null,
+            avatar: p.foto ?? null,
           });
-        });
-      }
+        }
+      });
+
+      return result;
+    } catch (error) {
+      console.error("Error en getRecommendationPreviewsForUsers:", error);
+      return {};
     }
-
-    const result: Record<string, any[]> = {};
-    ids.forEach((id) => {
-      const recommenderIds = recIdsByUserId.get(id) || [];
-      result[id] = recommenderIds
-        .map((rid) => {
-          const info = profilesById.get(rid);
-          if (!info) return null;
-          return {
-            id: rid,
-            name: info.name,
-            avatar: info.avatar,
-          };
-        })
-        .filter(Boolean);
-    });
-
-    return result;
   },
 };

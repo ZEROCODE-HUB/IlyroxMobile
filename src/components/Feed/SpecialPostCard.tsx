@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, Image, Dimensions } from "react-native";
 import { FeedItem, Post } from "../../types";
 import { Ionicons } from "@expo/vector-icons";
-import { CircularImageWithRays } from "../shared/Avatar";
+import { Avatar, CircularImageWithRays } from "../shared/Avatar";
 import { COLORS } from "../../constants";
 
 interface SpecialPostCardProps {
@@ -59,7 +59,12 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
         >
           {/* Versión miniatura del avatar con burst */}
           <View style={styles.gridBurstCircle}>
-            <Image source={{ uri: userAvatar }} style={styles.gridAvatar} />
+            <Avatar
+              uri={userAvatar}
+              name={userName}
+              size={40}
+              style={styles.gridAvatar}
+            />
           </View>
           <Text style={styles.gridTinyText}>Aniversario</Text>
           <Text style={styles.gridLargeText}>
@@ -160,7 +165,7 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
         {/* Avatar Central con efecto 'burst' */}
         <View style={styles.aniversaryAvatarContainer}>
           <View>
-            <CircularImageWithRays uri={userAvatar} />
+            <CircularImageWithRays uri={userAvatar} name={userName} />
           </View>
         </View>
 
@@ -219,7 +224,12 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
         <View style={[styles.openHouseFooter, { backgroundColor: mainColor }]}>
           {/* Avatar sobrepuesto (Left) */}
           <View style={styles.overlappingAvatarContainer}>
-            <Image source={{ uri: userAvatar }} style={styles.overlapAvatar} />
+            <Avatar
+              uri={userAvatar}
+              name={userName}
+              size={110}
+              style={styles.overlapAvatar}
+            />
           </View>
 
           {/* Textos (Right) */}

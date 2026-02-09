@@ -20,9 +20,15 @@ const LOGO_SOURCE = require("../assets/Logo.jpeg");
 
 interface HomeHeaderProps {
   style?: any;
+  onSearchingChange?: (val: boolean) => void;
+  isHeaderVisible?: boolean;
 }
 
-export const HomeHeader: React.FC<HomeHeaderProps> = ({ style }) => {
+export const HomeHeader: React.FC<HomeHeaderProps> = ({
+  style,
+  onSearchingChange,
+  isHeaderVisible = true,
+}) => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { setSelectedLocation } = useApp();
@@ -44,7 +50,23 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({ style }) => {
   };
 
   return (
-    <View style={[styles.headerContainer, { paddingTop: insets.top }, style]}>
+    <View
+      pointerEvents="box-none"
+      style={[styles.headerContainer, { paddingTop: insets.top }, style]}
+    >
+      {/* Background fill - this covers only the header part */}
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: COLORS.primary,
+            height: 130 + insets.top, // Fixed height for background
+            zIndex: -1,
+          },
+        ]}
+      />
+
       <View style={styles.headerTopRow}>
         <Image
           source={LOGO_SOURCE}
@@ -61,7 +83,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({ style }) => {
               <Ionicons
                 name={
                   screen === "Matches"
-                    ? "git-compare-outline" // Changed from "git-compare-outline" to match App.tsx if it's correct there, App.tsx had "git-compare-outline"
+                    ? "git-compare-outline"
                     : screen === "Messages"
                       ? "chatbubble"
                       : "calendar"
@@ -80,6 +102,8 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({ style }) => {
             setSelectedLocation(loc);
             if (loc) router.push("/(stack)/map");
           }}
+          onSearchingChange={onSearchingChange}
+          isHeaderVisible={isHeaderVisible}
         />
       </View>
     </View>
@@ -129,7 +153,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   searchWrapper: {
-    height: 60,
     justifyContent: "center",
+    zIndex: 100,
   },
 });

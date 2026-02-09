@@ -32,6 +32,7 @@ interface FeedProps {
   currentUserState?: string;
   onUserClick?: (user: User) => void;
   onScroll?: (offset: number) => void;
+  scrollEnabled?: boolean;
 }
 
 const Feed: React.FC<FeedProps> = ({
@@ -39,6 +40,7 @@ const Feed: React.FC<FeedProps> = ({
   currentUserState,
   onUserClick,
   onScroll,
+  scrollEnabled = true,
 }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -324,6 +326,7 @@ const Feed: React.FC<FeedProps> = ({
           { paddingTop: dynamicPaddingTop },
         ]}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={scrollEnabled}
         onScroll={handleScroll}
         scrollEventThrottle={16}
         onViewableItemsChanged={onViewableItemsChanged}

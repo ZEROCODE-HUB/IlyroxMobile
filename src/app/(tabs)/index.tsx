@@ -1,5 +1,5 @@
-import React, { useRef } from "react";
-import { View, StyleSheet, Animated } from "react-native";
+import React, { useRef, useState } from "react";
+import { View, StyleSheet, Animated, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import Feed from "../../components/Feed/Feed";
 import { useAuth } from "../../context/AuthContext";
@@ -11,6 +11,9 @@ export default function FeedScreen() {
   const router = useRouter();
   const { user, profile } = useAuth();
   const insets = useSafeAreaInsets();
+
+  const [isSearching, setIsSearching] = useState(false);
+  const [headerShown, setHeaderShown] = useState(true);
 
   // Animation Refs
   const headerTranslateY = useRef(new Animated.Value(0)).current;
@@ -35,6 +38,7 @@ export default function FeedScreen() {
       bounciness: 0,
     }).start();
     isHeaderVisible.current = true;
+    setHeaderShown(true);
     lastScrollY.current = 0;
   };
 
@@ -56,6 +60,7 @@ export default function FeedScreen() {
         useNativeDriver: true,
       }).start();
       isHeaderVisible.current = false;
+      setHeaderShown(false);
     } else if (diff < -15 && !isHeaderVisible.current) {
       // Show
       resetHeader();
@@ -65,24 +70,43 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View
-        style={[
-          styles.headerWrapper,
-          {
-            height: TOTAL_HEADER_HEIGHT,
-            transform: [{ translateY: headerTranslateY }],
-          },
-        ]}
-      >
-        <HomeHeader style={{ height: TOTAL_HEADER_HEIGHT }} />
-      </Animated.View>
-
       <Feed
         currentUserId={user?.id}
         currentUserState={profile?.estado || ""}
         onUserClick={handleUserClick}
         onScroll={handleScroll}
+        scrollEnabled={!isSearching}
       />
+
+      {isSearching && (
+        <Pressable
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: "rgba(0,0,0,0.1)",
+              zIndex: 90,
+            },
+          ]}
+          onPress={() => setIsSearching(false)}
+        />
+      )}
+
+      <Animated.View
+        pointerEvents="box-none"
+        style={[
+          styles.headerWrapper,
+          {
+            transform: [{ translateY: headerTranslateY }],
+            zIndex: 100,
+          },
+        ]}
+      >
+        <HomeHeader
+          style={{ height: TOTAL_HEADER_HEIGHT }}
+          onSearchingChange={setIsSearching}
+          isHeaderVisible={headerShown}
+        />
+      </Animated.View>
     </View>
   );
 }

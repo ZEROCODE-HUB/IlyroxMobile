@@ -31,7 +31,7 @@ export const LeadMatchCard: React.FC<LeadMatchCardProps> = ({
     if (amount >= 1000) {
       return `$${(amount / 1000).toFixed(0)}k`;
     }
-    return `$${amount}`;
+    return `$${amount}k`;
   };
 
   const currencyDisplay = currency === "USD" ? "USD" : "MXN";

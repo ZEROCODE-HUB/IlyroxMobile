@@ -108,7 +108,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
     if (amount >= 1000) {
       return `$${(amount / 1000).toFixed(0)}k`;
     }
-    return `$${amount}`;
+    return `$${amount}k`;
   };
 
   const renderSearchDetail = (
