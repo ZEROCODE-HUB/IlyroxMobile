@@ -26,11 +26,15 @@ const SettingsScreen: React.FC = () => {
   const handleLogout = () => {
     const performLogout = async () => {
       try {
+        console.log("🚀 Iniciando cierre de sesión desde Settings...");
         await signOut();
+        console.log("✨ Proceso de cierre de sesión completado.");
       } catch (error) {
-        console.error("Error en signOut:", error);
+        console.error("❌ Error en performLogout:", error);
         if (Platform.OS === "web") {
-          alert("Error al cerrar sesión. Inténtalo de nuevo.");
+          if (typeof window !== "undefined") {
+            window.alert("Error al cerrar sesión. Inténtalo de nuevo.");
+          }
         } else {
           Alert.alert("Error", "No se pudo cerrar sesión. Inténtalo de nuevo.");
         }
@@ -77,6 +81,14 @@ const SettingsScreen: React.FC = () => {
       icon: "business-outline",
       onPress: () => {
         router.push("/easy-broker");
+      },
+    },
+    {
+      id: "support",
+      title: "Soporte",
+      icon: "help-circle-outline",
+      onPress: () => {
+        router.push("/support");
       },
     },
     {

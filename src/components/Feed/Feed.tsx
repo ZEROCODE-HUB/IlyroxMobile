@@ -18,8 +18,6 @@ import { FlashList } from "@shopify/flash-list";
 import { FeedItem, User } from "../../types";
 import UsersSlider from "../UsersSlider";
 import { ReelCard, PropertyCard, PostCard } from "../cards";
-import ReelDetail from "../Reel/ReelDetail";
-import FeedDetail from "./FeedDetail";
 
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { COLORS } from "../../constants/colors";
@@ -33,6 +31,7 @@ interface FeedProps {
   onUserClick?: (user: User) => void;
   onScroll?: (offset: number) => void;
   scrollEnabled?: boolean;
+  refreshTimestamp?: number;
 }
 
 const Feed: React.FC<FeedProps> = ({
@@ -41,15 +40,17 @@ const Feed: React.FC<FeedProps> = ({
   onUserClick,
   onScroll,
   scrollEnabled = true,
+  refreshTimestamp,
 }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const [selectedItem, setSelectedItem] = useState<FeedItem | null>(null);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [activeCommentItem, setActiveCommentItem] = useState<FeedItem | null>(
     null,
   );
   const flatListRef = useRef<any>(null);
+
+  const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
 
   // Hooks de datos reales
   const {
@@ -72,6 +73,12 @@ const Feed: React.FC<FeedProps> = ({
     }, [refreshUserStats]),
   );
 
+  useEffect(() => {
+    if (refreshTimestamp) {
+      refresh();
+    }
+  }, [refreshTimestamp, refresh]);
+
   const dynamicPaddingTop = useMemo(() => {
     return Platform.OS === "ios" ? insets.top + 140 : insets.top + 130;
   }, [insets.top]);
@@ -89,16 +96,30 @@ const Feed: React.FC<FeedProps> = ({
   const bannerAnim = useRef(new Animated.Value(0)).current;
 
   // Viewability config
-  const [viewableItems, setViewableItems] = useState<string[]>([]);
+
   const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      const visibleIds = viewableItems.map((viewToken) => viewToken.item.id);
-      setViewableItems(visibleIds);
+    ({
+      viewableItems,
+      changed,
+    }: {
+      viewableItems: ViewToken[];
+      changed: ViewToken[];
+    }) => {
+      if (viewableItems.length > 0) {
+        const firstVisible = viewableItems[0];
+        setFocusedItemId((prevId) => {
+          if (prevId !== firstVisible.item.id) {
+            return firstVisible.item.id;
+          }
+          return prevId;
+        });
+      }
     },
   ).current;
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
+    itemVisiblePercentThreshold: 60,
+    minimumViewTime: 200,
   }).current;
 
   const showBanner = useCallback(
@@ -127,33 +148,27 @@ const Feed: React.FC<FeedProps> = ({
   const handleOpenDetail = useCallback(
     (item: FeedItem) => {
       if (item.type === "property" && item.propertyDetails?.id) {
-        // Navigate to property detail in the stack
         navigation.navigate("(stack)", {
           screen: "property/[id]",
           params: { id: item.propertyDetails.id },
+        });
+      } else if (item.type === "reel") {
+        navigation.navigate("(stack)", {
+          screen: "reel/[id]",
+          params: {
+            id: item.id,
+            item: JSON.stringify(item),
+          },
         });
       } else if (item.type === "post") {
         navigation.push("(stack)", {
           screen: "post/[id]",
           params: { id: item.id },
         });
-      } else {
-        setSelectedItem(item);
       }
     },
     [navigation],
   );
-
-  const handleCloseDetail = useCallback(() => {
-    setSelectedItem(null);
-    // Restaurar posición del scroll
-    // setTimeout(() => {
-    //   flatListRef.current?.scrollToOffset({
-    //     offset: scrollOffset,
-    //     animated: false,
-    //   });
-    // }, 100);
-  }, [scrollOffset]);
 
   const handleScroll = useCallback(
     (event: any) => {
@@ -177,7 +192,6 @@ const Feed: React.FC<FeedProps> = ({
       const success = await approveUser(user.id);
       if (success) {
         showBanner("¡Usuario aprobado!");
-        onUserClick?.(user);
       }
     },
     [approveUser, showBanner, onUserClick],
@@ -194,7 +208,7 @@ const Feed: React.FC<FeedProps> = ({
   // Renderizar item según su tipo
   const renderItem = useCallback(
     ({ item }: { item: FeedItem }) => {
-      const isVisible = viewableItems.includes(item.id);
+      const isVisible = item.id === focusedItemId;
 
       switch (item.type) {
         case "reel":
@@ -238,7 +252,7 @@ const Feed: React.FC<FeedProps> = ({
       handleOpenDetail,
       handleOpenComments,
       onUserClick,
-      viewableItems,
+      focusedItemId,
       currentUserId,
     ],
   );
@@ -291,26 +305,6 @@ const Feed: React.FC<FeedProps> = ({
     );
   }, [loading]);
 
-  // Si hay un item seleccionado, mostrar el detalle
-
-  if (selectedItem?.type === "reel") {
-    return (
-      <ReelDetail
-        item={selectedItem}
-        onClose={handleCloseDetail}
-        onUserClick={onUserClick}
-        currentUserId={currentUserId}
-      />
-    );
-  }
-
-  // <FeedDetail
-  //       item={selectedItem}
-  //       onClose={handleCloseDetail}
-  //       onUserClick={onUserClick}
-  //       currentUserId={currentUserId}
-  //     />
-
   return (
     <>
       <FlashList
@@ -318,6 +312,8 @@ const Feed: React.FC<FeedProps> = ({
         data={items}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
+        estimatedItemSize={400} // Altura aproximada promedio de un post/reel
+        extraData={focusedItemId}
         ListHeaderComponent={ListHeader}
         ListFooterComponent={ListFooter}
         ListEmptyComponent={ListEmpty}

@@ -17,6 +17,7 @@ import { useProfileLoader } from "./auth/useProfileLoader";
 import { useAuthListener } from "./auth/useAuthListener";
 import { useSessionRefresh } from "./auth/useSessionRefresh";
 import { OneSignal } from "react-native-onesignal";
+import { router } from "expo-router";
 
 interface AuthContextType {
   session: Session | null;
@@ -77,17 +78,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signOut = async () => {
     try {
-      console.log("Cerrar sesión presionado");
+      console.log("🔄 Iniciando proceso de cierre de sesión...");
       await supabase.auth.signOut();
       await OneSignal.logout();
       OneSignal.User.removeAlias("external_id");
+      console.log("✅ Supabase y OneSignal cerraron sesión correctamente");
     } catch (error) {
-      console.error("❌ Supabase signOut error:", error);
+      console.error("❌ Error durante el proceso de signOut:", error);
     } finally {
+      console.log("🧹 Limpiando estado local de sesión...");
       setSession(null);
       setUser(null);
       setProfile(null);
       clearCache();
+
+      // Forzar navegación al login como medida extra
+      router.replace("/login");
     }
   };
 

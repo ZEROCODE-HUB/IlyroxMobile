@@ -70,7 +70,7 @@ export const usePropertyFilters = (
       if (rawStatus) {
         const s = String(rawStatus).toLowerCase().trim();
         // Excluir si es vendida o suspendida (o cualquier cosa que no sea publicada/disponible)
-        if (s === "Vendida" || s === "Suspendida" || s === "Baja") {
+        if (s === "vendida" || s === "suspendida" || s === "baja") {
           return false;
         }
         // Opcional: Ser estricto y solo permitir "publicada" / "disponible"
@@ -78,8 +78,16 @@ export const usePropertyFilters = (
         // Por seguridad, si dice "vendida", adiós.
       }
 
-      // Geocerca por coordenadas si está definida
-      if (geofenceBounds) {
+      // Geocerca por coordenadas si está definida.
+      // Si hay un filtro de ubicación explícito (ciudad/municipio/colonia), desactivamos la geocerca
+      // porque los bounds de Google suelen ser muy restrictivos para zonas industriales periféricas.
+      const hasNamedLocationFilter = !!(
+        filters.locationFilter.ciudad ||
+        filters.locationFilter.municipio ||
+        filters.locationFilter.colonia
+      );
+
+      if (geofenceBounds && !hasNamedLocationFilter) {
         const lat = p.coordinates?.lat ?? anyP.latitud;
         const lng = p.coordinates?.lng ?? anyP.longitud;
         const valid =
@@ -119,6 +127,7 @@ export const usePropertyFilters = (
         }
       }
 
+
       // Filtro de estado
       if (filters.locationFilter.estado) {
         const pEstado = (anyP.estado || p.location?.state || "")
@@ -134,32 +143,43 @@ export const usePropertyFilters = (
         }
       }
 
-      // Filtro de ciudad
-      if (filters.locationFilter.ciudad) {
-        const pCiudad = (anyP.ciudad || p.location?.city || "")
-          .toString()
-          .trim()
-          .toLowerCase();
-        const fCiudad = filters.locationFilter.ciudad
-          .toString()
-          .trim()
-          .toLowerCase();
-        if (pCiudad !== fCiudad) {
-          return false;
-        }
-      }
-
-      // Filtro de municipio
+      const pCiudad = (anyP.ciudad || p.location?.city || "")
+        .toString()
+        .trim()
+        .toLowerCase();
       const pMunicipio = (anyP.municipio || p.location?.municipio || "")
         .toString()
         .trim()
         .toLowerCase();
-      if (
-        filters.locationFilter.municipio &&
-        pMunicipio !==
-          filters.locationFilter.municipio.toString().trim().toLowerCase()
-      ) {
-        return false;
+
+      // Filtro de ciudad (Flexible: busca en ciudad O municipio)
+      if (filters.locationFilter.ciudad) {
+        const fCiudad = filters.locationFilter.ciudad
+          .toString()
+          .trim()
+          .toLowerCase();
+        // Si el filtro es "Monterrey", aceptamos si p.ciudad="Monterrey" OR p.municipio="Monterrey"
+        const matchCiudad = pCiudad === fCiudad;
+        const matchMunicipio = pMunicipio === fCiudad;
+
+        if (!matchCiudad && !matchMunicipio) {
+          return false;
+        }
+      }
+
+      // Filtro de municipio (Flexible: busca en municipio O ciudad)
+      if (filters.locationFilter.municipio) {
+        const fMunicipio = filters.locationFilter.municipio
+          .toString()
+          .trim()
+          .toLowerCase();
+
+        const matchMunicipio = pMunicipio === fMunicipio;
+        const matchCiudad = pCiudad === fMunicipio;
+
+        if (!matchMunicipio && !matchCiudad) {
+          return false;
+        }
       }
 
       // Filtro de colonia
@@ -177,11 +197,17 @@ export const usePropertyFilters = (
         }
       }
 
-      if (filters.tipoPropiedad && p.type !== filters.tipoPropiedad) {
+      if (
+        filters.tipoPropiedad &&
+        p.type?.toString().toLowerCase() !== filters.tipoPropiedad.toLowerCase()
+      ) {
         return false;
       }
 
-      if (filters.subtipo && anyP.subtipo !== filters.subtipo) {
+      if (
+        filters.subtipo &&
+        anyP.subtipo?.toString().toLowerCase() !== filters.subtipo.toLowerCase()
+      ) {
         return false;
       }
 
@@ -199,8 +225,8 @@ export const usePropertyFilters = (
         finalPrice = pPrice * EXCHANGE_RATE;
       }
 
-      const minP = parseFloat(filters.precioMin) || 0;
-      const maxP = parseFloat(filters.precioMax) || Infinity;
+      const minP = parseFloat(filters.precioMin.replace(/,/g, "")) || 0;
+      const maxP = parseFloat(filters.precioMax.replace(/,/g, "")) || Infinity;
 
       if (finalPrice < minP || finalPrice > maxP) {
         return false;
@@ -255,12 +281,16 @@ export const usePropertyFilters = (
 
       if (filters.m2TerrenoMin) {
         const land = p.features?.landSqft || 0;
-        if (land < parseFloat(filters.m2TerrenoMin)) return false;
+        if (land < parseFloat(filters.m2TerrenoMin.replace(/,/g, "")))
+          return false;
       }
 
       if (filters.m2ConstruccionMin) {
         const constr = p.features?.constructionSqft || 0;
-        if (constr < parseFloat(filters.m2ConstruccionMin)) return false;
+        if (
+          constr < parseFloat(filters.m2ConstruccionMin.replace(/,/g, ""))
+        )
+          return false;
       }
 
       if (
@@ -290,20 +320,15 @@ export const usePropertyFilters = (
     setFilters((prev) => ({ ...prev, locationFilter: location }));
   };
 
-  const clearFilters = () => {
-    setFilters({
+  const clearFilters = (newLocationFilter?: PropertyFilters["locationFilter"]) => {
+    setFilters((prev) => ({
       tipoPropiedad: "",
       subtipo: "",
       precioMin: "",
       precioMax: "",
       moneda: "MXN",
       operacion: "",
-      locationFilter: {
-        estado: "",
-        ciudad: "",
-        municipio: "",
-        colonia: "",
-      },
+      locationFilter: newLocationFilter || prev.locationFilter, // KEEP LOCATION or use new one
       habitaciones: "",
       banos: "",
       estacionamientos: "",
@@ -311,7 +336,7 @@ export const usePropertyFilters = (
       niveles: "",
       m2TerrenoMin: "",
       m2ConstruccionMin: "",
-    });
+    }));
   };
 
   const hasActiveFilters =

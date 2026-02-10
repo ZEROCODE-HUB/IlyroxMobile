@@ -24,7 +24,6 @@ import { COLORS } from "../../constants";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
 import {
-  KeyboardProvider,
   KeyboardAvoidingView,
 } from "react-native-keyboard-controller";
 
@@ -56,7 +55,6 @@ export default function ChatScreen({
 }: ChatScreenProps) {
   const flatListRef = useRef<FlatList>(null);
   const insets = useSafeAreaInsets();
-  const [isInputFocused, setIsInputFocused] = useState(false);
   const actualConversationId = conversationId === "new" ? null : conversationId;
 
   const {
@@ -168,7 +166,7 @@ export default function ChatScreen({
   };
 
   const renderHeader = () => {
-    if (!hasMore) return null;
+    if (!hasMore || messages.length === 0 || loading) return null;
 
     return (
       <TouchableOpacity style={styles.loadMoreButton} onPress={loadMore}>
@@ -188,67 +186,62 @@ export default function ChatScreen({
   };
 
   return (
-    <KeyboardProvider>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={100}
-      >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMessage}
-          contentContainerStyle={styles.messagesContent}
-          ListHeaderComponent={renderHeader}
-          ListFooterComponent={renderFooter}
-          ListEmptyComponent={
-            !loading ? (
-              <View style={styles.emptyContainer}>
-                <Ionicons
-                  name="chatbubble-outline"
-                  size={64}
-                  color={COLORS.cardBorder}
-                />
-                <Text style={styles.emptyText}>No hay mensajes aún</Text>
-                <Text style={styles.emptySubtext}>
-                  Envía un mensaje para iniciar la conversación
-                </Text>
-              </View>
-            ) : null
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={100}
+    >
+      <FlatList
+        ref={flatListRef}
+        data={messages}
+        keyExtractor={(item) => item.id}
+        renderItem={renderMessage}
+        contentContainerStyle={styles.messagesContent}
+        ListHeaderComponent={renderHeader}
+        ListFooterComponent={renderFooter}
+        ListEmptyComponent={
+          !loading ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons
+                name="chatbubble-outline"
+                size={64}
+                color={COLORS.cardBorder}
+              />
+              <Text style={styles.emptyText}>No hay mensajes aún</Text>
+              <Text style={styles.emptySubtext}>
+                Envía un mensaje para iniciar la conversación
+              </Text>
+            </View>
+          ) : null
+        }
+        onContentSizeChange={() => {
+          if (messages.length > 0) {
+            flatListRef.current?.scrollToEnd({ animated: false });
           }
-          onContentSizeChange={() => {
-            if (messages.length > 0) {
-              flatListRef.current?.scrollToEnd({ animated: false });
-            }
-          }}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-        />
+        }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+      />
 
-        <View style={isInputFocused ? { marginBottom: 25 } : {}}>
-          <MessageInput
-            onSendText={(text) => sendMessage(text, messageMetadata)}
-            onSendImage={async (uri) => {
-              await sendImage(uri, messageMetadata);
-            }}
-            onSendFile={async (uri, name) => {
-              await sendFile(uri, name, messageMetadata);
-            }}
-            onSendProperty={handleSendProperty}
-            sending={sending}
-            onFocusChange={setIsInputFocused}
-          />
+      <MessageInput
+        onSendText={(text) => sendMessage(text, messageMetadata)}
+        onSendImage={async (uri) => {
+          await sendImage(uri, messageMetadata);
+        }}
+        onSendFile={async (uri, name) => {
+          await sendFile(uri, name, messageMetadata);
+        }}
+        onSendProperty={handleSendProperty}
+        sending={sending}
+      />
+
+      {error && (
+        <View style={styles.errorBanner}>
+          <Ionicons name="alert-circle" size={16} color={COLORS.error} />
+          <Text style={styles.errorText}>{error}</Text>
         </View>
-
-        {error && (
-          <View style={styles.errorBanner}>
-            <Ionicons name="alert-circle" size={16} color={COLORS.error} />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-      </KeyboardAvoidingView>
-    </KeyboardProvider>
+      )}
+    </KeyboardAvoidingView>
   );
 }
 

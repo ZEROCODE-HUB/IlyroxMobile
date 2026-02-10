@@ -9,22 +9,27 @@ import {
   Text,
   Modal,
   TouchableOpacity,
-  StyleSheet,
   ScrollView,
   ActivityIndicator,
   Alert,
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { AppInput } from "../../design-system/components/AppInput";
 import { COLORS } from "../../constants";
 import { supabase } from "../../lib/supabase";
 import { useToast } from "../../context/ToastContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import DateTimePicker from "@react-native-community/datetimepicker";
+
+// Sub-components
+import DatePickerField from "./DatePickerField";
+import TimePickerField from "./TimePickerField";
+import AppointmentTypeSelector, {
+  APPOINTMENT_TYPES,
+} from "./AppointmentTypeSelector";
+import { createAppointmentStyles as styles } from "./createAppointmentStyles";
 
 interface CreateAppointmentModalProps {
   visible: boolean;
@@ -34,14 +39,43 @@ interface CreateAppointmentModalProps {
   currentUserId: string;
 }
 
-const APPOINTMENT_TYPES = [
-  { value: "visita", label: "Visita a propiedad", icon: "home-outline" },
-  { value: "llamada", label: "Llamada telefónica", icon: "call-outline" },
-  { value: "videollamada", label: "Videollamada", icon: "videocam-outline" },
-  { value: "reunion", label: "Reunión presencial", icon: "people-outline" },
-];
+/**
+ * Construye una URL de Google Calendar con los datos de la cita
+ */
+function buildGoogleCalendarUrl(params: {
+  fecha: string;
+  hora: string;
+  tipo: string;
+  descripcion: string;
+}): string {
+  const { fecha, hora, tipo, descripcion } = params;
 
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+  // Encontrar label del tipo
+  const typeLabel =
+    APPOINTMENT_TYPES.find((t) => t.value === tipo)?.label || tipo;
+
+  // Construir fecha/hora de inicio (ISO sin guiones ni dos puntos)
+  // fecha = "2026-02-15", hora = "09:00"
+  const [year, month, day] = fecha.split("-");
+  const [hourStr, minuteStr] = hora.split(":");
+
+  // Formato: YYYYMMDDTHHmmSS
+  const startDateTime = `${year}${month}${day}T${hourStr}${minuteStr}00`;
+
+  // Duración por defecto: 1 hora
+  const endHour = String(
+    Math.min(parseInt(hourStr, 10) + 1, 23),
+  ).padStart(2, "0");
+  const endDateTime = `${year}${month}${day}T${endHour}${minuteStr}00`;
+
+  const title = encodeURIComponent(`Cita - ${typeLabel}`);
+  const details = encodeURIComponent(
+    descripcion.trim() || `Cita de tipo: ${typeLabel}`,
+  );
+  const dates = `${startDateTime}/${endDateTime}`;
+
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}`;
+}
 
 export default function CreateAppointmentModal({
   visible,
@@ -59,8 +93,6 @@ export default function CreateAppointmentModal({
   const [tipo, setTipo] = useState<string>("visita");
   const [descripcion, setDescripcion] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
 
   React.useEffect(() => {
     if (visible) {
@@ -167,6 +199,21 @@ export default function CreateAppointmentModal({
       if (error) throw error;
 
       showToast("Cita creada exitosamente", "success");
+
+      // Abrir Google Calendar automáticamente
+      const calendarUrl = buildGoogleCalendarUrl({
+        fecha: fechaText,
+        hora: horaText,
+        tipo,
+        descripcion,
+      });
+
+      try {
+        await Linking.openURL(calendarUrl);
+      } catch (linkError) {
+        console.warn("No se pudo abrir Google Calendar:", linkError);
+      }
+
       onClose();
 
       // Reset form
@@ -187,11 +234,10 @@ export default function CreateAppointmentModal({
     }
   };
 
-  const handleInputFocus = (y: number) => {
-    // Scroll al campo cuando recibe focus
+  const handleInputFocus = (_y?: number) => {
     setTimeout(() => {
-      scrollRef.current?.scrollTo({ y: y - 100, animated: true });
-    }, 100);
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 300);
   };
 
   return (
@@ -237,176 +283,23 @@ export default function CreateAppointmentModal({
               keyboardShouldPersistTaps="handled"
               bounces={true}
             >
-              {/* Fecha */}
-              <View style={styles.field}>
-                <Text style={styles.label}>
-                  <Ionicons
-                    name="calendar-outline"
-                    size={14}
-                    color={COLORS.textSecondary}
-                  />
-                  {"  "}Fecha
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setShowDatePicker(true)}
-                  style={styles.inputContainer}
-                  activeOpacity={0.7}
-                  disabled={isCreating}
-                >
-                  <Text style={styles.inputText}>
-                    {fechaText
-                      ? fechaText.split("-").reverse().join("/")
-                      : "Seleccionar fecha"}
-                  </Text>
-                  <View style={styles.iconBadge}>
-                    <Ionicons
-                      name="calendar"
-                      size={18}
-                      color={COLORS.primary}
-                    />
-                  </View>
-                </TouchableOpacity>
+              <DatePickerField
+                fechaText={fechaText}
+                onDateChange={setFechaText}
+                disabled={isCreating}
+              />
 
-                {showDatePicker && (
-                  <DateTimePicker
-                    value={(() => {
-                      const parts = fechaText.split("-");
-                      if (parts.length === 3) {
-                        return new Date(
-                          parseInt(parts[0]),
-                          parseInt(parts[1]) - 1,
-                          parseInt(parts[2]),
-                        );
-                      }
-                      return new Date();
-                    })()}
-                    mode="date"
-                    display={Platform.OS === "ios" ? "spinner" : "default"}
-                    minimumDate={new Date()}
-                    onChange={(event, selectedDate) => {
-                      if (Platform.OS === "android") setShowDatePicker(false);
-                      if (selectedDate) {
-                        const y = selectedDate.getFullYear();
-                        const m = String(selectedDate.getMonth() + 1).padStart(
-                          2,
-                          "0",
-                        );
-                        const d = String(selectedDate.getDate()).padStart(
-                          2,
-                          "0",
-                        );
-                        setFechaText(`${y}-${m}-${d}`);
-                        if (Platform.OS === "ios") setShowDatePicker(false);
-                      } else if (event.type === "dismissed") {
-                        setShowDatePicker(false);
-                      }
-                    }}
-                  />
-                )}
-              </View>
+              <TimePickerField
+                horaText={horaText}
+                onTimeChange={setHoraText}
+                disabled={isCreating}
+              />
 
-              {/* Hora */}
-              <View style={styles.field}>
-                <Text style={styles.label}>
-                  <Ionicons
-                    name="time-outline"
-                    size={14}
-                    color={COLORS.textSecondary}
-                  />
-                  {"  "}Hora
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setShowTimePicker(true)}
-                  style={styles.inputContainer}
-                  activeOpacity={0.7}
-                  disabled={isCreating}
-                >
-                  <Text style={styles.inputText}>
-                    {horaText || "Seleccionar hora"}
-                  </Text>
-                  <View style={styles.iconBadge}>
-                    <Ionicons name="time" size={18} color={COLORS.primary} />
-                  </View>
-                </TouchableOpacity>
-
-                {showTimePicker && (
-                  <DateTimePicker
-                    value={(() => {
-                      const [h, m] = (horaText || "09:00")
-                        .split(":")
-                        .map(Number);
-                      const d = new Date();
-                      d.setHours(h, m, 0, 0);
-                      return d;
-                    })()}
-                    mode="time"
-                    is24Hour={true}
-                    display={Platform.OS === "ios" ? "spinner" : "default"}
-                    onChange={(event, selectedDate) => {
-                      if (Platform.OS === "android") setShowTimePicker(false);
-                      if (selectedDate) {
-                        const h = String(selectedDate.getHours()).padStart(
-                          2,
-                          "0",
-                        );
-                        const m = String(selectedDate.getMinutes()).padStart(
-                          2,
-                          "0",
-                        );
-                        setHoraText(`${h}:${m}`);
-                        if (Platform.OS === "ios") setShowTimePicker(false);
-                      } else if (event.type === "dismissed") {
-                        setShowTimePicker(false);
-                      }
-                    }}
-                  />
-                )}
-                <Text style={styles.hint}>Formato 24h (ej: 09:00, 14:30)</Text>
-              </View>
-
-              {/* Tipo */}
-              <View style={styles.field}>
-                <Text style={styles.label}>
-                  <Ionicons
-                    name="options-outline"
-                    size={14}
-                    color={COLORS.textSecondary}
-                  />
-                  {"  "}Tipo de cita
-                </Text>
-                <View style={styles.typeGrid}>
-                  {APPOINTMENT_TYPES.map((type) => (
-                    <TouchableOpacity
-                      key={type.value}
-                      style={[
-                        styles.typeButton,
-                        tipo === type.value && styles.typeButtonActive,
-                      ]}
-                      onPress={() => setTipo(type.value)}
-                      disabled={isCreating}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons
-                        name={type.icon as any}
-                        size={18}
-                        color={
-                          tipo === type.value
-                            ? COLORS.primary
-                            : COLORS.textTertiary
-                        }
-                      />
-                      <Text
-                        style={[
-                          styles.typeButtonText,
-                          tipo === type.value && styles.typeButtonTextActive,
-                        ]}
-                      >
-                        {type.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
+              <AppointmentTypeSelector
+                selectedType={tipo}
+                onTypeChange={setTipo}
+                disabled={isCreating}
+              />
 
               {/* Descripción */}
               <View style={styles.field}>
@@ -467,7 +360,11 @@ export default function CreateAppointmentModal({
                   <ActivityIndicator size="small" color={COLORS.white} />
                 ) : (
                   <>
-                    <Ionicons name="checkmark" size={18} color={COLORS.white} />
+                    <Ionicons
+                      name="checkmark"
+                      size={18}
+                      color={COLORS.white}
+                    />
                     <Text style={styles.buttonPrimaryText}>Crear Cita</Text>
                   </>
                 )}
@@ -479,176 +376,3 @@ export default function CreateAppointmentModal({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  overlayBackground: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  keyboardView: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  container: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: SCREEN_HEIGHT * 0.85,
-  },
-  handleContainer: {
-    alignItems: "center",
-    paddingVertical: 10,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#E0E0E0",
-    borderRadius: 2,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  headerTitle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  field: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-    marginBottom: 10,
-  },
-  optionalLabel: {
-    fontWeight: "400",
-    color: COLORS.textTertiary,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#E5E7EB",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  inputText: {
-    fontSize: 16,
-    color: COLORS.textPrimary,
-    fontWeight: "500",
-  },
-  iconBadge: {
-    backgroundColor: "rgba(37, 99, 235, 0.1)", // Primary with low opacity
-    padding: 6,
-    borderRadius: 8,
-  },
-  hint: {
-    fontSize: 12,
-    color: COLORS.textTertiary,
-    marginTop: 6,
-    marginLeft: 4,
-  },
-  typeGrid: {
-    gap: 10,
-  },
-  typeButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#E5E5E5",
-    gap: 12,
-  },
-  typeButtonActive: {
-    backgroundColor: "#F0FDFA",
-    borderColor: COLORS.primary,
-  },
-  typeButtonText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  },
-  typeButtonTextActive: {
-    color: COLORS.primary,
-    fontWeight: "600",
-  },
-  textArea: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#E5E5E5",
-    padding: 14,
-    fontSize: 14,
-    color: COLORS.textPrimary,
-    minHeight: 100,
-  },
-  footer: {
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
-    backgroundColor: COLORS.white,
-  },
-  button: {
-    flex: 1,
-    flexDirection: "row",
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  buttonSecondary: {
-    backgroundColor: "#F3F4F6",
-  },
-  buttonSecondaryText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-  },
-  buttonPrimary: {
-    backgroundColor: COLORS.primary,
-  },
-  buttonPrimaryText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.white,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-});

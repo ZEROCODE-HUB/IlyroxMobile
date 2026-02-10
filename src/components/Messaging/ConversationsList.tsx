@@ -56,9 +56,8 @@ export default function ConversationsList({
       const query = searchQuery.toLowerCase();
       result = result.filter((conv) => {
         const otherUser = conv.other_user;
-        const fullName = `${otherUser?.nombre || ""} ${
-          otherUser?.apellido_paterno || ""
-        }`.toLowerCase();
+        const fullName = `${otherUser?.nombre || ""} ${otherUser?.apellido_paterno || ""
+          }`.toLowerCase();
         return (
           fullName.includes(query) ||
           conv.ultimo_mensaje_preview?.toLowerCase().includes(query)
@@ -144,9 +143,8 @@ export default function ConversationsList({
 
   const renderConversation = ({ item }: { item: any }) => {
     const otherUser = item.other_user;
-    const fullName = `${otherUser?.nombre || "Usuario"} ${
-      otherUser?.apellido_paterno || ""
-    }`;
+    const fullName = `${otherUser?.nombre || "Usuario"} ${otherUser?.apellido_paterno || ""
+      }`;
     const unreadCount = item.total_mensajes_no_leidos || 0;
     const totalConvs = item.total_conversaciones || 0;
     const conversationTags = item.etiquetas || [];
@@ -255,6 +253,7 @@ export default function ConversationsList({
       {/* Conversations List */}
       <FlatList
         data={filteredConversations}
+        extraData={conversations} // Force update when conversations change
         keyExtractor={(item) => item.id}
         renderItem={renderConversation}
         contentContainerStyle={styles.listContent}

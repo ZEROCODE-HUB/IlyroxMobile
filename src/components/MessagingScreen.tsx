@@ -22,6 +22,7 @@ import { useStableSafeInsets } from "../context/SafeInsetsContext";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
 import HeaderChat from "./Messaging/HeaderChat";
 import { router } from "expo-router";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 
 interface MessagingScreenProps {
   initialUser?: User;
@@ -276,37 +277,39 @@ export default function MessagingScreen({
   // Chat View
   if (isInChatView) {
     return (
-      <View style={styles.container}>
-        {/* Header fijo */}
-        <View
-          onLayout={(e) => {
-            const h = e.nativeEvent.layout.height;
-            if (h && h !== headerHeight) setHeaderHeight(h);
-          }}
-          style={[styles.headerFixed, { paddingTop: top }]}
-        >
-          <HeaderChat
-            onBack={handleBack}
-            otherUser={otherUser}
-            userId={profile.id}
-            propertyId={activePropertyId}
-            conversationId={activeConversationId}
-          />
-        </View>
+      <KeyboardProvider>
+        <View style={styles.container}>
+          {/* Header fijo */}
+          <View
+            onLayout={(e) => {
+              const h = e.nativeEvent.layout.height;
+              if (h && h !== headerHeight) setHeaderHeight(h);
+            }}
+            style={[styles.headerFixed, { paddingTop: top }]}
+          >
+            <HeaderChat
+              onBack={handleBack}
+              otherUser={otherUser}
+              userId={profile.id}
+              propertyId={activePropertyId}
+              conversationId={activeConversationId}
+            />
+          </View>
 
-        {/* Contenido del chat */}
-        <View style={[styles.chatContent, { marginTop: headerHeight }]}>
-          <ChatScreen
-            conversationId={activeConversationId}
-            userId={profile.id}
-            otherUser={otherUser}
-            propertyId={activePropertyId}
-            onBack={handleBack}
-            onConversationCreated={handleConversationCreated}
-            keyboardOffset={headerHeight + top}
-          />
+          {/* Contenido del chat */}
+          <View style={[styles.chatContent, { marginTop: headerHeight }]}>
+            <ChatScreen
+              conversationId={activeConversationId}
+              userId={profile.id}
+              otherUser={otherUser}
+              propertyId={activePropertyId}
+              onBack={handleBack}
+              onConversationCreated={handleConversationCreated}
+              keyboardOffset={headerHeight + top}
+            />
+          </View>
         </View>
-      </View>
+      </KeyboardProvider>
     );
   }
 

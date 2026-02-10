@@ -1,15 +1,18 @@
 /**
  * ThreeDotsMenu.tsx
  * Componente reutilizable de menú de 3 puntos con opciones personalizables
+ * Usa Modal transparente para escapar overflow:hidden de los contenedores padre
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ViewStyle,
+  Modal,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
@@ -29,9 +32,9 @@ interface ThreeDotsMenuProps {
   iconSize?: number;
 }
 
-// Global state to track which menu is open
-let currentOpenMenu: string | null = null;
-const menuCallbacks: { [key: string]: () => void } = {};
+const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get("window");
+const MENU_WIDTH = 150;
+const SCREEN_MARGIN = 10;
 
 const ThreeDotsMenu: React.FC<ThreeDotsMenuProps> = ({
   options,
@@ -41,57 +44,78 @@ const ThreeDotsMenu: React.FC<ThreeDotsMenuProps> = ({
   iconSize = 16,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
-  const menuId = React.useRef(`menu-${Math.random()}`).current;
+  const [menuAnchor, setMenuAnchor] = useState({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+  });
+  const buttonRef = useRef<View>(null);
 
-  useEffect(() => {
-    // Register this menu's close callback
-    menuCallbacks[menuId] = () => setShowMenu(false);
+  const handleToggleMenu = useCallback(
+    (e: any) => {
+      e.stopPropagation();
 
-    return () => {
-      // Cleanup on unmount
-      delete menuCallbacks[menuId];
-      if (currentOpenMenu === menuId) {
-        currentOpenMenu = null;
+      if (showMenu) {
+        setShowMenu(false);
+        return;
       }
-    };
-  }, [menuId]);
 
-  const getMenuPositionStyle = (): ViewStyle => {
-    switch (menuPosition) {
-      case "top-right":
-        return { top: 28, right: 0 };
-      case "top-left":
-        return { top: 28, left: 0 };
-      case "bottom-right":
-        return { bottom: 28, right: 0 };
-      case "bottom-left":
-        return { bottom: 28, left: 0 };
-      default:
-        return { top: 28, right: 0 };
-    }
-  };
+      // Medir la posición del botón en la pantalla
+      buttonRef.current?.measureInWindow((x, y, width, height) => {
+        setMenuAnchor({ x, y, width, height });
+        setShowMenu(true);
+      });
+    },
+    [showMenu],
+  );
 
-  const handleToggleMenu = (e: any) => {
-    e.stopPropagation();
+  const getDropdownPosition = (): ViewStyle => {
+    const { x, y, width, height } = menuAnchor;
 
-    // Close all other menus
-    if (currentOpenMenu && currentOpenMenu !== menuId) {
-      menuCallbacks[currentOpenMenu]?.();
-    }
+    let top = 0;
+    let left = 0;
+    const estimatedHeight = options.length * 45; // Aprox 45px por opción
 
-    const newShowMenu = !showMenu;
-    setShowMenu(newShowMenu);
-
-    if (newShowMenu) {
-      currentOpenMenu = menuId;
+    // 1. Cálculo base de LEFT
+    if (menuPosition.includes("right")) {
+      left = x + width - MENU_WIDTH;
     } else {
-      currentOpenMenu = null;
+      left = x;
     }
+
+    // 2. Cálculo base de TOP
+    if (menuPosition.includes("top")) {
+      top = y + height + 4;
+    } else {
+      top = y - estimatedHeight - 4;
+    }
+
+    // 3. AJUSTES DE LÍMITES HORIZONTALES
+    if (left < SCREEN_MARGIN) {
+      left = SCREEN_MARGIN;
+    }
+    if (left + MENU_WIDTH > WINDOW_WIDTH - SCREEN_MARGIN) {
+      left = WINDOW_WIDTH - MENU_WIDTH - SCREEN_MARGIN;
+    }
+
+    // 4. AJUSTES DE LÍMITES VERTICALES
+    if (top + estimatedHeight > WINDOW_HEIGHT - SCREEN_MARGIN) {
+      // Si se sale por abajo, intentar moverlo arriba del botón
+      top = y - estimatedHeight - 4;
+    }
+    if (top < SCREEN_MARGIN + 30) { // 30 para considerar status bar aprox
+      // Si se sale por arriba, forzar abajo
+      top = y + height + 4;
+    }
+
+    return { top, left };
   };
 
   return (
     <View style={styles.container}>
       <TouchableOpacity
+        ref={buttonRef as any}
         style={[styles.menuButton, buttonStyle]}
         onPress={handleToggleMenu}
         activeOpacity={0.7}
@@ -99,20 +123,20 @@ const ThreeDotsMenu: React.FC<ThreeDotsMenuProps> = ({
         <Ionicons name="ellipsis-vertical" size={iconSize} color={iconColor} />
       </TouchableOpacity>
 
-      {showMenu && (
-        <>
-          {/* Backdrop to close menu when clicking outside */}
-          <TouchableOpacity
-            style={styles.backdrop}
-            onPress={(e) => {
-              e.stopPropagation();
-              setShowMenu(false);
-              currentOpenMenu = null;
-            }}
-            activeOpacity={1}
-          />
-
-          <View style={[styles.menuDropdown, getMenuPositionStyle()]}>
+      <Modal
+        visible={showMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        {/* Backdrop */}
+        <TouchableOpacity
+          style={styles.backdrop}
+          onPress={() => setShowMenu(false)}
+          activeOpacity={1}
+        >
+          {/* Dropdown menu posicionado absolutamente */}
+          <View style={[styles.menuDropdown, getDropdownPosition()]}>
             {options.map((option, index) => (
               <TouchableOpacity
                 key={index}
@@ -120,10 +144,8 @@ const ThreeDotsMenu: React.FC<ThreeDotsMenuProps> = ({
                   styles.menuOption,
                   index === options.length - 1 && styles.menuOptionLast,
                 ]}
-                onPress={(e) => {
-                  e.stopPropagation();
+                onPress={() => {
                   setShowMenu(false);
-                  currentOpenMenu = null;
                   option.onPress();
                 }}
                 activeOpacity={0.7}
@@ -144,8 +166,8 @@ const ThreeDotsMenu: React.FC<ThreeDotsMenuProps> = ({
               </TouchableOpacity>
             ))}
           </View>
-        </>
-      )}
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -164,18 +186,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   backdrop: {
-    position: "absolute",
-    top: -1000,
-    left: -1000,
-    right: -1000,
-    bottom: -1000,
-    zIndex: 9998,
+    flex: 1,
+    backgroundColor: "transparent",
   },
   menuDropdown: {
     position: "absolute",
     backgroundColor: COLORS.white,
     borderRadius: 8,
-    minWidth: 120,
+    minWidth: 140,
     elevation: 10,
     shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 4 },

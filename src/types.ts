@@ -8,7 +8,7 @@ export type Post = {
   deleted_at: string | null;
   status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
   tipo?: "post" | "busqueda" | "openhouse" | "aniversario" | "sold";
-  foto_perfil?: string;
+  foto_perfil_usuario?: string;
   fecha_hora?: string;
   nombre_asesor?: string;
   ubicacion?: string;
@@ -34,7 +34,7 @@ export type FeedItem = {
   status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
   codigo_propiedad?: string;
   postType?: "post" | "busqueda" | "openhouse" | "aniversario" | "sold";
-  foto_perfil?: string;
+  foto_perfil_usuario?: string;
   fecha_hora?: string;
   nombre_asesor?: string;
   ubicacion?: string;

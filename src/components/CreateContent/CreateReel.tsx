@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { useRouter } from "expo-router";
 import {
   View,
   Text,
@@ -9,6 +10,8 @@ import {
   ActivityIndicator,
   Modal,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
@@ -99,6 +102,7 @@ const VideoPreview = ({
 
 export default function CreateReel({ onBack, reelId }: CreateReelProps) {
   const { user } = useAuth();
+  const router = useRouter();
   const isEditing = !!reelId;
 
   const {
@@ -252,7 +256,14 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
           setDescription("");
           setVideoUri("");
           setThumbnailUri("");
-          onBack();
+          if (!isEditing) {
+            router.replace({
+              pathname: "/(tabs)",
+              params: { refresh: String(Date.now()) },
+            });
+          } else {
+            onBack();
+          }
         }, 500);
       }
     } catch (error) {
@@ -269,49 +280,58 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
         onBack={onBack}
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <Text style={styles.label}>Video del Reel</Text>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.card}>
+            <Text style={styles.label}>Video del Reel</Text>
 
-          {videoUri ? (
-            /* CLAVE: Usamos 'key={videoUri}'. 
-               Si el usuario cambia de video, React destruye el componente anterior 
-               y crea uno nuevo, reiniciando el Player de expo-video sin errores de memoria o pantalla gris.
-            */
-            <VideoPreview
-              key={videoUri}
-              uri={videoUri}
-              thumbnail={thumbnailUri}
-              onRemove={() => setVideoUri("")}
+            {videoUri ? (
+              /* CLAVE: Usamos 'key={videoUri}'. 
+                 Si el usuario cambia de video, React destruye el componente anterior 
+                 y crea uno nuevo, reiniciando el Player de expo-video sin errores de memoria o pantalla gris.
+              */
+              <VideoPreview
+                key={videoUri}
+                uri={videoUri}
+                thumbnail={thumbnailUri}
+                onRemove={() => setVideoUri("")}
+              />
+            ) : (
+              <TouchableOpacity
+                onPress={handlePickVideo}
+                style={[
+                  styles.uploadPlaceholder,
+                  errors.video && { borderColor: COLORS.error },
+                ]}
+              >
+                <Ionicons name="videocam" size={48} color={COLORS.textTertiary} />
+                <Text style={styles.uploadText}>
+                  Presiona para elegir un video
+                </Text>
+              </TouchableOpacity>
+            )}
+            {errors.video && <Text style={styles.errorText}>{errors.video}</Text>}
+          </View>
+
+          <View style={styles.card}>
+            <AppInput
+              label="Descripción"
+              placeholder="Escribe algo sobre tu video..."
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              maxLength={500}
             />
-          ) : (
-            <TouchableOpacity
-              onPress={handlePickVideo}
-              style={[
-                styles.uploadPlaceholder,
-                errors.video && { borderColor: COLORS.error },
-              ]}
-            >
-              <Ionicons name="videocam" size={48} color={COLORS.textTertiary} />
-              <Text style={styles.uploadText}>
-                Presiona para elegir un video
-              </Text>
-            </TouchableOpacity>
-          )}
-          {errors.video && <Text style={styles.errorText}>{errors.video}</Text>}
-        </View>
-
-        <View style={styles.card}>
-          <AppInput
-            label="Descripción"
-            placeholder="Escribe algo sobre tu video..."
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            maxLength={500}
-          />
-        </View>
-      </ScrollView>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <View style={styles.footer}>
         <TouchableOpacity
@@ -333,12 +353,25 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
       <Modal visible={uploading} transparent>
         <View style={styles.uploadModalOverlay}>
           <View style={styles.uploadModalContent}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.uploadModalTitle}>Subiendo Video...</Text>
-            <Text style={styles.uploadModalSubtitle}>{uploadProgress}%</Text>
+            {Math.min(uploadProgress, 100) >= 100 ? (
+              <Ionicons name="checkmark-circle" size={40} color={COLORS.success || "#22C55E"} />
+            ) : (
+              <ActivityIndicator size="large" color={COLORS.primary} />
+            )}
+            <Text style={styles.uploadModalTitle}>
+              {Math.min(uploadProgress, 100) >= 100
+                ? "¡Completado!"
+                : "Subiendo Video..."}
+            </Text>
+            <Text style={styles.uploadModalSubtitle}>
+              {Math.min(uploadProgress, 100)}%
+            </Text>
             <View style={styles.progressBarContainer}>
               <View
-                style={[styles.progressBar, { width: `${uploadProgress}%` }]}
+                style={[
+                  styles.progressBar,
+                  { width: `${Math.min(uploadProgress, 100)}%` },
+                ]}
               />
             </View>
           </View>
@@ -511,6 +544,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 20,
     zIndex: 100,
+    paddingBottom: 50
   },
   publishBtn: {
     backgroundColor: COLORS.primary,

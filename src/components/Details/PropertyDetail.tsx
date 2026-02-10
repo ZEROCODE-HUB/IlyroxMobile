@@ -294,7 +294,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                         : ""
                     }, `
                   : ""}
-                {propertyDetails.colonia ? propertyDetails.colonia : ""}
+                {propertyDetails.colonia ? propertyDetails.colonia + ", " : ""}
                 {propertyDetails.municipio}, {propertyDetails.ciudad}
               </Text>
             </View>
@@ -306,13 +306,20 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Características</Text>
             <View style={styles.statsGrid}>
-              {propertyDetails.habitaciones > 0 && (
-                <StatItem
-                  icon="bed-outline"
-                  label="Recámaras"
-                  value={propertyDetails.habitaciones}
-                />
-              )}
+              {propertyDetails.habitaciones > 0 &&
+                (propertyDetails.tipo?.toLowerCase() === "industrial" ? (
+                  <StatItem
+                    icon="grid-outline"
+                    label="Espacios"
+                    value={propertyDetails.habitaciones}
+                  />
+                ) : (
+                  <StatItem
+                    icon="bed-outline"
+                    label="Recámaras"
+                    value={propertyDetails.habitaciones}
+                  />
+                ))}
               {propertyDetails.banos > 0 && (
                 <View style={styles.statItem}>
                   <View style={styles.statIconContainer}>

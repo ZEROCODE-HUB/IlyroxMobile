@@ -12,6 +12,7 @@ import {
   PanResponder,
   StatusBar,
   Platform,
+  Pressable,
 } from "react-native";
 import { VideoView } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
@@ -121,29 +122,33 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
         ]}
         {...panResponder.panHandlers}
       >
-        <TouchableWithoutFeedback onPress={togglePlayPause}>
-          <View style={[styles.video, { width, height }]}>
-            {/* Placeholder Image (Thumbnail) */}
-            {item.images && item.images.length > 0 && (
-              <Image
-                source={{ uri: item.images[0] }}
-                style={StyleSheet.absoluteFill}
-                resizeMode="cover"
-              />
-            )}
-
-            {/* VIDEO - Pantalla completa manteniendo aspect ratio */}
-            <VideoView
-              player={player}
+        <View style={[styles.video, { width, height }]}>
+          {/* Placeholder Image (Thumbnail) */}
+          {item.images && item.images.length > 0 && (
+            <Image
+              source={{ uri: item.images[0] }}
               style={StyleSheet.absoluteFill}
-              contentFit="contain"
-              nativeControls={false}
+              resizeMode="cover"
             />
-          </View>
-        </TouchableWithoutFeedback>
+          )}
+
+          {/* VIDEO - Pantalla completa manteniendo aspect ratio */}
+          <VideoView
+            player={player}
+            style={StyleSheet.absoluteFill}
+            contentFit="contain"
+            nativeControls={false}
+          />
+        </View>
 
         {/* OVERLAY - UI Elements al estilo TikTok */}
         <View style={styles.overlay} pointerEvents="box-none">
+          {/* Pressable invisible que cubre todo el fondo para play/pause */}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={togglePlayPause}
+          />
+
           {/* Botón cerrar (top left) */}
           <TouchableOpacity
             onPress={onClose}
@@ -157,11 +162,15 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
 
           {/* Play indicator (center) */}
           {!isPlaying && (
-            <View style={styles.playIndicator} pointerEvents="none">
+            <Pressable
+              style={styles.playIndicator}
+              onPress={togglePlayPause}
+              pointerEvents="none"
+            >
               <View style={styles.playIconContainer}>
                 <View style={styles.playIcon} />
               </View>
-            </View>
+            </Pressable>
           )}
 
           {/* Bottom UI - Información del usuario (estilo TikTok) */}
@@ -278,7 +287,6 @@ const styles = StyleSheet.create({
     borderBottomColor: "transparent",
     marginLeft: 6,
   },
-  // Bottom UI - Estilo TikTok
   bottomUI: {
     position: "absolute",
     left: 12,

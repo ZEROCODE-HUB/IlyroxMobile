@@ -11,7 +11,12 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../lib/supabase";
-import { FeedItem, RecommendedByPreviewUser, User } from "../../types";
+import {
+  FeedItem,
+  PropertyType,
+  RecommendedByPreviewUser,
+  User,
+} from "../../types";
 import { profileService } from "../../services/profileService";
 
 type ReviewStatsRow = {
@@ -350,6 +355,7 @@ export function useFeed(options: UseFeedOptions = {}) {
                 subtipo,
                 ciudad,
                 municipio,
+                estado,
                 fotos,
                 habitaciones,
                 banos,
@@ -505,10 +511,11 @@ export function useFeed(options: UseFeedOptions = {}) {
                   currency: (operation?.moneda || "MXN") as "USD" | "MXN",
                   createdAt: property.created_at,
                   location: {
-                    address: `${property.municipio}, ${property.ciudad}`,
+                    address: `${property.municipio}, ${property.ciudad}, ${property.estado}`,
                     country: "México",
-                    state: property.ciudad || "",
-                    city: property.municipio || "",
+                    state: property.estado || "",
+                    city: property.ciudad || "",
+                    municipio: property.municipio || "",
                     colony: "",
                   },
                   images: property.fotos || [],
@@ -521,8 +528,14 @@ export function useFeed(options: UseFeedOptions = {}) {
                     landSqft: property.metros_cuadrados_terreno || 0,
                   },
                   amenities: [],
-                  type: "habitacional" as const,
-                  subtype: property.subtipo || property.tipo,
+                  type: (
+                    property.tipo || "habitacional"
+                  ).toLowerCase() as PropertyType,
+                  subtype: (
+                    property.subtipo ||
+                    property.tipo ||
+                    ""
+                  ).toLowerCase(),
                   operation:
                     operation?.tipo_operacion === "venta"
                       ? "Publicada"
@@ -751,6 +764,7 @@ export function useFeedItem(feedItemId: string) {
             subtipo,
             ciudad,
             municipio,
+            estado,
             fotos,
             habitaciones,
             banos,
@@ -797,7 +811,7 @@ export function useFeedItem(feedItemId: string) {
           likes: feedData.likes_count,
           comments: feedData.comentarios_count,
           timestamp: formatTimestamp(feedData.publicado_en),
-          foto_perfil: contentData.foto_perfil,
+          foto_perfil_usuario: contentData.foto_perfil,
           fecha_hora: contentData.fecha_hora,
           nombre_asesor: contentData.nombre_asesor,
           ubicacion: contentData.ubicacion,
@@ -840,10 +854,11 @@ export function useFeedItem(feedItemId: string) {
             currency: (operation?.moneda || "MXN") as "USD" | "MXN",
             createdAt: contentData.created_at,
             location: {
-              address: `${contentData.municipio}, ${contentData.ciudad}`,
+              address: `${contentData.municipio}, ${contentData.ciudad}, ${contentData.estado}`,
               country: "México",
-              state: contentData.ciudad || "",
-              city: contentData.municipio || "",
+              state: contentData.estado || "",
+              city: contentData.ciudad || "",
+              municipio: contentData.municipio || "",
               colony: "",
             },
             images: contentData.fotos || [],
@@ -855,8 +870,14 @@ export function useFeedItem(feedItemId: string) {
               landSqft: contentData.metros_cuadrados_terreno || 0,
             },
             amenities: [],
-            type: "habitacional",
-            subtype: contentData.subtipo || contentData.tipo,
+            type: (
+              contentData.tipo || "habitacional"
+            ).toLowerCase() as PropertyType,
+            subtype: (
+              contentData.subtipo ||
+              contentData.tipo ||
+              ""
+            ).toLowerCase(),
             operation:
               operation?.tipo_operacion === "venta" ? "Publicada" : "Rentada",
             status: "Publicada",

@@ -13,10 +13,8 @@ import {
   usePropertyFilters,
   GeofenceBounds,
 } from "../../hooks/hooks/usePropertyFilters";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useStableSafeInsets } from "../../context/SafeInsetsContext";
 import { router } from "expo-router";
-import { ScreenWrapper } from "@/screens/ScreenWrapper";
 
 interface MapSearchProps {
   properties: Property[];
@@ -190,10 +188,30 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     });
   };
 
-  // Limpiar filtros incluyendo ubicación
+  // Limpiar filtros (mantiene ubicación actual del contexto global)
   const handleClearAll = () => {
-    clearFilters();
-    setSelectedLocation(null);
+    let locationToKeep = {
+      estado: "",
+      ciudad: "",
+      municipio: "",
+      colonia: "",
+    };
+
+    if (selectedLocation) {
+      if (selectedLocation.type === "ciudad") {
+        locationToKeep.ciudad = selectedLocation.name;
+      } else if (selectedLocation.type === "municipio") {
+        locationToKeep.municipio = selectedLocation.name;
+      } else if (selectedLocation.type === "colonia") {
+        locationToKeep.colonia = selectedLocation.name;
+      } else if (selectedLocation.type === "estado") {
+        locationToKeep.estado = selectedLocation.name;
+      } else {
+        locationToKeep.ciudad = selectedLocation.name;
+      }
+    }
+
+    clearFilters(locationToKeep);
   };
 
   // Obtener primera imagen de la propiedad

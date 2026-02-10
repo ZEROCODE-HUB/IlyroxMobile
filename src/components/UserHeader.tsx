@@ -64,8 +64,6 @@ const UserHeader: React.FC<UserHeaderProps> = ({
     setShowRecommendedModal(true);
     setLoadingRecommended(true);
     setRecommendedList([]);
-    console.log("Prueba de bucle");
-
     // CORRECCIÓN: Una sola consulta con relación (inner join implícito al pedir datos anidados)
     const { data: recs } = await supabase
       .from("recomendaciones_usuarios")

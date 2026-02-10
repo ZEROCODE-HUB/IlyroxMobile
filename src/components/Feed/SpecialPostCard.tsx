@@ -44,8 +44,7 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
   const eventDate = item.fecha_hora || "Próximamente";
   // Asumimos antiguedad viene en el item aunque no esté en el tipo estricto aún, o usamos 1 por defecto
   const years = item.antiguedad || 1;
-  const userAvatar = item.foto_perfil || user.avatar;
-
+  const userAvatar = item.postDetails.foto_perfil_usuario;
   // --- RENDER: GRID MODE (Prioridad Alta) ---
   if (mode === "grid") {
     // --- GRID: ANIVERSARIO ---

@@ -828,25 +828,21 @@ export function useMessages(conversationId: string | null, userId?: string) {
 
           console.log("📨 New message received via Realtime");
 
-          // Intentar cargar mensaje completo con relaciones (propiedades, etc.)
+
+          // Intentar cargar mensaje completo con relaciones
+          // NOTA: mensajes no tiene relación directa con propiedades,
+          // y la columna de usuario es emisor_id
           try {
             const { data, error } = await supabase
               .from("mensajes")
               .select(
                 `
                 *,
-                propiedad:propiedades(
+                emisor:perfiles!emisor_id(
                   id,
-                  tipo,
-                  subtipo,
-                  descripcion,
-                  fotos,
-                  ciudad,
-                  operaciones:operaciones_propiedad(
-                    tipo_operacion,
-                    precio,
-                    moneda
-                  )
+                  nombre,
+                  apellido_paterno,
+                  foto
                 )
               `,
               )

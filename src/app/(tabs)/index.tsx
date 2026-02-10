@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { View, StyleSheet, Animated, Pressable } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import Feed from "../../components/Feed/Feed";
 import { useAuth } from "../../context/AuthContext";
 import { HomeHeader } from "../../components/HomeHeader";
@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function FeedScreen() {
   const router = useRouter();
+  const { refresh } = useLocalSearchParams();
   const { user, profile } = useAuth();
   const insets = useSafeAreaInsets();
 
@@ -76,6 +77,7 @@ export default function FeedScreen() {
         onUserClick={handleUserClick}
         onScroll={handleScroll}
         scrollEnabled={!isSearching}
+        refreshTimestamp={refresh ? Number(refresh) : undefined}
       />
 
       {isSearching && (

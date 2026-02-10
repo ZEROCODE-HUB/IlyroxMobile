@@ -12,40 +12,57 @@ export const useVideoUpload = () => {
    * @param folder Kept for backward compatibility (ignored)
    * @returns Object with videoUrl and optionally thumbnailUrl, or null if failed
    */
+  const MAX_UPLOAD_RETRIES = 3;
+
   const uploadVideo = async (
     videoUri: string,
     bucket: string = "feed-images",
     folder: string = "reels",
   ): Promise<{ videoUrl: string; thumbnailUrl?: string } | null> => {
-    try {
-      setUploading(true);
-      setUploadProgress(0);
-
-      // Si la URI ya es una URL remota, retornarla directamente.
-      if (videoUri.startsWith("http") || videoUri.startsWith("https")) {
-        console.log("ℹ️ Video ya está en la nube, saltando subida.");
-        setUploadProgress(100);
-        return { videoUrl: videoUri };
-      }
-
-      console.log("📤 Subiendo video a través del servicio de video...");
-
-      const result = await uploadVideoService(videoUri, (progress) => {
-        setUploadProgress(Math.round(progress));
-      });
-
-      console.log("✅ Video subido exitosamente:", result.videoUrl);
+    // Si la URI ya es una URL remota, retornarla directamente.
+    if (videoUri.startsWith("http") || videoUri.startsWith("https")) {
       setUploadProgress(100);
-
-      return result;
-    } catch (err) {
-      console.error("💥 ERROR AL SUBIR VIDEO:", err);
-      return null;
-    } finally {
-      setUploading(false);
-      // Pequeña espera para que la UI de carga se vea completa
-      setTimeout(() => setUploadProgress(0), 1000);
+      return { videoUrl: videoUri };
     }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    let lastError: any = null;
+
+    for (let attempt = 1; attempt <= MAX_UPLOAD_RETRIES; attempt++) {
+      try {
+        console.log(`📤 Upload attempt ${attempt}/${MAX_UPLOAD_RETRIES}...`);
+        setUploadProgress(0);
+
+        const result = await uploadVideoService(videoUri, (progress) => {
+          setUploadProgress(Math.min(Math.round(progress), 99));
+        });
+
+        setUploadProgress(100);
+        setUploading(false);
+        return result;
+      } catch (err) {
+        lastError = err;
+        console.warn(
+          `⚠️ Upload attempt ${attempt}/${MAX_UPLOAD_RETRIES} failed:`,
+          err,
+        );
+
+        if (attempt < MAX_UPLOAD_RETRIES) {
+          // Esperar 1 segundo antes de reintentar
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      }
+    }
+
+    console.error(
+      `❌ Video upload failed after ${MAX_UPLOAD_RETRIES} attempts:`,
+      lastError,
+    );
+    setUploading(false);
+    setTimeout(() => setUploadProgress(0), 1000);
+    return null;
   };
 
   /**

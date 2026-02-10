@@ -32,30 +32,30 @@ interface ProviderButtonConfig {
 }
 
 const providerConfigs: ProviderButtonConfig[] = [
-  {
-    icon: "logo-facebook",
-    label: "Continuar con Facebook",
-    provider: "facebook",
-    textColor: COLORS.white,
-    iconColor: COLORS.white,
-    backgroundColor: COLORS.facebook,
-  },
-  {
-    icon: "logo-google",
-    label: "Continuar con Google",
-    provider: "google",
-    textColor: COLORS.white,
-    iconColor: COLORS.white,
-    backgroundColor: COLORS.google,
-  },
-  {
-    icon: "logo-apple",
-    label: "Continuar con Apple",
-    provider: "apple",
-    textColor: COLORS.white,
-    iconColor: COLORS.white,
-    backgroundColor: COLORS.apple,
-  },
+  // {
+  //   icon: "logo-facebook",
+  //   label: "Continuar con Facebook",
+  //   provider: "facebook",
+  //   textColor: COLORS.white,
+  //   iconColor: COLORS.white,
+  //   backgroundColor: COLORS.facebook,
+  // },
+  // {
+  //   icon: "logo-google",
+  //   label: "Continuar con Google",
+  //   provider: "google",
+  //   textColor: COLORS.white,
+  //   iconColor: COLORS.white,
+  //   backgroundColor: COLORS.google,
+  // },
+  // {
+  //   icon: "logo-apple",
+  //   label: "Continuar con Apple",
+  //   provider: "apple",
+  //   textColor: COLORS.white,
+  //   iconColor: COLORS.white,
+  //   backgroundColor: COLORS.apple,
+  // },
   {
     icon: "mail",
     label: "Continuar con Email",

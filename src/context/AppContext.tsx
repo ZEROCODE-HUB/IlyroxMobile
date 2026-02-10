@@ -133,8 +133,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
                 landSqft: p.metros_cuadrados_terreno || 0,
               },
               amenities: p.amenidades || [],
-              type: p.tipo as any,
-              subtype: p.subtipo,
+              type: (p.tipo || "habitacional").toLowerCase() as any,
+              subtype: (p.subtipo || "").toLowerCase(),
               operation:
                 operacion?.tipo_operacion === "venta" ? "Sale" : "Rent",
               status: "Publicada",

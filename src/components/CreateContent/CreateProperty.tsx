@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useRouter } from "expo-router";
 import {
   View,
   Text,
@@ -24,6 +25,8 @@ import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
 import { uploadImage as uploadImageService } from "../../services/uploadService";
 import LocationPicker from "./LocationPicker";
+import ReordenableImages from "./ReordenableImages";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { COLORS } from "../../constants/colors";
 
 // Importar helpers de catálogos
@@ -64,6 +67,7 @@ export default function CreateProperty({
 }: CreatePropertyProps) {
   const { top } = useStableSafeInsets();
   const { user } = useAuth();
+  const router = useRouter();
   const { saveProperty } = usePropertyMutation();
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -201,7 +205,7 @@ export default function CreateProperty({
   const [showNumberInput, setShowNumberInput] = useState(false);
   const [numberInputConfig, setNumberInputConfig] = useState({
     title: "",
-    onSave: (val: string) => {},
+    onSave: (val: string) => { },
   });
 
   // Modals para gravamen/financiamiento
@@ -553,15 +557,7 @@ export default function CreateProperty({
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const moveImage = (fromIndex: number, toIndex: number) => {
-    setImages((prev) => {
-      const next = [...prev];
-      if (toIndex < 0 || toIndex >= next.length) return next;
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
-  };
+
 
   /**
    * Toggle amenidad
@@ -615,8 +611,8 @@ export default function CreateProperty({
 
     if (!ubicacionData.estado) newErrors.estado = "El estado es requerido";
     if (!ubicacionData.ciudad) newErrors.ciudad = "La ciudad es requerida";
-    if (!ubicacionData.municipio)
-      newErrors.municipio = "El municipio es requerido";
+    // if (!ubicacionData.municipio)
+    //   newErrors.municipio = "El municipio es requerido";
 
     // Validación de m²
     if (esTerreno(subtipo)) {
@@ -813,11 +809,11 @@ export default function CreateProperty({
         gravamenes:
           tieneGravamen === "Sí" && institucionGravamen
             ? [
-                {
-                  institucion: institucionGravamen,
-                  monto: montoGravamen ? parseFloat(montoGravamen) : null,
-                },
-              ]
+              {
+                institucion: institucionGravamen,
+                monto: montoGravamen ? parseFloat(montoGravamen) : null,
+              },
+            ]
             : [],
       };
 
@@ -837,7 +833,14 @@ export default function CreateProperty({
           {
             text: "OK",
             onPress: () => {
-              if (onBack) onBack(true);
+              if (!propertyId) {
+                router.replace({
+                  pathname: "/(tabs)",
+                  params: { refresh: String(Date.now()) },
+                });
+              } else {
+                if (onBack) onBack(true);
+              }
             },
           },
         ],
@@ -897,11 +900,11 @@ export default function CreateProperty({
       style={
         isSecondInstance
           ? {
-              marginTop: 24,
-              paddingTop: 24,
-              borderTopWidth: 1,
-              borderTopColor: COLORS.cardBorder,
-            }
+            marginTop: 24,
+            paddingTop: 24,
+            borderTopWidth: 1,
+            borderTopColor: COLORS.cardBorder,
+          }
           : {}
       }
     >
@@ -1076,52 +1079,27 @@ export default function CreateProperty({
             Mínimo 1 imagen, máximo 15 ({images.length}/15)
           </Text>
 
-          <View style={styles.imagesGrid}>
-            {images.map((uri, index) => (
-              <View key={index} style={styles.imageBox}>
-                <ViewImage src={uri} imageStyle={styles.previewImage} />
-                <TouchableOpacity
-                  onPress={() => moveImage(index, index - 1)}
-                  style={styles.moveLeftBtn}
-                >
-                  <Ionicons
-                    name="chevron-back"
-                    size={14}
-                    color={COLORS.white}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => moveImage(index, index + 1)}
-                  style={styles.moveRightBtn}
-                >
-                  <Ionicons
-                    name="chevron-forward"
-                    size={14}
-                    color={COLORS.white}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => handleRemoveImage(index)}
-                  style={styles.removeBtn}
-                >
-                  <Ionicons name="close" size={16} color={COLORS.white} />
-                </TouchableOpacity>
-              </View>
-            ))}
+          <GestureHandlerRootView>
+            <ReordenableImages
+              images={images}
+              onReorder={(newOrder) => setImages(newOrder)}
+              onRemove={handleRemoveImage}
+            />
+          </GestureHandlerRootView>
 
-            {images.length < 15 && (
-              <TouchableOpacity
-                onPress={handlePickImages}
-                style={[
-                  styles.uploadBtn,
-                  errors.images && styles.uploadBtnError,
-                ]}
-              >
-                <Ionicons name="camera" size={32} color={COLORS.textTertiary} />
-                <Text style={styles.uploadText}>Agregar</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          {images.length < 15 && (
+            <TouchableOpacity
+              onPress={handlePickImages}
+              style={[
+                styles.uploadBtn,
+                errors.images && styles.uploadBtnError,
+                { marginTop: 12 },
+              ]}
+            >
+              <Ionicons name="camera" size={32} color={COLORS.textTertiary} />
+              <Text style={styles.uploadText}>Agregar</Text>
+            </TouchableOpacity>
+          )}
           {errors.images && (
             <Text style={styles.errorText}>{errors.images}</Text>
           )}
@@ -1656,13 +1634,13 @@ export default function CreateProperty({
           {/* PET FRIENDLY */}
           {tipoOperacion === "renta" || tipoOperacion === "ambas"
             ? camposVisibles.petFriendly && (
-                <RadioGroupSelector
-                  label="Mascotas Permitidas"
-                  options={[...OPCIONES_SI_NO]}
-                  selectedValue={petFriendly}
-                  onSelect={(val) => setPetFriendly(val as any)}
-                />
-              )
+              <RadioGroupSelector
+                label="Mascotas Permitidas"
+                options={[...OPCIONES_SI_NO]}
+                selectedValue={petFriendly}
+                onSelect={(val) => setPetFriendly(val as any)}
+              />
+            )
             : null}
         </View>
 
@@ -1682,7 +1660,7 @@ export default function CreateProperty({
                 style={[
                   styles.amenidadChip,
                   amenidadesSeleccionadas.includes(amenidad) &&
-                    styles.amenidadChipActive,
+                  styles.amenidadChipActive,
                 ]}
                 onPress={() => toggleAmenidad(amenidad)}
               >
@@ -1690,7 +1668,7 @@ export default function CreateProperty({
                   style={[
                     styles.amenidadText,
                     amenidadesSeleccionadas.includes(amenidad) &&
-                      styles.amenidadTextActive,
+                    styles.amenidadTextActive,
                   ]}
                 >
                   {amenidad}
@@ -1840,7 +1818,7 @@ export default function CreateProperty({
                     style={[
                       styles.amenidadChip,
                       tiposFinanciamientoSeleccionados.includes(tipo) &&
-                        styles.amenidadChipActive,
+                      styles.amenidadChipActive,
                     ]}
                     onPress={() => toggleFinanciamiento(tipo)}
                   >
@@ -1848,7 +1826,7 @@ export default function CreateProperty({
                       style={[
                         styles.amenidadText,
                         tiposFinanciamientoSeleccionados.includes(tipo) &&
-                          styles.amenidadTextActive,
+                        styles.amenidadTextActive,
                       ]}
                     >
                       {tipo}
@@ -1886,7 +1864,12 @@ export default function CreateProperty({
       {/* ============================================ */}
       {/* FOOTER - BOTÓN PUBLICAR */}
       {/* ============================================ */}
-      <View style={[styles.footer, propertyId ? { paddingBottom: 50 } : {}]}>
+      <View
+        style={[
+          styles.footer,
+          propertyId ? { paddingBottom: 50 } : { paddingBottom: 50 },
+        ]}
+      >
         <TouchableOpacity
           style={[styles.publishBtn, uploading && styles.publishBtnDisabled]}
           onPress={handlePublish}
@@ -2231,20 +2214,5 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 8,
   },
-  moveLeftBtn: {
-    position: "absolute",
-    bottom: 6,
-    left: 6,
-    backgroundColor: COLORS.blackTransparent60,
-    padding: 4,
-    borderRadius: 12,
-  },
-  moveRightBtn: {
-    position: "absolute",
-    bottom: 6,
-    right: 6,
-    backgroundColor: COLORS.blackTransparent60,
-    padding: 4,
-    borderRadius: 12,
-  },
+
 });

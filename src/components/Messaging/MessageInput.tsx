@@ -155,9 +155,6 @@ export default React.forwardRef<TextInput, MessageInputProps>(
           {
             paddingBottom: Math.max(insets.bottom, 10),
           },
-          onFocusChange && {
-            marginBottom: 5,
-          },
         ]}
       >
         {onSendImage && (

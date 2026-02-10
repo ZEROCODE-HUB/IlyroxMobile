@@ -235,6 +235,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 6,
   },
   dateColumn: {
     backgroundColor: COLORS.primaryTransparent,
@@ -318,6 +320,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: COLORS.textPrimary,
     marginBottom: 2,
+    flexShrink: 1,
   },
   actions: {
     borderTopWidth: 1,
@@ -342,6 +345,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     borderRadius: 8,
     gap: 6,
+    flexShrink: 0,
   },
   completeBtnText: {
     color: COLORS.white,

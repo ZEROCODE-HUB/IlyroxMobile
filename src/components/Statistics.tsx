@@ -33,9 +33,52 @@ import Chart11_TopAmenities from "./charts/Chart11_TopAmenities";
 import Chart12_SurfaceVsSaleTime from "./charts/Chart12_SurfaceVsSaleTime";
 import Chart13_PriceByRooms from "./charts/Chart13_PriceByRooms";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
-const OPERATIONS = ["Venta", "Renta"];
 
 const Statistics = () => {
+  const isVisible = true;
+
+  if (isVisible) {
+    return (
+      <ScreenWrapper withHeader={false} style={styles.container}>
+        <AppHeader
+          title="Dashboard I360"
+          showBackButton
+          onBack={() => navigation.goBack()}
+        />
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 30,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: COLORS.primary + "15",
+              padding: 40,
+              borderRadius: 100,
+              marginBottom: 24,
+            }}
+          >
+            <Ionicons name="stats-chart" size={80} color={COLORS.primary} />
+          </View>
+          <Text
+            style={{
+              fontSize: 28,
+              fontWeight: "bold",
+              color: COLORS.primary,
+              marginBottom: 16,
+              textAlign: "center",
+            }}
+          >
+            Próximamente
+          </Text>
+        </View>
+      </ScreenWrapper>
+    );
+  }
+
   const navigation = useNavigation<any>();
   const [activePoint, setActivePoint] = useState<ActivePoint | null>(null);
 
@@ -202,15 +245,15 @@ const Statistics = () => {
         title="Dashboard I360"
         showBackButton
         onBack={() => navigation.goBack()}
-        rightComponent={
-          <TouchableOpacity onPress={() => setShowFiltersModal(true)}>
-            <Ionicons name="filter" size={24} color={COLORS.primary} />
-          </TouchableOpacity>
-        }
+        // rightComponent={
+        //   <TouchableOpacity onPress={() => setShowFiltersModal(true)}>
+        //     <Ionicons name="filter" size={24} color={COLORS.primary} />
+        //   </TouchableOpacity>
+        // }
       />
 
       {/* Active Filters Summary */}
-      <View style={styles.filtersSummary}>
+      {/* <View style={styles.filtersSummary}>
         <Text style={styles.summaryText}>
           {filters.operationType} • {filters.propertyType.type}
           {filters.propertyType.subtype
@@ -227,7 +270,7 @@ const Statistics = () => {
             .filter(Boolean)
             .join(" > ") || "Todo México"}
         </Text>
-      </View>
+      </View> */}
 
       <ScrollView
         style={styles.scrollView}

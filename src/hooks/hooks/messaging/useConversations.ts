@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { AppState, AppStateStatus } from "react-native";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -92,14 +93,14 @@ export function useConversations(userId?: string) {
       const { data: conversationTags } =
         conversationIds.length > 0
           ? await supabase
-              .from("conversacion_etiquetas")
-              .select(
-                `
+            .from("conversacion_etiquetas")
+            .select(
+              `
                 conversacion_id,
                 etiqueta:etiquetas_conversacion(id, nombre, color)
               `,
-              )
-              .in("conversacion_id", conversationIds)
+            )
+            .in("conversacion_id", conversationIds)
           : { data: [] };
 
       // Crear un mapa de conversación -> etiquetas
@@ -213,13 +214,13 @@ export function useConversations(userId?: string) {
       clearTimeout(reloadTimerRef.current);
     }
 
-    // Programar nueva recarga en 100ms
+    // Programar nueva recarga en 500ms (dar tiempo a triggers de BD)
     reloadTimerRef.current = setTimeout(() => {
       if (isMountedRef.current) {
         console.log("🔄 Reloading conversations (debounced)");
         loadConversations();
       }
-    }, 100);
+    }, 500);
   }, [loadConversations]);
 
   /**
@@ -297,6 +298,326 @@ export function useConversations(userId?: string) {
   };
 
   /**
+   * Actualizar una sola conversación/agrupación
+   * Más eficiente que recargar toda la lista
+   */
+  /**
+   * Actualizar conversación basada en usuarios (Source of Truth: tabla conversaciones)
+   * Evita depender de la vista agrupaciones_conversaciones que puede tener lag
+   */
+  const updateConversationByUsers = useCallback(
+    async (u1: string, u2: string) => {
+      if (!userId) return;
+
+      try {
+        // 1. Cargar TODAS las conversaciones entre estos dos usuarios directamente de la tabla base
+        const { data: groupConversations, error } = await supabase
+          .from("conversaciones")
+          .select(
+            `
+            *,
+            usuario1:perfiles!usuario1_id(id, nombre, apellido_paterno, foto),
+            usuario2:perfiles!usuario2_id(id, nombre, apellido_paterno, foto),
+            propiedad:propiedades(id, tipo, subtipo, ciudad, fotos, operaciones_propiedad(precio, moneda))
+          `,
+          )
+          .or(
+            `and(usuario1_id.eq.${u1},usuario2_id.eq.${u2}),and(usuario1_id.eq.${u2},usuario2_id.eq.${u1})`,
+          );
+
+        if (error || !groupConversations || groupConversations.length === 0) {
+          // Si no hay conversaciones, intentar recargar todo por seguridad
+          debouncedReload();
+          return;
+        }
+
+        const groupConvs = groupConversations;
+        const conversationIds = groupConvs.map((c) => c.id);
+
+        // 2. Cargar etiquetas
+        const { data: conversationTags } =
+          conversationIds.length > 0
+            ? await supabase
+              .from("conversacion_etiquetas")
+              .select(
+                `
+                  conversacion_id,
+                  etiqueta:etiquetas_conversacion(id, nombre, color)
+                `,
+              )
+              .in("conversacion_id", conversationIds)
+            : { data: [] };
+
+        const tagsMap = new Map<string, any[]>();
+        (conversationTags || []).forEach((ct: any) => {
+          if (ct.etiqueta) {
+            const existing = tagsMap.get(ct.conversacion_id) || [];
+            if (!existing.find((t) => t.id === ct.etiqueta.id)) {
+              existing.push(ct.etiqueta);
+            }
+            tagsMap.set(ct.conversacion_id, existing);
+          }
+        });
+
+        // 3. Calcular agregados manualmente
+        const latestConvInGroup = groupConvs.reduce(
+          (latest: any, current: any) => {
+            if (!latest) return current;
+            if (!current.ultimo_mensaje_en) return latest;
+            if (!latest.ultimo_mensaje_en) return current;
+            return new Date(current.ultimo_mensaje_en) >
+              new Date(latest.ultimo_mensaje_en)
+              ? current
+              : latest;
+          },
+          null,
+        );
+
+        const unreadCount = groupConvs.reduce((total: number, conv: any) => {
+          const amInConvUsuario1 = conv.usuario1_id === userId;
+          const count = amInConvUsuario1
+            ? conv.mensajes_no_leidos_usuario1
+            : conv.mensajes_no_leidos_usuario2;
+          return total + (count || 0);
+        }, 0);
+
+        const allTags = new Map<string, any>();
+        groupConvs.forEach((conv: any) => {
+          const convTags = tagsMap.get(conv.id) || [];
+          convTags.forEach((tag) => {
+            allTags.set(tag.id, tag);
+          });
+        });
+
+        // Determinar el "otro usuario" (siempre es el que no soy yo)
+        // Usamos la info de la conversación más reciente o la primera
+        const referenceConv = latestConvInGroup || groupConvs[0];
+        const isUsuario1InRef = referenceConv.usuario1_id === userId;
+        const otherUser = isUsuario1InRef ? referenceConv.usuario2 : referenceConv.usuario1;
+
+        // Construir objeto actualizado
+        const updatedConversation = {
+          id: latestConvInGroup?.id || `${u1}_${u2}`,
+          usuario1_id: u1,
+          usuario2_id: u2,
+          total_conversaciones: groupConvs.length,
+          total_mensajes_no_leidos: unreadCount,
+          conversacion_mas_reciente_id: latestConvInGroup?.id,
+          ultimo_mensaje_preview: latestConvInGroup?.ultimo_mensaje_preview,
+          ultima_actividad: latestConvInGroup?.ultimo_mensaje_en,
+          other_user: otherUser,
+          etiquetas: Array.from(allTags.values()),
+        };
+
+        // 4. Actualizar estado
+        setConversations((prev) => {
+          const existingIndex = prev.findIndex(
+            (c) =>
+              (c.usuario1_id === u1 && c.usuario2_id === u2) ||
+              (c.usuario1_id === u2 && c.usuario2_id === u1),
+          );
+
+          let newList;
+          if (existingIndex >= 0) {
+            newList = [...prev];
+            newList[existingIndex] = updatedConversation;
+          } else {
+            newList = [updatedConversation, ...prev];
+          }
+
+          // Reordenar
+          newList.sort((a: any, b: any) => {
+            const dateA = new Date(a.ultima_actividad || 0).getTime();
+            const dateB = new Date(b.ultima_actividad || 0).getTime();
+            return dateB - dateA;
+          });
+
+          return newList;
+        });
+
+      } catch (err) {
+        console.error("Error updating conversation by users:", err);
+      }
+    },
+    [userId, debouncedReload],
+  );
+
+  const updateSingleConversation = useCallback(
+    async (groupingId: string) => {
+      if (!userId) return;
+
+      try {
+        // Cargar la agrupación actualizada
+        const { data: agrupacion, error: fetchError } = await supabase
+          .from("agrupaciones_conversaciones")
+          .select(
+            `
+            *,
+            usuario1:perfiles!usuario1_id(id, nombre, apellido_paterno, foto),
+            usuario2:perfiles!usuario2_id(id, nombre, apellido_paterno, foto),
+            conversacion_mas_reciente:conversaciones!conversacion_mas_reciente_id(
+              ultimo_mensaje_preview,
+              ultimo_mensaje_en
+            )
+          `,
+          )
+          .eq("id", groupingId)
+          .single();
+
+        if (fetchError || !agrupacion) {
+          // Si no se encuentra, recargar toda la lista
+          debouncedReload();
+          return;
+        }
+
+        // Cargar todas las conversaciones de este grupo
+        const { data: groupConversations } = await supabase
+          .from("conversaciones")
+          .select(
+            "id, usuario1_id, usuario2_id, mensajes_no_leidos_usuario1, mensajes_no_leidos_usuario2, ultimo_mensaje_en, ultimo_mensaje_preview",
+          )
+          .or(
+            `and(usuario1_id.eq.${agrupacion.usuario1_id},usuario2_id.eq.${agrupacion.usuario2_id}),and(usuario1_id.eq.${agrupacion.usuario2_id},usuario2_id.eq.${agrupacion.usuario1_id})`,
+          );
+
+        const groupConvs = groupConversations || [];
+        const conversationIds = groupConvs.map((c) => c.id);
+
+        // Cargar etiquetas de estas conversaciones
+        const { data: conversationTags } =
+          conversationIds.length > 0
+            ? await supabase
+              .from("conversacion_etiquetas")
+              .select(
+                `
+                  conversacion_id,
+                  etiqueta:etiquetas_conversacion(id, nombre, color)
+                `,
+              )
+              .in("conversacion_id", conversationIds)
+            : { data: [] };
+
+        // Crear mapa de etiquetas
+        const tagsMap = new Map<string, any[]>();
+        (conversationTags || []).forEach((ct: any) => {
+          if (ct.etiqueta) {
+            const existing = tagsMap.get(ct.conversacion_id) || [];
+            if (!existing.find((t) => t.id === ct.etiqueta.id)) {
+              existing.push(ct.etiqueta);
+            }
+            tagsMap.set(ct.conversacion_id, existing);
+          }
+        });
+
+        // Procesar la agrupación
+        const isUsuario1 = agrupacion.usuario1_id === userId;
+        const otherUser = isUsuario1 ? agrupacion.usuario2 : agrupacion.usuario1;
+
+        // Encontrar conversación más reciente
+        const latestConvInGroup = groupConvs.reduce(
+          (latest: any, current: any) => {
+            if (!latest) return current;
+            if (!current.ultimo_mensaje_en) return latest;
+            if (!latest.ultimo_mensaje_en) return current;
+            return new Date(current.ultimo_mensaje_en) >
+              new Date(latest.ultimo_mensaje_en)
+              ? current
+              : latest;
+          },
+          null,
+        );
+
+        // Calcular no leídos
+        const unreadCount = groupConvs.reduce((total: number, conv: any) => {
+          const amInConvUsuario1 = conv.usuario1_id === userId;
+          const count = amInConvUsuario1
+            ? conv.mensajes_no_leidos_usuario1
+            : conv.mensajes_no_leidos_usuario2;
+          return total + (count || 0);
+        }, 0);
+
+        // Recopilar etiquetas únicas
+        const allTags = new Map<string, any>();
+        groupConvs.forEach((conv: any) => {
+          const convTags = tagsMap.get(conv.id) || [];
+          convTags.forEach((tag) => {
+            allTags.set(tag.id, tag);
+          });
+        });
+
+        const updatedConversation = {
+          id:
+            agrupacion.conversacion_mas_reciente_id ||
+            `${agrupacion.usuario1_id}_${agrupacion.usuario2_id}`,
+          usuario1_id: agrupacion.usuario1_id,
+          usuario2_id: agrupacion.usuario2_id,
+          total_conversaciones: agrupacion.total_conversaciones,
+          total_mensajes_no_leidos: unreadCount,
+          conversacion_mas_reciente_id:
+            latestConvInGroup?.id || agrupacion.conversacion_mas_reciente_id,
+          ultimo_mensaje_preview:
+            latestConvInGroup?.ultimo_mensaje_preview ||
+            agrupacion.conversacion_mas_reciente?.ultimo_mensaje_preview,
+          ultima_actividad:
+            latestConvInGroup?.ultimo_mensaje_en || agrupacion.ultima_actividad,
+          other_user: otherUser,
+          etiquetas: Array.from(allTags.values()),
+        };
+
+        // Actualizar estado de forma optimizada
+        setConversations((prev) => {
+          // Buscar si ya existe
+          const existingIndex = prev.findIndex(
+            (c) =>
+              (c.usuario1_id === agrupacion.usuario1_id &&
+                c.usuario2_id === agrupacion.usuario2_id) ||
+              (c.usuario1_id === agrupacion.usuario2_id &&
+                c.usuario2_id === agrupacion.usuario1_id),
+          );
+
+          let newList;
+          if (existingIndex >= 0) {
+            // Reemplazar existente
+            newList = [...prev];
+            newList[existingIndex] = updatedConversation;
+          } else {
+            // Agregar nueva
+            newList = [updatedConversation, ...prev];
+          }
+
+          // Reordenar por última actividad
+          newList.sort((a: any, b: any) => {
+            const dateA = new Date(a.ultima_actividad || 0).getTime();
+            const dateB = new Date(b.ultima_actividad || 0).getTime();
+            return dateB - dateA;
+          });
+
+          return newList;
+        });
+      } catch (err) {
+        console.error("Error updating single conversation:", err);
+        // Fallback: recargar todo
+        debouncedReload();
+      }
+    },
+    [userId, debouncedReload],
+  );
+
+  /**
+   * Manejar actualización directa de tabla conversaciones
+   */
+  const handleConversationUpdate = useCallback(
+    async (payload: any) => {
+      const newConv = payload.new;
+      if (!newConv || !newConv.usuario1_id || !newConv.usuario2_id) return;
+
+      // Actualizar usando IDs de usuarios directamente
+      updateConversationByUsers(newConv.usuario1_id, newConv.usuario2_id);
+    },
+    [updateConversationByUsers],
+  );
+
+  /**
    * Configurar suscripción Realtime
    * FIX: Solo se crea UNA vez por usuario
    */
@@ -305,26 +626,13 @@ export function useConversations(userId?: string) {
 
   // Modifica setupRealtimeSubscription:
   const setupRealtimeSubscription = async (uid: string) => {
-    console.log("🔍 setupRealtimeSubscription called");
-    console.log("🔍 setupInProgressRef:", setupInProgressRef.current);
-
     // FIX: Si ya está en progreso, salir inmediatamente
     if (setupInProgressRef.current) {
-      console.log("⚠️ Setup already in progress, aborting");
       return;
     }
 
-    console.log("🔍 uid:", uid.substring(0, 8));
-    console.log("🔍 channelRef.current exists?", !!channelRef.current);
-    console.log(
-      "🔍 currentUserIdRef.current:",
-      currentUserIdRef.current?.substring(0, 8),
-    );
-    console.log("🔍 Are they equal?", currentUserIdRef.current === uid);
-
     // Si ya existe para este usuario, no crear otra
     if (channelRef.current && currentUserIdRef.current === uid) {
-      console.log("✅ Conversations subscription already exists");
       return;
     }
 
@@ -336,12 +644,12 @@ export function useConversations(userId?: string) {
       await cleanupChannel();
 
       console.log(
-        "📡 Setting up conversations subscription for",
+        "📡 Setting up conversations LIST subscription for",
         uid.substring(0, 8),
       );
 
       const channel = supabase
-        .channel(`conversations-${uid}`)
+        .channel(`conversations-list-${uid}`)
         .on(
           "postgres_changes",
           {
@@ -350,9 +658,12 @@ export function useConversations(userId?: string) {
             table: "agrupaciones_conversaciones",
             filter: `usuario1_id=eq.${uid}`,
           },
-          () => {
-            console.log("📨 Conversation update received (usuario1)");
-            debouncedReload();
+          (payload) => {
+            if (payload.new && (payload.new as any).usuario1_id && (payload.new as any).usuario2_id) {
+              updateConversationByUsers((payload.new as any).usuario1_id, (payload.new as any).usuario2_id);
+            } else {
+              debouncedReload();
+            }
           },
         )
         .on(
@@ -363,12 +674,15 @@ export function useConversations(userId?: string) {
             table: "agrupaciones_conversaciones",
             filter: `usuario2_id=eq.${uid}`,
           },
-          () => {
-            console.log("📨 Conversation update received (usuario2)");
-            debouncedReload();
+          (payload) => {
+            if (payload.new && (payload.new as any).usuario1_id && (payload.new as any).usuario2_id) {
+              updateConversationByUsers((payload.new as any).usuario1_id, (payload.new as any).usuario2_id);
+            } else {
+              debouncedReload();
+            }
           },
         )
-        // Listen to direct changes on conversaciones table (Source of Truth for unread counts)
+        // Listen to direct changes on conversaciones table (Source of Truth)
         .on(
           "postgres_changes",
           {
@@ -377,9 +691,8 @@ export function useConversations(userId?: string) {
             table: "conversaciones",
             filter: `usuario1_id=eq.${uid}`,
           },
-          () => {
-            console.log("📨 Conversation update received (conversaciones u1)");
-            debouncedReload();
+          (payload) => {
+            handleConversationUpdate(payload);
           },
         )
         .on(
@@ -390,14 +703,16 @@ export function useConversations(userId?: string) {
             table: "conversaciones",
             filter: `usuario2_id=eq.${uid}`,
           },
-          () => {
-            console.log("📨 Conversation update received (conversaciones u2)");
-            debouncedReload();
+          (payload) => {
+            console.log(
+              "📨 Conversation update received (conversaciones u2)",
+              payload,
+            );
+            handleConversationUpdate(payload);
           },
         )
         .subscribe((status) => {
-          console.log("📡 Conversations subscription status:", status);
-          // Desmarcar cuando termina (éxito o error)
+          console.log("📡 Conversations List subscription status:", status);
           setupInProgressRef.current = false;
         });
 
@@ -456,8 +771,19 @@ export function useConversations(userId?: string) {
       setupRealtimeSubscription(userId);
     }
 
+    // Recargar cuando la app vuelve al foreground
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === "active" && isMountedRef.current && userId) {
+        console.log("🔄 App came to foreground, reloading conversations");
+        debouncedReload();
+      }
+    };
+
+    const appStateSub = AppState.addEventListener("change", handleAppStateChange);
+
     return () => {
       isMountedRef.current = false;
+      appStateSub.remove();
       if (reloadTimerRef.current) {
         clearTimeout(reloadTimerRef.current);
       }

@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState } from "react";
+import { useRouter } from "expo-router";
 import {
   View,
   Text,
@@ -37,6 +38,7 @@ interface CreatePostProps {
 
 export default function CreatePost({ post, onBack }: CreatePostProps) {
   const { user } = useAuth();
+  const router = useRouter();
   const { createPost, uploading: creatingPost } = useCreateContent(user?.id);
 
   const [content, setContent] = useState("");
@@ -183,7 +185,14 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
         setImages([]);
         setUploadProgress(0);
         setIsUploadingManual(false);
-        onBack();
+        if (!isEditing) {
+          router.replace({
+            pathname: "/(tabs)",
+            params: { refresh: String(Date.now()) },
+          });
+        } else {
+          onBack();
+        }
       }, 500);
     } catch (error) {
       console.error("Error publishing:", error);

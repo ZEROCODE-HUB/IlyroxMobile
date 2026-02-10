@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { SubmitButton } from "./SubmitButton";
@@ -7,6 +7,7 @@ import { BackButton } from "./BackButton";
 import { AuthFormState } from "../hooks/useAuthForm";
 import { COLORS } from "../../../constants/colors";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 
 interface LoginFormProps {
   formState: AuthFormState;
@@ -66,6 +67,14 @@ export function LoginForm({
             </TouchableOpacity>
           }
         />
+        <TouchableOpacity
+          style={styles.forgotPasswordLink}
+          onPress={() => {
+            router.push("/forgot-password");
+          }}
+        >
+          <Text style={styles.forgotPasswordText}>Olvidé mi contraseña</Text>
+        </TouchableOpacity>
         <SubmitButton loading={loading} onPress={onSubmit} text="Entrar" />
         <BackButton onPress={onBack} text="Volver a opciones" />
       </View>
@@ -80,5 +89,15 @@ const styles = StyleSheet.create({
   form: {
     width: "100%",
     paddingVertical: 16,
+  },
+  forgotPasswordLink: {
+    alignSelf: "flex-end",
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: "500",
   },
 });

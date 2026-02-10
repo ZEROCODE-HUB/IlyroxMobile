@@ -147,9 +147,8 @@ const EditProfile: React.FC<EditProfileProps> = ({
       const updates: any = {
         ...formData,
         foto: photoUrl || "",
-        nombre_completo: `${formData.nombre} ${formData.apellido_paterno} ${
-          formData.apellido_materno || ""
-        }`.trim(),
+        nombre_completo: `${formData.nombre} ${formData.apellido_paterno} ${formData.apellido_materno || ""
+          }`.trim(),
         modalidad: cleanValue(formData.modalidad),
         sitio_web: cleanValue(formData.sitio_web),
         nombre_inmobiliaria: cleanValue(formData.nombre_inmobiliaria),
@@ -290,57 +289,6 @@ const EditProfile: React.FC<EditProfileProps> = ({
               placeholder="https://tu-sitio.com"
               autoCapitalize="none"
               keyboardType="url"
-            />
-          </View>
-
-          {/* Professional Info */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Información Profesional</Text>
-
-            <AppInput
-              label="Ocupación"
-              value={formData.ocupacion}
-              onChangeText={(t) => handleInputChange("ocupacion", t)}
-              placeholder="Ej. Agente Inmobiliario, Arquitecto..."
-            />
-
-            {formData.ocupacion === "Otro" && (
-              <AppInput
-                label="Especifique Ocupación"
-                value={formData.otro_ocupacion}
-                onChangeText={(t) => handleInputChange("otro_ocupacion", t)}
-                placeholder="Escriba su ocupación"
-              />
-            )}
-
-            <AppInput
-              label="Empresa / Inmobiliaria"
-              value={formData.nombre_inmobiliaria}
-              onChangeText={(t) => handleInputChange("nombre_inmobiliaria", t)}
-              placeholder="Nombre de tu empresa"
-            />
-
-            <AppInput
-              label="Modalidad"
-              value={formData.modalidad}
-              onChangeText={(t) => handleInputChange("modalidad", t)}
-              placeholder="Ej. Independiente, Inmobiliaria"
-            />
-
-            <AppInput
-              label="Años de experiencia"
-              value={formData.anos_experiencia}
-              onChangeText={(t) => handleInputChange("anos_experiencia", t)}
-              placeholder="Ej. 5 años"
-              keyboardType="numeric"
-            />
-
-            <AppInput
-              label="Cursos / Certificaciones"
-              value={formData.curso_certificacion}
-              onChangeText={(t) => handleInputChange("curso_certificacion", t)}
-              placeholder="Ej. Certificación AMPI, Curso Real Estate 101"
-              multiline
             />
           </View>
 

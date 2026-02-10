@@ -523,7 +523,6 @@ export const statsService = {
     try {
       // Validar que se haya seleccionado un estado
       if (!filters.estado || filters.estado === "Todos") {
-        console.log("Se requiere seleccionar un Estado específico");
         return [];
       }
 

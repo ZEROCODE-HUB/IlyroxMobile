@@ -197,11 +197,18 @@ export default function CascadeLocationSelector({
 
       {/* Municipio */}
       <View style={styles.field}>
-        <Text style={styles.label}>Municipio{isMandatory ? " *" : ""}</Text>
+        <Text style={styles.label}>
+          Municipio
+          {isMandatory && municipiosDisponibles.length > 0 ? " *" : ""}
+        </Text>
         <TouchableOpacity
           style={[
             styles.selector,
-            isMandatory && ciudad && !municipio && styles.selectorEmpty,
+            isMandatory &&
+              ciudad &&
+              municipiosDisponibles.length > 0 &&
+              !municipio &&
+              styles.selectorEmpty,
             !ciudad && styles.selectorDisabled,
           ]}
           onPress={() => {

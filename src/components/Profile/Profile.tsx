@@ -133,7 +133,7 @@ const mapPostToFeedItem = (
     comments: post.comentarios_count || 0,
     timestamp: post.created_at,
     status: post.status,
-    foto_perfil: post.foto_perfil,
+    foto_perfil_usuario: post.foto_perfil,
     fecha_hora: post.fecha_hora,
     nombre_asesor: post.nombre_asesor,
     ubicacion: post.ubicacion,
