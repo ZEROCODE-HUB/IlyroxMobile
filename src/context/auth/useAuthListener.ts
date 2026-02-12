@@ -11,6 +11,7 @@ import { supabase } from "../../lib/supabase";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { perfiles } from "../../types";
 import { OneSignal } from "react-native-onesignal";
+import { Platform } from "react-native";
 
 interface UseAuthListenerProps {
   onSessionChange: (session: Session | null) => void;
@@ -94,10 +95,12 @@ export const useAuthListener = ({
         onUserChange(session?.user ?? null);
 
         if (session?.user) {
-          OneSignal.login(session.user.id);
+          if (Platform.OS !== "web") OneSignal.login(session.user.id);
         } else {
-          OneSignal.User.removeAlias("external_id");
-          OneSignal.logout();
+          if (Platform.OS !== "web") {
+            OneSignal.User.removeAlias("external_id");
+            OneSignal.logout();
+          }
         }
 
         // Cargar perfil si hay usuario
@@ -218,7 +221,7 @@ export const useAuthListener = ({
       onUserChange(session?.user ?? null);
 
       if (session?.user) {
-        OneSignal.login(session.user.id);
+        if (Platform.OS !== "web") OneSignal.login(session.user.id);
         try {
           const profilePromise = loadProfile(session.user.id);
           const profileTimeoutPromise = new Promise<never>((_, reject) => {
@@ -252,8 +255,10 @@ export const useAuthListener = ({
         // Sin sesión, limpiar todo
         if (mounted) {
           onProfileChange(null);
-          OneSignal.User.removeAlias("external_id");
-          OneSignal.logout();
+          if (Platform.OS !== "web") {
+            OneSignal.User.removeAlias("external_id");
+            OneSignal.logout();
+          }
           // await cleanupProfileSubscription(); // DESHABILITADO
         }
       }

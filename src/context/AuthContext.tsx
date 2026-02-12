@@ -17,6 +17,7 @@ import { useProfileLoader } from "./auth/useProfileLoader";
 import { useAuthListener } from "./auth/useAuthListener";
 import { useSessionRefresh } from "./auth/useSessionRefresh";
 import { OneSignal } from "react-native-onesignal";
+import { Platform } from "react-native";
 import { router } from "expo-router";
 
 interface AuthContextType {
@@ -80,8 +81,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log("🔄 Iniciando proceso de cierre de sesión...");
       await supabase.auth.signOut();
-      await OneSignal.logout();
-      OneSignal.User.removeAlias("external_id");
+      if (Platform.OS !== "web") {
+        await OneSignal.logout();
+        OneSignal.User.removeAlias("external_id");
+      }
       console.log("✅ Supabase y OneSignal cerraron sesión correctamente");
     } catch (error) {
       console.error("❌ Error durante el proceso de signOut:", error);

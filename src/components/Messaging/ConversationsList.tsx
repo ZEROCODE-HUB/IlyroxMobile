@@ -17,7 +17,6 @@ import { AppInput } from "../../design-system/components/AppInput";
 import ConversationsSelectionModal from "./ConversationsSelectionModal";
 import TagFilterBar from "./TagFilterBar";
 import TagsModal from "./TagsModal";
-import { useConversations } from "../../hooks/hooks/messaging/useConversations";
 import { useTags } from "../../hooks/hooks/messaging/useTags";
 import { COLORS } from "../../constants";
 import { Avatar } from "../shared";
@@ -29,11 +28,20 @@ interface ConversationsListProps {
     otherUser: any,
     propertyId?: string | null,
   ) => void;
+  // Nuevos props para recibir datos del hook desde MessagingScreen
+  conversations: any[];
+  loading: boolean;
+  getConversationsForUser: (otherUserId: string) => Promise<any[]>;
+  refresh: () => void;
 }
 
 export default function ConversationsList({
   userId,
   onSelectConversation,
+  conversations,
+  loading,
+  getConversationsForUser,
+  refresh,
 }: ConversationsListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSelectionModal, setShowSelectionModal] = useState(false);
@@ -41,9 +49,6 @@ export default function ConversationsList({
   const [specificConversations, setSpecificConversations] = useState<any[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [showTagsManager, setShowTagsManager] = useState(false);
-
-  const { conversations, loading, getConversationsForUser, refresh } =
-    useConversations(userId);
 
   const { tags, createTag, deleteTag, updateTag } = useTags(userId);
 

@@ -7,20 +7,19 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
 import { ScreenWrapper } from "@/screens/ScreenWrapper";
 import { supabase } from "@/lib/supabase";
+import { router } from "expo-router";
 
 const ForgotPasswordScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
 
   // Email validation regex
   const validateEmail = (email: string): boolean => {
@@ -44,55 +43,29 @@ const ForgotPasswordScreen: React.FC = () => {
     setError("");
 
     try {
-      // Enviar correo de recuperación usando Supabase
+      console.log("📧 Enviando código de recuperación a:", email);
+
+      // Enviar código OTP al correo (sin redirectTo)
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        email,
-        {
-          redirectTo: `${window.location.origin}/reset-password`,
-        },
+        email
       );
 
       if (resetError) {
-        console.error("Error al enviar correo:", resetError);
+        console.error("❌ Error al enviar correo:", resetError);
         throw resetError;
       }
 
-      // Mostrar mensaje de éxito
-      setEmailSent(true);
+      console.log("✅ Código enviado exitosamente");
 
-      if (Platform.OS === "web") {
-        if (typeof window !== "undefined") {
-          window.alert(
-            "Se ha enviado un correo de recuperación. Por favor revisa tu bandeja de entrada.",
-          );
-        }
-      } else {
-        Alert.alert(
-          "Correo enviado",
-          "Se ha enviado un correo de recuperación. Por favor revisa tu bandeja de entrada.",
-          [
-            {
-              text: "OK",
-              onPress: () => navigation.goBack(),
-            },
-          ],
-        );
-      }
+      // Navegar directamente a la pantalla de verificación
+      router.push({
+        pathname: "/verify-password-reset",
+        params: { email }
+      });
 
-      // Limpiar formulario
-      setEmail("");
     } catch (error: any) {
-      console.error("Error al recuperar contraseña:", error);
-      const errorMessage =
-        error?.message || "No se pudo enviar el correo. Intenta de nuevo.";
-
-      if (Platform.OS === "web") {
-        if (typeof window !== "undefined") {
-          window.alert(errorMessage);
-        }
-      } else {
-        Alert.alert("Error", errorMessage);
-      }
+      console.error("❌ Error al recuperar contraseña:", error);
+      setError(error?.message || "No se pudo enviar el correo. Intenta de nuevo.");
     } finally {
       setIsSubmitting(false);
     }
@@ -112,70 +85,47 @@ const ForgotPasswordScreen: React.FC = () => {
       >
         <View style={styles.content}>
           <View style={styles.formContainer}>
-            {!emailSent ? (
-              <>
-                <Text style={styles.description}>
-                  Ingresa tu correo electrónico y te enviaremos un enlace para
-                  restablecer tu contraseña.
-                </Text>
+            <Text style={styles.description}>
+              Ingresa tu correo electrónico y te enviaremos un código de
+              verificación para restablecer tu contraseña.
+            </Text>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>
-                    Correo electrónico <Text style={styles.required}>*</Text>
-                  </Text>
-                  <TextInput
-                    style={[styles.input, error && styles.inputError]}
-                    placeholder="ejemplo@correo.com"
-                    placeholderTextColor={COLORS.textTertiary}
-                    value={email}
-                    onChangeText={(text) => {
-                      setEmail(text);
-                      if (error) {
-                        setError("");
-                      }
-                    }}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    editable={!isSubmitting}
-                  />
-                  {error ? <Text style={styles.errorText}>{error}</Text> : null}
-                </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                Correo electrónico <Text style={styles.required}>*</Text>
+              </Text>
+              <TextInput
+                style={[styles.input, error && styles.inputError]}
+                placeholder="ejemplo@correo.com"
+                placeholderTextColor={COLORS.textTertiary}
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (error) {
+                    setError("");
+                  }
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!isSubmitting}
+              />
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            </View>
 
-                <TouchableOpacity
-                  style={[
-                    styles.submitButton,
-                    isSubmitting && styles.submitButtonDisabled,
-                  ]}
-                  onPress={handleResetPassword}
-                  disabled={isSubmitting}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.submitButtonText}>
-                    {isSubmitting ? "Enviando..." : "Enviar enlace"}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <View style={styles.successContainer}>
-                <Text style={styles.successTitle}>✓ Correo enviado</Text>
-                <Text style={styles.successText}>
-                  Hemos enviado un enlace de recuperación a{" "}
-                  <Text style={styles.emailText}>{email}</Text>
-                </Text>
-                <Text style={styles.successText}>
-                  Por favor revisa tu bandeja de entrada y sigue las
-                  instrucciones.
-                </Text>
-
-                <TouchableOpacity
-                  style={styles.backButton}
-                  onPress={() => navigation.goBack()}
-                >
-                  <Text style={styles.backButtonText}>Volver al inicio</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            <TouchableOpacity
+              style={[
+                styles.submitButton,
+                isSubmitting && styles.submitButtonDisabled,
+              ]}
+              onPress={handleResetPassword}
+              disabled={isSubmitting}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.submitButtonText}>
+                {isSubmitting ? "Enviando..." : "Enviar código"}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -266,39 +216,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: COLORS.white,
-  },
-  successContainer: {
-    alignItems: "center",
-  },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: COLORS.success,
-    marginBottom: 16,
-  },
-  successText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: "center",
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  emailText: {
-    fontWeight: "600",
-    color: COLORS.primary,
-  },
-  backButton: {
-    marginTop: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-  backButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.primary,
   },
 });
 

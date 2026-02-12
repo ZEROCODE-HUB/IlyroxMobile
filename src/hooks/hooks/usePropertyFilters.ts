@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Property } from "../../types";
+import { useExchangeRate } from "./useExchangeRate";
 
 export interface PropertyFilters {
   tipoPropiedad: string;
@@ -23,8 +24,6 @@ export interface PropertyFilters {
   m2ConstruccionMin: string;
 }
 
-const EXCHANGE_RATE = 20;
-
 export interface GeofenceBounds {
   minLat: number;
   maxLat: number;
@@ -36,6 +35,8 @@ export const usePropertyFilters = (
   properties: Property[],
   geofenceBounds?: GeofenceBounds | null,
 ) => {
+  const { convertPrice } = useExchangeRate();
+
   const [filters, setFilters] = useState<PropertyFilters>({
     tipoPropiedad: "",
     subtipo: "",
@@ -106,24 +107,49 @@ export const usePropertyFilters = (
 
       // FILTRO DE OPERACIÓN - Solo aplicar si hay filtro
       if (filters.operacion) {
-        const rawOperacion =
-          anyP.operacion ||
-          anyP.operation ||
-          (anyP.operaciones && anyP.operaciones[0]?.tipo_operacion);
-        const pOperacion =
-          rawOperacion &&
-          String(rawOperacion)
-            .toLowerCase()
-            .replace("sale", "venta")
-            .replace("rent", "renta");
+        // Una propiedad puede tener múltiples operaciones (venta Y renta)
+        // Necesitamos buscar si ALGUNA de sus operaciones coincide con el filtro
+        let hasMatchingOperation = false;
 
-        if (
-          pOperacion &&
-          pOperacion.toLowerCase() !== filters.operacion.toLowerCase()
-        ) {
+        // El array en la BD se llama operaciones_propiedad
+        const operaciones = anyP.operaciones_propiedad || anyP.operaciones;
+
+        // Primero revisar si tiene el array de operaciones
+        if (operaciones && Array.isArray(operaciones)) {
+          hasMatchingOperation = operaciones.some((op: any) => {
+            const tipoOp = op?.tipo_operacion;
+            if (!tipoOp) return false;
+            
+            // Normalizar: convertir a minúsculas y traducir de inglés a español
+            const lower = String(tipoOp).toLowerCase();
+            let normalized = lower;
+            
+            // Solo hacer replace si NO está ya en español
+            if (lower === "sale") {
+              normalized = "venta";
+            } else if (lower === "rent") {
+              normalized = "renta";
+            }
+            // Si ya es "venta" o "renta", no hacer nada
+            
+            return normalized === filters.operacion.toLowerCase();
+          });
+        } else {
+          // Fallback: revisar campos individuales por compatibilidad
+          const rawOperacion = anyP.operacion || anyP.operation;
+          if (rawOperacion) {
+            const pOperacion = String(rawOperacion)
+              .toLowerCase()
+              .replace("sale", "venta")
+              .replace("rent", "renta");
+            
+            hasMatchingOperation = pOperacion === filters.operacion.toLowerCase();
+          }
+        }
+
+        // Si no encontró ninguna operación que coincida, filtrar la propiedad
+        if (!hasMatchingOperation) {
           return false;
-        } else if (!pOperacion) {
-          // No rechazar, permitir pasar
         }
       }
 
@@ -211,24 +237,66 @@ export const usePropertyFilters = (
         return false;
       }
 
-      const pPrice = p.price || 0;
-      const pCurrency =
-        anyP.currency ||
-        (anyP.operaciones && anyP.operaciones[0]?.moneda) ||
-        "MXN";
+      // FILTRADO DE PRECIO CON CONVERSIÓN DE MONEDA
+      // Si hay filtro de operación, usar el precio de esa operación específica
+      // (una propiedad puede tener precio de venta Y precio de renta)
+      let pPrice = p.price || 0;
+      let pCurrency: "MXN" | "USD" = p.currency || "MXN";
 
+      // El array en la BD se llama operaciones_propiedad
+      const operaciones = anyP.operaciones_propiedad || anyP.operaciones;
+
+
+
+      // Si hay operaciones múltiples y un filtro de operación, buscar el precio correcto
+      if (filters.operacion && operaciones && Array.isArray(operaciones)) {
+        const matchingOp = operaciones.find((op: any) => {
+          const tipoOp = op?.tipo_operacion;
+          if (!tipoOp) return false;
+          
+          // Normalizar: convertir a minúsculas y traducir de inglés a español
+          const lower = String(tipoOp).toLowerCase();
+          let normalized = lower;
+          
+          // Solo hacer replace si NO está ya en español
+          if (lower === "sale") {
+            normalized = "venta";
+          } else if (lower === "rent") {
+            normalized = "renta";
+          }
+          
+          return normalized === filters.operacion.toLowerCase();
+        });
+
+        // Si encontramos la operación que coincide con el filtro, usar su precio
+        if (matchingOp) {
+          pPrice = matchingOp.precio || 0;
+          pCurrency = matchingOp.moneda || "MXN";
+          
+
+        }
+      }
+
+      // Convertir el precio de la propiedad a la moneda del filtro
       let finalPrice = pPrice;
+      if (pCurrency !== filters.moneda) {
+        finalPrice = convertPrice(
+          pPrice,
+          pCurrency as "MXN" | "USD",
+          filters.moneda
+        );
+        
 
-      if (filters.moneda === "USD" && pCurrency === "MXN") {
-        finalPrice = pPrice / EXCHANGE_RATE;
-      } else if (filters.moneda === "MXN" && pCurrency === "USD") {
-        finalPrice = pPrice * EXCHANGE_RATE;
       }
 
       const minP = parseFloat(filters.precioMin.replace(/,/g, "")) || 0;
       const maxP = parseFloat(filters.precioMax.replace(/,/g, "")) || Infinity;
 
-      if (finalPrice < minP || finalPrice > maxP) {
+      const passesPrice = finalPrice >= minP && finalPrice <= maxP;
+      
+
+
+      if (!passesPrice) {
         return false;
       }
 

@@ -58,7 +58,7 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
           cachePolicy="memory-disk"
         />
 
-        <View style={[styles.statusBadge, { backgroundColor: "#aab9d761" }]}>
+        <View style={[styles.statusBadge, { backgroundColor: "#03a58fd7" }]}>
           {commissionText ? (
             <Text style={styles.statusText}>{commissionText} comisión</Text>
           ) : (
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   statusText: {
-    color: "#4a4d55ff",
+    color: "#ffffffff",
     fontSize: 11,
     fontWeight: "500",
     letterSpacing: 0.3,

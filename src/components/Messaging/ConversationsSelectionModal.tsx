@@ -9,6 +9,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants';
 
 interface ConversationItem {
@@ -39,23 +40,24 @@ export default function ConversationsSelectionModal({
   onSelectConversation,
   otherUserName,
 }: ConversationsSelectionModalProps) {
-  
+  const insets = useSafeAreaInsets();
+
   const renderItem = ({ item }: { item: ConversationItem }) => {
     const isGeneral = !item.propiedad;
-    const title = isGeneral 
-      ? 'Chat General' 
+    const title = isGeneral
+      ? 'Chat General'
       : `${item.propiedad?.tipo} en ${item.propiedad?.ciudad}`;
-    
+
     const subtitle = isGeneral
       ? 'Conversación personal'
       : `$${item.propiedad?.precio?.toLocaleString()}`;
 
-    const image = !isGeneral && item.propiedad?.imagenes?.[0] 
+    const image = !isGeneral && item.propiedad?.imagenes?.[0]
       ? { uri: item.propiedad.imagenes[0] }
       : null;
 
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.item}
         onPress={() => onSelectConversation(item)}
       >
@@ -64,10 +66,10 @@ export default function ConversationsSelectionModal({
             <Image source={image} style={styles.propertyImage} />
           ) : (
             <View style={[styles.iconPlaceholder, { backgroundColor: isGeneral ? COLORS.primary : COLORS.info }]}>
-              <Ionicons 
-                name={isGeneral ? "chatbubble-ellipses-outline" : "home-outline"} 
-                size={24} 
-                color={COLORS.white} 
+              <Ionicons
+                name={isGeneral ? "chatbubble-ellipses-outline" : "home-outline"}
+                size={24}
+                color={COLORS.white}
               />
             </View>
           )}
@@ -88,7 +90,7 @@ export default function ConversationsSelectionModal({
             <Text style={styles.badgeText}>{item.unread_count}</Text>
           </View>
         )}
-        
+
         <Ionicons name="chevron-forward" size={20} color={COLORS.textTertiary} />
       </TouchableOpacity>
     );
@@ -102,14 +104,14 @@ export default function ConversationsSelectionModal({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingBottom: insets.bottom || 16 }]}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Conversaciones con {otherUserName}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={COLORS.textPrimary} />
             </TouchableOpacity>
           </View>
-          
+
           <FlatList
             data={conversations}
             renderItem={renderItem}

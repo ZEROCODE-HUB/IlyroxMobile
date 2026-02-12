@@ -30,8 +30,8 @@ export function LoginForm({
   const [showPassword, setShowPassword] = useState(false);
   return (
     <KeyboardAwareScrollView
-      extraScrollHeight={100}
-      extraHeight={120}
+      extraScrollHeight={40}
+      extraHeight={60}
       enableOnAndroid={true}
       enableAutomaticScroll={true}
       keyboardOpeningTime={0}

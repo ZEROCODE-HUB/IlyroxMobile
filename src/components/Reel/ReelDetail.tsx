@@ -221,6 +221,7 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
               shareDescription={item.content}
               shareImageUrl={item.images?.[0]}
               authorId={item.user.id}
+              contentId={item.reelDetails?.id}
             />
           </View>
         </View>

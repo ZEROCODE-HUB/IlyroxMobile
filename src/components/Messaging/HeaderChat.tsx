@@ -81,7 +81,7 @@ export default function HeaderChat({
   return (
     <View style={[styles.header]}>
       <TouchableOpacity onPress={onBack} style={styles.backButton}>
-        <Ionicons name="chevron-back" size={28} color={COLORS.textPrimary} />
+        <Ionicons name="chevron-back-outline" size={28} color={COLORS.textPrimary} />
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.headerUser}>
@@ -121,7 +121,7 @@ export default function HeaderChat({
         style={styles.headerButton}
       >
         <Ionicons
-          name="pricetag"
+          name="pricetag-outline"
           size={22}
           color={
             conversationTags.length > 0 ? COLORS.primary : COLORS.textSecondary

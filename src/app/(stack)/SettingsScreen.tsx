@@ -15,53 +15,38 @@ import { useAuth } from "@/context/AuthContext";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
 import EditProfile from "@/components/Profile/EditProfile";
+import { useModal } from "@/context/ModalContext";
 
 import { router } from "expo-router";
+import Constants from "expo-constants";
 import { ScreenWrapper } from "@/screens/ScreenWrapper";
 
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { signOut } = useAuth();
+  const { showModal } = useModal();
 
   const handleLogout = () => {
-    const performLogout = async () => {
-      try {
-        console.log("🚀 Iniciando cierre de sesión desde Settings...");
-        await signOut();
-        console.log("✨ Proceso de cierre de sesión completado.");
-      } catch (error) {
-        console.error("❌ Error en performLogout:", error);
-        if (Platform.OS === "web") {
-          if (typeof window !== "undefined") {
-            window.alert("Error al cerrar sesión. Inténtalo de nuevo.");
-          }
-        } else {
-          Alert.alert("Error", "No se pudo cerrar sesión. Inténtalo de nuevo.");
+    showModal({
+      title: "Cerrar Sesión",
+      message: "¿Estás seguro de que quieres cerrar sesión?",
+      confirmText: "Cerrar Sesión",
+      cancelText: "Cancelar",
+      onConfirm: async () => {
+        try {
+          console.log("🚀 Iniciando cierre de sesión desde Settings...");
+          await signOut();
+          console.log("✨ Proceso de cierre de sesión completado.");
+        } catch (error) {
+          console.error("❌ Error en performLogout:", error);
+          showModal({
+            title: "Error",
+            message: "No se pudo cerrar sesión. Inténtalo de nuevo.",
+            confirmText: "OK",
+          });
         }
-      }
-    };
-
-    if (Platform.OS === "web") {
-      if (
-        typeof window !== "undefined" &&
-        window.confirm("¿Estás seguro de que quieres cerrar sesión?")
-      ) {
-        performLogout();
-      }
-    } else {
-      Alert.alert(
-        "Cerrar Sesión",
-        "¿Estás seguro de que quieres cerrar sesión?",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Cerrar Sesión",
-            onPress: performLogout,
-            style: "destructive",
-          },
-        ],
-      );
-    }
+      },
+    });
   };
 
   const [showEditProfile, setShowEditProfile] = React.useState(false);
@@ -92,14 +77,6 @@ const SettingsScreen: React.FC = () => {
       },
     },
     {
-      id: "privacy_policy",
-      title: "Política de privacidad",
-      icon: "shield-checkmark-outline",
-      onPress: () => {
-        // Por ahora no hace nada
-      },
-    },
-    {
       id: "logout",
       title: "Cerrar sesión",
       icon: "log-out-outline",
@@ -108,6 +85,8 @@ const SettingsScreen: React.FC = () => {
       showChevron: false,
     },
   ];
+
+  const appVersion = Constants.expoConfig?.version || "1.0.0";
 
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>
@@ -167,8 +146,9 @@ const SettingsScreen: React.FC = () => {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.versionText}>Versión 1.0.0</Text>
+          <Text style={styles.versionText}>Versión {appVersion}</Text>
         </View>
+
       </ScrollView>
 
       <Modal

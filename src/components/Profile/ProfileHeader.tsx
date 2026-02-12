@@ -22,7 +22,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         disabled={isOwnProfile && !onBack}
       >
         {!isOwnProfile && (
-          <Ionicons name="chevron-back" size={24} color={COLORS.textPrimary} />
+          <Ionicons name="chevron-back-outline" size={24} color={COLORS.textPrimary} />
         )}
       </TouchableOpacity>
 

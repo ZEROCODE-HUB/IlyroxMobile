@@ -76,14 +76,15 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     }
   }, [properties, mapReady]);
 
-  const formatPrice = (price: number): string => {
-    if (price === 0) return "$0"; // Asegurar que el 0 se muestre
+  const formatPrice = (price: number, currency: "USD" | "MXN" = "MXN"): string => {
+    const symbol = currency === "USD" ? "USD" : "MXN";
+    if (price === 0) return `${symbol} 0`;
     if (price >= 1000000) {
-      return `$${(price / 1000000).toFixed(1)}M`;
+      return `${symbol} ${(price / 1000000).toFixed(1)}M`;
     } else if (price >= 1000) {
-      return `$${Math.round(price / 1000)}k`;
+      return `${symbol} ${Math.round(price / 1000)}k`;
     }
-    return `$${price}`;
+    return `${symbol} ${price}`;
   };
 
   const calculateRegionWithPadding = () => {
@@ -234,7 +235,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
       if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
 
-      const priceText = formatPrice(p.price || 0);
+      const priceText = formatPrice(p.price || 0, p.currency);
       const isHighlighted = p.id === highlightedPropertyId;
       const markerColor = isHighlighted ? COLORS.warning : COLORS.primary;
 
@@ -360,7 +361,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
             if (!pos) return null;
 
             const isHighlighted = p.id === highlightedPropertyId;
-            const priceText = formatPrice(p.price || 0);
+            const priceText = formatPrice(p.price || 0, p.currency);
             const bgColor = isHighlighted ? COLORS.warning : COLORS.primary;
 
             return (

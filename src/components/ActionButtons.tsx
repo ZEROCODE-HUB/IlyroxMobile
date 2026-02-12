@@ -39,6 +39,7 @@ interface ActionButtonsProps {
   authorId?: string; // ID of the user who owns/posted the content
   contentId?: string; // ID of the actual property/post (for reports)
   propertyId?: string; // Direct property ID for properties
+  shareCode?: string; // Code for sharing properties (e.g. 9010276520)
 }
 
 const ActionButtons: React.FC<ActionButtonsProps> = ({
@@ -58,6 +59,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   authorId,
   contentId,
   propertyId,
+  shareCode,
 }) => {
   // Hook de likes con optimistic updates
   const {
@@ -119,6 +121,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     }
     const success = await shareContent({
       feedItemId,
+      shareId: contentId,
       type: feedItemType,
       title: shareTitle,
       description: shareDescription,
@@ -247,6 +250,10 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           onClose={() => setShowShareModal(false)}
           propertyTitle={shareTitle || "Propiedad"}
           propertyId={propertyId}
+          shareCode={shareCode}
+          feedItemId={feedItemId}
+          shareDescription={shareDescription}
+          shareImageUrl={shareImageUrl}
         />
       )}
     </View>

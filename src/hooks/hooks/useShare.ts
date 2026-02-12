@@ -15,6 +15,7 @@ import * as Linking from "expo-linking";
 
 interface ShareOptions {
   feedItemId: string;
+  shareId?: string;
   type: "post" | "reel" | "property";
   title: string;
   description: string;
@@ -27,11 +28,11 @@ export function useShare() {
    */
   const generateDeepLink = useCallback(
     (feedItemId: string, type: string): string => {
-      // URL de tu app (configurar en app.json)
-      const scheme = "i360realestate"; // Scheme de tu app
+      // URL base
+      const baseUrl = "https://ilyrox.vercel.app/";
 
-      // Deep link que abrirá el detalle
-      return Linking.createURL(`feed/${type}/${feedItemId}`);
+      // Retornar formato: https://ilyrox.vercel.app/?type={type}&id={id}
+      return `${baseUrl}?type=${type}&id=${feedItemId}`;
     },
     [],
   );
@@ -41,11 +42,11 @@ export function useShare() {
    */
   const shareContent = useCallback(
     async (options: ShareOptions): Promise<boolean> => {
-      const { feedItemId, type, title, description, imageUrl } = options;
+      const { feedItemId, shareId, type, title, description, imageUrl } = options;
 
       try {
         // 1. Generar deep link
-        const deepLink = generateDeepLink(feedItemId, type);
+        const deepLink = generateDeepLink(shareId || feedItemId, type);
 
         // 2. Mensaje para compartir
         const message = `${title}\n\n${description}\n\n${deepLink}`;
@@ -85,17 +86,18 @@ export function useShare() {
       url: string,
     ): Promise<{ type: string; feedItemId: string } | null> => {
       try {
-        const { path, queryParams } = Linking.parse(url);
+        const { queryParams } = Linking.parse(url);
 
-        if (!path) return null;
+        if (!queryParams) return null;
 
-        // Parsear: feed/post/abc123 o feed/property/xyz789
-        const parts = path.split("/");
-        if (parts.length !== 3 || parts[0] !== "feed") return null;
+        const type = queryParams.type as string; // 'property' | 'post' | 'reel'
+        const feedItemId = queryParams.id as string; // id o codigo_propiedad
 
-        const [, type, feedItemId] = parts;
-
-        if (!feedItemId) return null;
+        if (!type || !feedItemId) {
+          // Fallback para legacy links si es necesario
+          // Por ahora solo soportamos el nuevo formato
+          return null;
+        }
 
         return { type, feedItemId };
       } catch (error) {

@@ -1,7 +1,8 @@
-import { Alert } from "react-native";
 import { supabase } from "../../lib/supabase";
+import { useModal } from "@/context/ModalContext";
 
 const useAppointment = () => {
+  const { showModal } = useModal();
   const handleCancelAppointment = async (id: string): Promise<boolean> => {
     try {
       const { error } = await supabase
@@ -14,10 +15,11 @@ const useAppointment = () => {
 
       if (error) throw error;
 
-      Alert.alert("Cita ha sido cancelada exitosamente");
+      showModal({ title: "Éxito", message: "Cita ha sido cancelada exitosamente", confirmText: "OK" });
+      return true;
     } catch (error) {
       console.error("Error canceling appointment:", error);
-      Alert.alert("Error", "No se pudo cancelar la cita");
+      showModal({ title: "Error", message: "No se pudo cancelar la cita", confirmText: "OK" });
       return false;
     }
   };

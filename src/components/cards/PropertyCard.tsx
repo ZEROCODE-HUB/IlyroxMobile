@@ -173,6 +173,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             tintColor={COLORS.white}
             authorId={item.user.id}
             propertyId={property.id}
+            shareCode={property.codigo_propiedad || property.code}
           />
         </View>
       </View>

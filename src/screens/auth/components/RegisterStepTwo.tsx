@@ -67,8 +67,8 @@ export function RegisterStepTwo({
 
   return (
     <KeyboardAwareScrollView
-      extraScrollHeight={100}
-      extraHeight={120}
+      extraScrollHeight={40}
+      extraHeight={60}
       enableOnAndroid={true}
       enableAutomaticScroll={true}
       keyboardOpeningTime={0}

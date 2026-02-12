@@ -11,6 +11,7 @@ import { useApp } from "@/context/AppContext";
 
 import { OneSignal } from "react-native-onesignal";
 import { useImageUpload } from "@/hooks/hooks";
+import { useModal } from "@/context/ModalContext";
 
 export interface AuthFormState {
   // Credenciales
@@ -57,6 +58,7 @@ export function useAuthForm() {
 
   const { setCurrentUser } = useApp();
   const { uploadImage } = useImageUpload();
+  const { showModal } = useModal();
 
   // Actualizar campo individual
   const updateField = useCallback(
@@ -92,19 +94,35 @@ export function useAuthForm() {
       !password ||
       !estado
     ) {
-      Alert.alert("Error", "Por favor completa todos los campos obligatorios");
+      showModal({
+        title: "Error",
+        message: "Por favor completa todos los campos obligatorios",
+        confirmText: "OK",
+      });
       return false;
     }
     if (!email.includes("@")) {
-      Alert.alert("Error", "Email inválido");
+      showModal({
+        title: "Error",
+        message: "Email inválido",
+        confirmText: "OK",
+      });
       return false;
     }
     if (password.length < 6) {
-      Alert.alert("Error", "La contraseña debe tener al menos 6 caracteres");
+      showModal({
+        title: "Error",
+        message: "La contraseña debe tener al menos 6 caracteres",
+        confirmText: "OK",
+      });
       return false;
     }
     if (password !== confirmPassword) {
-      Alert.alert("Error", "Las contraseñas no coinciden");
+      showModal({
+        title: "Error",
+        message: "Las contraseñas no coinciden",
+        confirmText: "OK",
+      });
       return false;
     }
     return true;
@@ -122,25 +140,45 @@ export function useAuthForm() {
       } = formState;
 
       if (requireEstado && !estado) {
-        Alert.alert("Error", "Selecciona tu estado");
+        showModal({
+          title: "Error",
+          message: "Selecciona tu estado",
+          confirmText: "OK",
+        });
         return false;
       }
       if (!ocupacion) {
-        Alert.alert("Error", "Selecciona tu ocupación");
+        showModal({
+          title: "Error",
+          message: "Selecciona tu ocupación",
+          confirmText: "OK",
+        });
         return false;
       }
       if (ocupacion === "Asesor Inmobiliario") {
         if (!modalidad) {
-          Alert.alert("Error", "Selecciona tu modalidad");
+          showModal({
+            title: "Error",
+            message: "Selecciona tu modalidad",
+            confirmText: "OK",
+          });
           return false;
         }
         if (modalidad === "Inmobiliaria" && !nombreInmobiliaria) {
-          Alert.alert("Error", "Ingresa el nombre de la inmobiliaria");
+          showModal({
+            title: "Error",
+            message: "Ingresa el nombre de la inmobiliaria",
+            confirmText: "OK",
+          });
           return false;
         }
       }
       if (anosExperiencia === "") {
-        Alert.alert("Error", "Selecciona tus años de experiencia");
+        showModal({
+          title: "Error",
+          message: "Selecciona tus años de experiencia",
+          confirmText: "OK",
+        });
         return false;
       }
       return true;
@@ -152,7 +190,11 @@ export function useAuthForm() {
   const validateLogin = useCallback((): boolean => {
     const { email, password } = formState;
     if (!email || !password) {
-      Alert.alert("Error", "Por favor ingresa email y contraseña");
+      showModal({
+        title: "Error",
+        message: "Por favor ingresa email y contraseña",
+        confirmText: "OK",
+      });
       return false;
     }
     return true;
@@ -176,7 +218,11 @@ export function useAuthForm() {
       }
       return true;
     } catch (error: any) {
-      Alert.alert("Error", "Credenciales incorrectas");
+      showModal({
+        title: "Error",
+        message: "Credenciales incorrectas",
+        confirmText: "OK",
+      });
       return false;
     } finally {
       setLoading(false);
@@ -252,7 +298,11 @@ export function useAuthForm() {
 
       return true;
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Ocurrió un error al registrarse");
+      showModal({
+        title: "Error",
+        message: error.message || "Ocurrió un error al registrarse",
+        confirmText: "OK",
+      });
       return false;
     } finally {
       setLoading(false);

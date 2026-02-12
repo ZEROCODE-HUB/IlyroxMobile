@@ -143,6 +143,16 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
               showContactButton={false}
               orientation="horizontal"
               authorId={item.user.id}
+              contentId={
+                item.postDetails?.id ||
+                item.reelDetails?.id ||
+                item.propertyDetails?.id
+              }
+              propertyId={item.propertyDetails?.id}
+              shareCode={
+                item.propertyDetails?.codigo_propiedad ||
+                item.propertyDetails?.code
+              }
             />
           </View>
         )}
@@ -253,6 +263,16 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
                 shareDescription={item.content.substring(0, 100)}
                 showContactButton={false}
                 authorId={item.user.id}
+                contentId={
+                  item.postDetails?.id ||
+                  item.reelDetails?.id ||
+                  item.propertyDetails?.id
+                }
+                propertyId={item.propertyDetails?.id}
+                shareCode={
+                  item.propertyDetails?.codigo_propiedad ||
+                  item.propertyDetails?.code
+                }
               />
             </View>
           )}

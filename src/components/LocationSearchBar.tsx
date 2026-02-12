@@ -116,13 +116,13 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
           query.length > 0 ? (
             <TouchableOpacity onPress={handleClearSearch}>
               <Ionicons
-                name="close-circle"
+                name="close-circle-outline"
                 size={22}
                 color={COLORS.textTertiary}
               />
             </TouchableOpacity>
           ) : (
-            <Ionicons name="search" size={22} color={COLORS.textTertiary} />
+            <Ionicons name="search-outline" size={22} color={COLORS.textTertiary} />
           )
         }
       />

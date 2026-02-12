@@ -206,6 +206,9 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
               tintColor={COLORS.white}
               showContactButton={false}
               propertyId={propertyDetails.id}
+              shareCode={
+                propertyDetails.codigo_propiedad || propertyDetails.code
+              }
             />
           </View>
 

@@ -39,7 +39,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             accessibilityRole="button"
           >
             <Ionicons
-              name="chevron-back"
+              name="chevron-back-outline"
               size={24}
               color={COLORS.textPrimary}
             />

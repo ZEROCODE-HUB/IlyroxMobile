@@ -3,7 +3,7 @@ import MapView, {
   Marker,
   PROVIDER_DEFAULT,
   PROVIDER_GOOGLE,
-} from "react-native-maps";
+} from "../shared/MapComponents";
 import { View, StyleSheet, Text, Platform } from "react-native";
 import { Property } from "../../types";
 import { COLORS } from "../../constants";
@@ -42,6 +42,14 @@ export const MapDetails: React.FC<PropertyMapProps> = ({ property }) => {
       longitudeDelta: 0.005,
     };
   }, [lat, lng]);
+
+  if (Platform.OS === "web") {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#f3f4f6' }]}>
+        <Text style={{ color: COLORS.textSecondary }}>Mapa no disponible en web</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

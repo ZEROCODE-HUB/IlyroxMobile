@@ -3,11 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useModal } from '../context/ModalContext';
 import { COLORS, DIMENSIONS } from '../constants';
 import { theme } from '../design-system/theme';
 
 export default function PendingApprovalScreen() {
   const { profile, signOut } = useAuth();
+  const { showModal } = useModal();
 
   const recibidas = profile?.aprobaciones_recibidas || 0;
   const requeridas = profile?.aprobaciones_requeridas || 3;
@@ -47,7 +49,18 @@ export default function PendingApprovalScreen() {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
+        <TouchableOpacity
+          style={styles.signOutButton}
+          onPress={() => {
+            showModal({
+              title: "Cerrar Sesión",
+              message: "¿Estás seguro de que deseas cerrar sesión?",
+              confirmText: "Cerrar Sesión",
+              cancelText: "Cancelar",
+              onConfirm: signOut
+            });
+          }}
+        >
           <Ionicons name="log-out-outline" size={24} color={COLORS.textSecondary} />
           <Text style={styles.signOutText}>Cerrar Sesión</Text>
         </TouchableOpacity>

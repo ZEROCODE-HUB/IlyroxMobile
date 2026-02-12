@@ -18,6 +18,8 @@ interface AppointmentCardProps {
     fecha: string; // YYYY-MM-DD
     hora: string; // HH:MM:SS
     estado: string;
+    tipo: string;
+    descripcion: string | null;
     user: {
       id: string;
       name: string;
@@ -41,7 +43,11 @@ interface AppointmentCardProps {
   activeTab?: string;
   onPropertyPress?: (id: string) => void;
   onUserPress?: (id: string) => void;
+
 }
+
+import { buildGoogleCalendarUrl } from "./Appointments/calendarUtils";
+import { Linking } from "react-native";
 
 export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
   ({
@@ -105,16 +111,42 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
               </View>
             </Pressable>
             {onContact && (
-              <TouchableOpacity
-                style={styles.msgButton}
-                onPress={() => onContact(appointment.id)}
-              >
-                <Ionicons
-                  name="chatbubble-outline"
-                  size={16}
-                  color={COLORS.textTertiary}
-                />
-              </TouchableOpacity>
+              <View style={styles.headerActions}>
+                {activeTab === "upcoming" && (
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => {
+                      const url = buildGoogleCalendarUrl({
+                        date: appointment.fecha,
+                        time: appointment.hora.substring(0, 5),
+                        type: appointment.tipo,
+                        description: appointment.descripcion || "",
+                        propertyTitle: appointment.propertyTitle,
+                        location: appointment.location,
+                        otherUserName: appointment.user.name,
+                      });
+                      Linking.openURL(url);
+                    }}
+                  >
+                    <Image
+                      source={{
+                        uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Google_Calendar_icon_%282020%29.svg/1024px-Google_Calendar_icon_%282020%29.svg.png",
+                      }}
+                      style={{ width: 18, height: 18 }}
+                    />
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => onContact(appointment.id)}
+                >
+                  <Ionicons
+                    name="chatbubble-outline"
+                    size={16}
+                    color={COLORS.textTertiary}
+                  />
+                </TouchableOpacity>
+              </View>
             )}
           </View>
 
@@ -268,6 +300,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: 8,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  actionButton: {
+    padding: 6,
+    backgroundColor: COLORS.background,
+    borderRadius: 20,
   },
   userInfo: {
     flexDirection: "row",

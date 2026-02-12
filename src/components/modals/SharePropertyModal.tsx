@@ -11,12 +11,13 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 import { pdfService } from "../../services/pdfService";
+import { useShare } from "../../hooks/hooks";
 
 //////////////////////////////////////
 // URL a futuro:
-// https://i360.app/property/${propertyId}
-// https://i360.app/post/${postId}
-// https://i360.app/reel/${reelId}
+// https://ilyroxox.app/property/${propertyId}
+// https://ilyroxox.app/post/${postId}
+// https://ilyroxox0.app/reel/${reelId}
 //////////////////////////////////////
 
 interface SharePropertyModalProps {
@@ -24,6 +25,10 @@ interface SharePropertyModalProps {
   onClose: () => void;
   propertyTitle: string;
   propertyId: string;
+  shareCode?: string;
+  feedItemId?: string;
+  shareDescription?: string;
+  shareImageUrl?: string;
 }
 
 const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
@@ -31,26 +36,28 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
   onClose,
   propertyTitle,
   propertyId,
+  shareCode,
+  feedItemId,
+  shareDescription,
+  shareImageUrl,
 }) => {
   const [activeTab, setActiveTab] = useState<"con" | "sin">("con");
   const [downloading, setDownloading] = useState(false);
 
-  const shareUrl = useMemo(
-    () => `https://i360.app/property/${propertyId}`,
-    [propertyId],
-  );
+  const { shareContent } = useShare();
 
-  const copyUrl = async () => {
-    let Clipboard: any = null;
-    try {
-      Clipboard = require("expo-clipboard");
-    } catch {}
+  const handleShare = async () => {
+    const success = await shareContent({
+      feedItemId: feedItemId || propertyId,
+      shareId: shareCode || propertyId,
+      type: "property",
+      title: propertyTitle,
+      description: shareDescription || "Mira esta propiedad en i360",
+      imageUrl: shareImageUrl,
+    });
 
-    if (Clipboard?.setStringAsync) {
-      await Clipboard.setStringAsync(shareUrl);
-      Alert.alert("Copiado", "URL copiada al portapapeles");
-    } else {
-      Alert.alert("URL", shareUrl);
+    if (success) {
+      onClose();
     }
   };
 
@@ -161,11 +168,11 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
             <View style={styles.actions}>
               <TouchableOpacity
                 style={styles.actionBtn}
-                onPress={copyUrl}
+                onPress={handleShare}
                 activeOpacity={0.85}
               >
-                <Ionicons name="link" size={18} color={COLORS.primary} />
-                <Text style={styles.actionText}>Copiar URL</Text>
+                <Ionicons name="share-social" size={18} color={COLORS.primary} />
+                <Text style={styles.actionText}>Compartir propiedad</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[

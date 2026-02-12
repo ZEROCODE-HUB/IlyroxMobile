@@ -6,7 +6,8 @@ import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
 import { supabase } from "../lib/supabase";
 import { useState } from "react";
-import { Alert } from "react-native";
+
+import { useModal } from "@/context/ModalContext";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -23,6 +24,7 @@ import { Platform } from "react-native";
 
 export function useGoogleAuth() {
   const [loading, setLoading] = useState(false);
+  const { showModal } = useModal();
 
   const redirectUri = Platform.select({
     android: "com.i360.realestateapp:/oauth2redirect",
@@ -64,7 +66,7 @@ export function useGoogleAuth() {
       return { user: data.user, error: null };
     } catch (error: any) {
       console.error("Error en Google Auth:", error);
-      Alert.alert("Error", error.message);
+      showModal({ title: "Error", message: error.message, confirmText: "OK" });
       return { error: error.message };
     } finally {
       setLoading(false);

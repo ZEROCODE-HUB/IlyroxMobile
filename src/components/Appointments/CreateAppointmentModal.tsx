@@ -39,43 +39,7 @@ interface CreateAppointmentModalProps {
   currentUserId: string;
 }
 
-/**
- * Construye una URL de Google Calendar con los datos de la cita
- */
-function buildGoogleCalendarUrl(params: {
-  fecha: string;
-  hora: string;
-  tipo: string;
-  descripcion: string;
-}): string {
-  const { fecha, hora, tipo, descripcion } = params;
-
-  // Encontrar label del tipo
-  const typeLabel =
-    APPOINTMENT_TYPES.find((t) => t.value === tipo)?.label || tipo;
-
-  // Construir fecha/hora de inicio (ISO sin guiones ni dos puntos)
-  // fecha = "2026-02-15", hora = "09:00"
-  const [year, month, day] = fecha.split("-");
-  const [hourStr, minuteStr] = hora.split(":");
-
-  // Formato: YYYYMMDDTHHmmSS
-  const startDateTime = `${year}${month}${day}T${hourStr}${minuteStr}00`;
-
-  // Duración por defecto: 1 hora
-  const endHour = String(
-    Math.min(parseInt(hourStr, 10) + 1, 23),
-  ).padStart(2, "0");
-  const endDateTime = `${year}${month}${day}T${endHour}${minuteStr}00`;
-
-  const title = encodeURIComponent(`Cita - ${typeLabel}`);
-  const details = encodeURIComponent(
-    descripcion.trim() || `Cita de tipo: ${typeLabel}`,
-  );
-  const dates = `${startDateTime}/${endDateTime}`;
-
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}`;
-}
+import { buildGoogleCalendarUrl } from "./calendarUtils";
 
 export default function CreateAppointmentModal({
   visible,
@@ -200,12 +164,56 @@ export default function CreateAppointmentModal({
 
       showToast("Cita creada exitosamente", "success");
 
+      // Obtener detalles adicionales para el calendario
+      let propertyTitle = "";
+      let location = "";
+      let otherUserName = "";
+
+      try {
+        // Obtener datos de la propiedad
+        if (propertyId) {
+          const { data: propData } = await supabase
+            .from("propiedades")
+            .select("titulo, calle, numero, ciudad, codigo_postal")
+            .eq("id", propertyId)
+            .single();
+
+          if (propData) {
+            propertyTitle = propData.titulo || "Propiedad";
+            const parts = [
+              propData.calle,
+              propData.numero,
+              propData.ciudad,
+              propData.codigo_postal,
+            ].filter(Boolean);
+            location = parts.join(", ");
+          }
+        }
+
+        // Obtener nombre del otro usuario
+        const { data: userData } = await supabase
+          .from("perfiles")
+          .select("nombre, apellido_paterno")
+          .eq("id", otherUserId)
+          .single();
+
+        if (userData) {
+          otherUserName = `${userData.nombre || ""} ${userData.apellido_paterno || ""
+            }`.trim();
+        }
+      } catch (err) {
+        console.warn("Could not fetch details for calendar", err);
+      }
+
       // Abrir Google Calendar automáticamente
       const calendarUrl = buildGoogleCalendarUrl({
-        fecha: fechaText,
-        hora: horaText,
-        tipo,
-        descripcion,
+        date: fechaText,
+        time: horaText,
+        type: tipo,
+        description: descripcion,
+        propertyTitle,
+        location,
+        otherUserName,
       });
 
       try {

@@ -23,3 +23,7 @@ dist-ssr
 *.sw?
 
 android
+
+# Custom build scripts and logs
+build-prod.ps1
+build-debug-log.txt

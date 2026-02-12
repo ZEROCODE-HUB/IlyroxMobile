@@ -35,6 +35,7 @@ import Chart13_PriceByRooms from "./charts/Chart13_PriceByRooms";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
 
 const Statistics = () => {
+  const navigation = useNavigation<any>();
   const isVisible = true;
 
   if (isVisible) {
@@ -42,8 +43,7 @@ const Statistics = () => {
       <ScreenWrapper withHeader={false} style={styles.container}>
         <AppHeader
           title="Dashboard I360"
-          showBackButton
-          onBack={() => navigation.goBack()}
+          showBackButton={false}
         />
         <View
           style={{
@@ -79,7 +79,7 @@ const Statistics = () => {
     );
   }
 
-  const navigation = useNavigation<any>();
+
   const [activePoint, setActivePoint] = useState<ActivePoint | null>(null);
 
   // Filters State
@@ -141,25 +141,25 @@ const Statistics = () => {
       if (
         filters.location.estado &&
         p.estado?.trim().toLowerCase() !==
-          filters.location.estado.trim().toLowerCase()
+        filters.location.estado.trim().toLowerCase()
       )
         return false;
       if (
         filters.location.ciudad &&
         p.ciudad?.trim().toLowerCase() !==
-          filters.location.ciudad.trim().toLowerCase()
+        filters.location.ciudad.trim().toLowerCase()
       )
         return false;
       if (
         filters.location.municipio &&
         p.municipio?.trim().toLowerCase() !==
-          filters.location.municipio.trim().toLowerCase()
+        filters.location.municipio.trim().toLowerCase()
       )
         return false;
       if (
         filters.location.colonia &&
         p.colonia?.trim().toLowerCase() !==
-          filters.location.colonia.trim().toLowerCase()
+        filters.location.colonia.trim().toLowerCase()
       )
         return false;
 
@@ -198,25 +198,25 @@ const Statistics = () => {
       if (
         filters.location.estado &&
         s.estado?.trim().toLowerCase() !==
-          filters.location.estado.trim().toLowerCase()
+        filters.location.estado.trim().toLowerCase()
       )
         return false;
       if (
         filters.location.ciudad &&
         s.ciudad?.trim().toLowerCase() !==
-          filters.location.ciudad.trim().toLowerCase()
+        filters.location.ciudad.trim().toLowerCase()
       )
         return false;
       if (
         filters.location.municipio &&
         s.municipio?.trim().toLowerCase() !==
-          filters.location.municipio.trim().toLowerCase()
+        filters.location.municipio.trim().toLowerCase()
       )
         return false;
       if (
         filters.location.colonia &&
         s.colonia?.trim().toLowerCase() !==
-          filters.location.colonia.trim().toLowerCase()
+        filters.location.colonia.trim().toLowerCase()
       )
         return false;
 
@@ -245,11 +245,11 @@ const Statistics = () => {
         title="Dashboard I360"
         showBackButton
         onBack={() => navigation.goBack()}
-        // rightComponent={
-        //   <TouchableOpacity onPress={() => setShowFiltersModal(true)}>
-        //     <Ionicons name="filter" size={24} color={COLORS.primary} />
-        //   </TouchableOpacity>
-        // }
+      // rightComponent={
+      //   <TouchableOpacity onPress={() => setShowFiltersModal(true)}>
+      //     <Ionicons name="filter" size={24} color={COLORS.primary} />
+      //   </TouchableOpacity>
+      // }
       />
 
       {/* Active Filters Summary */}

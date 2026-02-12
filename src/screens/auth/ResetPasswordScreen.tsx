@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { COLORS } from "@/constants/colors";
@@ -15,10 +15,42 @@ import { AppHeader } from "@/components/AppHeader";
 import { ScreenWrapper } from "@/screens/ScreenWrapper";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
+import { useModal } from "@/context/ModalContext";
+import * as Linking from "expo-linking";
+import { Session } from "@supabase/supabase-js";
+
+// Función helper para parsear parámetros de URL (tanto query ? como fragment #)
+const parseUrlParams = (url: string): Record<string, string> => {
+  const params: Record<string, string> = {};
+  
+  // Parsear query params (después de ?)
+  const queryMatch = url.match(/\?([^#]*)/);
+  if (queryMatch) {
+    const queryString = queryMatch[1];
+    queryString.split('&').forEach(param => {
+      const [key, value] = param.split('=');
+      if (key) params[key] = decodeURIComponent(value || '');
+    });
+  }
+  
+  // Parsear fragment params (después de #)
+  const fragmentMatch = url.match(/#(.+)/);
+  if (fragmentMatch) {
+    const fragmentString = fragmentMatch[1];
+    fragmentString.split('&').forEach(param => {
+      const [key, value] = param.split('=');
+      if (key) params[key] = decodeURIComponent(value || '');
+    });
+  }
+  
+  return params;
+};
 
 const ResetPasswordScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { showModal } = useModal();
+  const localParams = useLocalSearchParams();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState({
@@ -28,6 +60,10 @@ const ResetPasswordScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isProcessingLink, setIsProcessingLink] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [currentSession, setCurrentSession] = useState<Session | null>(null);
+  const hasProcessedLink = useRef(false);
 
   const validateForm = (): boolean => {
     const newErrors = {
@@ -57,71 +93,251 @@ const ResetPasswordScreen: React.FC = () => {
     return isValid;
   };
 
+  useEffect(() => {
+    console.log("=== ResetPasswordScreen INIT ===");
+    
+    // 1. Sincronizar sesión inicial
+    const syncSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        console.log("✅ Sesión activa encontrada al inicio");
+        setCurrentSession(session);
+        setIsProcessingLink(false);
+        hasProcessedLink.current = true;
+      }
+    };
+    syncSession();
+
+    // 2. Listener de cambios de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`🔄 Auth Event: ${event}, Session: ${session ? "YES" : "NO"}`);
+      
+      if (session) {
+        setCurrentSession(session);
+        setIsProcessingLink(false);
+      }
+      
+      // Evento específico de recuperación de contraseña
+      if (event === 'PASSWORD_RECOVERY' && session) {
+        console.log("✅ PASSWORD_RECOVERY event con sesión válida");
+        setIsProcessingLink(false);
+        hasProcessedLink.current = true;
+      }
+    });
+
+    // 3. Función para manejar parámetros de recuperación
+    const handleRecoveryParams = async (params: Record<string, string>) => {
+      if (!params || Object.keys(params).length === 0) return;
+      if (hasProcessedLink.current) {
+        console.log("⏭️  Link ya procesado, ignorando...");
+        return;
+      }
+
+      console.log("🔍 Procesando parámetros:", params);
+
+      // PRIMERO: Detectar errores
+      if (params.error || params.error_description || params.error_code) {
+        hasProcessedLink.current = true;
+        let msg = params.error_description?.replace(/\+/g, ' ') || params.error || "Error desconocido";
+        
+        if (params.error_code === 'otp_expired') {
+          msg = "El enlace de recuperación ha expirado o ya ha sido utilizado. Por favor, solicita uno nuevo.";
+        }
+        
+        console.error("❌ Error en parámetros:", msg);
+        setSessionError(msg);
+        setIsProcessingLink(false);
+        return;
+      }
+
+      // SEGUNDO: Procesar tokens válidos
+      try {
+        if (params.access_token && params.refresh_token) {
+          console.log("🔑 Estableciendo sesión con tokens...");
+          const { data, error } = await supabase.auth.setSession({
+            access_token: params.access_token,
+            refresh_token: params.refresh_token,
+          });
+          
+          if (error) throw error;
+          
+          hasProcessedLink.current = true;
+          console.log("✅ Sesión establecida correctamente");
+          setCurrentSession(data.session);
+          setIsProcessingLink(false);
+        } else if (params.code) {
+          console.log("🔄 Intercambiando código por sesión...");
+          const { data, error } = await supabase.auth.exchangeCodeForSession(params.code);
+          
+          if (error) throw error;
+          
+          hasProcessedLink.current = true;
+          console.log("✅ Código intercambiado correctamente");
+          setCurrentSession(data.session);
+          setIsProcessingLink(false);
+        } else {
+          console.log("⚠️  No se encontraron tokens ni código en parámetros");
+        }
+      } catch (err: any) {
+        console.error("💥 Error al procesar tokens:", err);
+        hasProcessedLink.current = true;
+        setSessionError(err.message || "No se pudo validar el enlace de recuperación.");
+        setIsProcessingLink(false);
+      }
+    };
+
+    // 4. Detectar y procesar links
+    const checkLink = async () => {
+      // Prioridad 1: Expo Router Params
+      if (Object.keys(localParams).length > 0) {
+        console.log("📱 Parámetros vía Expo Router");
+        const params: Record<string, string> = {};
+        Object.keys(localParams).forEach(key => {
+          const value = localParams[key];
+          params[key] = typeof value === 'string' ? value : String(value);
+        });
+        await handleRecoveryParams(params);
+      }
+
+      // Prioridad 2: Initial URL
+      const initialUrl = await Linking.getInitialURL();
+      if (initialUrl) {
+        console.log("🔗 URL inicial:", initialUrl);
+        const params = parseUrlParams(initialUrl);
+        await handleRecoveryParams(params);
+      }
+
+      // Timeout de seguridad
+      setTimeout(async () => {
+        if (isProcessingLink && !hasProcessedLink.current) {
+          console.log("⏰ Timeout alcanzado");
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session && !sessionError) {
+            console.log("⚠️  No se detectó sesión válida");
+          }
+          setIsProcessingLink(false);
+        }
+      }, 4000);
+    };
+
+    checkLink();
+
+    // 5. Listener para URLs entrantes
+    const linkSubscription = Linking.addEventListener("url", async ({ url }) => {
+      console.log("📨 URL entrante:", url);
+      const params = parseUrlParams(url);
+      await handleRecoveryParams(params);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      linkSubscription.remove();
+    };
+  }, []);
+
   const handleResetPassword = async () => {
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsSubmitting(true);
 
     try {
-      // Actualizar la contraseña usando Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("Sesión de recuperación no encontrada. El enlace es inválido o ha expirado.");
+      }
+
+      console.log("🔐 Actualizando contraseña...");
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
 
-      if (error) {
-        console.error("Error al actualizar contraseña:", error);
-        throw error;
-      }
+      if (error) throw error;
 
-      // Mostrar mensaje de éxito
-      if (Platform.OS === "web") {
-        if (typeof window !== "undefined") {
-          window.alert(
-            "Contraseña actualizada exitosamente. Ahora puedes iniciar sesión.",
-          );
-        }
-      } else {
-        Alert.alert(
-          "Éxito",
-          "Contraseña actualizada exitosamente. Ahora puedes iniciar sesión.",
-          [
-            {
-              text: "OK",
-              onPress: () => router.navigate("login"),
-            },
-          ],
-        );
-      }
+      console.log("✅ Contraseña actualizada exitosamente");
 
-      // Limpiar formulario
-      setNewPassword("");
-      setConfirmPassword("");
-      setErrors({ newPassword: "", confirmPassword: "" });
+      showModal({
+        title: "Contraseña actualizada",
+        message: "Tu contraseña ha sido cambiada con éxito. Ya puedes iniciar sesión.",
+        confirmText: "Ir al Login",
+        onConfirm: () => {
+          // Cerrar sesión para forzar nuevo login
+          supabase.auth.signOut();
+          router.replace("/login");
+        },
+      });
 
-      // Navegar al login en web
-      if (Platform.OS === "web") {
-        setTimeout(() => navigation.navigate("login"), 1500);
-      }
     } catch (error: any) {
-      console.error("Error al restablecer contraseña:", error);
-      const errorMessage =
-        error?.message ||
-        "No se pudo actualizar la contraseña. Intenta de nuevo.";
-
-      if (Platform.OS === "web") {
-        if (typeof window !== "undefined") {
-          window.alert(errorMessage);
-        }
-      } else {
-        Alert.alert("Error", errorMessage);
-      }
+      console.error("❌ Error al actualizar contraseña:", error);
+      showModal({
+        title: "Error",
+        message: error.message || "Ocurrió un error inesperado.",
+        confirmText: "OK",
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // RENDER: Loading
+  if (isProcessingLink) {
+    return (
+      <ScreenWrapper withHeader={false} style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Validando enlace...</Text>
+      </ScreenWrapper>
+    );
+  }
+
+  // RENDER: Error de sesión
+  if (sessionError) {
+    return (
+      <ScreenWrapper withHeader={false} style={[styles.container, styles.centerContent]}>
+        <Ionicons name="alert-circle-outline" size={60} color={COLORS.error} />
+        <Text style={styles.errorTitle}>Enlace inválido</Text>
+        <Text style={styles.errorSubtitle}>{sessionError}</Text>
+        <TouchableOpacity 
+          style={styles.submitButton}
+          onPress={() => router.replace("/forgot-password")}
+        >
+          <Text style={styles.submitButtonText}>Solicitar nuevo enlace</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.replace("/login")}
+        >
+          <Text style={styles.backButtonText}>Volver al login</Text>
+        </TouchableOpacity>
+      </ScreenWrapper>
+    );
+  }
+
+  // RENDER: No hay sesión válida
+  if (!currentSession) {
+    return (
+      <ScreenWrapper withHeader={false} style={[styles.container, styles.centerContent]}>
+        <Ionicons name="link-outline" size={60} color={COLORS.textTertiary} />
+        <Text style={styles.errorTitle}>Enlace no detectado</Text>
+        <Text style={styles.errorSubtitle}>
+          No pudimos validar tu sesión de recuperación. Esto ocurre si el enlace ya expiró o si abriste la pantalla directamente.
+        </Text>
+        <TouchableOpacity 
+          style={styles.submitButton}
+          onPress={() => router.replace("/forgot-password")}
+        >
+          <Text style={styles.submitButtonText}>Solicitar nuevo enlace</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.replace("/login")}
+        >
+          <Text style={styles.backButtonText}>Volver al login</Text>
+        </TouchableOpacity>
+      </ScreenWrapper>
+    );
+  }
+
+  // RENDER: Formulario de reset
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>
       <AppHeader
@@ -337,6 +553,45 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: COLORS.white,
+  },
+  centerContent: {
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: COLORS.textSecondary,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  errorSubtitle: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+    paddingHorizontal: 20,
+  },
+  backButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.primary,
   },
 });
 

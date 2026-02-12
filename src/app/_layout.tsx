@@ -5,20 +5,34 @@ import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { OneSignal } from "react-native-onesignal";
 import { useEffect } from "react";
-import { Platform, StatusBar, StyleSheet, View, Text } from "react-native";
+import { Platform, StatusBar, StyleSheet, View, Text, LogBox } from "react-native";
 import { COLORS } from "../constants";
 
 import { AppProvider, useApp } from "@/context/AppContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ToastProvider } from "@/context/ToastContext";
+
+import { ModalProvider } from "@/context/ModalContext";
 import { SafeInsetsProvider } from "@/context/SafeInsetsContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import PendingApprovalScreen from "@/screens/PendingApprovalScreen";
 import { InitialLoading } from "@/components/common/InitialLoading";
+import { useVersionCheck } from "@/hooks/useVersionCheck";
+import { VersionUpdateModal } from "@/components/modals/VersionUpdateModal";
+
+// Ignore common warnings that do not affect functionality
+LogBox.ignoreLogs([
+  "Support for defaultProps will be removed",
+  "MemoizedTNodeRenderer",
+  "TNodeChildrenRenderer",
+  "TRenderEngineProvider",
+]);
 
 // OneSignal init
-OneSignal.initialize("a727fcbb-320c-4028-bd6b-a2ec90ed2141");
-OneSignal.Notifications.requestPermission(true);
+if (Platform.OS !== "web") {
+  OneSignal.initialize("a727fcbb-320c-4028-bd6b-a2ec90ed2141");
+  OneSignal.Notifications.requestPermission(true);
+}
 
 const queryClient = new QueryClient();
 
@@ -30,13 +44,15 @@ export default function RootLayout() {
           <AppProvider>
             <ToastProvider>
               <SafeAreaProvider>
-                <SafeInsetsProvider>
-                  <BottomSheetModalProvider>
-                    <QueryClientProvider client={queryClient}>
-                      <RootLayoutNav />
-                    </QueryClientProvider>
-                  </BottomSheetModalProvider>
-                </SafeInsetsProvider>
+                <ModalProvider>
+                  <SafeInsetsProvider>
+                    <BottomSheetModalProvider>
+                      <QueryClientProvider client={queryClient}>
+                        <RootLayoutNav />
+                      </QueryClientProvider>
+                    </BottomSheetModalProvider>
+                  </SafeInsetsProvider>
+                </ModalProvider>
               </SafeAreaProvider>
             </ToastProvider>
           </AppProvider>
@@ -47,9 +63,12 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading: authLoading } = useAuth();
+  const { updateRequired, versionInfo, loading: versionLoading } = useVersionCheck();
   const segments = useSegments();
   const router = useRouter();
+  
+  const loading = authLoading || versionLoading;
 
   // Global StatusBar setup
   useEffect(() => {
@@ -57,9 +76,10 @@ function RootLayoutNav() {
     if (Platform.OS === "android") {
       StatusBar.setBackgroundColor("transparent");
       StatusBar.setTranslucent(true);
-      StatusBar.setBarStyle("light-content");
+      StatusBar.setBarStyle("dark-content"); // Default to dark content for light theme
+    } else {
+      StatusBar.setBarStyle("dark-content");
     }
-    StatusBar.setBarStyle("dark-content");
   }, []);
 
   useEffect(() => {
@@ -91,7 +111,7 @@ function RootLayoutNav() {
     if (
       !isAdmin &&
       (profile.aprobaciones_recibidas || 0) <
-        (profile.aprobaciones_requeridas || 3)
+      (profile.aprobaciones_requeridas || 3)
     ) {
       return <PendingApprovalScreen />;
     }
@@ -99,11 +119,19 @@ function RootLayoutNav() {
 
   // Main Stack incorporating all groups
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="(stack)" />
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(stack)" />
+      </Stack>
+      {updateRequired && versionInfo && (
+        <VersionUpdateModal 
+          visible={updateRequired} 
+          storeUrl={versionInfo.store_url} 
+        />
+      )}
+    </>
   );
 }
 

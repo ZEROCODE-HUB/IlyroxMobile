@@ -85,8 +85,8 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
                   screen === "Matches"
                     ? "git-compare-outline"
                     : screen === "Messages"
-                      ? "chatbubble"
-                      : "calendar"
+                      ? "chatbubble-outline"
+                      : "calendar-outline"
                 }
                 size={22}
                 color={COLORS.white}

@@ -29,6 +29,8 @@ export const PropertyMapCard: React.FC<PropertyMapCardProps> = ({
     return `${(price / 1000).toFixed(0)}K`;
   };
 
+  const currencyLabel = currency === "USD" ? "USD" : "MXN";
+
   return (
     <TouchableOpacity
       style={[styles.card, isHighlighted && styles.cardHighlighted]}
@@ -44,7 +46,7 @@ export const PropertyMapCard: React.FC<PropertyMapCardProps> = ({
 
         <View style={styles.priceTag}>
           <Text style={styles.priceText}>
-            ${formatPrice()} {currency}
+            {currencyLabel} {formatPrice()}
           </Text>
         </View>
 

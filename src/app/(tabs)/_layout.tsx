@@ -39,13 +39,13 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
 
           let iconName: any = "home-outline";
           if (route.name === "index")
-            iconName = isFocused ? "home" : "home-outline";
+            iconName = "home-outline";
           else if (route.name === "Statistics")
-            iconName = isFocused ? "stats-chart" : "stats-chart-outline";
+            iconName = "stats-chart-outline";
           else if (route.name === "create")
-            iconName = isFocused ? "add-circle" : "add-circle-outline";
+            iconName = "add-circle-outline";
           else if (route.name === "profile")
-            iconName = isFocused ? "person" : "person-outline";
+            iconName = "person-outline";
 
           return (
             <TouchableOpacity

@@ -76,7 +76,7 @@ const ProfileReelItem: React.FC<ProfileReelItemProps> = React.memo(
         <Image
           source={
             thumbSource || {
-              uri: "https://placehold.co/400x600/202020/white?text=No+Preview",
+              uri: "https://placehold.co/400x600/202020/white?text=Cargando...",
             }
           }
           style={styles.gridImage}

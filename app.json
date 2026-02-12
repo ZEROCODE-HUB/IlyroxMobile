@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "i360",
-    "slug": "i360",
+    "name": "ilyrox",
+    "slug": "ilyrox",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/Icon-size.png",
     "userInterfaceStyle": "light",
-    "scheme": "i360realestate",
+    "scheme": "ilyroxapp",
     "splash": {
       "image": "./src/assets/Icon-size.png",
       "resizeMode": "cover",
@@ -15,7 +15,7 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.i360.realestateapp",
+      "bundleIdentifier": "com.ilyrox.app",
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": false,
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
@@ -24,13 +24,13 @@
       "entitlements": {
         "aps-environment": "development",
         "com.apple.security.application-groups": [
-          "group.com.i360.realestateapp.onesignal"
+          "group.com.ilyrox.app.onesignal"
         ]
       },
       "config": {
         "googleMapsApiKey": "AIzaSyCMns7F3TjXiJ4oswwws0USAgum-GcwM9A"
       },
-      "associatedDomains": ["applinks:i360.app", "applinks:*.i360.app"]
+      "associatedDomains": ["applinks:ilyrox.app", "applinks:*.ilyrox.app"]
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
@@ -45,7 +45,7 @@
         "foregroundImage": "./src/assets/Icon-size.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.i360.realestateapp",
+      "package": "com.ilyrox.app",
       "launchMode": "singleTask",
       "config": {
         "googleMaps": {
@@ -59,11 +59,16 @@
           "data": [
             {
               "scheme": "https",
-              "host": "i360.app",
+              "host": "ilyrox.app",
               "pathPrefix": "/feed"
             },
             {
-              "scheme": "i360realestate"
+              "scheme": "https",
+              "host": "ilyrox.app",
+              "pathPrefix": "/reset-password"
+            },
+            {
+              "scheme": "ilyroxapp"
             }
           ],
           "category": ["BROWSABLE", "DEFAULT"]
@@ -105,10 +110,10 @@
               "appExtensions": [
                 {
                   "targetName": "OneSignalNotificationServiceExtension",
-                  "bundleIdentifier": "com.i360.realestateapp.OneSignalNotificationServiceExtension",
+                  "bundleIdentifier": "com.ilyrox.app.OneSignalNotificationServiceExtension",
                   "entitlements": {
                     "com.apple.security.application-groups": [
-                      "group.com.i360.realestateapp.onesignal"
+                      "group.com.ilyrox.app.onesignal"
                     ]
                   }
                 }

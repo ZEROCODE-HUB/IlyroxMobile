@@ -13,6 +13,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { Platform } from "react-native";
+import { useModal } from "@/context/ModalContext";
 
 interface Message {
   id: string;
@@ -46,6 +47,7 @@ const PAGE_SIZE = 20;
 
 export function useMessages(conversationId: string | null, userId?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const { showModal } = useModal();
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -353,8 +355,9 @@ export function useMessages(conversationId: string | null, userId?: string) {
       if (isMountedRef.current) {
         setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
         // Mostrar alerta
-        const { Alert } = require("react-native");
-        Alert.alert("Error", "No se pudo enviar el mensaje.");
+        setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+        // Mostrar alerta
+        showModal({ title: "Error", message: "No se pudo enviar el mensaje.", confirmText: "OK" });
         setError(err.message);
       }
       return false;
@@ -452,8 +455,7 @@ export function useMessages(conversationId: string | null, userId?: string) {
       console.error("Error sending image:", err);
       if (isMountedRef.current) {
         setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-        const { Alert } = require("react-native");
-        Alert.alert("Error", "No se pudo enviar la imagen.");
+        showModal({ title: "Error", message: "No se pudo enviar la imagen.", confirmText: "OK" });
         setError(err.message);
       }
       return false;
@@ -553,8 +555,7 @@ export function useMessages(conversationId: string | null, userId?: string) {
       console.error("Error sending file:", err);
       if (isMountedRef.current) {
         setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-        const { Alert } = require("react-native");
-        Alert.alert("Error", "No se pudo enviar el archivo.");
+        showModal({ title: "Error", message: "No se pudo enviar el archivo.", confirmText: "OK" });
         setError(err.message);
       }
       return false;
@@ -666,8 +667,7 @@ export function useMessages(conversationId: string | null, userId?: string) {
       console.error("Error sending property:", err);
       if (isMountedRef.current) {
         setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-        const { Alert } = require("react-native");
-        Alert.alert("Error", "No se pudo compartir la propiedad.");
+        showModal({ title: "Error", message: "No se pudo compartir la propiedad.", confirmText: "OK" });
         setError(err.message);
       }
       return false;

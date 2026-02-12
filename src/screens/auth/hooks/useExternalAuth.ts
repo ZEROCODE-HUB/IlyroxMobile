@@ -11,6 +11,8 @@ import { useApp } from "@/context/AppContext";
 import { useImageUpload } from "@/hooks/hooks/useImageUpload";
 import { useGoogleAuth } from "@/lib/useGoogleAuth";
 import { OneSignal } from "react-native-onesignal";
+import { Platform } from "react-native";
+import { useModal } from "@/context/ModalContext";
 
 export type AuthProvider = "google" | "facebook" | "apple";
 
@@ -43,6 +45,7 @@ export function useExternalAuth() {
   const { setCurrentUser } = useApp();
   const { uploadImage } = useImageUpload();
   const { signInWithGoogle, loading: googleLoading } = useGoogleAuth();
+  const { showModal } = useModal();
 
   // Manejar autenticación con proveedor externo
   const handleProviderAuth = useCallback(
@@ -69,18 +72,18 @@ export function useExternalAuth() {
             }
             break;
           case "facebook":
-            Alert.alert("Próximamente", "Inicio con Facebook en desarrollo");
+            showModal({ title: "Próximamente", message: "Inicio con Facebook en desarrollo", confirmText: "OK" });
             setLoading(false);
             return;
           case "apple":
-            Alert.alert("Próximamente", "Inicio con Apple en desarrollo");
+            showModal({ title: "Próximamente", message: "Inicio con Apple en desarrollo", confirmText: "OK" });
             setLoading(false);
             return;
         }
 
         if (externalError) {
           if (externalError !== "Inicio de sesión cancelado o fallido") {
-            Alert.alert("Error de Autenticación", externalError);
+            showModal({ title: "Error de Autenticación", message: externalError, confirmText: "OK" });
           }
           setLoading(false);
           return;
@@ -102,7 +105,7 @@ export function useExternalAuth() {
 
         if (profile) {
           // Usuario existente - login exitoso
-          OneSignal.login(user.id);
+          if (Platform.OS !== "web") OneSignal.login(user.id);
           setCurrentUser(profile);
           onSuccess();
         } else {
@@ -137,7 +140,7 @@ export function useExternalAuth() {
           });
         }
       } catch (error: any) {
-        Alert.alert("Error de Autenticación", error.message);
+        showModal({ title: "Error de Autenticación", message: error.message, confirmText: "OK" });
       } finally {
         setLoading(false);
       }
@@ -206,14 +209,14 @@ export function useExternalAuth() {
           .single();
 
         if (error) throw error;
-
-        OneSignal.login(pendingUser.id);
+ 
+        if (Platform.OS !== "web") OneSignal.login(pendingUser.id);
         setCurrentUser(data);
         setPendingUser(null);
         onSuccess();
         return true;
       } catch (error: any) {
-        Alert.alert("Error al crear perfil", error.message);
+        showModal({ title: "Error al crear perfil", message: error.message, confirmText: "OK" });
         return false;
       } finally {
         setLoading(false);
@@ -226,8 +229,10 @@ export function useExternalAuth() {
   const cancelExternalRegistration = useCallback(async () => {
     try {
       await supabase.auth.signOut();
-      OneSignal.User.removeAlias("external_id");
-      await OneSignal.logout();
+      if (Platform.OS !== "web") {
+        OneSignal.User.removeAlias("external_id");
+        await OneSignal.logout();
+      }
     } catch (error) {
       console.error("Error al cancelar registro:", error);
     } finally {

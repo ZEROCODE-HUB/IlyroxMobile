@@ -105,6 +105,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
             const operacion =
               p.operaciones_propiedad && p.operaciones_propiedad[0];
             return {
+              ...p, // Preservar todas las propiedades originales incluyendo operaciones_propiedad
               id: p.id,
               title: `${p.subtipo} en ${p.municipio}`,
               description: p.descripcion,

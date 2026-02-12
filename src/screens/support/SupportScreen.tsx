@@ -16,9 +16,11 @@ import { AppHeader } from "@/components/AppHeader";
 import { ScreenWrapper } from "@/screens/ScreenWrapper";
 import { supabase } from "@/lib/supabase";
 import { router } from "expo-router";
+import { useModal } from "@/context/ModalContext";
 
 const SupportScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { showModal } = useModal();
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
@@ -108,16 +110,13 @@ const SupportScreen: React.FC = () => {
           );
         }
       } else {
-        Alert.alert(
-          "Éxito",
-          "Mensaje enviado exitosamente. Nos pondremos en contacto pronto.",
-          [
-            {
-              text: "OK",
-              onPress: () => navigation.goBack(),
-            },
-          ],
-        );
+        showModal({
+          title: "Éxito",
+          message:
+            "Mensaje enviado exitosamente. Nos pondremos en contacto pronto.",
+          confirmText: "OK",
+          onConfirm: () => navigation.goBack(),
+        });
       }
 
       // Limpiar formulario
@@ -139,10 +138,11 @@ const SupportScreen: React.FC = () => {
           );
         }
       } else {
-        Alert.alert(
-          "Error",
-          "No se pudo enviar el mensaje. Por favor intenta de nuevo.",
-        );
+        showModal({
+          title: "Error",
+          message: "No se pudo enviar el mensaje. Por favor intenta de nuevo.",
+          confirmText: "OK",
+        });
       }
     } finally {
       setIsSubmitting(false);

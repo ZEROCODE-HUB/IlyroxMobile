@@ -42,7 +42,7 @@ export default function CreateContent() {
                 { backgroundColor: COLORS.primaryTransparent },
               ]}
             >
-              <Ionicons name="document-text" size={32} color={COLORS.primary} />
+              <Ionicons name="document-text-outline" size={32} color={COLORS.primary} />
             </View>
             <View style={styles.optionTextContainer}>
               <Text style={styles.optionTitle}>Publicar Post</Text>
@@ -51,7 +51,7 @@ export default function CreateContent() {
               </Text>
             </View>
             <Ionicons
-              name="chevron-forward"
+              name="chevron-forward-outline"
               size={20}
               color={COLORS.textTertiary}
             />
@@ -70,7 +70,7 @@ export default function CreateContent() {
                 { backgroundColor: COLORS.primaryTransparent },
               ]}
             >
-              <Ionicons name="videocam" size={32} color={COLORS.primary} />
+              <Ionicons name="videocam-outline" size={32} color={COLORS.primary} />
             </View>
             <View style={styles.optionTextContainer}>
               <Text style={styles.optionTitle}>Publicar Reel</Text>
@@ -79,7 +79,7 @@ export default function CreateContent() {
               </Text>
             </View>
             <Ionicons
-              name="chevron-forward"
+              name="chevron-forward-outline"
               size={20}
               color={COLORS.textTertiary}
             />
@@ -98,7 +98,7 @@ export default function CreateContent() {
                 { backgroundColor: COLORS.primaryTransparent },
               ]}
             >
-              <Ionicons name="home" size={32} color={COLORS.primary} />
+              <Ionicons name="home-outline" size={32} color={COLORS.primary} />
             </View>
             <View style={styles.optionTextContainer}>
               <Text style={styles.optionTitle}>Publicar Propiedad</Text>
@@ -107,7 +107,7 @@ export default function CreateContent() {
               </Text>
             </View>
             <Ionicons
-              name="chevron-forward"
+              name="chevron-forward-outline"
               size={20}
               color={COLORS.textTertiary}
             />

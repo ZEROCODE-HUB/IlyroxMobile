@@ -156,6 +156,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
           shareTitle={`Reel de ${item.user.nombre || item.user.name}`}
           shareDescription={item.content || "Mira este reel"}
           orientation="horizontal"
+          contentId={item.reelDetails?.id}
         />
       </View>
 

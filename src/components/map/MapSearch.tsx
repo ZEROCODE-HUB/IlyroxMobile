@@ -284,18 +284,23 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           decelerationRate="fast"
           snapToInterval={212} // 200 + 12 margin
         >
-          {filteredProperties.map((property) => (
-            <PropertyMapCard
-              key={property.id}
-              id={property.id}
-              title={property.title || "Propiedad"}
-              price={property.price || 0}
-              currency={filters.moneda}
-              image={getPropertyImage(property)}
-              isHighlighted={property.id === highlightedPropertyId}
-              onPress={() => handleCardPress(property.id)}
-            />
-          ))}
+          {filteredProperties.map((property) => {
+            // La moneda ya está mapeada en property.currency desde AppContext
+            const propertyCurrency = property.currency || "MXN";
+            
+            return (
+              <PropertyMapCard
+                key={property.id}
+                id={property.id}
+                title={property.title || "Propiedad"}
+                price={property.price || 0}
+                currency={propertyCurrency}
+                image={getPropertyImage(property)}
+                isHighlighted={property.id === highlightedPropertyId}
+                onPress={() => handleCardPress(property.id)}
+              />
+            );
+          })}
         </ScrollView>
       </View>
 

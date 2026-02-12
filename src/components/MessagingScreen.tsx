@@ -325,6 +325,10 @@ export default function MessagingScreen({
         <ConversationsList
           userId={profile.id}
           onSelectConversation={handleSelectConversation}
+          conversations={conversations}
+          loading={conversationsHook.loading}
+          getConversationsForUser={getConversationsForUser}
+          refresh={conversationsHook.refresh}
         />
       </View>
     </ScreenWrapper>

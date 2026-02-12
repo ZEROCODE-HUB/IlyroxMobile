@@ -8,6 +8,7 @@ import { Alert } from "react-native";
 import { supabase } from "../../lib/supabase";
 import { useImageUpload } from "./useImageUpload";
 import * as Burnt from "burnt";
+import { useModal } from "@/context/ModalContext";
 
 export function useCreateContent(userId?: string) {
   const {
@@ -16,6 +17,7 @@ export function useCreateContent(userId?: string) {
     uploading: isUploadingImage,
   } = useImageUpload();
   const [isCreatingInDB, setIsCreatingInDB] = useState(false);
+  const { showModal } = useModal();
 
   const uploading = isUploadingImage || isCreatingInDB;
 
@@ -29,7 +31,7 @@ export function useCreateContent(userId?: string) {
     metadata: any = null,
   ) => {
     if (!userId) {
-      Alert.alert("Error", "Debes iniciar sesión");
+      showModal({ title: "Error", message: "Debes iniciar sesión", confirmText: "OK" });
       return false;
     }
 
@@ -93,7 +95,7 @@ export function useCreateContent(userId?: string) {
     thumbnailUrl?: string | null,
   ) => {
     if (!userId) {
-      Alert.alert("Error", "Debes iniciar sesión");
+      showModal({ title: "Error", message: "Debes iniciar sesión", confirmText: "OK" });
       return false;
     }
 
@@ -166,7 +168,7 @@ export function useCreateContent(userId?: string) {
     thumbnailUrl?: string | null,
   ) => {
     if (!userId) {
-      Alert.alert("Error", "Debes iniciar sesión");
+      showModal({ title: "Error", message: "Debes iniciar sesión", confirmText: "OK" });
       return false;
     }
 
@@ -249,7 +251,7 @@ export function useCreateContent(userId?: string) {
     coordinates?: { lat: number; lng: number };
   }) => {
     if (!userId) {
-      Alert.alert("Error", "Debes iniciar sesión");
+      showModal({ title: "Error", message: "Debes iniciar sesión", confirmText: "OK" });
       return false;
     }
 
@@ -311,7 +313,7 @@ export function useCreateContent(userId?: string) {
       return true;
     } catch (error: any) {
       console.error("Error creating property:", error);
-      Alert.alert("Error", error.message || "No se pudo publicar la propiedad");
+      showModal({ title: "Error", message: error.message || "No se pudo publicar la propiedad", confirmText: "OK" });
       return false;
     } finally {
       setIsCreatingInDB(false);

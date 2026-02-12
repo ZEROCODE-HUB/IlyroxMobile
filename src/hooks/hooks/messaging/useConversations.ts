@@ -628,11 +628,13 @@ export function useConversations(userId?: string) {
   const setupRealtimeSubscription = async (uid: string) => {
     // FIX: Si ya está en progreso, salir inmediatamente
     if (setupInProgressRef.current) {
+      console.log("⚠️ Subscription setup already in progress, skipping");
       return;
     }
 
     // Si ya existe para este usuario, no crear otra
     if (channelRef.current && currentUserIdRef.current === uid) {
+      console.log("✅ Channel already exists for this user, skipping");
       return;
     }
 
@@ -644,82 +646,77 @@ export function useConversations(userId?: string) {
       await cleanupChannel();
 
       console.log(
-        "📡 Setting up conversations LIST subscription for",
+        "📡 Setting up conversations subscription for",
         uid.substring(0, 8),
       );
 
+      // SIMPLIFICADO: Escuchar TODOS los cambios en conversaciones
+      // y filtrar en el cliente para evitar errores de "mismatch"
       const channel = supabase
-        .channel(`conversations-list-${uid}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "agrupaciones_conversaciones",
-            filter: `usuario1_id=eq.${uid}`,
+        .channel(`conversations-realtime-${uid}`, {
+          config: {
+            broadcast: { self: false },
+            presence: { key: '' },
           },
-          (payload) => {
-            if (payload.new && (payload.new as any).usuario1_id && (payload.new as any).usuario2_id) {
-              updateConversationByUsers((payload.new as any).usuario1_id, (payload.new as any).usuario2_id);
-            } else {
-              debouncedReload();
-            }
-          },
-        )
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "agrupaciones_conversaciones",
-            filter: `usuario2_id=eq.${uid}`,
-          },
-          (payload) => {
-            if (payload.new && (payload.new as any).usuario1_id && (payload.new as any).usuario2_id) {
-              updateConversationByUsers((payload.new as any).usuario1_id, (payload.new as any).usuario2_id);
-            } else {
-              debouncedReload();
-            }
-          },
-        )
-        // Listen to direct changes on conversaciones table (Source of Truth)
+        })
+        // Escuchar TODOS los cambios en la tabla conversaciones
+        // sin filtros de columna (esto evita el error de mismatch)
         .on(
           "postgres_changes",
           {
             event: "*",
             schema: "public",
             table: "conversaciones",
-            filter: `usuario1_id=eq.${uid}`,
           },
           (payload) => {
-            handleConversationUpdate(payload);
+            console.log("📨 Conversation change received:", payload.eventType);
+
+            // Filtrar en el cliente: solo procesar si involucra a este usuario
+            const conv = payload.new as any;
+            if (conv && (conv.usuario1_id === uid || conv.usuario2_id === uid)) {
+              console.log("✅ Change affects this user, updating...");
+              handleConversationUpdate(payload);
+            } else {
+              console.log("⏭️ Change doesn't affect this user, ignoring");
+            }
           },
         )
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "conversaciones",
-            filter: `usuario2_id=eq.${uid}`,
-          },
-          (payload) => {
-            console.log(
-              "📨 Conversation update received (conversaciones u2)",
-              payload,
-            );
-            handleConversationUpdate(payload);
-          },
-        )
-        .subscribe((status) => {
-          console.log("📡 Conversations List subscription status:", status);
-          setupInProgressRef.current = false;
+        .subscribe((status, err) => {
+          console.log("📡 Realtime subscription status:", status);
+
+          if (err) {
+            console.error("❌ Subscription error:", err);
+            console.error("Error details:", JSON.stringify(err, null, 2));
+          }
+
+          if (status === "SUBSCRIBED") {
+            console.log("✅ Successfully subscribed to conversations realtime");
+            setupInProgressRef.current = false;
+          } else if (status === "CHANNEL_ERROR") {
+            console.error("❌ Channel error - Check Supabase Realtime settings");
+            console.error("Make sure Realtime is enabled for table: conversaciones");
+            console.error("Check that RLS policies allow SELECT on conversaciones table");
+            setupInProgressRef.current = false;
+          } else if (status === "TIMED_OUT") {
+            console.error("⏱️ Subscription timed out - retrying...");
+            setupInProgressRef.current = false;
+            // Reintentar después de un delay
+            setTimeout(() => {
+              if (isMountedRef.current) {
+                setupRealtimeSubscription(uid);
+              }
+            }, 2000);
+          } else if (status === "CLOSED") {
+            console.log("🔒 Channel closed");
+            setupInProgressRef.current = false;
+          }
         });
 
       channelRef.current = channel;
       currentUserIdRef.current = uid;
+      console.log("✅ Channel created for user:", uid.substring(0, 8));
     } catch (error) {
-      console.error("Error setting up subscription:", error);
+      console.error("❌ Error setting up subscription:", error);
       setupInProgressRef.current = false;
     }
   };
@@ -752,6 +749,16 @@ export function useConversations(userId?: string) {
       return;
     }
 
+    // FIX: Si ya tenemos canal para este usuario exacto y está todo configurado, no hacer nada
+    if (
+      currentUserIdRef.current === userId &&
+      channelRef.current &&
+      !isInitializingRef.current
+    ) {
+      console.log("✅ Already configured for this user, skipping");
+      return;
+    }
+
     // FIX: Prevenir doble inicialización
     if (isInitializingRef.current && userId === currentUserIdRef.current) {
       console.log("⚠️ Already initializing for this user, skipping");
@@ -763,13 +770,14 @@ export function useConversations(userId?: string) {
     // Cargar conversaciones
     (async () => {
       await loadConversations();
+
+      // Configurar Realtime solo si cambió el usuario o no existe canal
+      if (userId !== currentUserIdRef.current || !channelRef.current) {
+        await setupRealtimeSubscription(userId);
+      }
+
       isInitializingRef.current = false;
     })();
-
-    // Configurar Realtime solo si cambió el usuario
-    if (userId !== currentUserIdRef.current) {
-      setupRealtimeSubscription(userId);
-    }
 
     // Recargar cuando la app vuelve al foreground
     const handleAppStateChange = (nextState: AppStateStatus) => {
@@ -782,13 +790,14 @@ export function useConversations(userId?: string) {
     const appStateSub = AppState.addEventListener("change", handleAppStateChange);
 
     return () => {
+      console.log("🧹 useConversations cleanup");
       isMountedRef.current = false;
       appStateSub.remove();
       if (reloadTimerRef.current) {
         clearTimeout(reloadTimerRef.current);
       }
-      // Solo limpiar si userId tiene valor
-      if (userId) {
+      // Solo limpiar si cambió el usuario
+      if (userId !== currentUserIdRef.current) {
         cleanupChannel();
         isInitializingRef.current = false;
       }

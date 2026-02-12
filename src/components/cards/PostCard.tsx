@@ -185,6 +185,7 @@ const PostCard: React.FC<PostCardProps> = ({
           shareImageUrl={hasImages ? images[0] : undefined}
           orientation="horizontal"
           authorId={item.user.id}
+          contentId={item.postDetails?.id}
         />
       </View>
 

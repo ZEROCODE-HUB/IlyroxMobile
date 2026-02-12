@@ -32,7 +32,7 @@ export function useUserApprovals(
    * Cargar usuarios pendientes del mismo estado
    */
   const loadPendingUsers = useCallback(async () => {
-    if (!currentUserId) {
+    if (!currentUserId || !currentUserState) {
       setLoading(false);
       return;
     }
@@ -52,10 +52,12 @@ export function useUserApprovals(
 
       // 2. Cargar usuarios con menos de 3 aprobaciones que siguen en estado 'pendiente'
       // El requisito es que tengan menos de 3 aprobaciones recibidas para aparecer en el slider.
+      // Y que sean del MISMO estado que el usuario actual
       const { data, error } = await supabase
         .from("perfiles")
         .select("*")
         .eq("estado_registro", "pendiente")
+        .eq("estado", currentUserState)
         .lt("aprobaciones_recibidas", 3) // Menos de 3 aprobaciones
         .neq("id", currentUserId)
         .is("deleted_at", null)

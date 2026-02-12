@@ -3,6 +3,7 @@ import { Alert } from "react-native";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
+import { useModal } from "../../context/ModalContext";
 import { useChatInitiator } from "../hooks/messaging/useChatInitiator";
 import useAppointment from "../hooks/useAppointment";
 import { router } from "expo-router";
@@ -15,6 +16,7 @@ import {
 export const useAppointments = () => {
     const { profile } = useAuth();
     const { showToast } = useToast();
+    const { showModal } = useModal();
     const { handleContact } = useChatInitiator();
     const { handleCancelAppointment } = useAppointment();
 
@@ -146,22 +148,19 @@ export const useAppointments = () => {
     };
 
     const handleMarkCancel = (id: string) => {
-        Alert.alert("Cancelar Cita", "¿Estás seguro de cancelar esta cita?", [
-            {
-                text: "Volver",
-                style: "cancel",
+        showModal({
+            title: "Cancelar Cita",
+            message: "¿Estás seguro de que deseas cancelar esta cita? Esta acción no se puede deshacer.",
+            confirmText: "Sí, cancelar",
+            cancelText: "Volver",
+            onConfirm: async () => {
+                const success = await handleCancelAppointment(id);
+                if (success) {
+                    await loadAppointments();
+                    showToast("Cita cancelada correctamente", "success");
+                }
             },
-            {
-                text: "Cancelar Cita",
-                style: "destructive",
-                onPress: async () => {
-                    const success = await handleCancelAppointment(id);
-                    if (success) {
-                        loadAppointments();
-                    }
-                },
-            },
-        ]);
+        });
     };
 
     const handleOpenRating = (id: string) => {

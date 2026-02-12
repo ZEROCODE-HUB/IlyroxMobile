@@ -479,6 +479,7 @@ export function useFeed(options: UseFeedOptions = {}) {
                 comments: item.comentarios_count,
                 timestamp: formatTimestamp(item.publicado_en),
                 commentsList: [],
+                reelDetails: reel,
               };
             }
 
@@ -830,6 +831,7 @@ export function useFeedItem(feedItemId: string) {
           likes: feedData.likes_count,
           comments: feedData.comentarios_count,
           timestamp: formatTimestamp(feedData.publicado_en),
+          reelDetails: contentData,
         };
       } else if (tipo_contenido === "propiedad" && contentData) {
         const operation = Array.isArray(contentData.operaciones_propiedad)
