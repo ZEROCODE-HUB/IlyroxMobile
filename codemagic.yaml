@@ -1,15 +1,16 @@
 workflows:
   ios-release:
-    name: iOS Production Build
+    name: iOS Production Build & App Store Upload
     max_build_duration: 120
     instance_type: mac_mini_m1
     environment:
       groups:
-        - signing # Create this group in CodeMagic UI for certificates/profiles
+        - ios-signing # Group for Certificates and Profiles in CodeMagic
+        - app-store-credentials # Group for App Store Connect API Key
       vars:
         XCODE_WORKSPACE: "ios/ilyrox.xcworkspace"
         XCODE_SCHEME: "ilyrox"
-        APP_ID: "com.ilyrox.app"
+        APP_ID: "com.ilyrox.app" # iOS Bundle Identifier
       node: latest
       xcode: latest
       cocoapods: default
@@ -17,12 +18,12 @@ workflows:
       events:
         - push
       branch_patterns:
-        - pattern: main
+        - pattern: master
           include: true
     scripts:
       - name: Install dependencies
         script: |
-          npm install
+          npm ci
       - name: Set up code signing settings
         script: |
           keychain add-certificates
@@ -46,7 +47,11 @@ workflows:
     publishing:
       email:
         recipients:
-          - user@example.com # Replace with your email
+          - ffabian.m@gmail.com
         notify:
           success: true
           failure: true
+      app_store_connect:
+        auth: integration # Requires App Store Connect integration enabled in CodeMagic settings
+        submit_to_testflight: true # Automatically uploads to TestFlight
+        submit_to_app_store: false # Set to true only for final automated submission
