@@ -5,9 +5,19 @@ workflows:
     instance_type: mac_mini_m1
     environment:
       groups:
-        - ios-signing # Group for Certificates and Profiles in CodeMagic
-        - app-store-credentials # Group for App Store Connect API Key
+        - ios-signing # Grupo para Certificados y Perfiles en CodeMagic
+        - app-store-credentials # Grupo para las credenciales de App Store Connect
+        - app-env # Grupo para variables de entorno de la app (Supabase, Maps, R2, etc.)
       vars:
+        # --- App Store Connect API Key ---
+        # Estas variables se obtienen en: App Store Connect > Usuarios y Acceso > Integraciones > API de App Store Connect
+        # 
+        # 1. APP_STORE_CONNECT_ISSUER_ID: Es el "Issuer ID" que aparece arriba de la lista de llaves API.
+        # 2. APP_STORE_CONNECT_KEY_ID: Es el "Key ID" de la llave específica que crees.
+        # 3. APP_STORE_CONNECT_PRIVATE_KEY: Es el contenido de texto del archivo .p8 que descargas al crear la llave.
+        #
+        # Debes agregar estas variables en CodeMagic (Environment Variables) o dentro del grupo 'app-store-credentials'.
+        
         XCODE_WORKSPACE: "ios/ilyrox.xcworkspace"
         XCODE_SCHEME: "ilyrox"
         APP_ID: "com.ilyrox.app" # iOS Bundle Identifier
@@ -52,6 +62,9 @@ workflows:
           success: true
           failure: true
       app_store_connect:
-        auth: integration # Requires App Store Connect integration enabled in CodeMagic settings
-        submit_to_testflight: true # Automatically uploads to TestFlight
-        submit_to_app_store: false # Set to true only for final automated submission
+        # Se utilizan las variables definidas arriba para la conexión
+        api_key_id: $APP_STORE_CONNECT_KEY_ID
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        submit_to_testflight: true # Sube automáticamente a TestFlight
+        submit_to_app_store: false # Cambiar a true solo para revisión final automática

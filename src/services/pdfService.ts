@@ -405,7 +405,7 @@ const generatePropertyHtml = (
             </div>
         </div>
         <div class="footer-logo">
-            i360
+            ilyrox
         </div>
       </div>
     `;
@@ -414,7 +414,7 @@ const generatePropertyHtml = (
     creatorHtml = `
       <div class="footer-agent">
          <div class="agent-details">
-            <div class="without-agent-name">i360</div>
+            <div class="without-agent-name">ilyrox</div>
             ${idDateHtml}
          </div>
       </div>

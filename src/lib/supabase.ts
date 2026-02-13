@@ -28,7 +28,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
   global: {
     headers: {
-      'x-my-custom-header': 'i360-app',
+      'x-my-custom-header': 'ilyrox-app',
     },
   },
 });

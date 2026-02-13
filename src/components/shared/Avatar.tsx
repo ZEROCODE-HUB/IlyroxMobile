@@ -26,7 +26,7 @@ export const Avatar: React.FC<AvatarProps> = React.memo(
       width: size,
       height: size,
       borderRadius: size / 2,
-      backgroundColor: COLORS.primary, // Verde principal i360
+      backgroundColor: COLORS.primary, // Verde principal ilyrox
       justifyContent: "center" as const,
       alignItems: "center" as const,
       overflow: "hidden" as const,

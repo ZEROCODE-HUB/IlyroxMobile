@@ -42,7 +42,7 @@ const Statistics = () => {
     return (
       <ScreenWrapper withHeader={false} style={styles.container}>
         <AppHeader
-          title="Dashboard I360"
+          title="Dashboard ilyrox"
           showBackButton={false}
         />
         <View
@@ -242,7 +242,7 @@ const Statistics = () => {
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>
       <AppHeader
-        title="Dashboard I360"
+        title="Dashboard ilyrox"
         showBackButton
         onBack={() => navigation.goBack()}
       // rightComponent={

@@ -27,9 +27,9 @@ export function useGoogleAuth() {
   const { showModal } = useModal();
 
   const redirectUri = Platform.select({
-    android: "com.i360.realestateapp:/oauth2redirect",
-    ios: "com.i360.realestateapp:/oauth2redirect",
-    web: "i360realestate://",
+    android: "com.ilyrox.app:/oauth2redirect",
+    ios: "com.ilyrox.app:/oauth2redirect",
+    web: "ilyroxapp://",
   });
 
   const [request, response, promptAsync] = Google.useAuthRequest({

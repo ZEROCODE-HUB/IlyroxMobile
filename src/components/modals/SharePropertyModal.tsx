@@ -52,7 +52,7 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
       shareId: shareCode || propertyId,
       type: "property",
       title: propertyTitle,
-      description: shareDescription || "Mira esta propiedad en i360",
+      description: shareDescription || "Mira esta propiedad en ilyrox",
       imageUrl: shareImageUrl,
     });
 
