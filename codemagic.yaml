@@ -57,7 +57,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - ffabian.m@gmail.com
+          - andres.diaz@zerocode.la
         notify:
           success: true
           failure: true

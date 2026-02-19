@@ -12,14 +12,18 @@
       "resizeMode": "cover",
       "backgroundColor": "#FFFFFF"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ilyrox.app",
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": false,
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       },
       "entitlements": {
         "aps-environment": "development",
@@ -30,7 +34,10 @@
       "config": {
         "googleMapsApiKey": "AIzaSyCMns7F3TjXiJ4oswwws0USAgum-GcwM9A"
       },
-      "associatedDomains": ["applinks:ilyrox.app", "applinks:*.ilyrox.app"]
+      "associatedDomains": [
+        "applinks:ilyrox.app",
+        "applinks:*.ilyrox.app"
+      ]
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
@@ -71,7 +78,10 @@
               "scheme": "ilyroxapp"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -116,13 +126,33 @@
                       "group.com.ilyrox.app.onesignal"
                     ]
                   }
+                },
+                {
+                  "targetName": "OneSignalNotificationServiceExtension",
+                  "bundleIdentifier": "com.ilyrox.app.OneSignalNotificationServiceExtension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.ilyrox.app.onesignal"
+                    ]
+                  }
+                },
+                {
+                  "targetName": "OneSignalNotificationServiceExtension",
+                  "bundleIdentifier": "com.ilyrox.app.OneSignalNotificationServiceExtension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.ilyrox.app.onesignal"
+                    ]
+                  }
                 }
               ]
             }
           }
         },
-        "projectId": "a8b8b8c1-fc02-4f09-ae8e-9d929f564dd5"
-      }
-    }
+        "projectId": "1cff47e7-484f-4918-a037-ec4fa89f7c6e"
+      },
+      "router": {}
+    },
+    "owner": "oscarmpz"
   }
 }
