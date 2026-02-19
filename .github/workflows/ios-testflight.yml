@@ -83,20 +83,25 @@ jobs:
             echo "KEYCHAIN_PATH=$KEYCHAIN_PATH"
           } >> "$GITHUB_ENV"
 
-      # ─── 4. Expo prebuild (generates /ios folder) ──────────────────────────
+      # ─── 4. Expo prebuild (generates /ios folder with icons & assets) ───────
       - name: Expo Prebuild
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY }}
         run: |
-          npx expo prebuild --platform ios --non-interactive
+          # --clean garantiza que los íconos/assets se regeneren frescos
+          npx expo prebuild --platform ios --non-interactive --clean
 
       # ─── 5. CocoaPods ──────────────────────────────────────────────────────
       - name: Install CocoaPods
         run: |
           cd ios
           pod install
+
+      # ─── 5b. xcpretty (pretty xcodebuild logs) ────────────────────────────
+      - name: Install xcpretty
+        run: gem install xcpretty --no-document
 
       # ─── 6. Export options plist ───────────────────────────────────────────
       - name: Create ExportOptions.plist
@@ -151,6 +156,7 @@ jobs:
           set -euo pipefail
           ARCHIVE_PATH="$RUNNER_TEMP/ilyrox.xcarchive"
 
+          set -o pipefail
           xcodebuild archive \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -162,7 +168,7 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             MARKETING_VERSION="$BUILD_NAME" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            | xcpretty && exit "${PIPESTATUS[0]}" || true
+            | xcpretty
 
           echo "ARCHIVE_PATH=$ARCHIVE_PATH" >> "$GITHUB_ENV"
 
@@ -173,11 +179,12 @@ jobs:
           IPA_DIR="$RUNNER_TEMP/ipa"
           mkdir -p "$IPA_DIR"
 
+          set -o pipefail
           xcodebuild -exportArchive \
             -archivePath "$ARCHIVE_PATH" \
             -exportPath "$IPA_DIR" \
             -exportOptionsPlist "$EXPORT_OPTIONS_PATH" \
-            | xcpretty && exit "${PIPESTATUS[0]}" || true
+            | xcpretty
 
           IPA_PATH=$(find "$IPA_DIR" -maxdepth 1 -name "*.ipa" | head -n 1)
           if [[ -z "$IPA_PATH" ]]; then
