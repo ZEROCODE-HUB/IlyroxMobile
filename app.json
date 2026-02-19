@@ -101,7 +101,12 @@
           "imageWidth": 200
         }
       ],
-
+      [
+        "onesignal-expo-plugin",
+        {
+          "mode": "development"
+        }
+      ],
       "expo-video",
       "@react-native-community/datetimepicker",
       "expo-web-browser",
