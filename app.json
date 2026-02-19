@@ -115,39 +115,6 @@
     "extra": {
       "eas": {
         "build": {
-          "experimental": {
-            "ios": {
-              "appExtensions": [
-                {
-                  "targetName": "OneSignalNotificationServiceExtension",
-                  "bundleIdentifier": "com.ilyrox.app.OneSignalNotificationServiceExtension",
-                  "entitlements": {
-                    "com.apple.security.application-groups": [
-                      "group.com.ilyrox.app.onesignal"
-                    ]
-                  }
-                },
-                {
-                  "targetName": "OneSignalNotificationServiceExtension",
-                  "bundleIdentifier": "com.ilyrox.app.OneSignalNotificationServiceExtension",
-                  "entitlements": {
-                    "com.apple.security.application-groups": [
-                      "group.com.ilyrox.app.onesignal"
-                    ]
-                  }
-                },
-                {
-                  "targetName": "OneSignalNotificationServiceExtension",
-                  "bundleIdentifier": "com.ilyrox.app.OneSignalNotificationServiceExtension",
-                  "entitlements": {
-                    "com.apple.security.application-groups": [
-                      "group.com.ilyrox.app.onesignal"
-                    ]
-                  }
-                }
-              ]
-            }
-          }
         },
         "projectId": "1cff47e7-484f-4918-a037-ec4fa89f7c6e"
       },

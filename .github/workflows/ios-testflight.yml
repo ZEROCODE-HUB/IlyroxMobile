@@ -85,29 +85,7 @@ jobs:
             echo "KEYCHAIN_PATH=$KEYCHAIN_PATH"
           } >> "$GITHUB_ENV"
 
-      # ─── 3b. Setup Extension Profile (OneSignal) ───────────────────────────
-      - name: Setup Extension Profile
-        env:
-          IOS_EXTENSION_PROFILE_BASE64: ${{ secrets.IOS_EXTENSION_PROFILE_BASE64 }}
-        run: |
-          set -euo pipefail
-          if [[ -n "$IOS_EXTENSION_PROFILE_BASE64" ]]; then
-            EXT_PROFILE_PATH="$RUNNER_TEMP/extension.mobileprovision"
-            EXT_PROFILE_PLIST="$RUNNER_TEMP/ext_profile.plist"
-            
-            echo -n "$IOS_EXTENSION_PROFILE_BASE64" | base64 --decode > "$EXT_PROFILE_PATH"
-            security cms -D -i "$EXT_PROFILE_PATH" > "$EXT_PROFILE_PLIST"
-            
-            EXT_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$EXT_PROFILE_PLIST")
-            EXT_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" "$EXT_PROFILE_PLIST")
-            
-            cp "$EXT_PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$EXT_PROFILE_UUID.mobileprovision"
-            
-            echo "EXT_PROFILE_UUID=$EXT_PROFILE_UUID" >> "$GITHUB_ENV"
-            echo "EXT_PROFILE_NAME=$EXT_PROFILE_NAME" >> "$GITHUB_ENV"
-          else
-            echo "⚠️  No IOS_EXTENSION_PROFILE_BASE64 provided. Build might fail if extension exists."
-          fi
+
 
       # ─── 4. Expo prebuild (generates /ios folder with icons & assets) ───────
       - name: Expo Prebuild
@@ -131,13 +109,12 @@ jobs:
           # Install xcodeproj gem to modify project settings
           gem install xcodeproj --no-document
           
-          # Run ruby script to apply manual signing configurations
-          # Usage: ruby set_signing.rb <path> <team_id> <main_uuid> <ext_uuid>
+          # Run ruby script to apply manual signing configurations and remove extension target
+          # Usage: ruby set_signing.rb <path> <team_id> <main_uuid>
           ruby .github/scripts/set_signing.rb \
             "ios/ilyrox.xcodeproj" \
             "${{ env.APPLE_TEAM_ID }}" \
-            "${{ env.PROFILE_UUID }}" \
-            "${{ env.EXT_PROFILE_UUID }}"
+            "${{ env.PROFILE_UUID }}"
 
       # ─── 5b. xcpretty (pretty xcodebuild logs) ────────────────────────────
       - name: Install xcpretty
