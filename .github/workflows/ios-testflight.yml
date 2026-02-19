@@ -24,11 +24,9 @@ jobs:
       XCODE_WORKSPACE: ios/ilyrox.xcworkspace
 
     steps:
-      # ─── 1. Source code ────────────────────────────────────────────────────
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ─── 2. Node / JS tooling ──────────────────────────────────────────────
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -38,7 +36,6 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
-      # ─── 3. iOS signing setup ──────────────────────────────────────────────
       - name: Setup signing assets
         env:
           IOS_DISTRIBUTION_CERT_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERT_BASE64 }}
@@ -85,42 +82,51 @@ jobs:
             echo "KEYCHAIN_PATH=$KEYCHAIN_PATH"
           } >> "$GITHUB_ENV"
 
-
-
-      # ─── 4. Expo prebuild (generates /ios folder with icons & assets) ───────
       - name: Expo Prebuild
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY }}
         run: |
-          # --clean garantiza que los íconos/assets se regeneren frescos
           npx expo prebuild --platform ios --non-interactive --clean
 
-      # ─── 5. CocoaPods ──────────────────────────────────────────────────────
-      # ─── 5. CocoaPods & Project Patching ───────────────────────────────────
       - name: Install CocoaPods
         run: |
           cd ios
           pod install
 
-      - name: Patch Xcode Project Signing
+      - name: Resolve workspace and scheme
         run: |
-          # Install xcodeproj gem to modify project settings
-          gem install xcodeproj --no-document
-          
-          # Run ruby script to apply manual signing configurations and remove extension target
-          # Usage: ruby set_signing.rb <path> <team_id> <main_uuid>
-          ruby .github/scripts/set_signing.rb \
-            "ios/ilyrox.xcodeproj" \
-            "${{ env.APPLE_TEAM_ID }}" \
-            "${{ env.PROFILE_UUID }}"
+          set -euo pipefail
 
-      # ─── 5b. xcpretty (pretty xcodebuild logs) ────────────────────────────
+          WORKSPACE_PATH="${XCODE_WORKSPACE:-}"
+          if [[ -z "$WORKSPACE_PATH" || ! -f "$WORKSPACE_PATH" ]]; then
+            WORKSPACE_PATH="$(find ios -maxdepth 1 -name '*.xcworkspace' | head -n 1)"
+          fi
+
+          if [[ -z "$WORKSPACE_PATH" ]]; then
+            echo "No se encontro .xcworkspace en ios/"
+            exit 1
+          fi
+
+          SCHEME_NAME="${XCODE_SCHEME:-}"
+          if [[ -z "$SCHEME_NAME" ]]; then
+            SCHEME_NAME="$(xcodebuild -list -workspace "$WORKSPACE_PATH" | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | sed 's/^[[:space:]]*//' | head -n 1)"
+          fi
+
+          if [[ -z "$SCHEME_NAME" ]]; then
+            echo "No se pudo resolver XCODE_SCHEME para $WORKSPACE_PATH"
+            exit 1
+          fi
+
+          echo "XCODE_WORKSPACE=$WORKSPACE_PATH" >> "$GITHUB_ENV"
+          echo "XCODE_SCHEME=$SCHEME_NAME" >> "$GITHUB_ENV"
+          echo "Workspace: $WORKSPACE_PATH"
+          echo "Scheme: $SCHEME_NAME"
+
       - name: Install xcpretty
         run: gem install xcpretty --no-document
 
-      # ─── 6. Export options plist ───────────────────────────────────────────
       - name: Create ExportOptions.plist
         run: |
           set -euo pipefail
@@ -134,6 +140,8 @@ jobs:
             <string>app-store</string>
             <key>signingStyle</key>
             <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
             <key>teamID</key>
             <string>${APPLE_TEAM_ID}</string>
             <key>provisioningProfiles</key>
@@ -150,15 +158,14 @@ jobs:
           EOF
           echo "EXPORT_OPTIONS_PATH=$EXPORT_OPTIONS_PATH" >> "$GITHUB_ENV"
 
-      # ─── 7. Build version args ─────────────────────────────────────────────
       - name: Resolve build version
         run: |
+          set -euo pipefail
           BUILD_NAME="${{ github.event.inputs.build_name }}"
           BUILD_NUMBER="${{ github.event.inputs.build_number }}"
 
-          # Fallback to app.json values if not provided
           if [[ -z "$BUILD_NAME" ]]; then
-            BUILD_NAME=$(node -e "const a=require('./app.json'); console.log(a.expo.version);")
+            BUILD_NAME=$(node -e "const {execSync}=require('child_process'); try { const out=execSync('npx expo config --type public --json',{stdio:['ignore','pipe','ignore']}).toString(); const cfg=JSON.parse(out); console.log(cfg.version || '1.0.0'); } catch (e) { try { const a=require('./app.json'); console.log((a.expo && a.expo.version) || a.version || '1.0.0'); } catch (e2) { console.log('1.0.0'); } }")
           fi
           if [[ -z "$BUILD_NUMBER" ]]; then
             BUILD_NUMBER=$(date +%Y%m%d%H%M)
@@ -167,33 +174,42 @@ jobs:
           echo "BUILD_NAME=$BUILD_NAME" >> "$GITHUB_ENV"
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
 
-      # ─── 8. Archive ────────────────────────────────────────────────────────
       - name: Build Archive
         run: |
           set -euo pipefail
           ARCHIVE_PATH="$RUNNER_TEMP/ilyrox.xcarchive"
+          LOG_PATH="$RUNNER_TEMP/xcodebuild-archive.log"
 
-          # Raw output (no xcpretty) so the real error appears in CI logs
-          # Note: We removed PROVISIONING_PROFILE_SPECIFIER and CODE_SIGN_IDENTITY from here
-          # because they are now set in the project file by the ruby script.
+          set +e
           xcodebuild archive \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -archivePath "$ARCHIVE_PATH" \
             -destination "generic/platform=iOS" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH" \
             MARKETING_VERSION="$BUILD_NAME" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             NODE_BINARY="$(which node)" \
             COMPILER_INDEX_STORE_ENABLE=NO \
             SKIP_INSTALL=NO \
-            ONLY_ACTIVE_ARCH=NO
+            ONLY_ACTIVE_ARCH=NO \
+            2>&1 | tee "$LOG_PATH"
+          XCODE_STATUS=${PIPESTATUS[0]}
+          set -e
+
+          if [[ "$XCODE_STATUS" -ne 0 ]]; then
+            echo "Archive failed. Errores relevantes:"
+            grep -nE "error:|ARCHIVE FAILED|CodeSign|No profiles for|Provisioning profile|requires a provisioning profile|No signing certificate" "$LOG_PATH" | tail -n 200 || true
+            exit "$XCODE_STATUS"
+          fi
 
           echo "ARCHIVE_PATH=$ARCHIVE_PATH" >> "$GITHUB_ENV"
 
-
-
-      # ─── 9. Export IPA ─────────────────────────────────────────────────────
       - name: Export IPA
         run: |
           set -euo pipefail
