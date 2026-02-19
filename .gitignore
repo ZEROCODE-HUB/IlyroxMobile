@@ -26,4 +26,5 @@ android
 
 # Custom build scripts and logs
 build-prod.ps1
-build-debug-log.txt.env
+build-debug-log.txt
+.env
