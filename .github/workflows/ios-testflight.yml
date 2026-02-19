@@ -1,0 +1,197 @@
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_name:
+        description: "CFBundleShortVersionString (ej: 1.0.1)"
+        required: false
+        type: string
+      build_number:
+        description: "CFBundleVersion (ej: 2)"
+        required: false
+        type: string
+
+jobs:
+  build-and-upload:
+    runs-on: macos-latest
+    env:
+      BUNDLE_ID: com.ilyrox.app
+      APPLE_TEAM_ID: 9BWTN3CAXU
+      APPSTORE_ISSUER_ID: 05ec12f7-b988-4093-8849-a3ed039d8705
+      APPSTORE_API_KEY_ID: 7TB389LN84
+      XCODE_SCHEME: ilyrox
+      XCODE_WORKSPACE: ios/ilyrox.xcworkspace
+
+    steps:
+      # ─── 1. Source code ────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ─── 2. Node / JS tooling ──────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      # ─── 3. iOS signing setup ──────────────────────────────────────────────
+      - name: Setup signing assets
+        env:
+          IOS_DISTRIBUTION_CERT_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERT_BASE64 }}
+          IOS_DISTRIBUTION_CERT_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERT_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          CERT_PATH="$RUNNER_TEMP/ios_distribution.p12"
+          PROFILE_PATH="$RUNNER_TEMP/app_store.mobileprovision"
+          PROFILE_PLIST="$RUNNER_TEMP/profile.plist"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+
+          decode_base64() {
+            if base64 --help 2>&1 | grep -q -- "--decode"; then
+              base64 --decode
+            else
+              base64 -D
+            fi
+          }
+
+          echo -n "$IOS_DISTRIBUTION_CERT_BASE64" | decode_base64 > "$CERT_PATH"
+          echo -n "$IOS_PROVISIONING_PROFILE_BASE64" | decode_base64 > "$PROFILE_PATH"
+          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
+
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$PROFILE_PLIST")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" "$PROFILE_PLIST")
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$IOS_DISTRIBUTION_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" "$HOME/Library/Keychains/login.keychain-db"
+          security default-keychain -d user -s "$KEYCHAIN_PATH"
+
+          {
+            echo "PROFILE_NAME=$PROFILE_NAME"
+            echo "KEYCHAIN_PATH=$KEYCHAIN_PATH"
+          } >> "$GITHUB_ENV"
+
+      # ─── 4. Expo prebuild (generates /ios folder) ──────────────────────────
+      - name: Expo Prebuild
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY }}
+        run: |
+          npx expo prebuild --platform ios --non-interactive
+
+      # ─── 5. CocoaPods ──────────────────────────────────────────────────────
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+
+      # ─── 6. Export options plist ───────────────────────────────────────────
+      - name: Create ExportOptions.plist
+        run: |
+          set -euo pipefail
+          EXPORT_OPTIONS_PATH="$RUNNER_TEMP/ExportOptions.plist"
+          cat > "$EXPORT_OPTIONS_PATH" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>teamID</key>
+            <string>${APPLE_TEAM_ID}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${PROFILE_NAME}</string>
+            </dict>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>compileBitcode</key>
+            <false/>
+          </dict>
+          </plist>
+          EOF
+          echo "EXPORT_OPTIONS_PATH=$EXPORT_OPTIONS_PATH" >> "$GITHUB_ENV"
+
+      # ─── 7. Build version args ─────────────────────────────────────────────
+      - name: Resolve build version
+        run: |
+          BUILD_NAME="${{ github.event.inputs.build_name }}"
+          BUILD_NUMBER="${{ github.event.inputs.build_number }}"
+
+          # Fallback to app.json values if not provided
+          if [[ -z "$BUILD_NAME" ]]; then
+            BUILD_NAME=$(node -e "const a=require('./app.json'); console.log(a.expo.version);")
+          fi
+          if [[ -z "$BUILD_NUMBER" ]]; then
+            BUILD_NUMBER=$(date +%Y%m%d%H%M)
+          fi
+
+          echo "BUILD_NAME=$BUILD_NAME" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+
+      # ─── 8. Archive ────────────────────────────────────────────────────────
+      - name: Build Archive
+        run: |
+          set -euo pipefail
+          ARCHIVE_PATH="$RUNNER_TEMP/ilyrox.xcarchive"
+
+          xcodebuild archive \
+            -workspace "$XCODE_WORKSPACE" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -archivePath "$ARCHIVE_PATH" \
+            -destination "generic/platform=iOS" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            MARKETING_VERSION="$BUILD_NAME" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            | xcpretty && exit "${PIPESTATUS[0]}" || true
+
+          echo "ARCHIVE_PATH=$ARCHIVE_PATH" >> "$GITHUB_ENV"
+
+      # ─── 9. Export IPA ─────────────────────────────────────────────────────
+      - name: Export IPA
+        run: |
+          set -euo pipefail
+          IPA_DIR="$RUNNER_TEMP/ipa"
+          mkdir -p "$IPA_DIR"
+
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$IPA_DIR" \
+            -exportOptionsPlist "$EXPORT_OPTIONS_PATH" \
+            | xcpretty && exit "${PIPESTATUS[0]}" || true
+
+          IPA_PATH=$(find "$IPA_DIR" -maxdepth 1 -name "*.ipa" | head -n 1)
+          if [[ -z "$IPA_PATH" ]]; then
+            echo "❌ No se encontró ningún .ipa en $IPA_DIR"
+            exit 1
+          fi
+          echo "✅ IPA generado: $IPA_PATH"
+          echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
+
+      # ─── 10. Upload to TestFlight ──────────────────────────────────────────
+      - name: Upload to TestFlight
+        uses: apple-actions/upload-testflight-build@v3
+        with:
+          app-path: ${{ env.IPA_PATH }}
+          issuer-id: ${{ env.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ env.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
