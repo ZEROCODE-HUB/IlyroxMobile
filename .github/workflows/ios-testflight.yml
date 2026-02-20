@@ -285,39 +285,36 @@ jobs:
         run: |
           set -euo pipefail
           EXPORT_OPTIONS_PATH="$RUNNER_TEMP/ExportOptions.plist"
+
           EXTENSION_PROFILE_XML=""
           if [[ -n "${EXTENSION_PROFILE_NAME:-}" ]]; then
-            EXTENSION_PROFILE_XML="
-              <key>${EXTENSION_BUNDLE_ID}</key>
-              <string>${EXTENSION_PROFILE_NAME}</string>"
+            EXTENSION_PROFILE_XML="<key>${EXTENSION_BUNDLE_ID}</key><string>${EXTENSION_PROFILE_NAME}</string>"
           fi
-          cat > "$EXPORT_OPTIONS_PATH" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store-connect</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>signingCertificate</key>
-            <string>Apple Distribution</string>
-            <key>teamID</key>
-            <string>${APPLE_TEAM_ID}</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>${BUNDLE_ID}</key>
-              <string>${PROFILE_NAME}</string>
-              ${EXTENSION_PROFILE_XML}
-            </dict>
-            <key>uploadSymbols</key>
-            <true/>
-            <key>compileBitcode</key>
-            <false/>
-          </dict>
-          </plist>
-          EOF
-          echo "✅ ExportOptions.plist generado:"
+
+          sed 's/^          //' <<'          PYEOF' | python3 -
+          import plistlib, os
+
+          data = {
+              "method": "app-store",
+              "signingStyle": "manual",
+              "signingCertificate": "Apple Distribution",
+              "teamID": os.environ["APPLE_TEAM_ID"],
+              "uploadSymbols": True,
+              "compileBitcode": False,
+              "provisioningProfiles": {
+                  os.environ["BUNDLE_ID"]: os.environ["PROFILE_NAME"],
+                  **({os.environ["EXTENSION_BUNDLE_ID"]: os.environ["EXTENSION_PROFILE_NAME"]}
+                     if os.environ.get("EXTENSION_PROFILE_NAME") else {})
+              }
+          }
+
+          with open(os.environ["RUNNER_TEMP"] + "/ExportOptions.plist", "wb") as f:
+              plistlib.dump(data, f)
+
+          print("✅ ExportOptions.plist generado correctamente")
+          PYEOF
+
+          echo "=== Contenido del plist ==="
           cat "$EXPORT_OPTIONS_PATH"
           echo "EXPORT_OPTIONS_PATH=$EXPORT_OPTIONS_PATH" >> "$GITHUB_ENV"
 
