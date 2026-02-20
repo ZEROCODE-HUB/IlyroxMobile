@@ -158,20 +158,10 @@ jobs:
 
           content = File.read(pbxproj_path)
 
-          # 1. Force Manual signing everywhere
           content.gsub!(/CODE_SIGN_STYLE = Automatic/, 'CODE_SIGN_STYLE = Manual')
-
-          # 2. Normalize code sign identity
           content.gsub!(/CODE_SIGN_IDENTITY = "iPhone Developer"/,    'CODE_SIGN_IDENTITY = "Apple Distribution"')
           content.gsub!(/CODE_SIGN_IDENTITY = "iPhone Distribution"/, 'CODE_SIGN_IDENTITY = "Apple Distribution"')
           content.gsub!(/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = ".*?"/, '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"')
-
-          # 3. Per-target PROVISIONING_PROFILE_SPECIFIER injection.
-          #
-          #    CRITICAL FIX: expo prebuild with Automatic signing does NOT write
-          #    PROVISIONING_PROFILE_SPECIFIER into the pbxproj. The previous script
-          #    only replaced existing values (.sub), so it was a no-op.
-          #    This version INJECTS the key when it is absent from the block.
 
           lines  = content.lines
           result = []
@@ -205,7 +195,6 @@ jobs:
                 has_specifier = block_lines.any? { |l| l =~ /PROVISIONING_PROFILE_SPECIFIER/ }
                 has_profile   = block_lines.any? { |l| l =~ /PROVISIONING_PROFILE\s*=/ && l !~ /SPECIFIER/ }
 
-                # Replace values that already exist
                 patched_block = block_lines.map do |bl|
                   if bl =~ /PROVISIONING_PROFILE_SPECIFIER/
                     bl.sub(/PROVISIONING_PROFILE_SPECIFIER\s*=\s*"[^"]*"/, "PROVISIONING_PROFILE_SPECIFIER = \"#{target_profile}\"")
@@ -217,7 +206,6 @@ jobs:
                   end
                 end
 
-                # INJECT missing keys just before the closing `};` of the block
                 closing_idx = patched_block.rindex { |l| l =~ /^\s*\};\s*$/ }
                 if closing_idx && !target_profile.empty?
                   indent     = "\t\t\t\t"
@@ -285,34 +273,32 @@ jobs:
         run: |
           set -euo pipefail
           EXPORT_OPTIONS_PATH="$RUNNER_TEMP/ExportOptions.plist"
+          PYTHON_SCRIPT="$RUNNER_TEMP/gen_plist.py"
 
-          EXTENSION_PROFILE_XML=""
-          if [[ -n "${EXTENSION_PROFILE_NAME:-}" ]]; then
-            EXTENSION_PROFILE_XML="<key>${EXTENSION_BUNDLE_ID}</key><string>${EXTENSION_PROFILE_NAME}</string>"
-          fi
+          cat > "$PYTHON_SCRIPT" << 'PYEOF'
+import plistlib, os
 
-          sed 's/^          //' <<'          PYEOF' | python3 -
-          import plistlib, os
+data = {
+    "method": "app-store",
+    "signingStyle": "manual",
+    "signingCertificate": "Apple Distribution",
+    "teamID": os.environ["APPLE_TEAM_ID"],
+    "uploadSymbols": True,
+    "compileBitcode": False,
+    "provisioningProfiles": {
+        os.environ["BUNDLE_ID"]: os.environ["PROFILE_NAME"],
+        **({os.environ["EXTENSION_BUNDLE_ID"]: os.environ["EXTENSION_PROFILE_NAME"]}
+           if os.environ.get("EXTENSION_PROFILE_NAME") else {})
+    }
+}
 
-          data = {
-              "method": "app-store",
-              "signingStyle": "manual",
-              "signingCertificate": "Apple Distribution",
-              "teamID": os.environ["APPLE_TEAM_ID"],
-              "uploadSymbols": True,
-              "compileBitcode": False,
-              "provisioningProfiles": {
-                  os.environ["BUNDLE_ID"]: os.environ["PROFILE_NAME"],
-                  **({os.environ["EXTENSION_BUNDLE_ID"]: os.environ["EXTENSION_PROFILE_NAME"]}
-                     if os.environ.get("EXTENSION_PROFILE_NAME") else {})
-              }
-          }
+with open(os.environ["RUNNER_TEMP"] + "/ExportOptions.plist", "wb") as f:
+    plistlib.dump(data, f)
 
-          with open(os.environ["RUNNER_TEMP"] + "/ExportOptions.plist", "wb") as f:
-              plistlib.dump(data, f)
+print("✅ ExportOptions.plist generado correctamente")
+PYEOF
 
-          print("✅ ExportOptions.plist generado correctamente")
-          PYEOF
+          python3 "$PYTHON_SCRIPT"
 
           echo "=== Contenido del plist ==="
           cat "$EXPORT_OPTIONS_PATH"
