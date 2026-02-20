@@ -26,10 +26,7 @@
         ]
       },
       "entitlements": {
-        "aps-environment": "development",
-        "com.apple.security.application-groups": [
-          "group.com.ilyrox.app.onesignal"
-        ]
+        "aps-environment": "production"
       },
       "config": {
         "googleMapsApiKey": "AIzaSyCMns7F3TjXiJ4oswwws0USAgum-GcwM9A"
@@ -104,7 +101,7 @@
       [
         "onesignal-expo-plugin",
         {
-          "mode": "development"
+          "mode": "production"
         }
       ],
       "expo-video",
@@ -114,8 +111,7 @@
     ],
     "extra": {
       "eas": {
-        "build": {
-        },
+        "build": {},
         "projectId": "1cff47e7-484f-4918-a037-ec4fa89f7c6e"
       },
       "router": {}
