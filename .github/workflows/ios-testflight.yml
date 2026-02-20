@@ -119,6 +119,21 @@ jobs:
             fi
           fi
 
+      - name: Force manual signing in project
+        run: |
+          set -euo pipefail
+          PBXPROJ="ios/ilyrox.xcodeproj/project.pbxproj"
+
+          # Cambiar Automatic a Manual en todos los targets
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' "$PBXPROJ"
+
+          # Asignar el provisioning profile de la extensión donde esté vacío
+          if [[ -n "${EXTENSION_PROFILE_NAME:-}" ]]; then
+            sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = \"\"/PROVISIONING_PROFILE_SPECIFIER = \"${EXTENSION_PROFILE_NAME}\"/g" "$PBXPROJ"
+          fi
+
+          echo "✅ Manual signing forzado en project.pbxproj"
+
       - name: Resolve workspace and scheme
         run: |
           set -euo pipefail
@@ -218,9 +233,10 @@ jobs:
             -configuration Release \
             -archivePath "$ARCHIVE_PATH" \
             -destination "generic/platform=iOS" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             MARKETING_VERSION="$BUILD_NAME" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             NODE_BINARY="$(which node)" \
@@ -260,7 +276,6 @@ jobs:
           echo "✅ IPA generado: $IPA_PATH"
           echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
 
-      # ─── 10. Upload to TestFlight ──────────────────────────────────────────
       - name: Upload to TestFlight
         uses: apple-actions/upload-testflight-build@v3
         with:
