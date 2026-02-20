@@ -109,6 +109,23 @@ jobs:
           cd ios
           pod install
 
+      - name: Patch entitlements - remove App Groups (temporal)
+        run: |
+          set -euo pipefail
+
+          patch_entitlements() {
+            local file="$1"
+            if [[ ! -f "$file" ]]; then
+              echo "No encontrado: $file"
+              return
+            fi
+            /usr/libexec/PlistBuddy -c "Delete :com.apple.security.application-groups" "$file" 2>/dev/null || true
+            echo "✅ App Groups removido de: $file"
+          }
+
+          patch_entitlements "ios/ilyrox/ilyrox.entitlements"
+          patch_entitlements "ios/OneSignalNotificationServiceExtension/OneSignalNotificationServiceExtension.entitlements"
+
       - name: Validate extension signing profile
         run: |
           set -euo pipefail
