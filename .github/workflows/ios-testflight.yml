@@ -79,6 +79,7 @@ jobs:
             EXT_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$EXT_PROFILE_PLIST")
             EXT_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" "$EXT_PROFILE_PLIST")
             cp "$EXT_PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$EXT_PROFILE_UUID.mobileprovision"
+            echo "EXT_PROFILE_UUID=$EXT_PROFILE_UUID" >> "$GITHUB_ENV"
             echo "EXTENSION_PROFILE_NAME=$EXT_PROFILE_NAME" >> "$GITHUB_ENV"
           fi
 
@@ -119,20 +120,97 @@ jobs:
             fi
           fi
 
-      - name: Force manual signing in project
+      - name: Configure manual signing per target
+        env:
+          PBXPROJ: ios/ilyrox.xcodeproj/project.pbxproj
         run: |
           set -euo pipefail
-          PBXPROJ="ios/ilyrox.xcodeproj/project.pbxproj"
 
-          # Cambiar Automatic a Manual en todos los targets
-          sed -i '' 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' "$PBXPROJ"
+          ruby <<'RUBY'
+          pbxproj_path = ENV['PBXPROJ']
+          profile_name = ENV['PROFILE_NAME'] || ''
+          profile_uuid = ENV['PROFILE_UUID'] || ''
+          ext_profile_name = ENV['EXTENSION_PROFILE_NAME'] || ''
+          ext_profile_uuid = ENV['EXT_PROFILE_UUID'] || ''
+          team_id = ENV['APPLE_TEAM_ID'] || ''
 
-          # Asignar el provisioning profile de la extensión donde esté vacío
-          if [[ -n "${EXTENSION_PROFILE_NAME:-}" ]]; then
-            sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = \"\"/PROVISIONING_PROFILE_SPECIFIER = \"${EXTENSION_PROFILE_NAME}\"/g" "$PBXPROJ"
-          fi
+          content = File.read(pbxproj_path)
 
-          echo "✅ Manual signing forzado en project.pbxproj"
+          # 1. Replace all CODE_SIGN_STYLE = Automatic with Manual
+          content.gsub!(/CODE_SIGN_STYLE = Automatic/, 'CODE_SIGN_STYLE = Manual')
+
+          # 2. Replace all code sign identity variants to Apple Distribution
+          content.gsub!(/CODE_SIGN_IDENTITY = "iPhone Developer"/, 'CODE_SIGN_IDENTITY = "Apple Distribution"')
+          content.gsub!(/CODE_SIGN_IDENTITY = "iPhone Distribution"/, 'CODE_SIGN_IDENTITY = "Apple Distribution"')
+          content.gsub!(/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = ".*?"/, '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"')
+
+          # 3. Per-target profile assignment using a state machine
+          #    We read each buildSettings block, detect the PRODUCT_BUNDLE_IDENTIFIER,
+          #    then assign the correct PROVISIONING_PROFILE_SPECIFIER
+          lines = content.lines
+          result = []
+          in_build_settings = false
+          brace_depth = 0
+          current_bundle_id = nil
+          block_lines = []
+
+          lines.each_with_index do |line, idx|
+            if line =~ /buildSettings\s*=\s*\{/
+              in_build_settings = true
+              brace_depth = 1
+              current_bundle_id = nil
+              block_lines = [line]
+              next
+            end
+
+            if in_build_settings
+              brace_depth += line.count('{') - line.count('}')
+              block_lines << line
+
+              if line =~ /PRODUCT_BUNDLE_IDENTIFIER\s*=\s*"?([^";]+)"?\s*;/
+                current_bundle_id = $1.strip.gsub('"', '')
+              end
+
+              if brace_depth <= 0
+                # End of buildSettings — now patch the block
+                is_extension = current_bundle_id && current_bundle_id.include?('OneSignalNotificationServiceExtension')
+                target_profile = is_extension ? ext_profile_name : profile_name
+                target_uuid = is_extension ? ext_profile_uuid : profile_uuid
+
+                patched_block = block_lines.map do |bl|
+                  if bl =~ /PROVISIONING_PROFILE_SPECIFIER/
+                    bl.sub(/PROVISIONING_PROFILE_SPECIFIER = ".*?"/, "PROVISIONING_PROFILE_SPECIFIER = \"#{target_profile}\"")
+                      .sub(/PROVISIONING_PROFILE_SPECIFIER = ""/, "PROVISIONING_PROFILE_SPECIFIER = \"#{target_profile}\"")
+                  elsif bl =~ /PROVISIONING_PROFILE = /
+                    bl.sub(/PROVISIONING_PROFILE = ".*?"/, "PROVISIONING_PROFILE = \"#{target_uuid}\"")
+                  else
+                    bl
+                  end
+                end
+
+                result.concat(patched_block)
+                in_build_settings = false
+                current_bundle_id = nil
+                block_lines = []
+                next
+              end
+
+              next
+            end
+
+            result << line
+          end
+
+          # Handle edge case: if still in a block at EOF
+          result.concat(block_lines) unless block_lines.empty?
+
+          File.write(pbxproj_path, result.join)
+          puts "✅ Manual signing configured per target in #{pbxproj_path}"
+          RUBY
+
+          # Debug: verify changes
+          echo "=== Signing settings after patching ==="
+          grep -n "CODE_SIGN_STYLE\|CODE_SIGN_IDENTITY\|PROVISIONING_PROFILE_SPECIFIER\|PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ" | head -80
 
       - name: Resolve workspace and scheme
         run: |
@@ -234,9 +312,9 @@ jobs:
             -archivePath "$ARCHIVE_PATH" \
             -destination "generic/platform=iOS" \
             CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             MARKETING_VERSION="$BUILD_NAME" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             NODE_BINARY="$(which node)" \
