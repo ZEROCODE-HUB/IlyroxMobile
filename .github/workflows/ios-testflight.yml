@@ -91,6 +91,9 @@ jobs:
           security list-keychains -d user -s "$KEYCHAIN_PATH" "$HOME/Library/Keychains/login.keychain-db"
           security default-keychain -d user -s "$KEYCHAIN_PATH"
 
+          echo "=== Certificados instalados en keychain ==="
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
           {
             echo "PROFILE_NAME=$PROFILE_NAME"
             echo "KEYCHAIN_PATH=$KEYCHAIN_PATH"
@@ -109,18 +112,22 @@ jobs:
           cd ios
           pod install
 
-      - name: Patch entitlements - remove App Groups (temporal)
+      - name: Patch entitlements - remove App Groups (temporal hasta configurar Apple Developer)
         run: |
           set -euo pipefail
 
           patch_entitlements() {
             local file="$1"
             if [[ ! -f "$file" ]]; then
-              echo "No encontrado: $file"
+              echo "⚠️  No encontrado: $file"
               return
             fi
+            echo "📄 Contenido antes del patch: $file"
+            cat "$file"
             /usr/libexec/PlistBuddy -c "Delete :com.apple.security.application-groups" "$file" 2>/dev/null || true
             echo "✅ App Groups removido de: $file"
+            echo "📄 Contenido después del patch:"
+            cat "$file"
           }
 
           patch_entitlements "ios/ilyrox/ilyrox.entitlements"
@@ -131,8 +138,7 @@ jobs:
           set -euo pipefail
           if grep -q "OneSignalNotificationServiceExtension" ios/*.xcodeproj/project.pbxproj; then
             if [[ -z "${EXTENSION_PROFILE_NAME:-}" ]]; then
-              echo "Se detecto OneSignalNotificationServiceExtension, pero falta secrets.IOS_EXTENSION_PROVISIONING_PROFILE_BASE64"
-              echo "Crea un provisioning profile App Store para ${EXTENSION_BUNDLE_ID} y guardalo en ese secret."
+              echo "❌ Se detecto OneSignalNotificationServiceExtension, pero falta secrets.IOS_EXTENSION_PROVISIONING_PROFILE_BASE64"
               exit 1
             fi
           fi
@@ -153,17 +159,11 @@ jobs:
 
           content = File.read(pbxproj_path)
 
-          # 1. Replace all CODE_SIGN_STYLE = Automatic with Manual
           content.gsub!(/CODE_SIGN_STYLE = Automatic/, 'CODE_SIGN_STYLE = Manual')
-
-          # 2. Replace all code sign identity variants to Apple Distribution
           content.gsub!(/CODE_SIGN_IDENTITY = "iPhone Developer"/, 'CODE_SIGN_IDENTITY = "Apple Distribution"')
           content.gsub!(/CODE_SIGN_IDENTITY = "iPhone Distribution"/, 'CODE_SIGN_IDENTITY = "Apple Distribution"')
           content.gsub!(/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = ".*?"/, '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"')
 
-          # 3. Per-target profile assignment using a state machine
-          #    We read each buildSettings block, detect the PRODUCT_BUNDLE_IDENTIFIER,
-          #    then assign the correct PROVISIONING_PROFILE_SPECIFIER
           lines = content.lines
           result = []
           in_build_settings = false
@@ -189,10 +189,9 @@ jobs:
               end
 
               if brace_depth <= 0
-                # End of buildSettings — now patch the block
                 is_extension = current_bundle_id && current_bundle_id.include?('OneSignalNotificationServiceExtension')
                 target_profile = is_extension ? ext_profile_name : profile_name
-                target_uuid = is_extension ? ext_profile_uuid : profile_uuid
+                target_uuid    = is_extension ? ext_profile_uuid  : profile_uuid
 
                 patched_block = block_lines.map do |bl|
                   if bl =~ /PROVISIONING_PROFILE_SPECIFIER/
@@ -218,15 +217,13 @@ jobs:
             result << line
           end
 
-          # Handle edge case: if still in a block at EOF
           result.concat(block_lines) unless block_lines.empty?
 
           File.write(pbxproj_path, result.join)
           puts "✅ Manual signing configured per target in #{pbxproj_path}"
           RUBY
 
-          # Debug: verify changes
-          echo "=== Signing settings after patching ==="
+          echo "=== Signing settings después del patch ==="
           grep -n "CODE_SIGN_STYLE\|CODE_SIGN_IDENTITY\|PROVISIONING_PROFILE_SPECIFIER\|PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ" | head -80
 
       - name: Resolve workspace and scheme
@@ -239,7 +236,7 @@ jobs:
           fi
 
           if [[ -z "$WORKSPACE_PATH" ]]; then
-            echo "No se encontro .xcworkspace en ios/"
+            echo "❌ No se encontro .xcworkspace en ios/"
             exit 1
           fi
 
@@ -249,14 +246,14 @@ jobs:
           fi
 
           if [[ -z "$SCHEME_NAME" ]]; then
-            echo "No se pudo resolver XCODE_SCHEME para $WORKSPACE_PATH"
+            echo "❌ No se pudo resolver XCODE_SCHEME para $WORKSPACE_PATH"
             exit 1
           fi
 
           echo "XCODE_WORKSPACE=$WORKSPACE_PATH" >> "$GITHUB_ENV"
           echo "XCODE_SCHEME=$SCHEME_NAME" >> "$GITHUB_ENV"
-          echo "Workspace: $WORKSPACE_PATH"
-          echo "Scheme: $SCHEME_NAME"
+          echo "✅ Workspace: $WORKSPACE_PATH"
+          echo "✅ Scheme: $SCHEME_NAME"
 
       - name: Install xcpretty
         run: gem install xcpretty --no-document
@@ -297,6 +294,8 @@ jobs:
           </dict>
           </plist>
           EOF
+          echo "✅ ExportOptions.plist generado:"
+          cat "$EXPORT_OPTIONS_PATH"
           echo "EXPORT_OPTIONS_PATH=$EXPORT_OPTIONS_PATH" >> "$GITHUB_ENV"
 
       - name: Resolve build version
@@ -314,6 +313,7 @@ jobs:
 
           echo "BUILD_NAME=$BUILD_NAME" >> "$GITHUB_ENV"
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          echo "✅ Version: $BUILD_NAME ($BUILD_NUMBER)"
 
       - name: Build Archive
         run: |
@@ -343,11 +343,20 @@ jobs:
           set -e
 
           if [[ "$XCODE_STATUS" -ne 0 ]]; then
-            echo "Archive failed. Errores relevantes:"
-            grep -nE "error:|ARCHIVE FAILED|CodeSign|No profiles for|Provisioning profile|requires a provisioning profile|No signing certificate" "$LOG_PATH" | tail -n 200 || true
+            echo ""
+            echo "========================================"
+            echo "ARCHIVE FAILED — ULTIMAS 150 LINEAS"
+            echo "========================================"
+            tail -n 150 "$LOG_PATH"
+            echo ""
+            echo "========================================"
+            echo "BUSQUEDA AMPLIA DE ERRORES"
+            echo "========================================"
+            grep -in "error\|fail\|invalid\|cannot\|missing\|codesign\|profile\|entitlement\|provisioning" "$LOG_PATH" | grep -v "^note:" | tail -n 80 || true
             exit "$XCODE_STATUS"
           fi
 
+          echo "✅ Archive generado: $ARCHIVE_PATH"
           echo "ARCHIVE_PATH=$ARCHIVE_PATH" >> "$GITHUB_ENV"
 
       - name: Export IPA

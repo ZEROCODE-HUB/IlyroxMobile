@@ -26,7 +26,7 @@
         ]
       },
       "entitlements": {
-        "aps-environment": "development",
+        "aps-environment": "production",
         "com.apple.security.application-groups": [
           "group.com.ilyrox.app.onesignal"
         ]
@@ -104,7 +104,7 @@
       [
         "onesignal-expo-plugin",
         {
-          "mode": "development"
+          "mode": "production"
         }
       ],
       "expo-video",
@@ -114,8 +114,7 @@
     ],
     "extra": {
       "eas": {
-        "build": {
-        },
+        "build": {},
         "projectId": "1cff47e7-484f-4918-a037-ec4fa89f7c6e"
       },
       "router": {}
