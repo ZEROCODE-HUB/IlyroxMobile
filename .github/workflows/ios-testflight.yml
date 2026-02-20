@@ -150,64 +150,87 @@ jobs:
           set -euo pipefail
 
           ruby <<'RUBY'
-          pbxproj_path = ENV['PBXPROJ']
-          profile_name = ENV['PROFILE_NAME'] || ''
-          profile_uuid = ENV['PROFILE_UUID'] || ''
+          pbxproj_path     = ENV['PBXPROJ']
+          profile_name     = ENV['PROFILE_NAME']           || ''
+          profile_uuid     = ENV['PROFILE_UUID']           || ''
           ext_profile_name = ENV['EXTENSION_PROFILE_NAME'] || ''
-          ext_profile_uuid = ENV['EXT_PROFILE_UUID'] || ''
-          team_id = ENV['APPLE_TEAM_ID'] || ''
+          ext_profile_uuid = ENV['EXT_PROFILE_UUID']       || ''
 
           content = File.read(pbxproj_path)
 
+          # 1. Force Manual signing everywhere
           content.gsub!(/CODE_SIGN_STYLE = Automatic/, 'CODE_SIGN_STYLE = Manual')
-          content.gsub!(/CODE_SIGN_IDENTITY = "iPhone Developer"/, 'CODE_SIGN_IDENTITY = "Apple Distribution"')
+
+          # 2. Normalize code sign identity
+          content.gsub!(/CODE_SIGN_IDENTITY = "iPhone Developer"/,    'CODE_SIGN_IDENTITY = "Apple Distribution"')
           content.gsub!(/CODE_SIGN_IDENTITY = "iPhone Distribution"/, 'CODE_SIGN_IDENTITY = "Apple Distribution"')
           content.gsub!(/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = ".*?"/, '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"')
 
-          lines = content.lines
+          # 3. Per-target PROVISIONING_PROFILE_SPECIFIER injection.
+          #
+          #    CRITICAL FIX: expo prebuild with Automatic signing does NOT write
+          #    PROVISIONING_PROFILE_SPECIFIER into the pbxproj. The previous script
+          #    only replaced existing values (.sub), so it was a no-op.
+          #    This version INJECTS the key when it is absent from the block.
+
+          lines  = content.lines
           result = []
           in_build_settings = false
-          brace_depth = 0
+          brace_depth       = 0
           current_bundle_id = nil
-          block_lines = []
+          block_lines       = []
 
-          lines.each_with_index do |line, idx|
+          lines.each do |line|
             if line =~ /buildSettings\s*=\s*\{/
               in_build_settings = true
-              brace_depth = 1
+              brace_depth       = 1
               current_bundle_id = nil
-              block_lines = [line]
+              block_lines       = [line]
               next
             end
 
             if in_build_settings
-              brace_depth += line.count('{') - line.count('}')
-              block_lines << line
+              brace_depth  += line.count('{') - line.count('}')
+              block_lines  << line
 
               if line =~ /PRODUCT_BUNDLE_IDENTIFIER\s*=\s*"?([^";]+)"?\s*;/
-                current_bundle_id = $1.strip.gsub('"', '')
+                current_bundle_id = $1.strip.delete('"')
               end
 
               if brace_depth <= 0
-                is_extension = current_bundle_id && current_bundle_id.include?('OneSignalNotificationServiceExtension')
-                target_profile = is_extension ? ext_profile_name : profile_name
-                target_uuid    = is_extension ? ext_profile_uuid  : profile_uuid
+                is_ext         = current_bundle_id&.include?('OneSignalNotificationServiceExtension')
+                target_profile = is_ext ? ext_profile_name : profile_name
+                target_uuid    = is_ext ? ext_profile_uuid  : profile_uuid
 
+                has_specifier = block_lines.any? { |l| l =~ /PROVISIONING_PROFILE_SPECIFIER/ }
+                has_profile   = block_lines.any? { |l| l =~ /PROVISIONING_PROFILE\s*=/ && l !~ /SPECIFIER/ }
+
+                # Replace values that already exist
                 patched_block = block_lines.map do |bl|
                   if bl =~ /PROVISIONING_PROFILE_SPECIFIER/
-                    bl.sub(/PROVISIONING_PROFILE_SPECIFIER = ".*?"/, "PROVISIONING_PROFILE_SPECIFIER = \"#{target_profile}\"")
-                      .sub(/PROVISIONING_PROFILE_SPECIFIER = ""/, "PROVISIONING_PROFILE_SPECIFIER = \"#{target_profile}\"")
-                  elsif bl =~ /PROVISIONING_PROFILE = /
-                    bl.sub(/PROVISIONING_PROFILE = ".*?"/, "PROVISIONING_PROFILE = \"#{target_uuid}\"")
+                    bl.sub(/PROVISIONING_PROFILE_SPECIFIER\s*=\s*"[^"]*"/, "PROVISIONING_PROFILE_SPECIFIER = \"#{target_profile}\"")
+                      .sub(/PROVISIONING_PROFILE_SPECIFIER\s*=\s*;/,       "PROVISIONING_PROFILE_SPECIFIER = \"#{target_profile}\";")
+                  elsif bl =~ /PROVISIONING_PROFILE\s*=/ && bl !~ /SPECIFIER/
+                    bl.sub(/PROVISIONING_PROFILE\s*=\s*"[^"]*"/, "PROVISIONING_PROFILE = \"#{target_uuid}\"")
                   else
                     bl
                   end
                 end
 
+                # INJECT missing keys just before the closing `};` of the block
+                closing_idx = patched_block.rindex { |l| l =~ /^\s*\};\s*$/ }
+                if closing_idx && !target_profile.empty?
+                  indent     = "\t\t\t\t"
+                  injections = []
+                  injections << "#{indent}PROVISIONING_PROFILE = \"#{target_uuid}\";\n"             unless has_profile
+                  injections << "#{indent}PROVISIONING_PROFILE_SPECIFIER = \"#{target_profile}\";\n" unless has_specifier
+                  patched_block.insert(closing_idx, *injections) unless injections.empty?
+                end
+
                 result.concat(patched_block)
                 in_build_settings = false
                 current_bundle_id = nil
-                block_lines = []
+                block_lines       = []
                 next
               end
 
@@ -224,7 +247,7 @@ jobs:
           RUBY
 
           echo "=== Signing settings después del patch ==="
-          grep -n "CODE_SIGN_STYLE\|CODE_SIGN_IDENTITY\|PROVISIONING_PROFILE_SPECIFIER\|PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ" | head -80
+          grep -n "CODE_SIGN_STYLE\|CODE_SIGN_IDENTITY\|PROVISIONING_PROFILE_SPECIFIER\|PROVISIONING_PROFILE\b\|PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ" | head -100
 
       - name: Resolve workspace and scheme
         run: |
