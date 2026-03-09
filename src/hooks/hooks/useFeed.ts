@@ -354,6 +354,7 @@ export function useFeed(options: UseFeedOptions = {}) {
                 tipo,
                 subtipo,
                 ciudad,
+                colonia,
                 municipio,
                 estado,
                 fotos,
@@ -363,6 +364,8 @@ export function useFeed(options: UseFeedOptions = {}) {
                 metros_cuadrados_construccion,
                 metros_cuadrados_terreno,
                 descripcion,
+                longitud,
+                latitud,
                 operaciones_propiedad!inner (
                   tipo_operacion,
                   precio,
@@ -482,7 +485,6 @@ export function useFeed(options: UseFeedOptions = {}) {
                 reelDetails: reel,
               };
             }
-
             // Propiedad
             if (item.tipo_contenido === "propiedad") {
               const property = propertiesMap.get(item.contenido_id);
@@ -508,6 +510,8 @@ export function useFeed(options: UseFeedOptions = {}) {
                   code: property.codigo_propiedad || undefined,
                   title: `${property.tipo} en ${property.ciudad}`,
                   description: property.descripcion,
+                  longitud: property.longitud,
+                  latitud: property.latitud,
                   price: operation?.precio || 0,
                   currency: (operation?.moneda || "MXN") as "USD" | "MXN",
                   createdAt: property.created_at,
@@ -517,7 +521,7 @@ export function useFeed(options: UseFeedOptions = {}) {
                     state: property.estado || "",
                     city: property.ciudad || "",
                     municipio: property.municipio || "",
-                    colony: "",
+                    colony: property.colonia || "",
                   },
                   images: property.fotos || [],
                   features: {
@@ -542,6 +546,7 @@ export function useFeed(options: UseFeedOptions = {}) {
                       ? "Publicada"
                       : "Rentada",
                   status: "Publicada" as const,
+                  colonia: property.colonia || "",
                 },
               };
             }
@@ -764,6 +769,7 @@ export function useFeedItem(feedItemId: string) {
             tipo,
             subtipo,
             ciudad,
+            colonia,
             municipio,
             estado,
             fotos,
@@ -773,6 +779,8 @@ export function useFeedItem(feedItemId: string) {
             metros_cuadrados_construccion,
             metros_cuadrados_terreno,
             descripcion,
+            longitud,
+            latitud,
             operaciones_propiedad!inner (
               tipo_operacion,
               precio,
@@ -852,6 +860,8 @@ export function useFeedItem(feedItemId: string) {
             code: contentData.codigo_propiedad || undefined,
             title: `${contentData.tipo} en ${contentData.ciudad}`,
             description: contentData.descripcion,
+            longitud: contentData.longitud,
+            latitud: contentData.latitud,
             price: operation?.precio || 0,
             currency: (operation?.moneda || "MXN") as "USD" | "MXN",
             createdAt: contentData.created_at,
@@ -861,7 +871,7 @@ export function useFeedItem(feedItemId: string) {
               state: contentData.estado || "",
               city: contentData.ciudad || "",
               municipio: contentData.municipio || "",
-              colony: "",
+              colony: contentData.colonia || "",
             },
             images: contentData.fotos || [],
             features: {
@@ -883,6 +893,7 @@ export function useFeedItem(feedItemId: string) {
             operation:
               operation?.tipo_operacion === "venta" ? "Publicada" : "Rentada",
             status: "Publicada",
+            colonia: contentData.colonia || "",
           } as any,
         };
       }

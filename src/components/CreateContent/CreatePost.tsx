@@ -18,6 +18,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
 import * as ImagePicker from "expo-image-picker";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { useAuth } from "../../context/AuthContext";
 import { COLORS } from "../../constants/colors";
@@ -46,6 +47,16 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  // Campos específicos de edición
+  const [fechaHora, setFechaHora] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
+  const [precioMin, setPrecioMin] = useState("");
+  const [precioMax, setPrecioMax] = useState("");
+  const [habitaciones, setHabitaciones] = useState("");
+  const [operacion, setOperacion] = useState("");
+
   const isEditing = !!post;
   const [isUploadingManual, setIsUploadingManual] = useState(false);
   const uploading = creatingPost || isUploadingManual;
@@ -70,6 +81,18 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
         if (data) {
           setContent(data.contenido);
           setImages(data.imagenes || []);
+
+          if (data.tipo === "openhouse" && data.fecha_hora) {
+            setFechaHora(new Date(data.fecha_hora));
+          }
+
+          if (data.tipo === "busqueda" && data.busquedas_json) {
+            const filtros = data.busquedas_json.filtros || {};
+            setPrecioMin(filtros.precio_min?.toString() || "");
+            setPrecioMax(filtros.precio_max?.toString() || "");
+            setHabitaciones(filtros.caracteristicas?.habitaciones?.toString() || "");
+            setOperacion(filtros.operacion || "");
+          }
         }
       } catch (err) {
         console.error("Error loading post:", err);
@@ -160,13 +183,39 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
 
       if (isEditing) {
         // ACTUALIZAR
+        let updatedData: any = {
+          contenido: content,
+          imagenes: uploadedImages.length > 0 ? uploadedImages : null,
+          updated_at: new Date(),
+        };
+
+        if (post?.tipo === "openhouse") {
+          updatedData.fecha_hora = fechaHora.toISOString();
+        }
+
+        if (post?.tipo === "busqueda") {
+          const currentJson = post.busquedas_json || {};
+          const currentFiltros = currentJson.filtros || {};
+          const currentCaracteristicas = currentFiltros.caracteristicas || {};
+
+          updatedData.busquedas_json = {
+            ...currentJson,
+            filtros: {
+              ...currentFiltros,
+              operacion: operacion || currentFiltros.operacion,
+              precio_min: precioMin ? Number(precioMin) : currentFiltros.precio_min,
+              precio_max: precioMax ? Number(precioMax) : currentFiltros.precio_max,
+              caracteristicas: {
+                ...currentCaracteristicas,
+                habitaciones: habitaciones ? Number(habitaciones) : currentCaracteristicas.habitaciones
+              }
+            }
+          };
+        }
+
         const { error } = await supabase
           .from("posts")
-          .update({
-            contenido: content,
-            imagenes: uploadedImages.length > 0 ? uploadedImages : null,
-            updated_at: new Date(),
-          })
+          .update(updatedData)
           .eq("id", post?.id);
 
         if (error) throw error;
@@ -233,6 +282,116 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
           />
         </View>
 
+        {isEditing && post?.tipo === "openhouse" && (
+          <View style={styles.card}>
+            <Text style={styles.label}>Fecha y Hora del Open House</Text>
+            
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+              <TouchableOpacity 
+                style={styles.dateButton} 
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
+                <Text style={styles.dateButtonText}>
+                  {fechaHora.toLocaleDateString("es-ES")}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.dateButton} 
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Ionicons name="time-outline" size={20} color={COLORS.primary} />
+                <Text style={styles.dateButtonText}>
+                  {fechaHora.toLocaleTimeString("es-ES", { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={fechaHora}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(false);
+                  if (selectedDate) {
+                    const newDate = new Date(fechaHora);
+                    newDate.setFullYear(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+                    setFechaHora(newDate);
+                  }
+                }}
+              />
+            )}
+
+            {showTimePicker && (
+              <DateTimePicker
+                value={fechaHora}
+                mode="time"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowTimePicker(false);
+                  if (selectedDate) {
+                    const newDate = new Date(fechaHora);
+                    newDate.setHours(selectedDate.getHours(), selectedDate.getMinutes());
+                    setFechaHora(newDate);
+                  }
+                }}
+              />
+            )}
+          </View>
+        )}
+
+        {isEditing && post?.tipo === "busqueda" && (
+          <View style={styles.card}>
+            <Text style={styles.label}>Parámetros de Búsqueda</Text>
+            
+            <View style={{ marginTop: 12, gap: 16 }}>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <AppInput
+                    label="Precio Mínimo"
+                    placeholder="Ej. 1000000"
+                    keyboardType="numeric"
+                    value={precioMin}
+                    onChangeText={setPrecioMin}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppInput
+                    label="Precio Máximo"
+                    placeholder="Ej. 5000000"
+                    keyboardType="numeric"
+                    value={precioMax}
+                    onChangeText={setPrecioMax}
+                  />
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <AppInput
+                    label="Habitaciones"
+                    placeholder="Ej. 3"
+                    keyboardType="numeric"
+                    value={habitaciones}
+                    onChangeText={setHabitaciones}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppInput
+                    label="Operación"
+                    placeholder="Venta / Renta"
+                    value={operacion}
+                    onChangeText={setOperacion}
+                  />
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {post?.tipo !== "busqueda" && post?.tipo !== "aniversario" && (
         <View style={styles.card}>
           <Text style={styles.label}>Imágenes (opcional)</Text>
           <Text style={styles.hint}>Máximo 5 imágenes</Text>
@@ -269,6 +428,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             )}
           </View>
         </View>
+        )}
       </ScrollView>
 
       {/* Botón Publicar */}
@@ -369,6 +529,23 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginBottom: 4,
     textTransform: "uppercase",
+  },
+  dateButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.background,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    gap: 8,
+  },
+  dateButtonText: {
+    fontSize: 14,
+    color: COLORS.textPrimary,
+    fontWeight: "500",
   },
   hint: {
     fontSize: 12,

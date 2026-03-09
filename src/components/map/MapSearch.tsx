@@ -287,7 +287,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           {filteredProperties.map((property) => {
             // La moneda ya está mapeada en property.currency desde AppContext
             const propertyCurrency = property.currency || "MXN";
-            
+
             return (
               <PropertyMapCard
                 key={property.id}

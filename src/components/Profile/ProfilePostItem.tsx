@@ -14,6 +14,7 @@ import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import { commonStyles } from "styles";
 import { RichText } from "../shared";
 import { SpecialPostCard } from "../Feed/SpecialPostCard";
+import PostCard from "../cards/PostCard";
 
 const { width } = Dimensions.get("window");
 // ProfilePostGrid used (width - 24) / 3
@@ -48,7 +49,7 @@ const ProfilePostItem: React.FC<ProfilePostItemProps> = React.memo(
     ].includes(cleanPostType);
 
     const menuOptions: MenuOption[] = [
-      ...(cleanPostType === "post"
+      ...(["post", "openhouse", "busqueda"].includes(cleanPostType)
         ? [
             {
               icon: "pencil-outline",
@@ -65,73 +66,68 @@ const ProfilePostItem: React.FC<ProfilePostItemProps> = React.memo(
       },
     ];
 
+    const feedItemProps = {
+      id: item.id,
+      type: "post" as const,
+      user: user || {
+        id: item.publicado_por,
+        name: "Usuario",
+        avatar: "",
+        role: "Cliente" as const,
+        isFollowing: false,
+      },
+      content: item.contenido || "",
+      images: item.imagenes || [],
+      likes: (item as any).likes_count || 0,
+      comments: (item as any).comentarios_count || 0,
+      timestamp: item.created_at,
+      postType: cleanPostType as any,
+      foto_perfil_usuario: item.foto_perfil,
+      fecha_hora: item.fecha_hora,
+      nombre_asesor: item.nombre_asesor,
+      ubicacion: item.ubicacion,
+      foto_propiedad: item.foto_propiedad,
+      antiguedad: item.antiguedad,
+      status: item.status,
+      postDetails: item,
+      busquedas_json: item.busquedas_json,
+    };
+
+    const SCALE = ITEM_SIZE / width;
+
     return (
       <TouchableOpacity
         style={styles.gridItem}
         onPress={() => onPress(item)}
         activeOpacity={0.8}
       >
-        {isSpecialPost ? (
-          <SpecialPostCard
-            item={{
-              id: item.id,
-              type: "post",
-              user: user || {
-                id: item.publicado_por,
-                name: "Usuario",
-                avatar: "",
-                role: "Cliente",
-                isFollowing: false,
-              },
-              content: item.contenido || "",
-              images: item.imagenes || [],
-              likes: (item as any).likes_count || 0,
-              comments: (item as any).comentarios_count || 0,
-              timestamp: item.created_at,
-              postType: cleanPostType as any,
-              foto_perfil: item.foto_perfil,
-              fecha_hora: item.fecha_hora,
-              nombre_asesor: item.nombre_asesor,
-              ubicacion: item.ubicacion,
-              foto_propiedad: item.foto_propiedad,
-              antiguedad: item.antiguedad,
-              status: item.status,
-              postDetails: item,
-              busquedas_json: item.busquedas_json,
-            }}
-            mode="grid"
-          />
-        ) : hasImages ? (
-          <>
-            <Image
-              source={{ uri: item.imagenes![0] }}
-              style={styles.gridImage}
-              contentFit="cover"
-              transition={0}
-              cachePolicy="memory-disk"
+        <View 
+          pointerEvents="none" 
+          style={{
+            width: width,
+            transformOrigin: "top left",
+            transform: [{ scale: SCALE }],
+            backgroundColor: COLORS.background,
+          }}
+        >
+          {isSpecialPost ? (
+            <SpecialPostCard
+              item={feedItemProps}
+              mode="preview"
             />
-            {hasMultipleImages && (
-              <View style={styles.multipleIndicator}>
-                <Ionicons name="copy-outline" size={16} color={COLORS.white} />
-              </View>
-            )}
-          </>
-        ) : (
-          <View
-            style={[
-              styles.textOnlyPost,
-              isSearchPost && commonStyles.cardDetail,
-            ]}
-          >
-            <RichText
-              style={[
-                styles.textOnlyContent,
-                isSearchPost && styles.searchPostText,
-              ]}
-              content={item.contenido}
-              iconSize={10}
-              iconColor={isSearchPost ? COLORS.primaryDark : COLORS.textPrimary}
+          ) : (
+            <PostCard
+              item={feedItemProps}
+              onClick={() => {}}
+              onCommentClick={() => {}}
+              currentUserId={user?.id}
             />
+          )}
+        </View>
+
+        {hasMultipleImages && !isSpecialPost && (
+          <View style={styles.multipleIndicator}>
+            <Ionicons name="copy-outline" size={16} color={COLORS.white} />
           </View>
         )}
 

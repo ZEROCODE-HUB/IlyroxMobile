@@ -23,6 +23,8 @@ import { useViewTracking } from "@/hooks/hooks";
 import usePropertyDetails from "@/hooks/hooks/usePropertyDetails";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Clipboard from "expo-clipboard";
+import { useToast } from "@/context/ToastContext";
 import { MapDetails } from "./MapDetails";
 import CreateProperty from "../CreateContent/CreateProperty";
 import { useChatInitiator } from "@/hooks/hooks/messaging/useChatInitiator";
@@ -35,6 +37,7 @@ interface PropertyDetailProps {
   navigation: any;
   onContact?: (ownerId: string, propertyId: string) => void;
   onRefresh?: () => void;
+  sinDatos?: boolean;
 }
 
 const PropertyDetail: React.FC<PropertyDetailProps> = ({
@@ -42,6 +45,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   navigation,
   onContact,
   onRefresh,
+  sinDatos,
 }) => {
   const { user } = useAuth();
   const { propertyDetails, loading, refetch } = usePropertyDetails(
@@ -58,6 +62,12 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   const { handleContact } = useChatInitiator();
 
   const [refreshing, setRefreshing] = useState(false);
+  const { showToast } = useToast();
+
+  const copyToClipboard = async (text: string) => {
+    await Clipboard.setStringAsync(text);
+    showToast("Código copiado al portapapeles", "success");
+  };
 
   const handleRefresh = async () => {
     try {
@@ -231,9 +241,30 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
         <View style={styles.content}>
           {/* Header Principal */}
           <View style={styles.headerInfo}>
-            <View style={styles.metaRow}>
+            <View style={styles.metaRowContent}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() =>
+                  copyToClipboard(
+                    propertyDetails.codigo_propiedad || propertyDetails.id,
+                  )
+                }
+                style={styles.idContainer}
+              >
+                <Text style={styles.metaText}>
+                  ID: {propertyDetails.codigo_propiedad || propertyDetails.id}
+                </Text>
+                <Ionicons
+                  name="copy-outline"
+                  size={14}
+                  color={COLORS.textSecondary}
+                  style={styles.copyIcon}
+                />
+              </TouchableOpacity>
+
+              <Text style={styles.metaSeparator}>•</Text>
+
               <Text style={styles.metaText}>
-                ID: {propertyDetails.codigo_propiedad || propertyDetails.id} •{" "}
                 {propertyDetails.created_at
                   ? new Date(propertyDetails.created_at).toLocaleDateString(
                       "es-MX",
@@ -501,7 +532,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           )}
 
           {/* Comisiones (Solo visible si comparte) */}
-          {operations.some((op: any) => op.comparte_comision) && (
+          {!sinDatos && operations.some((op: any) => op.comparte_comision) && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Esquema de Comisión</Text>
               {operations.map((op: any, i: number) =>
@@ -550,7 +581,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           </View>
 
           {/* Perfil del Publicador */}
-          {profile && (
+          {!sinDatos && profile && (
             <View style={styles.profileSection}>
               <Avatar
                 uri={profile.foto}
@@ -592,56 +623,60 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           )}
 
           {/* Botón de Acción Principal */}
-          {user?.id === profile?.id ? (
-            <TouchableOpacity
-              style={[styles.mainContactBtn, { backgroundColor: COLORS.info }]}
-              onPress={() => {
-                setLoadingEdit(true);
-                setShowModal(true);
-                setPropertyIdModal(propertyDetails.id);
-              }}
-            >
-              <Text style={styles.mainContactBtnText}>
-                {loadingEdit ? (
-                  <ActivityIndicator size="small" color={COLORS.primary} />
-                ) : (
-                  <>
-                    <Ionicons
-                      name="pencil"
-                      size={20}
-                      color={COLORS.white}
-                      style={{ marginRight: 8, gap: 8 }}
-                    />
-                    <Text style={{ marginLeft: 8 }}>Editar Propiedad</Text>
-                  </>
-                )}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={styles.mainContactBtn}
-              onPress={() => {
-                if (onContact) {
-                  onContact(profile.id, propertyDetails.id);
-                } else {
-                  handleContact(profile.id, propertyDetails.id, {
-                    id: profile.id,
-                    nombre: profile.nombre,
-                    foto: profile.foto,
-                    apellido_paterno: profile.apellido_paterno || "",
-                  });
-                }
-              }}
-            >
-              <Ionicons
-                name="call"
-                size={20}
-                color={COLORS.white}
-                style={{ marginRight: 8 }}
-              />
-              <Text style={styles.mainContactBtnText}>Contactar ahora</Text>
-            </TouchableOpacity>
-          )}
+          {!sinDatos &&
+            (user?.id === profile?.id ? (
+              <TouchableOpacity
+                style={[
+                  styles.mainContactBtn,
+                  { backgroundColor: COLORS.info },
+                ]}
+                onPress={() => {
+                  setLoadingEdit(true);
+                  setShowModal(true);
+                  setPropertyIdModal(propertyDetails.id);
+                }}
+              >
+                <Text style={styles.mainContactBtnText}>
+                  {loadingEdit ? (
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name="pencil"
+                        size={20}
+                        color={COLORS.white}
+                        style={{ marginRight: 8, gap: 8 }}
+                      />
+                      <Text style={{ marginLeft: 8 }}>Editar Propiedad</Text>
+                    </>
+                  )}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.mainContactBtn}
+                onPress={() => {
+                  if (onContact) {
+                    onContact(profile.id, propertyDetails.id);
+                  } else {
+                    handleContact(profile.id, propertyDetails.id, {
+                      id: profile.id,
+                      nombre: profile.nombre,
+                      foto: profile.foto,
+                      apellido_paterno: profile.apellido_paterno || "",
+                    });
+                  }
+                }}
+              >
+                <Ionicons
+                  name="call"
+                  size={20}
+                  color={COLORS.white}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={styles.mainContactBtnText}>Contactar ahora</Text>
+              </TouchableOpacity>
+            ))}
         </View>
       </ScrollView>
 
@@ -728,7 +763,7 @@ const styles = StyleSheet.create({
   },
   imageBadge: {
     position: "absolute",
-    bottom: 30,
+    bottom: 26,
     right: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -762,8 +797,22 @@ const styles = StyleSheet.create({
   headerInfo: {
     marginBottom: 16,
   },
-  metaRow: {
+  metaRowContent: {
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
+  },
+  idContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  copyIcon: {
+    marginLeft: 4,
+  },
+  metaSeparator: {
+    marginHorizontal: 8,
+    color: COLORS.textSecondary,
+    fontSize: 12,
   },
   metaText: {
     fontSize: 12,

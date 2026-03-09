@@ -40,7 +40,7 @@ const initialFormState: AuthFormState = {
   name: "",
   lastNamePaterno: "",
   lastNameMaterno: "",
-  phone: "",
+  phone: "+52 ",
   pais: "Mexico",
   estado: "",
   avatarUri: null,
@@ -81,6 +81,7 @@ export function useAuthForm() {
       lastNamePaterno,
       lastNameMaterno,
       email,
+      phone,
       password,
       confirmPassword,
       estado,
@@ -91,6 +92,7 @@ export function useAuthForm() {
       !lastNamePaterno ||
       !lastNameMaterno ||
       !email ||
+      !phone ||
       !password ||
       !estado
     ) {
@@ -261,8 +263,8 @@ export function useAuthForm() {
           nombre: formState.name,
           apellido_paterno: formState.lastNamePaterno,
           apellido_materno: formState.lastNameMaterno,
-          prefijo_celular: null,
-          celular: formState.phone || "",
+          prefijo_celular: formState.phone.includes(" ") ? formState.phone.split(" ")[0] : "+52",
+          celular: formState.phone.includes(" ") ? formState.phone.split(" ").slice(1).join(" ") : formState.phone,
           email: formState.email,
           rol: "cliente",
           pais: "Mexico",

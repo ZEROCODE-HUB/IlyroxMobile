@@ -35,6 +35,8 @@ interface AppContextType {
   setSelectedLocation: (
     location: { type: "ciudad" | "municipio" | "colonia"; name: string } | null,
   ) => void;
+  isGlobalMuted: boolean;
+  setIsGlobalMuted: (muted: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -51,6 +53,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     type: "ciudad" | "municipio" | "colonia";
     name: string;
   } | null>(null);
+  const [isGlobalMuted, setIsGlobalMuted] = useState(true);
 
   // Obtener autenticación desde AuthContext
   const { user, profile, loading } = useAuth();
@@ -195,6 +198,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     saveSearch,
     selectedLocation,
     setSelectedLocation,
+    isGlobalMuted,
+    setIsGlobalMuted,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

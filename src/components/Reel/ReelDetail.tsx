@@ -97,6 +97,12 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
 
   const SAFE_BOTTOM = Platform.OS === "ios" ? 34 : 20;
 
+  const [showFullCaption, setShowFullCaption] = useState(false);
+
+  const handleShowMore = () => {
+    setShowFullCaption(!showFullCaption);
+  };
+
   return (
     <Modal
       visible={true}
@@ -195,13 +201,29 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
                 <Text style={styles.userName}>
                   {item.user.name || item.user.nombre || "Usuario"}
                 </Text>
-                {item.content && (
-                  <Text style={styles.content} numberOfLines={3}>
-                    {item.content}
-                  </Text>
-                )}
               </View>
             </TouchableOpacity>
+            {item.content && (
+              <TouchableOpacity
+                style={styles.contentContainer}
+                onPress={handleShowMore}
+              >
+                <Text
+                  style={[
+                    styles.content,
+                    showFullCaption && styles.contentExpanded,
+                  ]}
+                  numberOfLines={showFullCaption ? undefined : 3}
+                >
+                  {item.content}
+                </Text>
+                {item.content.length > 100 && (
+                  <Text style={styles.seeMoreText}>
+                    {showFullCaption ? "Ver menos" : "Ver más"}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Actions - Botones verticales derecha (estilo TikTok) */}
@@ -341,6 +363,20 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 10,
     alignItems: "center",
+  },
+  contentContainer: {
+    marginTop: 10,
+  },
+  seeMoreText: {
+    color: COLORS.whiteTransparent50,
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 4,
+  },
+  contentExpanded: {
+    backgroundColor: COLORS.blackTransparent,
+    borderRadius: 10,
+    padding: 10,
   },
 });
 

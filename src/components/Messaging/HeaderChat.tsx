@@ -6,7 +6,8 @@ import { useTags } from "../../hooks/hooks/messaging";
 import { useState, useEffect } from "react";
 import TagsModal from "./TagsModal";
 import CreateAppointmentModal from "../Appointments/CreateAppointmentModal";
-import { ScreenWrapper } from "../../screens/ScreenWrapper";
+import { useRouter } from "expo-router";
+import { Image } from "expo-image";
 
 export default function HeaderChat({
   onBack,
@@ -24,6 +25,7 @@ export default function HeaderChat({
   const [conversationTags, setConversationTags] = useState<any[]>([]);
   const [showTagsModal, setShowTagsModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const router = useRouter();
 
   const {
     tags,
@@ -81,10 +83,22 @@ export default function HeaderChat({
   return (
     <View style={[styles.header]}>
       <TouchableOpacity onPress={onBack} style={styles.backButton}>
-        <Ionicons name="chevron-back-outline" size={28} color={COLORS.textPrimary} />
+        <Ionicons
+          name="chevron-back-outline"
+          size={28}
+          color={COLORS.textPrimary}
+        />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.headerUser}>
+      <TouchableOpacity
+        style={styles.headerUser}
+        onPress={() =>
+          router.push({
+            pathname: "/(stack)/user/[id]",
+            params: { id: otherUser.id },
+          })
+        }
+      >
         <Avatar uri={otherUser.foto} name={otherUser.nombre} size={40} />
         <View style={styles.headerInfo}>
           <Text style={styles.headerName} numberOfLines={1}>
@@ -134,10 +148,9 @@ export default function HeaderChat({
           onPress={() => setShowAppointmentModal(true)}
           style={styles.headerButton}
         >
-          <Ionicons
-            name="calendar-outline"
-            size={22}
-            color={COLORS.textSecondary}
+          <Image
+            source={require("@/assets/google-calendar-svg.svg")}
+            style={{ width: 30, height: 30 }}
           />
         </TouchableOpacity>
       )}

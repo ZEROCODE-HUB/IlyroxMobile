@@ -3,7 +3,7 @@
  * Componente de burbuja de mensaje individual
  */
 
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -11,10 +11,15 @@ import {
   Image,
   TouchableOpacity,
   Linking,
+  Pressable,
+  Modal,
+  Dimensions,
+  SafeAreaView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants";
 import { ViewImage } from "../modals/ViewImage";
+import VideoPlayer from "../shared/VideoPlayer";
 
 interface MessageBubbleProps {
   message: {
@@ -43,6 +48,15 @@ export default function MessageBubble({
     });
   };
 
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } =
+    Dimensions.get("window");
+
+  const isVideo = (url: string | null) => {
+    if (!url) return false;
+    return /\.(mp4|mov|avi|m4v|mkv|webm)$/i.test(url);
+  };
+
   const handleOpenFile = () => {
     if (message.archivo_url) {
       Linking.openURL(message.archivo_url);
@@ -69,8 +83,71 @@ export default function MessageBubble({
         {/* Mensaje con imagen */}
         {message.tipo === "imagen" && message.imagen_url && (
           <View style={styles.imageContainer}>
-            {/* <Image source={{ uri: message.imagen_url }} style={styles.image} /> */}
-            <ViewImage src={message.imagen_url} containerStyle={{ width: 'auto', height: 'auto' }} imageStyle={styles.image} />
+            {isVideo(message.imagen_url) ? (
+              <View style={styles.videoWrapper}>
+                <VideoPlayer
+                  videoUrl={message.imagen_url}
+                  isVisible={true}
+                  aspectRatio={1}
+                  contentFit="cover"
+                  showControls={false}
+                  showTimeline={false}
+                  showPlayIcon={false}
+                  autoPlay={false}
+                  isMuted={true}
+                />
+                <View style={styles.playOverlay}>
+                  <Ionicons
+                    name="play-circle"
+                    size={48}
+                    color="rgba(255,255,255,0.8)"
+                  />
+                </View>
+                <Pressable
+                  onPress={() => setIsFullScreen(true)}
+                  style={StyleSheet.absoluteFillObject}
+                />
+
+                <Modal
+                  visible={isFullScreen}
+                  transparent={true}
+                  animationType="fade"
+                  onRequestClose={() => setIsFullScreen(false)}
+                >
+                  <View style={styles.fullScreenContainer}>
+                    <SafeAreaView style={styles.safeArea}>
+                      <TouchableOpacity
+                        style={styles.closeButton}
+                        onPress={() => setIsFullScreen(false)}
+                      >
+                        <Ionicons
+                          name="close-circle"
+                          size={32}
+                          color={COLORS.white}
+                        />
+                      </TouchableOpacity>
+                    </SafeAreaView>
+                    <View style={styles.fullScreenVideoWrapper}>
+                      <VideoPlayer
+                        videoUrl={message.imagen_url}
+                        isVisible={isFullScreen}
+                        aspectRatio={SCREEN_WIDTH / SCREEN_HEIGHT}
+                        contentFit="contain"
+                        showControls={true}
+                        autoPlay={true}
+                        isMuted={false}
+                      />
+                    </View>
+                  </View>
+                </Modal>
+              </View>
+            ) : (
+              <ViewImage
+                src={message.imagen_url}
+                containerStyle={{ width: "auto", height: "auto" }}
+                imageStyle={styles.image}
+              />
+            )}
             {message.contenido && message.contenido !== "📷 Imagen" && (
               <Text
                 style={[
@@ -189,6 +266,40 @@ const styles = StyleSheet.create({
   imageContainer: {
     gap: 8,
   },
+  videoWrapper: {
+    width: 200,
+    height: 200,
+    borderRadius: 12,
+    overflow: "hidden",
+    position: "relative",
+  },
+  playOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullScreenContainer: {
+    flex: 1,
+    backgroundColor: COLORS.black,
+  },
+  fullScreenVideoWrapper: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  safeArea: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+  },
+  closeButton: {
+    alignSelf: "flex-end",
+    padding: 16,
+    marginTop: 16,
+  },
   image: {
     width: 200,
     height: 200,
@@ -223,5 +334,17 @@ const styles = StyleSheet.create({
   fileAction: {
     fontSize: 11,
     opacity: 0.7,
+  },
+  viewButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primary,
+  },
+  viewButtonText: {
+    color: COLORS.white,
+    fontSize: 12,
   },
 });

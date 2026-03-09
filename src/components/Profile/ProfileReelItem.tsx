@@ -43,13 +43,24 @@ const ProfileReelItem: React.FC<ProfileReelItemProps> = React.memo(
     );
 
     React.useEffect(() => {
+      let isMounted = true;
       if (!item.thumbnail_url && item.video_url && !thumbSource) {
-        VideoThumbnails.getThumbnailAsync(item.video_url, {
-          time: 1000,
-          quality: 0.3, // Lower quality for grid
-        })
-          .then(({ uri }) => setThumbSource(uri))
-          .catch((e) => console.warn("Thumbnail generation failed", e));
+        // Retrasar la generación para no bloquear el renderizado de la lista
+        const timeoutId = setTimeout(() => {
+          VideoThumbnails.getThumbnailAsync(item.video_url, {
+            time: 0, // El inicio del video es más rápido de extraer
+            quality: 0.1, // Baja calidad para el grid es suficiente y procesa más rápido
+          })
+            .then(({ uri }) => {
+              if (isMounted) setThumbSource(uri);
+            })
+            .catch((e) => console.warn("Thumbnail generation failed", e));
+        }, 500);
+
+        return () => {
+          isMounted = false;
+          clearTimeout(timeoutId);
+        };
       }
     }, [item.thumbnail_url, item.video_url]);
 
@@ -75,13 +86,15 @@ const ProfileReelItem: React.FC<ProfileReelItemProps> = React.memo(
       >
         <Image
           source={
-            thumbSource || {
-              uri: "https://placehold.co/400x600/202020/white?text=Cargando...",
-            }
+            thumbSource
+              ? { uri: thumbSource }
+              : {
+                  uri: "https://placehold.co/400x600/111111/111111/png", // Color oscuro limpio en vez de "Cargando"
+                }
           }
           style={styles.gridImage}
           contentFit="cover"
-          transition={0}
+          transition={200}
           cachePolicy="memory-disk"
         />
 

@@ -28,3 +28,10 @@ android
 build-prod.ps1
 build-debug-log.txt
 .env
+AuthKey_7TB389LN84.p8
+base64.txt
+check_profile.ps1
+extension.mobileprovision
+fixed_dist.p12
+ios_distribution.p12
+main.mobileprovision

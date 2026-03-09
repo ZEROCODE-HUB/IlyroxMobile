@@ -46,7 +46,7 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
 
   const { shareContent } = useShare();
 
-  const handleShare = async () => {
+  const handleShare = async (sinDatos: boolean = false) => {
     const success = await shareContent({
       feedItemId: feedItemId || propertyId,
       shareId: shareCode || propertyId,
@@ -54,6 +54,7 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
       title: propertyTitle,
       description: shareDescription || "Mira esta propiedad en ilyrox",
       imageUrl: shareImageUrl,
+      sinDatos,
     });
 
     if (success) {
@@ -168,7 +169,7 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
             <View style={styles.actions}>
               <TouchableOpacity
                 style={styles.actionBtn}
-                onPress={handleShare}
+                onPress={() => handleShare(false)}
                 activeOpacity={0.85}
               >
                 <Ionicons name="share-social" size={18} color={COLORS.primary} />
@@ -205,6 +206,14 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
             </View>
           ) : (
             <View style={styles.actions}>
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => handleShare(true)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="share-social" size={18} color={COLORS.primary} />
+                <Text style={styles.actionText}>Compartir propiedad</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.actionBtn,

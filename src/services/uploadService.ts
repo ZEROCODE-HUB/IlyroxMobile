@@ -112,20 +112,35 @@ export async function uploadVideo(
         }
       });
       xhr.addEventListener("load", () => {
-        if (xhr.status === 200) {
-          const response = JSON.parse(xhr.responseText);
-          resolve({
-            videoUrl: response.videoUrl || response.video_url,
-            thumbnailUrl: response.thumbnailUrl || undefined,
-          });
-        } else {
-          reject(new Error(`Upload failed: ${xhr.responseText}`));
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const response = JSON.parse(xhr.responseText);
+            resolve({
+              videoUrl: response.videoUrl || response.video_url,
+              thumbnailUrl: response.thumbnailUrl || undefined,
+            });
+          } else {
+            console.error(
+              `Upload failed with status ${xhr.status}: ${xhr.responseText}`,
+            );
+            reject(new Error(`Error al subir el video: ${xhr.status}`));
+          }
+        } catch (e: any) {
+          console.error("Error procesando respuesta del servidor:", e);
+          reject(new Error(`Error en el formato de respuesta: ${e.message}`));
         }
       });
       xhr.addEventListener("error", () => {
-        reject(new Error("Network Error"));
+        reject(new Error("Error de red al subir el video"));
+      });
+      xhr.addEventListener("timeout", () => {
+        reject(new Error("La subida tardó demasiado (Timeout)"));
+      });
+      xhr.addEventListener("abort", () => {
+        reject(new Error("La subida fue cancelada"));
       });
       xhr.open("POST", `${VIDEO_API_URL}/process-video`);
+      xhr.timeout = 120000; // 2 minutos para process-video (lento)
       xhr.send(formData);
     });
   } catch (error) {

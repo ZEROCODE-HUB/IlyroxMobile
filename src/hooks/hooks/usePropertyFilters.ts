@@ -4,7 +4,7 @@ import { useExchangeRate } from "./useExchangeRate";
 
 export interface PropertyFilters {
   tipoPropiedad: string;
-  subtipo: string;
+  subtipo: string[];
   precioMin: string;
   precioMax: string;
   moneda: "MXN" | "USD";
@@ -39,7 +39,7 @@ export const usePropertyFilters = (
 
   const [filters, setFilters] = useState<PropertyFilters>({
     tipoPropiedad: "",
-    subtipo: "",
+    subtipo: [],
     precioMin: "",
     precioMax: "",
     moneda: "MXN",
@@ -119,11 +119,11 @@ export const usePropertyFilters = (
           hasMatchingOperation = operaciones.some((op: any) => {
             const tipoOp = op?.tipo_operacion;
             if (!tipoOp) return false;
-            
+
             // Normalizar: convertir a minúsculas y traducir de inglés a español
             const lower = String(tipoOp).toLowerCase();
             let normalized = lower;
-            
+
             // Solo hacer replace si NO está ya en español
             if (lower === "sale") {
               normalized = "venta";
@@ -131,7 +131,7 @@ export const usePropertyFilters = (
               normalized = "renta";
             }
             // Si ya es "venta" o "renta", no hacer nada
-            
+
             return normalized === filters.operacion.toLowerCase();
           });
         } else {
@@ -142,8 +142,9 @@ export const usePropertyFilters = (
               .toLowerCase()
               .replace("sale", "venta")
               .replace("rent", "renta");
-            
-            hasMatchingOperation = pOperacion === filters.operacion.toLowerCase();
+
+            hasMatchingOperation =
+              pOperacion === filters.operacion.toLowerCase();
           }
         }
 
@@ -152,7 +153,6 @@ export const usePropertyFilters = (
           return false;
         }
       }
-
 
       // Filtro de estado
       if (filters.locationFilter.estado) {
@@ -230,11 +230,11 @@ export const usePropertyFilters = (
         return false;
       }
 
-      if (
-        filters.subtipo &&
-        anyP.subtipo?.toString().toLowerCase() !== filters.subtipo.toLowerCase()
-      ) {
-        return false;
+      if (filters.subtipo && filters.subtipo.length > 0) {
+        const propSubtipo = anyP.subtipo?.toString().toLowerCase();
+        if (!filters.subtipo.some((s) => s.toLowerCase() === propSubtipo)) {
+          return false;
+        }
       }
 
       // FILTRADO DE PRECIO CON CONVERSIÓN DE MONEDA
@@ -246,25 +246,23 @@ export const usePropertyFilters = (
       // El array en la BD se llama operaciones_propiedad
       const operaciones = anyP.operaciones_propiedad || anyP.operaciones;
 
-
-
       // Si hay operaciones múltiples y un filtro de operación, buscar el precio correcto
       if (filters.operacion && operaciones && Array.isArray(operaciones)) {
         const matchingOp = operaciones.find((op: any) => {
           const tipoOp = op?.tipo_operacion;
           if (!tipoOp) return false;
-          
+
           // Normalizar: convertir a minúsculas y traducir de inglés a español
           const lower = String(tipoOp).toLowerCase();
           let normalized = lower;
-          
+
           // Solo hacer replace si NO está ya en español
           if (lower === "sale") {
             normalized = "venta";
           } else if (lower === "rent") {
             normalized = "renta";
           }
-          
+
           return normalized === filters.operacion.toLowerCase();
         });
 
@@ -272,8 +270,6 @@ export const usePropertyFilters = (
         if (matchingOp) {
           pPrice = matchingOp.precio || 0;
           pCurrency = matchingOp.moneda || "MXN";
-          
-
         }
       }
 
@@ -283,18 +279,14 @@ export const usePropertyFilters = (
         finalPrice = convertPrice(
           pPrice,
           pCurrency as "MXN" | "USD",
-          filters.moneda
+          filters.moneda,
         );
-        
-
       }
 
       const minP = parseFloat(filters.precioMin.replace(/,/g, "")) || 0;
       const maxP = parseFloat(filters.precioMax.replace(/,/g, "")) || Infinity;
 
       const passesPrice = finalPrice >= minP && finalPrice <= maxP;
-      
-
 
       if (!passesPrice) {
         return false;
@@ -355,9 +347,7 @@ export const usePropertyFilters = (
 
       if (filters.m2ConstruccionMin) {
         const constr = p.features?.constructionSqft || 0;
-        if (
-          constr < parseFloat(filters.m2ConstruccionMin.replace(/,/g, ""))
-        )
+        if (constr < parseFloat(filters.m2ConstruccionMin.replace(/,/g, "")))
           return false;
       }
 
@@ -388,10 +378,12 @@ export const usePropertyFilters = (
     setFilters((prev) => ({ ...prev, locationFilter: location }));
   };
 
-  const clearFilters = (newLocationFilter?: PropertyFilters["locationFilter"]) => {
+  const clearFilters = (
+    newLocationFilter?: PropertyFilters["locationFilter"],
+  ) => {
     setFilters((prev) => ({
       tipoPropiedad: "",
-      subtipo: "",
+      subtipo: [],
       precioMin: "",
       precioMax: "",
       moneda: "MXN",
@@ -409,7 +401,7 @@ export const usePropertyFilters = (
 
   const hasActiveFilters =
     filters.tipoPropiedad !== "" ||
-    filters.subtipo !== "" ||
+    (filters.subtipo && filters.subtipo.length > 0) ||
     filters.precioMin !== "" ||
     filters.precioMax !== "" ||
     filters.habitaciones !== "" ||

@@ -39,21 +39,18 @@
         "applinks:*.ilyrox.app"
       ]
     },
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#FFFFFF",
+      "translucent": false
+    },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
-      "largeHeap": true,
-      "statusBar": {
-        "barStyle": "light-content",
-        "backgroundColor": "#FFFFFF",
-        "translucent": false,
-        "hidden": false
-      },
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/Icon-size.png",
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.ilyrox.app",
-      "launchMode": "singleTask",
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyB2SD7BpH4ms3h3N4FiXcTv1CZdlElhRGg"
@@ -110,7 +107,8 @@
       "expo-video",
       "@react-native-community/datetimepicker",
       "expo-web-browser",
-      "expo-router"
+      "expo-router",
+      "expo-font"
     ],
     "extra": {
       "eas": {

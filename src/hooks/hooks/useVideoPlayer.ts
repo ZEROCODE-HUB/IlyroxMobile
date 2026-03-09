@@ -22,8 +22,8 @@
  * });
  */
 
-import { useState, useCallback, useEffect } from 'react';
-import { useVideoPlayer as useExpoVideoPlayer } from 'expo-video';
+import { useState, useCallback, useEffect } from "react";
+import { useVideoPlayer as useExpoVideoPlayer } from "expo-video";
 
 export interface UseVideoPlayerOptions {
   videoSource: string;
@@ -40,8 +40,16 @@ export interface UseVideoPlayerReturn {
   togglePlayPause: () => void;
 }
 
-export const useVideoPlayer = (options: UseVideoPlayerOptions): UseVideoPlayerReturn => {
-  const { videoSource, isVisible, autoPlay = true, loop = true, muted = true } = options;
+export const useVideoPlayer = (
+  options: UseVideoPlayerOptions,
+): UseVideoPlayerReturn => {
+  const {
+    videoSource,
+    isVisible,
+    autoPlay = true,
+    loop = true,
+    muted = true,
+  } = options;
 
   const [isPlaying, setIsPlaying] = useState(autoPlay && isVisible);
   const [progress, setProgress] = useState(0);
@@ -76,6 +84,13 @@ export const useVideoPlayer = (options: UseVideoPlayerOptions): UseVideoPlayerRe
       setIsPlaying(true);
     }
   }, [isVisible, autoPlay, player]);
+
+  // Sincronizar estado de mute global
+  useEffect(() => {
+    if (player) {
+      player.muted = muted;
+    }
+  }, [muted, player]);
 
   // Monitorear el estado del player
   useEffect(() => {

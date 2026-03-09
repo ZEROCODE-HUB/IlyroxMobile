@@ -20,6 +20,7 @@ interface ShareOptions {
   title: string;
   description: string;
   imageUrl?: string;
+  sinDatos?: boolean;
 }
 
 export function useShare() {
@@ -27,12 +28,15 @@ export function useShare() {
    * Generar deep link para el contenido
    */
   const generateDeepLink = useCallback(
-    (feedItemId: string, type: string): string => {
+    (feedItemId: string, type: string, sinDatos?: boolean): string => {
       // URL base
       const baseUrl = "https://ilyrox.vercel.app/";
 
-      // Retornar formato: https://ilyrox.vercel.app/?type={type}&id={id}
-      return `${baseUrl}?type=${type}&id=${feedItemId}`;
+      let url = `${baseUrl}?type=${type}&id=${feedItemId}`;
+      if (sinDatos) {
+        url += `&sinDatos=true`;
+      }
+      return url;
     },
     [],
   );
@@ -42,11 +46,11 @@ export function useShare() {
    */
   const shareContent = useCallback(
     async (options: ShareOptions): Promise<boolean> => {
-      const { feedItemId, shareId, type, title, description, imageUrl } = options;
+      const { feedItemId, shareId, type, title, description, imageUrl, sinDatos } = options;
 
       try {
         // 1. Generar deep link
-        const deepLink = generateDeepLink(shareId || feedItemId, type);
+        const deepLink = generateDeepLink(shareId || feedItemId, type, sinDatos);
 
         // 2. Mensaje para compartir
         const message = `${title}\n\n${description}\n\n${deepLink}`;

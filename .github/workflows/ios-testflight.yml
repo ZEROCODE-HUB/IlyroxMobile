@@ -29,12 +29,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        if: ${{ hashFiles('package.json') != '' }}
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
 
       - name: Install JS dependencies
+        if: ${{ hashFiles('package.json') != '' }}
         run: npm ci
 
       - name: Setup signing assets
@@ -79,7 +81,6 @@ jobs:
             EXT_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$EXT_PROFILE_PLIST")
             EXT_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" "$EXT_PROFILE_PLIST")
             cp "$EXT_PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$EXT_PROFILE_UUID.mobileprovision"
-            echo "EXT_PROFILE_UUID=$EXT_PROFILE_UUID" >> "$GITHUB_ENV"
             echo "EXTENSION_PROFILE_NAME=$EXT_PROFILE_NAME" >> "$GITHUB_ENV"
           fi
 
@@ -91,151 +92,26 @@ jobs:
           security list-keychains -d user -s "$KEYCHAIN_PATH" "$HOME/Library/Keychains/login.keychain-db"
           security default-keychain -d user -s "$KEYCHAIN_PATH"
 
-          echo "=== Certificados instalados en keychain ==="
-          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
-
           {
             echo "PROFILE_NAME=$PROFILE_NAME"
             echo "KEYCHAIN_PATH=$KEYCHAIN_PATH"
           } >> "$GITHUB_ENV"
-
-      - name: Expo Prebuild
-        env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
-          EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY }}
-        run: |
-          npx expo prebuild --platform ios --non-interactive --clean
 
       - name: Install CocoaPods
         run: |
           cd ios
           pod install
 
-      - name: Patch entitlements - remove App Groups (temporal hasta configurar Apple Developer)
-        run: |
-          set -euo pipefail
-
-          patch_entitlements() {
-            local file="$1"
-            if [[ ! -f "$file" ]]; then
-              echo "⚠️  No encontrado: $file"
-              return
-            fi
-            echo "📄 Contenido antes del patch: $file"
-            cat "$file"
-            /usr/libexec/PlistBuddy -c "Delete :com.apple.security.application-groups" "$file" 2>/dev/null || true
-            echo "✅ App Groups removido de: $file"
-            echo "📄 Contenido después del patch:"
-            cat "$file"
-          }
-
-          patch_entitlements "ios/ilyrox/ilyrox.entitlements"
-          patch_entitlements "ios/OneSignalNotificationServiceExtension/OneSignalNotificationServiceExtension.entitlements"
-
       - name: Validate extension signing profile
         run: |
           set -euo pipefail
           if grep -q "OneSignalNotificationServiceExtension" ios/*.xcodeproj/project.pbxproj; then
             if [[ -z "${EXTENSION_PROFILE_NAME:-}" ]]; then
-              echo "❌ Se detecto OneSignalNotificationServiceExtension, pero falta secrets.IOS_EXTENSION_PROVISIONING_PROFILE_BASE64"
+              echo "Se detecto OneSignalNotificationServiceExtension, pero falta secrets.IOS_EXTENSION_PROVISIONING_PROFILE_BASE64"
+              echo "Crea un provisioning profile App Store para ${EXTENSION_BUNDLE_ID} y guardalo en ese secret."
               exit 1
             fi
           fi
-
-      - name: Configure manual signing per target
-        env:
-          PBXPROJ: ios/ilyrox.xcodeproj/project.pbxproj
-        run: |
-          set -euo pipefail
-
-          ruby <<'RUBY'
-          pbxproj_path     = ENV['PBXPROJ']
-          profile_name     = ENV['PROFILE_NAME']           || ''
-          profile_uuid     = ENV['PROFILE_UUID']           || ''
-          ext_profile_name = ENV['EXTENSION_PROFILE_NAME'] || ''
-          ext_profile_uuid = ENV['EXT_PROFILE_UUID']       || ''
-
-          content = File.read(pbxproj_path)
-
-          content.gsub!(/CODE_SIGN_STYLE = Automatic/, 'CODE_SIGN_STYLE = Manual')
-          content.gsub!(/CODE_SIGN_IDENTITY = "iPhone Developer"/,    'CODE_SIGN_IDENTITY = "Apple Distribution"')
-          content.gsub!(/CODE_SIGN_IDENTITY = "iPhone Distribution"/, 'CODE_SIGN_IDENTITY = "Apple Distribution"')
-          content.gsub!(/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = ".*?"/, '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"')
-
-          lines  = content.lines
-          result = []
-          in_build_settings = false
-          brace_depth       = 0
-          current_bundle_id = nil
-          block_lines       = []
-
-          lines.each do |line|
-            if line =~ /buildSettings\s*=\s*\{/
-              in_build_settings = true
-              brace_depth       = 1
-              current_bundle_id = nil
-              block_lines       = [line]
-              next
-            end
-
-            if in_build_settings
-              brace_depth  += line.count('{') - line.count('}')
-              block_lines  << line
-
-              if line =~ /PRODUCT_BUNDLE_IDENTIFIER\s*=\s*"?([^";]+)"?\s*;/
-                current_bundle_id = $1.strip.delete('"')
-              end
-
-              if brace_depth <= 0
-                is_ext         = current_bundle_id&.include?('OneSignalNotificationServiceExtension')
-                target_profile = is_ext ? ext_profile_name : profile_name
-                target_uuid    = is_ext ? ext_profile_uuid  : profile_uuid
-
-                has_specifier = block_lines.any? { |l| l =~ /PROVISIONING_PROFILE_SPECIFIER/ }
-                has_profile   = block_lines.any? { |l| l =~ /PROVISIONING_PROFILE\s*=/ && l !~ /SPECIFIER/ }
-
-                patched_block = block_lines.map do |bl|
-                  if bl =~ /PROVISIONING_PROFILE_SPECIFIER/
-                    bl.sub(/PROVISIONING_PROFILE_SPECIFIER\s*=\s*"[^"]*"/, "PROVISIONING_PROFILE_SPECIFIER = \"#{target_profile}\"")
-                      .sub(/PROVISIONING_PROFILE_SPECIFIER\s*=\s*;/,       "PROVISIONING_PROFILE_SPECIFIER = \"#{target_profile}\";")
-                  elsif bl =~ /PROVISIONING_PROFILE\s*=/ && bl !~ /SPECIFIER/
-                    bl.sub(/PROVISIONING_PROFILE\s*=\s*"[^"]*"/, "PROVISIONING_PROFILE = \"#{target_uuid}\"")
-                  else
-                    bl
-                  end
-                end
-
-                closing_idx = patched_block.rindex { |l| l =~ /^\s*\};\s*$/ }
-                if closing_idx && !target_profile.empty?
-                  indent     = "\t\t\t\t"
-                  injections = []
-                  injections << "#{indent}PROVISIONING_PROFILE = \"#{target_uuid}\";\n"             unless has_profile
-                  injections << "#{indent}PROVISIONING_PROFILE_SPECIFIER = \"#{target_profile}\";\n" unless has_specifier
-                  patched_block.insert(closing_idx, *injections) unless injections.empty?
-                end
-
-                result.concat(patched_block)
-                in_build_settings = false
-                current_bundle_id = nil
-                block_lines       = []
-                next
-              end
-
-              next
-            end
-
-            result << line
-          end
-
-          result.concat(block_lines) unless block_lines.empty?
-
-          File.write(pbxproj_path, result.join)
-          puts "✅ Manual signing configured per target in #{pbxproj_path}"
-          RUBY
-
-          echo "=== Signing settings después del patch ==="
-          grep -n "CODE_SIGN_STYLE\|CODE_SIGN_IDENTITY\|PROVISIONING_PROFILE_SPECIFIER\|PROVISIONING_PROFILE\b\|PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ" | head -100
 
       - name: Resolve workspace and scheme
         run: |
@@ -247,24 +123,29 @@ jobs:
           fi
 
           if [[ -z "$WORKSPACE_PATH" ]]; then
-            echo "❌ No se encontro .xcworkspace en ios/"
+            echo "No se encontro .xcworkspace en ios/"
             exit 1
           fi
 
           SCHEME_NAME="${XCODE_SCHEME:-}"
+          AVAILABLE_SCHEMES="$(xcodebuild -list -workspace "$WORKSPACE_PATH" | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | sed 's/^[[:space:]]*//')"
+          if [[ -n "$SCHEME_NAME" ]] && ! echo "$AVAILABLE_SCHEMES" | grep -Fxq "$SCHEME_NAME"; then
+            echo "XCODE_SCHEME='$SCHEME_NAME' no existe en $WORKSPACE_PATH. Se usara el primer scheme disponible."
+            SCHEME_NAME=""
+          fi
           if [[ -z "$SCHEME_NAME" ]]; then
-            SCHEME_NAME="$(xcodebuild -list -workspace "$WORKSPACE_PATH" | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | sed 's/^[[:space:]]*//' | head -n 1)"
+            SCHEME_NAME="$(echo "$AVAILABLE_SCHEMES" | head -n 1)"
           fi
 
           if [[ -z "$SCHEME_NAME" ]]; then
-            echo "❌ No se pudo resolver XCODE_SCHEME para $WORKSPACE_PATH"
+            echo "No se pudo resolver XCODE_SCHEME para $WORKSPACE_PATH"
             exit 1
           fi
 
           echo "XCODE_WORKSPACE=$WORKSPACE_PATH" >> "$GITHUB_ENV"
           echo "XCODE_SCHEME=$SCHEME_NAME" >> "$GITHUB_ENV"
-          echo "✅ Workspace: $WORKSPACE_PATH"
-          echo "✅ Scheme: $SCHEME_NAME"
+          echo "Workspace: $WORKSPACE_PATH"
+          echo "Scheme: $SCHEME_NAME"
 
       - name: Install xcpretty
         run: gem install xcpretty --no-document
@@ -273,35 +154,38 @@ jobs:
         run: |
           set -euo pipefail
           EXPORT_OPTIONS_PATH="$RUNNER_TEMP/ExportOptions.plist"
-          PYTHON_SCRIPT="$RUNNER_TEMP/gen_plist.py"
-
-          cat > "$PYTHON_SCRIPT" << 'PYEOF'
-import plistlib, os
-
-data = {
-    "method": "app-store",
-    "signingStyle": "manual",
-    "signingCertificate": "Apple Distribution",
-    "teamID": os.environ["APPLE_TEAM_ID"],
-    "uploadSymbols": True,
-    "compileBitcode": False,
-    "provisioningProfiles": {
-        os.environ["BUNDLE_ID"]: os.environ["PROFILE_NAME"],
-        **({os.environ["EXTENSION_BUNDLE_ID"]: os.environ["EXTENSION_PROFILE_NAME"]}
-           if os.environ.get("EXTENSION_PROFILE_NAME") else {})
-    }
-}
-
-with open(os.environ["RUNNER_TEMP"] + "/ExportOptions.plist", "wb") as f:
-    plistlib.dump(data, f)
-
-print("✅ ExportOptions.plist generado correctamente")
-PYEOF
-
-          python3 "$PYTHON_SCRIPT"
-
-          echo "=== Contenido del plist ==="
-          cat "$EXPORT_OPTIONS_PATH"
+          EXTENSION_PROFILE_XML=""
+          if [[ -n "${EXTENSION_PROFILE_NAME:-}" ]]; then
+            EXTENSION_PROFILE_XML="
+              <key>${EXTENSION_BUNDLE_ID}</key>
+              <string>${EXTENSION_PROFILE_NAME}</string>"
+          fi
+          cat > "$EXPORT_OPTIONS_PATH" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+            <key>teamID</key>
+            <string>${APPLE_TEAM_ID}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${PROFILE_NAME}</string>
+              ${EXTENSION_PROFILE_XML}
+            </dict>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>compileBitcode</key>
+            <false/>
+          </dict>
+          </plist>
+          EOF
           echo "EXPORT_OPTIONS_PATH=$EXPORT_OPTIONS_PATH" >> "$GITHUB_ENV"
 
       - name: Resolve build version
@@ -311,7 +195,10 @@ PYEOF
           BUILD_NUMBER="${{ github.event.inputs.build_number }}"
 
           if [[ -z "$BUILD_NAME" ]]; then
-            BUILD_NAME=$(node -e "const {execSync}=require('child_process'); try { const out=execSync('npx expo config --type public --json',{stdio:['ignore','pipe','ignore']}).toString(); const cfg=JSON.parse(out); console.log(cfg.version || '1.0.0'); } catch (e) { try { const a=require('./app.json'); console.log((a.expo && a.expo.version) || a.version || '1.0.0'); } catch (e2) { console.log('1.0.0'); } }")
+            BUILD_NAME="$(xcodebuild -showBuildSettings -workspace "$XCODE_WORKSPACE" -scheme "$XCODE_SCHEME" -configuration Release 2>/dev/null | awk -F ' = ' '/MARKETING_VERSION/ {print $2; exit}')"
+            if [[ -z "$BUILD_NAME" ]]; then
+              BUILD_NAME="1.0.0"
+            fi
           fi
           if [[ -z "$BUILD_NUMBER" ]]; then
             BUILD_NUMBER=$(date +%Y%m%d%H%M)
@@ -319,7 +206,6 @@ PYEOF
 
           echo "BUILD_NAME=$BUILD_NAME" >> "$GITHUB_ENV"
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
-          echo "✅ Version: $BUILD_NAME ($BUILD_NUMBER)"
 
       - name: Build Archive
         run: |
@@ -340,7 +226,6 @@ PYEOF
             OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH" \
             MARKETING_VERSION="$BUILD_NAME" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            NODE_BINARY="$(which node)" \
             COMPILER_INDEX_STORE_ENABLE=NO \
             SKIP_INSTALL=NO \
             ONLY_ACTIVE_ARCH=NO \
@@ -349,20 +234,11 @@ PYEOF
           set -e
 
           if [[ "$XCODE_STATUS" -ne 0 ]]; then
-            echo ""
-            echo "========================================"
-            echo "ARCHIVE FAILED — ULTIMAS 150 LINEAS"
-            echo "========================================"
-            tail -n 150 "$LOG_PATH"
-            echo ""
-            echo "========================================"
-            echo "BUSQUEDA AMPLIA DE ERRORES"
-            echo "========================================"
-            grep -in "error\|fail\|invalid\|cannot\|missing\|codesign\|profile\|entitlement\|provisioning" "$LOG_PATH" | grep -v "^note:" | tail -n 80 || true
+            echo "Archive failed. Errores relevantes:"
+            grep -nE "error:|ARCHIVE FAILED|CodeSign|No profiles for|Provisioning profile|requires a provisioning profile|No signing certificate" "$LOG_PATH" | tail -n 200 || true
             exit "$XCODE_STATUS"
           fi
 
-          echo "✅ Archive generado: $ARCHIVE_PATH"
           echo "ARCHIVE_PATH=$ARCHIVE_PATH" >> "$GITHUB_ENV"
 
       - name: Export IPA
@@ -386,6 +262,7 @@ PYEOF
           echo "✅ IPA generado: $IPA_PATH"
           echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
 
+      # ─── 10. Upload to TestFlight ──────────────────────────────────────────
       - name: Upload to TestFlight
         uses: apple-actions/upload-testflight-build@v3
         with:

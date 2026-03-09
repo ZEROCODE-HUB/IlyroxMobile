@@ -214,6 +214,9 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
               size={isVertical ? 26 : 20}
               color={reportIconColor}
             />
+            <Text style={[styles.iconCountText, { color: textColor }]}>
+              {reportCount}
+            </Text>
           </TouchableOpacity>
         )}
       </View>

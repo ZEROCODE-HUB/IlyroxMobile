@@ -262,8 +262,9 @@ export function useMessages(conversationId: string | null, userId?: string) {
   const sendMessage = async (
     text: string,
     metadata?: { destinatario_id: string; propiedad_id: string | null },
+    imageUri?: string,
   ) => {
-    if (!userId || !text.trim()) {
+    if (!userId || (!text.trim() && !imageUri)) {
       return false;
     }
 
@@ -290,12 +291,12 @@ export function useMessages(conversationId: string | null, userId?: string) {
         id: tempId,
         conversacion_id: finalConversationId,
         emisor_id: userId,
-        contenido: text.trim(),
-        tipo: "texto",
+        contenido: text.trim() || (imageUri ? "📷 Imagen" : ""),
+        tipo: imageUri ? "imagen" : "texto",
         leido: false,
         fecha_leido: null,
         created_at: new Date().toISOString(),
-        imagen_url: null,
+        imagen_url: imageUri || null,
         archivo_url: null,
         archivo_nombre: null,
         propiedad_id: null,
@@ -305,12 +306,19 @@ export function useMessages(conversationId: string | null, userId?: string) {
         setMessages((prev) => [...prev, tempMessage]);
       }
 
+      let uploadedUrl: string | null = null;
+      if (imageUri) {
+        uploadedUrl = await uploadFile(imageUri, "images");
+        if (!uploadedUrl) throw new Error("Failed to upload image");
+      }
+
       // 3. Insertar en Supabase
       const messageData: any = {
         conversacion_id: finalConversationId,
         emisor_id: userId,
-        contenido: text.trim(),
-        tipo: "texto",
+        contenido: text.trim() || (imageUri ? "📷 Imagen" : ""),
+        tipo: imageUri ? "imagen" : "texto",
+        imagen_url: uploadedUrl || null,
       };
 
       if (metadata) {
@@ -342,7 +350,8 @@ export function useMessages(conversationId: string | null, userId?: string) {
         await supabase
           .from("conversaciones")
           .update({
-            ultimo_mensaje_preview: text.trim().substring(0, 100),
+            ultimo_mensaje_preview:
+              text.trim().substring(0, 100) || "📷 Imagen",
             ultimo_mensaje_en: new Date().toISOString(),
           })
           .eq("id", finalConversationId);
@@ -357,7 +366,11 @@ export function useMessages(conversationId: string | null, userId?: string) {
         // Mostrar alerta
         setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
         // Mostrar alerta
-        showModal({ title: "Error", message: "No se pudo enviar el mensaje.", confirmText: "OK" });
+        showModal({
+          title: "Error",
+          message: "No se pudo enviar el mensaje.",
+          confirmText: "OK",
+        });
         setError(err.message);
       }
       return false;
@@ -455,7 +468,11 @@ export function useMessages(conversationId: string | null, userId?: string) {
       console.error("Error sending image:", err);
       if (isMountedRef.current) {
         setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-        showModal({ title: "Error", message: "No se pudo enviar la imagen.", confirmText: "OK" });
+        showModal({
+          title: "Error",
+          message: "No se pudo enviar la imagen.",
+          confirmText: "OK",
+        });
         setError(err.message);
       }
       return false;
@@ -555,7 +572,11 @@ export function useMessages(conversationId: string | null, userId?: string) {
       console.error("Error sending file:", err);
       if (isMountedRef.current) {
         setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-        showModal({ title: "Error", message: "No se pudo enviar el archivo.", confirmText: "OK" });
+        showModal({
+          title: "Error",
+          message: "No se pudo enviar el archivo.",
+          confirmText: "OK",
+        });
         setError(err.message);
       }
       return false;
@@ -667,7 +688,11 @@ export function useMessages(conversationId: string | null, userId?: string) {
       console.error("Error sending property:", err);
       if (isMountedRef.current) {
         setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-        showModal({ title: "Error", message: "No se pudo compartir la propiedad.", confirmText: "OK" });
+        showModal({
+          title: "Error",
+          message: "No se pudo compartir la propiedad.",
+          confirmText: "OK",
+        });
         setError(err.message);
       }
       return false;
@@ -827,7 +852,6 @@ export function useMessages(conversationId: string | null, userId?: string) {
           if (newMessage.conversacion_id !== convId) return;
 
           console.log("📨 New message received via Realtime");
-
 
           // Intentar cargar mensaje completo con relaciones
           // NOTA: mensajes no tiene relación directa con propiedades,

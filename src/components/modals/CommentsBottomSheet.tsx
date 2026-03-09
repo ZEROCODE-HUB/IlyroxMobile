@@ -135,6 +135,13 @@ const CommentItem = React.memo<CommentItemProps>(
                 {!!reply.text && (
                   <Text style={styles.commentText}>{reply.text}</Text>
                 )}
+                {!!reply.imageUrl && (
+                  <ViewImage
+                    src={reply.imageUrl}
+                    containerStyle={styles.commentImageContainer}
+                    imageStyle={styles.commentImage}
+                  />
+                )}
               </View>
             </View>
           </View>
@@ -160,7 +167,6 @@ export default function CommentsBottomSheet({
 
   // State
   const [replyTo, setReplyTo] = useState<string | null>(null);
-  const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
 
   // Refs
   const inputRef = useRef<TextInput>(null);
@@ -213,24 +219,13 @@ export default function CommentsBottomSheet({
     onClose();
   }, [onClose]);
 
-  const handleSendText = useCallback(
-    async (text: string) => {
-      const success = await addComment(text, undefined, replyTo || undefined);
-
-      if (success) {
-        setReplyTo(null);
-        setTimeout(
-          () => flatListRef.current?.scrollToEnd({ animated: true }),
-          100,
-        );
-      }
-    },
-    [replyTo, addComment],
-  );
-
-  const handleSendImage = useCallback(
-    async (uri: string) => {
-      const success = await addComment(undefined, uri, replyTo || undefined);
+  const handleSendCombined = useCallback(
+    async (text?: string, imageUri?: string) => {
+      const success = await addComment(
+        text || undefined,
+        imageUri || undefined,
+        replyTo || undefined,
+      );
 
       if (success) {
         setReplyTo(null);
@@ -245,11 +240,6 @@ export default function CommentsBottomSheet({
 
   const handleLikeComment = useCallback(
     (commentId: string) => {
-      setLikedComments((prev) => {
-        const next = new Set(prev);
-        next.has(commentId) ? next.delete(commentId) : next.add(commentId);
-        return next;
-      });
       toggleCommentLike(commentId);
     },
     [toggleCommentLike],
@@ -264,12 +254,12 @@ export default function CommentsBottomSheet({
       <CommentItem
         comment={item}
         replies={comments.filter((c) => c.parentId === item.id)}
-        isLiked={likedComments.has(item.id)}
+        isLiked={!!item.isLiked}
         onLike={() => handleLikeComment(item.id)}
         onReply={() => setReplyTo(item.id)}
       />
     ),
-    [comments, likedComments, handleLikeComment],
+    [comments, handleLikeComment],
   );
 
   const ListEmptyComponent = useMemo(() => {
@@ -378,10 +368,9 @@ export default function CommentsBottomSheet({
               <View style={{ marginBottom: 30 }}>
                 <MessageInput
                   ref={inputRef}
-                  onSendText={handleSendText}
-                  onSendImage={handleSendImage}
+                  onSendCombined={handleSendCombined}
                   sending={posting}
-                  // onFocusChange logic internal to MessageInput for padding
+                  mediaType="Images"
                 />
               </View>
             </KeyboardAvoidingView>
@@ -512,6 +501,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+
   commentActions: {
     flexDirection: "row",
     gap: 16,

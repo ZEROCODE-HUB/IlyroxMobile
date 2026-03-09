@@ -63,6 +63,10 @@ export function useComments({
           id,
           nombre,
           foto
+        ),
+        likes_comentarios (
+          id,
+          usuario_id
         )
       `,
       )
@@ -88,6 +92,7 @@ export function useComments({
         timestamp: formatTimestamp(c.created_at),
         imageUrl: c.imagenes?.[0],
         parentId: c.parent_comentario_id,
+        isLiked: c.likes_comentarios?.some((l: any) => l.usuario_id === userId),
       };
     });
   };
@@ -175,7 +180,7 @@ export function useComments({
     // Optimistic Update
     onMutate: async ({ text, imageUri, parentCommentId }) => {
       await queryClient.cancelQueries({ queryKey });
-      const previousComments = queryClient.getQueryData(queryKey);
+      const previousComments = queryClient.getQueryData<Comment[]>(queryKey);
 
       // Crear comentario temporal con ID único
       const tempComment: Comment = {
@@ -192,6 +197,7 @@ export function useComments({
         timestamp: "Enviando...", // ⬅️ Indicador visual
         imageUrl: imageUri, // Mostrar imagen local temporalmente
         parentId: parentCommentId,
+        isLiked: false,
       };
 
       // Agregar a la lista optimísticamente
@@ -234,6 +240,7 @@ export function useComments({
           timestamp: "Ahora",
           imageUrl: data.imagenes?.[0],
           parentId: data.parent_comentario_id,
+          isLiked: false,
         };
 
         return [...filtered, realComment];
@@ -318,6 +325,31 @@ export function useComments({
 
         return { action: "like" as const };
       }
+    },
+    onMutate: async (commentId) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previousComments = queryClient.getQueryData<Comment[]>(queryKey);
+
+      if (previousComments) {
+        queryClient.setQueryData<Comment[]>(
+          queryKey,
+          previousComments.map((c) =>
+            c.id === commentId ? { ...c, isLiked: !c.isLiked } : c,
+          ),
+        );
+      }
+
+      return { previousComments };
+    },
+    onError: (err, commentId, context: any) => {
+      if (context?.previousComments) {
+        queryClient.setQueryData(queryKey, context.previousComments);
+      }
+      showToast("Error al procesar el like", "error");
+    },
+    onSettled: () => {
+      // Opcional: refetch para asegurar sincronización, pero el optimistic ya lo hace visual
+      // queryClient.invalidateQueries({ queryKey });
     },
   });
 

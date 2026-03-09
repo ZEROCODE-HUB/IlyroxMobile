@@ -15,6 +15,7 @@
       }
     },
     "production": {
+      "credentialsSource": "local",
       "autoIncrement": true,
       "android": {
         "buildType": "apk"
@@ -29,6 +30,14 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6756507569",
+        "appleTeamId": "9BWTN3CAXU",
+        "ascApiKeyPath": "./AuthKey_7TB389LN84.p8",
+        "ascApiKeyIssuerId": "05ec12f7-b988-4093-8849-a3ed039d8705",
+        "ascApiKeyId": "7TB389LN84"
+      }
+    }
   }
 }

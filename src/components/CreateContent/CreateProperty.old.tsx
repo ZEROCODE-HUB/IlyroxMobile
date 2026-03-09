@@ -1563,7 +1563,7 @@ export default function CreateProperty({
                 visible={showAntiguedadModal}
                 onClose={() => setShowAntiguedadModal(false)}
                 onSelect={(val) => {
-                  if (val === "Más de 50") {
+                  if (val === "Más") {
                     openNumberInput("Antigüedad (años)", (customVal) =>
                       setAntiguedad(customVal),
                     );
@@ -1574,11 +1574,14 @@ export default function CreateProperty({
                 title="Antigüedad"
                 options={[
                   "0 (Nueva)",
-                  "1-5",
-                  "6-10",
-                  "11-20",
-                  "21-50",
-                  "Más de 50",
+                  "1",
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "10",
+                  "20",
+                  "Más",
                 ]}
                 currentValue={antiguedad}
               />

@@ -116,14 +116,25 @@ export const OPCIONES_SI_NO = ["Sí", "No"] as const;
 /**
  * Verifica si el subtipo es un terreno
  */
-export const esTerreno = (subtipo: string): boolean => {
+export const esTerreno = (subtipo: string | string[]): boolean => {
+  if (!subtipo) return false;
+  if (Array.isArray(subtipo)) {
+    return (
+      subtipo.length > 0 &&
+      subtipo.every((s) => s.toLowerCase().includes("terreno"))
+    );
+  }
   return subtipo.toLowerCase().includes("terreno");
 };
 
 /**
  * Verifica si el subtipo es un departamento
  */
-export const esDepartamento = (subtipo: string): boolean => {
+export const esDepartamento = (subtipo: string | string[]): boolean => {
+  if (!subtipo) return false;
+  if (Array.isArray(subtipo)) {
+    return subtipo.length > 0 && subtipo.every((s) => s === "Departamento");
+  }
   return subtipo === "Departamento";
 };
 
@@ -146,7 +157,7 @@ export const getLabelRecamaras = (tipoPrincipal: TipoPrincipal): string => {
 /**
  * Define qué campos mostrar según el subtipo
  */
-export const getCamposVisibles = (subtipo: string) => {
+export const getCamposVisibles = (subtipo: string | string[]) => {
   const isTerreno = esTerreno(subtipo);
   const isDepartamento = esDepartamento(subtipo);
 

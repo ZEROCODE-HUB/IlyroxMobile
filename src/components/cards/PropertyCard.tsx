@@ -4,7 +4,13 @@
  */
 
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Pressable,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
@@ -22,6 +28,7 @@ import { Bath } from "lucide-react-native";
 import { useUserRecommendations } from "@/hooks/hooks/useUserRecommendations";
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
 import { useChatInitiator } from "@/hooks/hooks/messaging/useChatInitiator";
+import { MapModal } from "../shared/MapModal";
 
 interface PropertyCardProps {
   item: FeedItem;
@@ -56,10 +63,13 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   });
 
   const property = item.propertyDetails!;
+
   const images = property.images || [];
 
   const navigation = useNavigation<any>();
   const { handleContact } = useChatInitiator();
+
+  const [showMap, setShowMap] = React.useState(false);
 
   const handleContactPress = () => {
     if (!userId) return;
@@ -92,6 +102,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     setShowRecommendedModal(true);
     fetchRecommendations();
   };
+  const location = `${property.colonia ? property.colonia + ", " : ""}${property.location.municipio ? property.location.municipio + ", " : ""}${property.location.state ? property.location.state : ""}`;
 
   return (
     <TouchableOpacity
@@ -201,12 +212,13 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           <Text style={styles.priceText}>
             ${property.price.toLocaleString()} {property.currency}
           </Text>
-          <View style={styles.locationInline}>
+          <Pressable
+            style={styles.locationInline}
+            onPress={() => setShowMap(true)}
+          >
             <Ionicons name="location" size={12} color={COLORS.textSecondary} />
-            <Text style={styles.locationText}>
-              {property.location.city}, {property.location.state}
-            </Text>
-          </View>
+            <Text style={styles.locationText}>{location}</Text>
+          </Pressable>
         </View>
 
         {/* Contenedor de Fila Principal */}
@@ -280,6 +292,12 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           </View>
         )}
       </View>
+
+      <MapModal
+        visible={showMap}
+        onClose={() => setShowMap(false)}
+        property={property}
+      />
 
       {/* Modal de reporte */}
       <ReportModal

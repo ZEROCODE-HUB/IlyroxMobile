@@ -43,7 +43,6 @@ interface AppointmentCardProps {
   activeTab?: string;
   onPropertyPress?: (id: string) => void;
   onUserPress?: (id: string) => void;
-
 }
 
 import { buildGoogleCalendarUrl } from "./Appointments/calendarUtils";
@@ -129,10 +128,8 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
                     }}
                   >
                     <Image
-                      source={{
-                        uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Google_Calendar_icon_%282020%29.svg/1024px-Google_Calendar_icon_%282020%29.svg.png",
-                      }}
-                      style={{ width: 18, height: 18 }}
+                      source={require("../assets/google-calendar-svg.svg")}
+                      style={{ width: 25, height: 25 }}
                     />
                   </TouchableOpacity>
                 )}
@@ -142,7 +139,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
                 >
                   <Ionicons
                     name="chatbubble-outline"
-                    size={16}
+                    size={22}
                     color={COLORS.textTertiary}
                   />
                 </TouchableOpacity>
@@ -307,7 +304,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    padding: 6,
+    padding: 4,
     backgroundColor: COLORS.background,
     borderRadius: 20,
   },

@@ -17,8 +17,6 @@ import {
   RichText,
 } from "../shared";
 import ActionButtons from "../ActionButtons";
-import { Ionicons } from "@expo/vector-icons";
-// import { supabase } from "../../lib/supabase"; // Removed direct usage
 
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
 import { useFeedInteractions, useViewTracking } from "@/hooks/hooks";
@@ -79,6 +77,8 @@ const PostCard: React.FC<PostCardProps> = ({
       : `Recomendado por ${positiveRecommendations} usuarios`;
   const [showRecommendedModal, setShowRecommendedModal] = React.useState(false);
 
+  const [showFullCaption, setShowFullCaption] = React.useState(false);
+
   const { recommendedList, loadingRecommended, fetchRecommendations } =
     useUserRecommendations(item.user.id);
 
@@ -87,135 +87,154 @@ const PostCard: React.FC<PostCardProps> = ({
     fetchRecommendations();
   };
 
+  const handleSeeMore = () => {
+    setShowFullCaption(!showFullCaption);
+  };
+
   return (
-    <TouchableOpacity
-      activeOpacity={0.95}
-      style={commonStyles.card}
-      onPress={onClick}
-    >
-      <UserHeader
-        user={item.user}
-        timestamp={item.timestamp}
-        onUserClick={onUserClick}
-        showOptions={showOptions}
-        setShowOptions={setShowOptions}
-        onReport={() => setShowReportModal(true)}
-        totalRatings={item.user.totalRatings}
-        showRecommendedPreview={false}
-      />
-      {positiveRecommendations > 0 && (
-        <TouchableOpacity
-          style={styles.recommendedRow}
-          onPress={openRecommendedModal}
-          activeOpacity={0.85}
-        >
-          <View style={styles.recommendedAvatars}>
-            {recommendedByPreview.slice(0, 2).map((u, idx) => (
-              <View
-                key={`${u.id}-${idx}`}
-                style={[
-                  styles.recommendedAvatarWrapper,
-                  idx > 0 && styles.recommendedAvatarOverlap,
-                ]}
-              >
-                <Avatar
-                  uri={u.avatar || undefined}
-                  name={u.name}
-                  size={18}
-                  style={{ borderWidth: 1, borderColor: COLORS.white }}
-                />
-              </View>
-            ))}
-          </View>
-          <Text style={styles.recommendedText} numberOfLines={1}>
-            {recommendedText}
-          </Text>
-        </TouchableOpacity>
-      )}
-      {/* Imágenes o Contenido de Texto */}
-      <View style={styles.contentContainer}>
-        {isSpecialPost ? (
-          <SpecialPostCard item={item} mode="preview" />
-        ) : !hasImages ? (
-          <View
-            style={[
-              styles.textPostContainer,
-              isShortContent && styles.textPostGradient,
-              isSearchPost && commonStyles.cardDetail,
-            ]}
-          >
-            <RichText
-              style={[
-                isShortContent ? styles.textPostLarge : styles.textPostNormal,
-                isSearchPost && commonStyles.textDetail,
-                isOpenHouse && commonStyles.textDetail,
-                isAniversary && commonStyles.textDetail,
-                isSold && commonStyles.textDetail,
-              ]}
-              content={item.content}
-              iconSize={isSearchPost ? 18 : 16}
-              iconColor={isSearchPost ? COLORS.primaryDark : COLORS.textPrimary}
-            />
-          </View>
-        ) : (
-          <ImageGallery
-            images={images}
-            aspectRatio={DIMENSIONS.POST_ASPECT_RATIO}
-            showDots={true}
-            showImageCount={false}
-          />
-        )}
-      </View>
-
-      {/* Botones de acción - Estilo Instagram */}
-      <View style={styles.actionsContainer}>
-        <ActionButtons
-          feedItemId={item.id}
-          feedItemType="post"
-          initialLikes={item.likes}
-          comments={item.comments}
-          userId={currentUserId}
-          onCommentClick={() => {
-            trackInteraction("comentario");
-            onCommentClick();
-          }}
-          onTrackInteraction={trackInteraction}
-          shareTitle={`Post de ${item.user.nombre || item.user.name}`}
-          shareDescription={item.content.substring(0, 100)}
-          shareImageUrl={hasImages ? images[0] : undefined}
-          orientation="horizontal"
-          authorId={item.user.id}
-          contentId={item.postDetails?.id}
+    <View style={commonStyles.card}>
+      <TouchableOpacity
+        activeOpacity={0.95}
+        style={styles.contentCard}
+        onPress={onClick}
+      >
+        <UserHeader
+          user={item.user}
+          timestamp={item.timestamp}
+          onUserClick={onUserClick}
+          showOptions={showOptions}
+          setShowOptions={setShowOptions}
+          onReport={() => setShowReportModal(true)}
+          totalRatings={item.user.totalRatings}
+          showRecommendedPreview={false}
         />
-      </View>
+        {positiveRecommendations > 0 && (
+          <TouchableOpacity
+            style={styles.recommendedRow}
+            onPress={openRecommendedModal}
+            activeOpacity={0.85}
+          >
+            <View style={styles.recommendedAvatars}>
+              {recommendedByPreview.slice(0, 2).map((u, idx) => (
+                <View
+                  key={`${u.id}-${idx}`}
+                  style={[
+                    styles.recommendedAvatarWrapper,
+                    idx > 0 && styles.recommendedAvatarOverlap,
+                  ]}
+                >
+                  <Avatar
+                    uri={u.avatar || undefined}
+                    name={u.name}
+                    size={18}
+                    style={{ borderWidth: 1, borderColor: COLORS.white }}
+                  />
+                </View>
+              ))}
+            </View>
+            <Text style={styles.recommendedText} numberOfLines={1}>
+              {recommendedText}
+            </Text>
+          </TouchableOpacity>
+        )}
+        {/* Imágenes o Contenido de Texto */}
+        <View style={styles.contentContainer}>
+          {isSpecialPost ? (
+            <SpecialPostCard item={item} mode="preview" />
+          ) : !hasImages ? (
+            <View
+              style={[
+                styles.textPostContainer,
+                isShortContent && styles.textPostGradient,
+                isSearchPost && commonStyles.cardDetail,
+              ]}
+            >
+              <RichText
+                style={[
+                  isShortContent ? styles.textPostLarge : styles.textPostNormal,
+                  isSearchPost && commonStyles.textDetail,
+                  isOpenHouse && commonStyles.textDetail,
+                  isAniversary && commonStyles.textDetail,
+                  isSold && commonStyles.textDetail,
+                ]}
+                content={item.content}
+                iconSize={isSearchPost ? 18 : 16}
+                iconColor={
+                  isSearchPost ? COLORS.primaryDark : COLORS.textPrimary
+                }
+              />
+            </View>
+          ) : (
+            <ImageGallery
+              images={images}
+              aspectRatio={DIMENSIONS.POST_ASPECT_RATIO}
+              showDots={true}
+              showImageCount={false}
+            />
+          )}
+        </View>
 
-      {/* Descripción del post (solo si tiene imágenes) */}
+        {/* Botones de acción - Estilo Instagram */}
+        <View style={styles.actionsContainer}>
+          <ActionButtons
+            feedItemId={item.id}
+            feedItemType="post"
+            initialLikes={item.likes}
+            comments={item.comments}
+            userId={currentUserId}
+            onCommentClick={() => {
+              trackInteraction("comentario");
+              onCommentClick();
+            }}
+            onTrackInteraction={trackInteraction}
+            shareTitle={`Post de ${item.user.nombre || item.user.name}`}
+            shareDescription={item.content.substring(0, 100)}
+            shareImageUrl={hasImages ? images[0] : undefined}
+            orientation="horizontal"
+            authorId={item.user.id}
+            contentId={item.postDetails?.id}
+          />
+        </View>
+
+        {/* Descripción del post (solo si tiene imágenes) */}
+
+        {/* Modal de reporte */}
+        <ReportModal
+          visible={showReportModal}
+          reportType="post"
+          onClose={() => setShowReportModal(false)}
+          onReport={handleReport}
+        />
+        <RecommendedUsersModal
+          visible={showRecommendedModal}
+          onClose={() => setShowRecommendedModal(false)}
+          loading={loadingRecommended}
+          users={recommendedList}
+          totalCount={positiveRecommendations}
+        />
+      </TouchableOpacity>
       {hasImages && (
-        <View style={styles.captionContainer}>
+        <TouchableOpacity
+          style={styles.captionContainer}
+          onPress={handleSeeMore}
+        >
           <Text style={styles.captionText}>
             <Text style={styles.captionUser}>
               {item.user.nombre || item.user.name}
             </Text>
-            {" " + item.content}
+            {" " + item.content.substring(0, 100)}
+            {!showFullCaption && (
+              <Text style={styles.seeMoreText}>... más</Text>
+            )}
+            {showFullCaption && (
+              <Text style={styles.captionText}>
+                {item.content.substring(100)}
+              </Text>
+            )}
           </Text>
-        </View>
+        </TouchableOpacity>
       )}
-
-      {/* Modal de reporte */}
-      <ReportModal
-        visible={showReportModal}
-        reportType="post"
-        onClose={() => setShowReportModal(false)}
-        onReport={handleReport}
-      />
-      <RecommendedUsersModal
-        visible={showRecommendedModal}
-        onClose={() => setShowRecommendedModal(false)}
-        loading={loadingRecommended}
-        users={recommendedList}
-        totalCount={positiveRecommendations}
-      />
-    </TouchableOpacity>
+    </View>
   );
 };
 
@@ -228,6 +247,10 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: COLORS.white,
   },
+  contentCard: {
+    backgroundColor: COLORS.white,
+    marginBottom: 2,
+  },
   actionsContainer: {
     paddingHorizontal: 12,
     width: "100%",
@@ -236,7 +259,7 @@ const styles = StyleSheet.create({
   },
   captionContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 16,
   },
   captionText: {
     fontSize: 14,
@@ -429,6 +452,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
     fontWeight: "600",
+  },
+  seeMoreText: {
+    color: COLORS.primaryDark,
+    fontWeight: "700",
   },
 });
 

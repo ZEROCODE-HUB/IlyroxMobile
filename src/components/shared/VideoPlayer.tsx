@@ -19,7 +19,7 @@
  * />
  */
 
-import React from "react";
+import React, { useEffect } from "react";
 import { View, StyleSheet, TouchableWithoutFeedback } from "react-native";
 import { VideoView } from "expo-video";
 import { useVideoPlayer } from "@/hooks/hooks/useVideoPlayer";
@@ -33,6 +33,7 @@ export interface VideoPlayerProps {
   showControls?: boolean;
   showTimeline?: boolean;
   showPlayIcon?: boolean;
+  isMuted?: boolean;
   autoPlay?: boolean;
   contentFit?: "contain" | "cover" | "fill";
   onPress?: () => void;
@@ -46,6 +47,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   showControls = true,
   showTimeline = true,
   showPlayIcon = true,
+  isMuted = true,
   autoPlay = true,
   contentFit = "cover",
   onPress,
@@ -58,6 +60,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     videoSource,
     isVisible,
     autoPlay,
+    muted: isMuted,
   });
 
   const handlePress = () => {
@@ -66,6 +69,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
     onPress?.();
   };
+
+  // useEffect(() => {
+  //   return () => {
+  //     player.release();
+  //   };
+  // }, []);
 
   return (
     <TouchableWithoutFeedback onPress={handlePress} onLongPress={onLongPress}>

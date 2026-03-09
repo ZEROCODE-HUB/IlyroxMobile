@@ -86,6 +86,14 @@ export function RegisterStepOne({
         textContentType="emailAddress"
       />
 
+      <AppInput
+        placeholder="Celular *"
+        keyboardType="phone-pad"
+        value={formState.phone}
+        onChangeText={(v) => onUpdateField("phone", v)}
+        textContentType="telephoneNumber"
+      />
+
       <TouchableOpacity
         style={styles.selectButton}
         onPress={() => setShowEstadoModal(true)}

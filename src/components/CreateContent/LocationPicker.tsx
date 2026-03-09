@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Dimensions, Platform } from "react-native";
+import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
 import MapView, {
   Marker,
   Region,
@@ -9,6 +9,7 @@ import MapView, {
 } from "../shared/MapComponents";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
+import { Globe, MapIcon } from "lucide-react-native";
 
 interface LocationPickerProps {
   onLocationSelected: (location: {
@@ -30,6 +31,10 @@ export default function LocationPicker({
   const mapRef = React.useRef<MapView>(null);
   const [isMapReady, setIsMapReady] = useState(false);
   const pendingCoords = React.useRef<{ lat: number; lng: number } | null>(null);
+
+  const [mapTypeId, setMapTypeId] = useState<"standard" | "satellite">(
+    "standard",
+  );
 
   const [region, setRegion] = useState<Region>({
     latitude: selectedLocation?.latitude || focusLocation?.latitude || 25.6866,
@@ -127,26 +132,49 @@ export default function LocationPicker({
             </Text>
           </View>
         ) : (
-          <MapView
-            ref={mapRef}
-            style={styles.map}
-            initialRegion={region}
-            onPress={handleMapPress}
-            onMapReady={handleMapReady}
-            provider={
-              Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
-            }
-          >
-            {marker && (
-              <Marker
-                coordinate={marker}
-                draggable
-                onDragEnd={handleDragEnd}
-                title="Ubicación de la propiedad"
-                pinColor={COLORS.primaryDark}
-              />
-            )}
-          </MapView>
+          <>
+            <Pressable
+              style={styles.mapTypeButton}
+              onPress={() =>
+                setMapTypeId(
+                  mapTypeId === "standard" ? "satellite" : "standard",
+                )
+              }
+            >
+              {mapTypeId === "standard" ? (
+                <View style={styles.mapTypeButtonIcon}>
+                  <Globe size={10} />
+                  <Text style={styles.mapTypeButtonText}>Satélite</Text>
+                </View>
+              ) : (
+                <View style={styles.mapTypeButtonIcon}>
+                  <MapIcon size={10} />
+                  <Text style={styles.mapTypeButtonText}>Mapa</Text>
+                </View>
+              )}
+            </Pressable>
+            <MapView
+              ref={mapRef}
+              style={styles.map}
+              initialRegion={region}
+              mapType={mapTypeId}
+              onPress={handleMapPress}
+              onMapReady={handleMapReady}
+              provider={
+                Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
+              }
+            >
+              {marker && (
+                <Marker
+                  coordinate={marker}
+                  draggable
+                  onDragEnd={handleDragEnd}
+                  title="Ubicación de la propiedad"
+                  pinColor={COLORS.primaryDark}
+                />
+              )}
+            </MapView>
+          </>
         )}
 
         {!marker && Platform.OS !== "web" && (
@@ -242,5 +270,28 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textTertiary,
     fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+  },
+  mapTypeButton: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    zIndex: 1,
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: COLORS.white,
+    elevation: 3,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  mapTypeButtonIcon: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  mapTypeButtonText: {
+    fontSize: 10,
+    fontWeight: "bold",
   },
 });

@@ -19,7 +19,11 @@ import { FeedItem, User } from "../../types";
 import UsersSlider from "../UsersSlider";
 import { ReelCard, PropertyCard, PostCard } from "../cards";
 
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import {
+  useFocusEffect,
+  useNavigation,
+  useIsFocused,
+} from "@react-navigation/native";
 import { COLORS } from "../../constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
@@ -44,6 +48,7 @@ const Feed: React.FC<FeedProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const isFocused = useIsFocused();
   const [scrollOffset, setScrollOffset] = useState(0);
   const [activeCommentItem, setActiveCommentItem] = useState<FeedItem | null>(
     null,
@@ -208,7 +213,7 @@ const Feed: React.FC<FeedProps> = ({
   // Renderizar item según su tipo
   const renderItem = useCallback(
     ({ item }: { item: FeedItem }) => {
-      const isVisible = item.id === focusedItemId;
+      const isVisible = item.id === focusedItemId && isFocused;
 
       switch (item.type) {
         case "reel":

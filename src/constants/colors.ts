@@ -44,6 +44,7 @@ export const COLORS = {
   // Backgrounds
   white: "#ffffff",
   black: "#000000",
+  blackTransparent: "rgba(0, 0, 0, 0.5)",
   background: "#f4f8f8",
   backgroundDark: "#e8f1f1",
   backgroundDeep: "#0f172a",

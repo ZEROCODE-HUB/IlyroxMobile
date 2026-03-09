@@ -24,6 +24,9 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$ProfilePath,
 
+    [Parameter(Mandatory=$false)]
+    [string]$ExtensionProfilePath,
+
     [Parameter(Mandatory=$true)]
     [string]$ApiKeyP8Path,
 
@@ -50,6 +53,9 @@ Write-Host ""
 # Validar que los archivos existen
 Test-FilePath $P12Path          "Certificado .p12"
 Test-FilePath $ProfilePath      "Perfil de provisión .mobileprovision"
+if ($ExtensionProfilePath) {
+    Test-FilePath $ExtensionProfilePath "Perfil de provisión de extensión .mobileprovision"
+}
 Test-FilePath $ApiKeyP8Path     "API Key .p8"
 
 # Convertir a Base64
@@ -58,6 +64,10 @@ Write-Host "📦 Convirtiendo archivos a Base64..." -ForegroundColor Yellow
 
 $certBase64    = [Convert]::ToBase64String([IO.File]::ReadAllBytes($P12Path))
 $profileBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($ProfilePath))
+$extProfileBase64 = $null
+if ($ExtensionProfilePath) {
+    $extProfileBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($ExtensionProfilePath))
+}
 $apiKeyContent = Get-Content $ApiKeyP8Path -Raw
 
 # Generar contraseña de keychain aleatoria
@@ -97,6 +107,10 @@ if ($SetGhSecrets) {
         "IOS_PROVISIONING_PROFILE_BASE64"= $profileBase64
         "IOS_KEYCHAIN_PASSWORD"          = $keychainPassword
         "APPSTORE_API_PRIVATE_KEY"       = $apiKeyContent
+    }
+
+    if ($extProfileBase64) {
+        $secrets["IOS_EXTENSION_PROVISIONING_PROFILE_BASE64"] = $extProfileBase64
     }
 
     foreach ($secret in $secrets.GetEnumerator()) {

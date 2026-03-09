@@ -1,18 +1,3 @@
-/**
- * Profile.tsx - COMPLETO Y OPTIMIZADO
- *
- * MEJORAS:
- * - Tabs para Posts, Reels y Propiedades
- * - Avatar con cambio de foto inline
- * - Grid estilo Instagram
- * - Badges de comisión en propiedades
- * - Colores centralizados (no hardcoded)
- * - useEffects optimizados (sin duplicados)
- * - Rating Details completo con todas las estadísticas
- * - OPTIMIZACION DE MEMORIA: Uso de FlatList en lugar de ScrollView + FlatList anidados.
- * - Uso de expo-image para mejor gestión de memoria de imágenes.
- */
-
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,

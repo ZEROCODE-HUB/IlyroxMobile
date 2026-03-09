@@ -23,9 +23,7 @@ import { useMessages } from "../../hooks/hooks/messaging/useMessages";
 import { COLORS } from "../../constants";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
-import {
-  KeyboardAvoidingView,
-} from "react-native-keyboard-controller";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 
 interface ChatScreenProps {
   conversationId: string;
@@ -74,8 +72,12 @@ export default function ChatScreen({
     propiedad_id: propertyId,
   };
 
-  const sendMessage = async (text: string, metadata: any) => {
-    const result = await originalSendMessage(text, metadata);
+  const sendMessage = async (
+    text: string,
+    metadata: any,
+    imageUri?: string,
+  ) => {
+    const result = await originalSendMessage(text, metadata, imageUri);
 
     if (
       conversationId === "new" &&
@@ -224,9 +226,12 @@ export default function ChatScreen({
       />
 
       <MessageInput
-        onSendText={(text) => sendMessage(text, messageMetadata)}
-        onSendImage={async (uri) => {
-          await sendImage(uri, messageMetadata);
+        onSendCombined={async (text, imageUri) => {
+          if (imageUri && !text.trim()) {
+            await sendImage(imageUri, messageMetadata);
+          } else {
+            await sendMessage(text, messageMetadata, imageUri);
+          }
         }}
         onSendFile={async (uri, name) => {
           await sendFile(uri, name, messageMetadata);

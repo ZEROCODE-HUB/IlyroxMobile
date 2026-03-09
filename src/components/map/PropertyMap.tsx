@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, Platform } from "react-native";
+import { View, Text, StyleSheet, Platform, Pressable } from "react-native";
 
 import MapView, {
   Marker,
@@ -9,6 +9,7 @@ import MapView, {
 import { Property } from "../../types";
 import { COLORS } from "../../constants/colors";
 import { useStableSafeInsets } from "../../context/SafeInsetsContext";
+import { Globe, MapIcon } from "lucide-react-native";
 
 interface PropertyMapProps {
   properties: Property[];
@@ -39,6 +40,10 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   const [overlayPositions, setOverlayPositions] = useState<{
     [key: string]: { x: number; y: number };
   }>({});
+
+  const [mapTypeId, setMapTypeId] = useState<"standard" | "satellite">(
+    "standard",
+  );
 
   const updateOverlayPositions = async () => {
     if (
@@ -76,7 +81,10 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     }
   }, [properties, mapReady]);
 
-  const formatPrice = (price: number, currency: "USD" | "MXN" = "MXN"): string => {
+  const formatPrice = (
+    price: number,
+    currency: "USD" | "MXN" = "MXN",
+  ): string => {
     const symbol = currency === "USD" ? "USD" : "MXN";
     if (price === 0) return `${symbol} 0`;
     if (price >= 1000000) {
@@ -201,7 +209,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     };
 
     const existing = document.querySelector(
-      "script[data-google-maps]"
+      "script[data-google-maps]",
     ) as HTMLScriptElement | null;
 
     if (existing && (window as any).google?.maps) {
@@ -318,10 +326,28 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
   return (
     <View style={styles.container}>
+      <Pressable
+        style={styles.mapTypeButton}
+        onPress={() =>
+          setMapTypeId(mapTypeId === "standard" ? "satellite" : "standard")
+        }
+      >
+        {mapTypeId === "standard" ? (
+          <View style={styles.mapTypeButtonIcon}>
+            <Globe size={10} />
+            <Text style={styles.mapTypeButtonText}>Satélite</Text>
+          </View>
+        ) : (
+          <View style={styles.mapTypeButtonIcon}>
+            <MapIcon size={10} />
+            <Text style={styles.mapTypeButtonText}>Mapa</Text>
+          </View>
+        )}
+      </Pressable>
       <MapView
         ref={nativeMapRef}
         style={styles.mapNative}
-        mapType={"hybrid"}
+        mapType={mapTypeId}
         provider={
           Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
         }
@@ -470,5 +496,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textTertiary,
     textAlign: "center",
+  },
+  mapTypeButton: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    zIndex: 1,
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: COLORS.white,
+    elevation: 3,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  mapTypeButtonIcon: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  mapTypeButtonText: {
+    fontSize: 10,
+    fontWeight: "bold",
   },
 });

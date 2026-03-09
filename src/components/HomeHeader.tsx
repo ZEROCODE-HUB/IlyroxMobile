@@ -44,6 +44,9 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
       case "Appointments":
         router.push("/(stack)/appointments");
         break;
+      case "Requests":
+        router.push("/(stack)/requests");
+        break;
       default:
         break;
     }
@@ -74,25 +77,31 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
           resizeMode="cover"
         />
         <View style={styles.headerIcons}>
-          {["Matches", "Messages", "Appointments"].map((screen, idx) => (
-            <TouchableOpacity
-              key={idx}
-              onPress={() => handleNavigation(screen)}
-              style={styles.iconButton}
-            >
-              <Ionicons
-                name={
-                  screen === "Matches"
-                    ? "git-compare-outline"
-                    : screen === "Messages"
-                      ? "chatbubble-outline"
-                      : "calendar-outline"
-                }
-                size={22}
-                color={COLORS.white}
-              />
-            </TouchableOpacity>
-          ))}
+          {["Matches", "Messages", "Requests", "Appointments"].map(
+            (screen, idx) => (
+              <TouchableOpacity
+                key={idx}
+                onPress={() => handleNavigation(screen)}
+                style={styles.iconButton}
+              >
+                <Ionicons
+                  name={
+                    screen === "Matches"
+                      ? "git-compare-outline"
+                      : screen === "Messages"
+                        ? "chatbubble-outline"
+                        : screen === "Requests"
+                          ? "reader-outline"
+                          : screen === "Appointments"
+                            ? "calendar-outline"
+                            : "calendar-outline"
+                  }
+                  size={22}
+                  color={COLORS.white}
+                />
+              </TouchableOpacity>
+            ),
+          )}
         </View>
       </View>
 

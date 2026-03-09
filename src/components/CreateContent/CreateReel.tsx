@@ -311,13 +311,19 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
                   errors.video && { borderColor: COLORS.error },
                 ]}
               >
-                <Ionicons name="videocam" size={48} color={COLORS.textTertiary} />
+                <Ionicons
+                  name="videocam"
+                  size={48}
+                  color={COLORS.textTertiary}
+                />
                 <Text style={styles.uploadText}>
                   Presiona para elegir un video
                 </Text>
               </TouchableOpacity>
             )}
-            {errors.video && <Text style={styles.errorText}>{errors.video}</Text>}
+            {errors.video && (
+              <Text style={styles.errorText}>{errors.video}</Text>
+            )}
           </View>
 
           <View style={styles.card}>
@@ -354,17 +360,25 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
         <View style={styles.uploadModalOverlay}>
           <View style={styles.uploadModalContent}>
             {Math.min(uploadProgress, 100) >= 100 ? (
-              <Ionicons name="checkmark-circle" size={40} color={COLORS.success || "#22C55E"} />
+              <Ionicons
+                name="checkmark-circle"
+                size={40}
+                color={COLORS.success || "#22C55E"}
+              />
             ) : (
               <ActivityIndicator size="large" color={COLORS.primary} />
             )}
             <Text style={styles.uploadModalTitle}>
               {Math.min(uploadProgress, 100) >= 100
                 ? "¡Completado!"
-                : "Subiendo Video..."}
+                : uploadProgress >= 99
+                  ? "Procesando Video..."
+                  : "Subiendo Video..."}
             </Text>
             <Text style={styles.uploadModalSubtitle}>
-              {Math.min(uploadProgress, 100)}%
+              {uploadProgress >= 99 && uploadProgress < 100
+                ? "Esto puede tardar unos segundos"
+                : `${Math.min(uploadProgress, 100)}%`}
             </Text>
             <View style={styles.progressBarContainer}>
               <View
@@ -544,7 +558,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 20,
     zIndex: 100,
-    paddingBottom: 50
+    paddingBottom: 50,
   },
   publishBtn: {
     backgroundColor: COLORS.primary,

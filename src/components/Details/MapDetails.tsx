@@ -10,9 +10,13 @@ import { COLORS } from "../../constants";
 
 interface PropertyMapProps {
   property: Property;
+  containerStyle?: any;
 }
 
-export const MapDetails: React.FC<PropertyMapProps> = ({ property }) => {
+export const MapDetails: React.FC<PropertyMapProps> = ({
+  property,
+  containerStyle,
+}) => {
   const nativeMapRef = useRef<MapView>(null);
 
   const lat = property.latitud;
@@ -45,16 +49,28 @@ export const MapDetails: React.FC<PropertyMapProps> = ({ property }) => {
 
   if (Platform.OS === "web") {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#f3f4f6' }]}>
-        <Text style={{ color: COLORS.textSecondary }}>Mapa no disponible en web</Text>
+      <View
+        style={[
+          styles.container,
+          {
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "#f3f4f6",
+          },
+        ]}
+      >
+        <Text style={{ color: COLORS.textSecondary }}>
+          Mapa no disponible en web
+        </Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, containerStyle]}>
       <MapView
         ref={nativeMapRef}
+        mapType="hybrid"
         provider={
           Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
         }

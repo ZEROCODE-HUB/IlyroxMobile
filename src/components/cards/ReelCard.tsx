@@ -23,6 +23,7 @@ import ActionButtons from "../ActionButtons";
 // import { supabase } from "../../lib/supabase";
 import { useUserRecommendations } from "@/hooks/hooks/useUserRecommendations";
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
+import { useApp } from "../../context/AppContext";
 
 interface ReelCardProps {
   item: FeedItem;
@@ -49,6 +50,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
     userId: currentUserId,
     isVisible: isVisible, // ReelCard ya tiene este prop
   });
+  const { isGlobalMuted: isMuted, setIsGlobalMuted: setIsMuted } = useApp();
 
   const positiveRecommendations = item.user.positiveRecommendations ?? 0;
   const recommendedByPreview = item.user.recommendedByPreview ?? [];
@@ -63,12 +65,23 @@ const ReelCard: React.FC<ReelCardProps> = ({
       : `Recomendado por ${positiveRecommendations} usuarios`;
   const [showRecommendedModal, setShowRecommendedModal] = React.useState(false);
 
+  const [showFullCaption, setShowFullCaption] = React.useState(false);
+
   const { recommendedList, loadingRecommended, fetchRecommendations } =
     useUserRecommendations(item.user.id);
 
   const openRecommendedModal = async () => {
     setShowRecommendedModal(true);
     fetchRecommendations();
+  };
+
+  const handleExpand = () => {
+    setIsMuted(true); // Silenciar globalmente (afecta a las tarjetas del feed)
+    onClick();
+  };
+
+  const handleSeeMore = () => {
+    setShowFullCaption(!showFullCaption);
   };
 
   return (
@@ -119,9 +132,10 @@ const ReelCard: React.FC<ReelCardProps> = ({
           videoUrl={item.videoUrl || ""}
           isVisible={isVisible}
           aspectRatio={DIMENSIONS.REEL_ASPECT_RATIO}
-          contentFit="cover"
+          contentFit="contain"
           showTimeline={true}
           showPlayIcon={true}
+          isMuted={isMuted}
         />
 
         {/* Badge de Reel */}
@@ -133,11 +147,23 @@ const ReelCard: React.FC<ReelCardProps> = ({
         {/* Botón para expandir */}
         <TouchableOpacity
           style={styles.expandButton}
-          onPress={onClick}
+          onPress={handleExpand}
           activeOpacity={0.7}
         >
           <Ionicons name="expand" size={18} color={COLORS.white} />
         </TouchableOpacity>
+        <View style={styles.previewOverlayControls}>
+          <TouchableOpacity
+            onPress={() => setIsMuted(!isMuted)}
+            style={styles.controlIconBadge}
+          >
+            <Ionicons
+              name={isMuted ? "volume-mute" : "volume-high"}
+              size={20}
+              color={COLORS.white}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Botones de acción - Estilo Instagram */}
@@ -162,14 +188,28 @@ const ReelCard: React.FC<ReelCardProps> = ({
 
       {/* Descripción del reel - Estilo Instagram */}
       {item.content && (
-        <View style={styles.captionContainer}>
+        <TouchableOpacity
+          style={styles.captionContainer}
+          onPress={handleSeeMore}
+        >
           <Text style={styles.captionText}>
             <Text style={styles.captionUser}>
-              {item.user.nombre + ": " || item.user.name + ": "}
+              {item.user.nombre || item.user.name}
             </Text>
-            {item.content}
+            {" " +
+              (item.content.length > 100
+                ? item.content.substring(0, 100)
+                : item.content)}
+            {!showFullCaption && item.content.length > 100 && (
+              <Text style={styles.seeMoreText}>... más</Text>
+            )}
+            {showFullCaption && (
+              <Text style={styles.captionText}>
+                {item.content.substring(100)}
+              </Text>
+            )}
           </Text>
-        </View>
+        </TouchableOpacity>
       )}
       <RecommendedUsersModal
         visible={showRecommendedModal}
@@ -306,6 +346,22 @@ const styles = StyleSheet.create({
   recommendedModalEmptyText: {
     fontSize: 12,
     color: COLORS.textSecondary,
+  },
+
+  previewOverlayControls: {
+    position: "absolute",
+    bottom: 20,
+    right: 12,
+    zIndex: 20,
+  },
+  controlIconBadge: {
+    backgroundColor: "rgba(0,0,0,0.6)",
+    padding: 8,
+    borderRadius: 20,
+  },
+  seeMoreText: {
+    color: COLORS.primaryDark,
+    fontWeight: "700",
   },
 });
 

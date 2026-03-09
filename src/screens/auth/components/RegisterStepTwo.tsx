@@ -21,7 +21,7 @@ interface RegisterStepTwoProps {
   loading: boolean;
   onUpdateField: <K extends keyof AuthFormState>(
     field: K,
-    value: AuthFormState[K]
+    value: AuthFormState[K],
   ) => void;
   onSubmit: () => void;
   onBack: () => void;
@@ -87,7 +87,10 @@ export function RegisterStepTwo({
           size={100}
         />
         <Text style={styles.avatarText}>
-          {formState.avatarUri ? "Cambiar foto" : "Agregar foto de perfil"}
+          {formState.avatarUri ? "Cambiar foto" : "Agregar foto de perfil *"}
+        </Text>
+        <Text style={styles.avatarHint}>
+          Se recomienda encarecidamente una foto real del usuario.
         </Text>
       </TouchableOpacity>
 
@@ -191,6 +194,7 @@ export function RegisterStepTwo({
         loading={loading}
         onPress={onSubmit}
         text="Finalizar Registro"
+        disabled={!formState.avatarUri}
       />
       <BackButton onPress={onBack} text="Volver al paso 1" />
     </KeyboardAwareScrollView>
@@ -235,5 +239,12 @@ const styles = StyleSheet.create({
   },
   selectPlaceholder: {
     color: COLORS.textTertiary,
+  },
+  avatarHint: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textAlign: "center",
+    marginTop: 4,
+    paddingHorizontal: 20,
   },
 });

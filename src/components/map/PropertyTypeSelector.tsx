@@ -1,15 +1,21 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { SelectionModal } from '../modals';
-import { COLORS } from '../../constants/colors';
-import { PROPERTY_TYPES, TipoPrincipal } from '../../constants/propertyData';
+import React from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { MultiSelectionModal } from "../modals";
+import { COLORS } from "../../constants/colors";
+import { PROPERTY_TYPES, TipoPrincipal } from "../../constants/propertyData";
 
 interface PropertyTypeSelectorProps {
   tipoPropiedad: string;
-  subtipo: string;
+  subtipo: string[];
   onChangeTipo: (tipo: string) => void;
-  onChangeSubtipo: (subtipo: string) => void;
+  onChangeSubtipo: (subtipos: string[]) => void;
 }
 
 export const PropertyTypeSelector: React.FC<PropertyTypeSelectorProps> = ({
@@ -23,34 +29,36 @@ export const PropertyTypeSelector: React.FC<PropertyTypeSelectorProps> = ({
   return (
     <View style={styles.container}>
       <Text style={styles.sectionLabel}>Tipo de Propiedad</Text>
-      
+
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chipsContainer}
       >
-        {(['Habitacional', 'Comercial', 'Industrial', 'Agrícola'] as const).map((tipo) => (
-          <TouchableOpacity
-            key={tipo}
-            style={[
-              styles.chip,
-              tipoPropiedad === tipo.toLowerCase() && styles.chipActive,
-            ]}
-            onPress={() => {
-              onChangeTipo(tipo.toLowerCase() as TipoPrincipal);
-              onChangeSubtipo('');
-            }}
-          >
-            <Text
+        {(["Habitacional", "Comercial", "Industrial", "Agrícola"] as const).map(
+          (tipo) => (
+            <TouchableOpacity
+              key={tipo}
               style={[
-                styles.chipText,
-                tipoPropiedad === tipo.toLowerCase() && styles.chipTextActive,
+                styles.chip,
+                tipoPropiedad === tipo.toLowerCase() && styles.chipActive,
               ]}
+              onPress={() => {
+                onChangeTipo(tipo.toLowerCase() as TipoPrincipal);
+                onChangeSubtipo([]);
+              }}
             >
-              {tipo}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Text
+                style={[
+                  styles.chipText,
+                  tipoPropiedad === tipo.toLowerCase() && styles.chipTextActive,
+                ]}
+              >
+                {tipo}
+              </Text>
+            </TouchableOpacity>
+          ),
+        )}
       </ScrollView>
 
       {tipoPropiedad && (
@@ -61,20 +69,32 @@ export const PropertyTypeSelector: React.FC<PropertyTypeSelectorProps> = ({
             onPress={() => setShowSubtipoModal(true)}
           >
             <Text
-              style={subtipo ? styles.selectorText : styles.selectorPlaceholder}
+              style={
+                subtipo && subtipo.length > 0
+                  ? styles.selectorText
+                  : styles.selectorPlaceholder
+              }
             >
-              {subtipo || 'Selecciona un subtipo...'}
+              {subtipo && subtipo.length > 0
+                ? subtipo.join(", ")
+                : "Selecciona uno o más subtipos..."}
             </Text>
-            <Ionicons name="chevron-down" size={20} color={COLORS.textTertiary} />
+            <Ionicons
+              name="chevron-down"
+              size={20}
+              color={COLORS.textTertiary}
+            />
           </TouchableOpacity>
 
-          <SelectionModal
+          <MultiSelectionModal
             visible={showSubtipoModal}
             onClose={() => setShowSubtipoModal(false)}
-            onSelect={(val) => onChangeSubtipo(val)}
-            title={`Tipo de Propiedad ${tipoPropiedad}`}
-            options={[...(PROPERTY_TYPES[tipoPropiedad as TipoPrincipal] || [])]}
-            currentValue={subtipo}
+            onSelect={(vals) => onChangeSubtipo(vals)}
+            title={`Subtipos de ${tipoPropiedad}`}
+            options={[
+              ...(PROPERTY_TYPES[tipoPropiedad as TipoPrincipal] || []),
+            ]}
+            currentValues={subtipo}
           />
         </>
       )}
@@ -88,13 +108,13 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.textPrimary,
     marginBottom: 12,
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.textSecondary,
     marginBottom: 8,
     marginTop: 16,
@@ -118,16 +138,16 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 14,
     color: COLORS.textTertiary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   chipTextActive: {
     color: COLORS.primary,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   selector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: COLORS.background,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,

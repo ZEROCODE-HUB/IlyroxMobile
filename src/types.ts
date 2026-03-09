@@ -140,7 +140,7 @@ export type Property = {
   longitud?: string;
   latitud?: string;
   municipio?: string;
-  ciudad?: string;
+  colonia?: string;
   subtipo?: string;
   codigo_propiedad?: string;
 };
@@ -152,6 +152,7 @@ export type Comment = {
   timestamp: string;
   imageUrl?: string;
   parentId?: string;
+  isLiked?: boolean;
 };
 
 export type Lead = {
