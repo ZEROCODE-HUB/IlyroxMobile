@@ -6,7 +6,7 @@ import React, { useState, useCallback } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../../design-system/components/AppInput";
-import { SelectionModal } from "../../modals";
+import { SelectionModal, WheelNumberModal } from "../../modals";
 import NumberInputModal from "../../modals/NumberInputModal";
 import RadioGroupSelector from "../../common/RadioGroupSelector";
 import { COLORS } from "../../../constants/colors";
@@ -313,27 +313,13 @@ export const PhysicalFeaturesSection = React.memo(
                 color={COLORS.textSecondary}
               />
             </TouchableOpacity>
-            <SelectionModal
+            <WheelNumberModal
               visible={showAntiguedadModal}
               onClose={() => setShowAntiguedadModal(false)}
-              onSelect={(val) => {
-                if (val === "Más de 50") {
-                  openNumberInput("Antigüedad (años)", (customVal) =>
-                    setAntiguedad(customVal),
-                  );
-                } else {
-                  setAntiguedad(val);
-                }
-              }}
+              onSelect={(val) => setAntiguedad(val)}
               title="Antigüedad"
-              options={[
-                "0 (Nueva)",
-                "1-5",
-                "6-10",
-                "11-20",
-                "21-50",
-                "Más de 50",
-              ]}
+              min={0}
+              max={70}
               currentValue={antiguedad}
             />
           </>

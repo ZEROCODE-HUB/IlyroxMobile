@@ -50,9 +50,9 @@ export const PDF_FIELD_CONFIG = {
   showMontoEnganche: true,
   showFinanciamientos: true,
 
-  // Comisiones (solo con datos)
-  showComision: true,
-  showComisionCompartida: true,
+  // Comisiones (ocultas por defecto)
+  showComision: false,
+  showComisionCompartida: false,
 
   // Gravámenes
   showGravamenes: true,

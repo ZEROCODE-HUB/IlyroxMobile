@@ -161,8 +161,8 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
 
           <Text style={styles.tabDescription}>
             {activeTab === "con"
-              ? "Incluye todos los datos de la propiedad, información del agente y comisiones."
-              : "PDF simplificado sin información de contacto, comisiones ni gravámenes."}
+              ? "Incluye todos los datos de la propiedad e información del agente."
+              : "PDF simplificado sin información de contacto ni gravámenes."}
           </Text>
 
           {activeTab === "con" ? (

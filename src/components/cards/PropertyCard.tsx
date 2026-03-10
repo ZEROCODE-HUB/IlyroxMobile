@@ -29,6 +29,8 @@ import { useUserRecommendations } from "@/hooks/hooks/useUserRecommendations";
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
 import { useChatInitiator } from "@/hooks/hooks/messaging/useChatInitiator";
 import { MapModal } from "../shared/MapModal";
+import * as Clipboard from "expo-clipboard";
+import { useToast } from "@/context/ToastContext";
 
 interface PropertyCardProps {
   item: FeedItem;
@@ -61,6 +63,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     userId: currentUserId,
     isVisible: true,
   });
+
+  const { showToast } = useToast();
 
   const property = item.propertyDetails!;
 
@@ -102,6 +106,13 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     setShowRecommendedModal(true);
     fetchRecommendations();
   };
+
+  const copyToClipboard = async (text: string, label: string) => {
+    if (!text) return;
+    await Clipboard.setStringAsync(text);
+    showToast(`${label} copiado`, "success");
+  };
+
   const location = `${property.colonia ? property.colonia + ", " : ""}${property.location.municipio ? property.location.municipio + ", " : ""}${property.location.state ? property.location.state : ""}`;
 
   return (
@@ -189,9 +200,20 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         </View>
       </View>
 
-      <View style={styles.metaRow}>
+      <Pressable
+        style={styles.metaRow}
+        onPress={() =>
+          copyToClipboard(property.code || property.codigo_propiedad, "ID")
+        }
+      >
         <Text style={styles.metaText}>
-          ID: {property.code ? property.code : property.codigo_propiedad} •{" "}
+          ID: {property.code ? property.code : property.codigo_propiedad}{" "}
+          <Ionicons
+            name="copy-outline"
+            size={10}
+            color={COLORS.textSecondary}
+          />{" "}
+          •{" "}
           {property.createdAt
             ? new Date(property.createdAt).toLocaleDateString("es-MX", {
                 day: "2-digit",
@@ -200,7 +222,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               })
             : item.timestamp}
         </Text>
-      </View>
+      </Pressable>
 
       {/* Información de la propiedad */}
       <View style={[commonStyles.cardContent, styles.compactContent]}>
