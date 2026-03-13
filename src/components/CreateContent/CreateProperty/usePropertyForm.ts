@@ -189,6 +189,10 @@ export function usePropertyForm(
     });
   }, [tipoOperacion]);
 
+  const isColoniaMode = useMemo(() => {
+    return !!ubicacionData.colonia && !!ubicacionData.latitud && !!ubicacionData.longitud;
+  }, [ubicacionData.colonia, ubicacionData.latitud, ubicacionData.longitud]);
+
   // ============================================
   // ERROR CLEARING EFFECTS
   // ============================================
@@ -223,14 +227,16 @@ export function usePropertyForm(
   }, [location]);
 
   // ============================================
-  // MAP CENTER BASED ON STATE
+  // MAP CENTER BASED ON STATE OR GEO COORDS
   // ============================================
   useEffect(() => {
-    if (ubicacionData.estado && COORDENADAS_ESTADO[ubicacionData.estado]) {
+    if (ubicacionData.latitud && ubicacionData.longitud) {
+      setMapCenter({ lat: ubicacionData.latitud, lng: ubicacionData.longitud });
+    } else if (ubicacionData.estado && COORDENADAS_ESTADO[ubicacionData.estado]) {
       const coords = COORDENADAS_ESTADO[ubicacionData.estado];
       setMapCenter(coords);
     }
-  }, [ubicacionData.estado]);
+  }, [ubicacionData]);
 
   // ============================================
   // LOAD DATA FOR EDITING
@@ -635,6 +641,7 @@ export function usePropertyForm(
     setLocation,
     mapCenter,
     setMapCenter,
+    isColoniaMode,
 
     // Características Físicas
     recamaras,

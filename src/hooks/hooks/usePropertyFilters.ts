@@ -13,7 +13,7 @@ export interface PropertyFilters {
     estado: string;
     ciudad: string;
     municipio: string;
-    colonia: string;
+    colonia: string | string[];
   };
   habitaciones: string;
   banos: string;
@@ -83,10 +83,14 @@ export const usePropertyFilters = (
       // Si hay un filtro de ubicación explícito (ciudad/municipio/colonia), desactivamos la geocerca
       // porque los bounds de Google suelen ser muy restrictivos para zonas industriales periféricas.
       const hasNamedLocationFilter = !!(
-        filters.locationFilter.ciudad ||
         filters.locationFilter.municipio ||
-        filters.locationFilter.colonia
+        (Array.isArray(filters.locationFilter.colonia)
+          ? filters.locationFilter.colonia.length > 0
+          : filters.locationFilter.colonia)
       );
+
+      // DEBUG Geofence
+      // console.log(`[DEBUG_GEO] Property ${p.id} - hasNamedLocationFilter: ${hasNamedLocationFilter}, geofenceBounds: ${!!geofenceBounds}`);
 
       if (geofenceBounds && !hasNamedLocationFilter) {
         const lat = p.coordinates?.lat ?? anyP.latitud;
@@ -178,21 +182,6 @@ export const usePropertyFilters = (
         .trim()
         .toLowerCase();
 
-      // Filtro de ciudad (Flexible: busca en ciudad O municipio)
-      if (filters.locationFilter.ciudad) {
-        const fCiudad = filters.locationFilter.ciudad
-          .toString()
-          .trim()
-          .toLowerCase();
-        // Si el filtro es "Monterrey", aceptamos si p.ciudad="Monterrey" OR p.municipio="Monterrey"
-        const matchCiudad = pCiudad === fCiudad;
-        const matchMunicipio = pMunicipio === fCiudad;
-
-        if (!matchCiudad && !matchMunicipio) {
-          return false;
-        }
-      }
-
       // Filtro de municipio (Flexible: busca en municipio O ciudad)
       if (filters.locationFilter.municipio) {
         const fMunicipio = filters.locationFilter.municipio
@@ -209,17 +198,29 @@ export const usePropertyFilters = (
       }
 
       // Filtro de colonia
-      if (filters.locationFilter.colonia) {
-        const pColonia = (anyP.colonia || p.location?.colony || "")
-          .toString()
-          .trim()
-          .toLowerCase();
-        const fColonia = filters.locationFilter.colonia
-          .toString()
-          .trim()
-          .toLowerCase();
-        if (pColonia !== fColonia) {
-          return false;
+      if (
+        filters.locationFilter.colonia &&
+        filters.locationFilter.colonia.length > 0
+      ) {
+        const pColoniaRaw = anyP.colonia || p.location?.colony || "";
+        const pColonia = pColoniaRaw.toString().trim().toLowerCase();
+
+        if (Array.isArray(filters.locationFilter.colonia)) {
+          const fColonias = filters.locationFilter.colonia.map((c) =>
+            c.trim().toLowerCase(),
+          );
+          const isMatch = fColonias.some(
+            (f) => pColonia.includes(f) || f.includes(pColonia),
+          );
+          if (!isMatch) return false;
+        } else {
+          const fColonia = filters.locationFilter.colonia
+            .toString()
+            .trim()
+            .toLowerCase();
+          const isMatch =
+            pColonia.includes(fColonia) || fColonia.includes(pColonia);
+          if (!isMatch) return false;
         }
       }
 
@@ -416,7 +417,9 @@ export const usePropertyFilters = (
       filters.locationFilter.estado ||
       filters.locationFilter.ciudad ||
       filters.locationFilter.municipio ||
-      filters.locationFilter.colonia
+      (Array.isArray(filters.locationFilter.colonia)
+        ? filters.locationFilter.colonia.length > 0
+        : filters.locationFilter.colonia)
     );
 
   return {

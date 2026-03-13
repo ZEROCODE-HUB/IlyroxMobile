@@ -12,6 +12,7 @@ interface MapSectionProps {
   location: LocationCoords;
   setLocation: (loc: LocationCoords) => void;
   mapCenter: MapCenter | null;
+  isColonia?: boolean;
   error?: string;
 }
 
@@ -19,6 +20,7 @@ export const MapSection = React.memo(function MapSection({
   location,
   setLocation,
   mapCenter,
+  isColonia = false,
   error,
 }: MapSectionProps) {
   return (
@@ -33,6 +35,7 @@ export const MapSection = React.memo(function MapSection({
             ? { latitude: mapCenter.lat, longitude: mapCenter.lng }
             : null
         }
+        isColonia={isColonia}
       />
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>

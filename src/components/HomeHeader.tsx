@@ -108,7 +108,11 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
       <View style={styles.searchWrapper}>
         <LocationSearchBar
           onLocationSelect={(loc) => {
-            setSelectedLocation(loc);
+            setSelectedLocation({
+              type: loc.type,
+              name: loc.name,
+              estado_id: loc.estado_id,
+            });
             if (loc) router.push("/(stack)/map");
           }}
           onSearchingChange={onSearchingChange}

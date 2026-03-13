@@ -76,9 +76,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
       };
 
       // Actualizar el campo correcto según el tipo de ubicación
-      if (selectedLocation.type === "ciudad") {
-        newLocationFilter.ciudad = selectedLocation.name;
-      } else if (selectedLocation.type === "municipio") {
+      if (selectedLocation.type === "municipio") {
         newLocationFilter.municipio = selectedLocation.name;
       } else if (selectedLocation.type === "colonia") {
         newLocationFilter.colonia = selectedLocation.name;
@@ -198,9 +196,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     };
 
     if (selectedLocation) {
-      if (selectedLocation.type === "ciudad") {
-        locationToKeep.ciudad = selectedLocation.name;
-      } else if (selectedLocation.type === "municipio") {
+      if (selectedLocation.type === "municipio") {
         locationToKeep.municipio = selectedLocation.name;
       } else if (selectedLocation.type === "colonia") {
         locationToKeep.colonia = selectedLocation.name;
@@ -313,6 +309,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         onUpdateLocationFilter={updateLocationFilter}
         filteredPropertiesCount={filteredProperties.length}
         userId={user?.id}
+        selectedLocation={selectedLocation}
       />
     </View>
   );

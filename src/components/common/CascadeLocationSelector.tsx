@@ -1,25 +1,18 @@
-/**
- * CascadeLocationSelector.tsx
- * Selector en cascada para ubicaciones: Estado → Ciudad → Municipio → Colonia
- */
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { SelectionModal } from "../modals";
 import { COLORS } from "../../constants/colors";
-import {
-  ESTADOS_MEXICO,
-  getCiudadesPorEstado,
-  getMunicipiosPorCiudad,
-  getColoniasPorMunicipio,
-} from "../../constants/locations";
+import SelectionModal from "../modals/SelectionModal";
+import MultiSelectionModal from "../modals/MultiSelectionModal";
+import { useGeoLocation, GeoOption } from "../../hooks/useGeoLocation";
 
 interface LocationData {
   estado: string;
   ciudad: string;
   municipio: string;
   colonia: string;
+  latitud?: number;
+  longitud?: number;
 }
 
 interface CascadeLocationSelectorProps {
@@ -35,87 +28,176 @@ export default function CascadeLocationSelector({
   showColonia = false,
   isMandatory = true,
 }: CascadeLocationSelectorProps) {
-  const [estado, setEstado] = useState(initialData?.estado || "");
-  const [ciudad, setCiudad] = useState(initialData?.ciudad || "");
-  const [municipio, setMunicipio] = useState(initialData?.municipio || "");
-  const [colonia, setColonia] = useState(initialData?.colonia || "");
+  // We need to match existing string values to IDs or just allow selection
+  const [estadoLabel, setEstadoLabel] = useState(initialData?.estado || "");
+  const [municipioLabel, setMunicipioLabel] = useState(
+    initialData?.municipio || "",
+  );
+  const [coloniaLabel, setColoniaLabel] = useState(initialData?.colonia || "");
+
+  const [estadoId, setEstadoId] = useState("");
+  const [municipioId, setMunicipioId] = useState("");
+  const [coloniaId, setColoniaId] = useState("");
+
+  const [latitud, setLatitud] = useState<number | undefined>(
+    initialData?.latitud,
+  );
+  const [longitud, setLongitud] = useState<number | undefined>(
+    initialData?.longitud,
+  );
+
+  const {
+    estados,
+    municipios,
+    colonias,
+    isLoading,
+    fetchMunicipios,
+    fetchColonias,
+    clearMunicipios,
+    clearColonias,
+  } = useGeoLocation();
+
+  // Sync with asynchronous updates to initialData (when editing a property)
+  useEffect(() => {
+    if (initialData) {
+      const { estado, municipio, colonia, latitud: initLat, longitud: initLng } = initialData;
+      if (estado !== undefined && estado !== estadoLabel) setEstadoLabel(estado);
+      if (municipio !== undefined && municipio !== municipioLabel) setMunicipioLabel(municipio);
+      if (colonia !== undefined && colonia !== coloniaLabel) setColoniaLabel(colonia);
+      if (initLat !== undefined && initLat !== latitud) setLatitud(initLat);
+      if (initLng !== undefined && initLng !== longitud) setLongitud(initLng);
+    }
+  }, [initialData?.estado, initialData?.municipio, initialData?.colonia]);
 
   // Modals visibility
   const [showEstadoModal, setShowEstadoModal] = useState(false);
-  const [showCiudadModal, setShowCiudadModal] = useState(false);
   const [showMunicipioModal, setShowMunicipioModal] = useState(false);
   const [showColoniaModal, setShowColoniaModal] = useState(false);
 
-  // Opciones disponibles según selección
-  const [ciudadesDisponibles, setCiudadesDisponibles] = useState<string[]>([]);
-  const [municipiosDisponibles, setMunicipiosDisponibles] = useState<string[]>(
-    [],
-  );
-  const [coloniasDisponibles, setColoniasDisponibles] = useState<string[]>([]);
-
-  // Actualizar opciones cuando cambia el estado
+  // Re-fetch dependent dropdowns if IDs are selected
   useEffect(() => {
-    if (estado) {
-      const ciudades = getCiudadesPorEstado(estado);
-      setCiudadesDisponibles(ciudades);
-
-      // Si la ciudad seleccionada no está en el nuevo estado, resetear
-      if (ciudad && !ciudades.includes(ciudad)) {
-        setCiudad("");
-        setMunicipio("");
-        setColonia("");
-      }
+    if (estadoId) {
+      fetchMunicipios(estadoId);
     } else {
-      setCiudadesDisponibles([]);
-      setCiudad("");
-      setMunicipio("");
-      setColonia("");
+      clearMunicipios();
     }
-  }, [estado]);
+  }, [estadoId]);
 
-  // Actualizar municipios cuando cambia la ciudad
   useEffect(() => {
-    if (ciudad) {
-      const municipios = getMunicipiosPorCiudad(ciudad);
-      setMunicipiosDisponibles(municipios);
-
-      // Si el municipio seleccionado no está en la nueva ciudad, resetear
-      if (municipio && !municipios.includes(municipio)) {
-        setMunicipio("");
-        setColonia("");
-      }
+    if (municipioId) {
+      fetchColonias(municipioId);
     } else {
-      setMunicipiosDisponibles([]);
-      setMunicipio("");
-      setColonia("");
+      clearColonias();
     }
-  }, [ciudad]);
+  }, [municipioId]);
 
-  // Actualizar colonias cuando cambia el municipio
+  // Resolve IDs from labels if they were provided as strings in initialData
   useEffect(() => {
-    if (municipio) {
-      const colonias = getColoniasPorMunicipio(municipio);
-      setColoniasDisponibles(colonias);
-
-      // Si la colonia seleccionada no está en el nuevo municipio, resetear
-      if (colonia && !colonias.includes(colonia)) {
-        setColonia("");
-      }
-    } else {
-      setColoniasDisponibles([]);
-      setColonia("");
+    if (estados.length > 0 && estadoLabel && !estadoId) {
+      const match = estados.find(e => e.label === estadoLabel);
+      if (match) setEstadoId(match.value);
     }
-  }, [municipio]);
+  }, [estados, estadoLabel, estadoId]);
 
-  // Notificar cambios al componente padre
+  useEffect(() => {
+    if (municipios.length > 0 && municipioLabel && !municipioId) {
+      const match = municipios.find(m => m.label === municipioLabel);
+      if (match) setMunicipioId(match.value);
+    }
+  }, [municipios, municipioLabel, municipioId]);
+
+  useEffect(() => {
+    if (colonias.length > 0 && coloniaLabel && !coloniaId) {
+      const match = colonias.find(c => {
+        const nameOnly = c.label.split(" - ")[0] || c.label;
+        return nameOnly === coloniaLabel;
+      });
+      if (match) setColoniaId(match.value);
+    }
+  }, [colonias, coloniaLabel, coloniaId]);
+
+  // Handle onChange
   useEffect(() => {
     onChange({
-      estado,
-      ciudad,
-      municipio,
-      colonia,
+      estado: estadoLabel,
+      ciudad: "", // Ciudad is removed, keeping empty string.
+      municipio: municipioLabel,
+      colonia: coloniaLabel,
+      latitud,
+      longitud,
     });
-  }, [estado, ciudad, municipio, colonia]);
+  }, [estadoLabel, municipioLabel, coloniaLabel, latitud, longitud]);
+
+  // SIMPLE ID RESOLUTION (For editing mode)
+  // When options are loaded, if we have a label but no ID, find the ID.
+  useEffect(() => {
+    if (estados.length > 0 && estadoLabel && !estadoId) {
+      const match = estados.find(e => e.label === estadoLabel);
+      if (match) setEstadoId(match.value);
+    }
+  }, [estados, estadoLabel, estadoId]);
+
+  useEffect(() => {
+    if (municipios.length > 0 && municipioLabel && !municipioId) {
+      const match = municipios.find(m => m.label === municipioLabel);
+      if (match) setMunicipioId(match.value);
+    }
+  }, [municipios, municipioLabel, municipioId]);
+
+  useEffect(() => {
+    if (colonias.length > 0 && coloniaLabel && !coloniaId) {
+      const match = colonias.find(c => {
+        const nameOnly = c.label.split(" - ")[0] || c.label;
+        return nameOnly === coloniaLabel;
+      });
+      if (match) setColoniaId(match.value);
+    }
+  }, [colonias, coloniaLabel, coloniaId]);
+
+  // Mappers and handlers
+  const handleEstadoSelect = (valId: string) => {
+    const selected = estados.find((e) => e.value === valId);
+    if (selected) {
+      setEstadoId(valId);
+      setEstadoLabel(selected.label);
+      if (selected.latitud && selected.longitud) {
+        setLatitud(selected.latitud);
+        setLongitud(selected.longitud);
+      }
+      if (valId !== estadoId) {
+        setMunicipioId("");
+        setMunicipioLabel("");
+        setColoniaId("");
+        setColoniaLabel("");
+      }
+    }
+  };
+
+  const handleMunicipioSelect = (valId: string) => {
+    const selected = municipios.find((m) => m.value === valId);
+    if (selected) {
+      setMunicipioId(valId);
+      setMunicipioLabel(selected.label);
+      if (valId !== municipioId) {
+        setColoniaId("");
+        setColoniaLabel("");
+      }
+    }
+  };
+
+  const handleColoniaSelect = (valId: string) => {
+    const selected = colonias.find((c) => c.value === valId);
+    if (selected) {
+      setColoniaId(valId);
+      // Remove text after " - " which was added for label context
+      const nameOnly = selected.label.split(" - ")[0] || selected.label;
+      setColoniaLabel(nameOnly);
+      if (selected.latitud && selected.longitud) {
+        setLatitud(selected.latitud);
+        setLongitud(selected.longitud);
+      }
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -125,14 +207,16 @@ export default function CascadeLocationSelector({
         <TouchableOpacity
           style={[
             styles.selector,
-            isMandatory && !estado && styles.selectorEmpty,
+            isMandatory && !estadoLabel && styles.selectorEmpty,
           ]}
           onPress={() => setShowEstadoModal(true)}
         >
           <Text
-            style={estado ? styles.selectorText : styles.selectorPlaceholder}
+            style={
+              estadoLabel ? styles.selectorText : styles.selectorPlaceholder
+            }
           >
-            {estado || "Selecciona un estado..."}
+            {estadoLabel || "Selecciona un estado..."}
           </Text>
           <Ionicons
             name="chevron-down"
@@ -145,53 +229,10 @@ export default function CascadeLocationSelector({
       <SelectionModal
         visible={showEstadoModal}
         onClose={() => setShowEstadoModal(false)}
-        onSelect={(val) => setEstado(val)}
+        onSelect={handleEstadoSelect}
         title="Selecciona un Estado"
-        options={[...ESTADOS_MEXICO]}
-        currentValue={estado}
-        searchable
-      />
-
-      {/* Ciudad */}
-      <View style={styles.field}>
-        <Text style={styles.label}>Ciudad{isMandatory ? " *" : ""}</Text>
-        <TouchableOpacity
-          style={[
-            styles.selector,
-            isMandatory && estado && !ciudad && styles.selectorEmpty,
-            !estado && styles.selectorDisabled,
-          ]}
-          onPress={() => {
-            if (ciudadesDisponibles.length > 0) {
-              setShowCiudadModal(true);
-            }
-          }}
-          disabled={!estado || ciudadesDisponibles.length === 0}
-        >
-          <Text
-            style={ciudad ? styles.selectorText : styles.selectorPlaceholder}
-          >
-            {!estado
-              ? "Primero selecciona un estado"
-              : ciudadesDisponibles.length === 0
-                ? "No hay ciudades disponibles"
-                : ciudad || "Selecciona una ciudad..."}
-          </Text>
-          <Ionicons
-            name="chevron-down"
-            size={20}
-            color={COLORS.textSecondary}
-          />
-        </TouchableOpacity>
-      </View>
-
-      <SelectionModal
-        visible={showCiudadModal}
-        onClose={() => setShowCiudadModal(false)}
-        onSelect={(val) => setCiudad(val)}
-        title="Selecciona una Ciudad"
-        options={ciudadesDisponibles}
-        currentValue={ciudad}
+        options={estados}
+        currentValue={estadoId}
         searchable
       />
 
@@ -199,33 +240,37 @@ export default function CascadeLocationSelector({
       <View style={styles.field}>
         <Text style={styles.label}>
           Municipio
-          {isMandatory && municipiosDisponibles.length > 0 ? " *" : ""}
+          {isMandatory && municipios.length > 0 ? " *" : ""}
         </Text>
         <TouchableOpacity
           style={[
             styles.selector,
             isMandatory &&
-              ciudad &&
-              municipiosDisponibles.length > 0 &&
-              !municipio &&
+              estadoId &&
+              municipios.length > 0 &&
+              !municipioLabel &&
               styles.selectorEmpty,
-            !ciudad && styles.selectorDisabled,
+            !estadoId && styles.selectorDisabled,
           ]}
           onPress={() => {
-            if (municipiosDisponibles.length > 0) {
+            if (municipios.length > 0) {
               setShowMunicipioModal(true);
             }
           }}
-          disabled={!ciudad || municipiosDisponibles.length === 0}
+          disabled={!estadoId || municipios.length === 0}
         >
           <Text
-            style={municipio ? styles.selectorText : styles.selectorPlaceholder}
+            style={
+              municipioLabel ? styles.selectorText : styles.selectorPlaceholder
+            }
           >
-            {!ciudad
-              ? "Primero selecciona una ciudad"
-              : municipiosDisponibles.length === 0
-                ? "No hay municipios disponibles"
-                : municipio || "Selecciona un municipio..."}
+            {!estadoId
+              ? "Primero selecciona un estado"
+              : isLoading
+                ? "Cargando..."
+                : municipios.length === 0
+                  ? "No hay municipios disponibles"
+                  : municipioLabel || "Selecciona un municipio..."}
           </Text>
           <Ionicons
             name="chevron-down"
@@ -238,10 +283,10 @@ export default function CascadeLocationSelector({
       <SelectionModal
         visible={showMunicipioModal}
         onClose={() => setShowMunicipioModal(false)}
-        onSelect={(val) => setMunicipio(val)}
+        onSelect={handleMunicipioSelect}
         title="Selecciona un Municipio"
-        options={municipiosDisponibles}
-        currentValue={municipio}
+        options={municipios}
+        currentValue={municipioId}
         searchable
       />
 
@@ -251,24 +296,28 @@ export default function CascadeLocationSelector({
           <View style={styles.field}>
             <Text style={styles.label}>Colonia</Text>
             <TouchableOpacity
-              style={[styles.selector, !municipio && styles.selectorDisabled]}
+              style={[styles.selector, !municipioId && styles.selectorDisabled]}
               onPress={() => {
-                if (coloniasDisponibles.length > 0) {
+                if (colonias.length > 0) {
                   setShowColoniaModal(true);
                 }
               }}
-              disabled={!municipio || coloniasDisponibles.length === 0}
+              disabled={!municipioId || colonias.length === 0}
             >
               <Text
                 style={
-                  colonia ? styles.selectorText : styles.selectorPlaceholder
+                  coloniaLabel
+                    ? styles.selectorText
+                    : styles.selectorPlaceholder
                 }
               >
-                {!municipio
+                {!municipioId
                   ? "Primero selecciona un municipio"
-                  : coloniasDisponibles.length === 0
-                    ? "No hay colonias disponibles"
-                    : colonia || "Selecciona una colonia..."}
+                  : isLoading
+                    ? "Cargando..."
+                    : colonias.length === 0
+                      ? "No hay colonias disponibles"
+                      : coloniaLabel || "Selecciona una colonia..."}
               </Text>
               <Ionicons
                 name="chevron-down"
@@ -281,10 +330,10 @@ export default function CascadeLocationSelector({
           <SelectionModal
             visible={showColoniaModal}
             onClose={() => setShowColoniaModal(false)}
-            onSelect={(val) => setColonia(val)}
+            onSelect={handleColoniaSelect}
             title="Selecciona una Colonia"
-            options={coloniasDisponibles}
-            currentValue={colonia}
+            options={colonias}
+            currentValue={coloniaId}
             searchable
           />
         </>

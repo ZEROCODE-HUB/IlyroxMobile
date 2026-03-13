@@ -43,9 +43,10 @@ export default function CreateProperty({
   propertyId,
 }: CreatePropertyProps) {
   const form = usePropertyForm(propertyId, onBack);
-  const { publishState, handlePublish, cancelPublish } = usePublishProperty(
+  // 4. Hook de publicación (maneja guardado final y UI de load/error)
+  const { publishState, handlePublish, cancelPublish, clearPublishError } = usePublishProperty(
     form,
-    propertyId,
+    propertyId as string | undefined,
     onBack,
   );
 
@@ -300,6 +301,7 @@ export default function CreateProperty({
           location={form.location}
           setLocation={form.setLocation}
           mapCenter={form.mapCenter}
+          isColonia={form.isColoniaMode}
           error={form.errors.location}
         />
       </ScrollView>
@@ -335,7 +337,11 @@ export default function CreateProperty({
       </View>
 
       {/* MODAL DE PROGRESO MEJORADO */}
-      <ProgressModal publishState={publishState} onCancel={cancelPublish} />
+      <ProgressModal 
+        publishState={publishState} 
+        onCancel={cancelPublish} 
+        onCloseError={clearPublishError} 
+      />
 
       {/* STATUS MODAL */}
       <SelectionModal

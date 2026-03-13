@@ -1,18 +1,20 @@
-import { supabase } from "./supabase";
+import { supabaseGeo } from "./supabase-geo";
 
 export interface LocationSuggestion {
-  type: "ciudad" | "municipio" | "colonia";
+  type: "estado" | "municipio" | "colonia";
   name: string;
+  estado_id?: number;
 }
 
 /**
  * Obtiene todas las ubicaciones únicas desde la función RPC de Supabase
- * @returns Array de ubicaciones con tipo (ciudad, municipio, colonia)
+ * @returns Array de ubicaciones con tipo (ciudad, municipio, colonia, estado)
  */
 export async function getUniqueLocations(): Promise<LocationSuggestion[]> {
   try {
-    const { data, error } = await supabase
-      .rpc('get_unique_locations');
+    const { data, error } = await supabaseGeo.rpc("search_locations_geo", {
+      p_search: "",
+    });
 
     if (error) throw error;
 
@@ -31,17 +33,18 @@ export async function getUniqueLocations(): Promise<LocationSuggestion[]> {
  */
 export async function searchLocations(
   searchTerm: string,
-  limit: number = 8
+  limit: number = 8,
 ): Promise<LocationSuggestion[]> {
-  const allLocations = await getUniqueLocations();
-  
-  if (!searchTerm.trim()) {
-    return allLocations.slice(0, limit);
+  try {
+    const { data, error } = await supabaseGeo.rpc("search_locations_geo", {
+      p_search: searchTerm,
+    });
+
+    if (error) throw error;
+
+    return (data || []).slice(0, limit) as LocationSuggestion[];
+  } catch (error) {
+    console.error("Error fetching searched locations:", error);
+    return [];
   }
-
-  const filtered = allLocations.filter((location) =>
-    location.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  return filtered.slice(0, limit);
 }

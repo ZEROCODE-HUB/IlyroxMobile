@@ -57,7 +57,8 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
       parts.push(filters.subtipo);
 
     const loc = filters.locationFilter;
-    if (loc.ciudad && loc.ciudad !== "Cualquiera") parts.push(loc.ciudad);
+    if (loc?.ciudad && loc.ciudad !== "Cualquiera") parts.push(loc.ciudad);
+    if (filters.colonia) parts.push(`Colonia: ${filters.colonia}`);
 
     if (
       filters.precioMin ||

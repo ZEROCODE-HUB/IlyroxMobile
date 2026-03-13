@@ -29,11 +29,16 @@ interface AppContextType {
     leadPhone?: string,
   ) => void;
   selectedLocation: {
-    type: "ciudad" | "municipio" | "colonia";
+    type: "estado" | "municipio" | "colonia";
     name: string;
+    estado_id: number;
   } | null;
   setSelectedLocation: (
-    location: { type: "ciudad" | "municipio" | "colonia"; name: string } | null,
+    location: {
+      type: "estado" | "municipio" | "colonia";
+      name: string;
+      estado_id: number;
+    } | null,
   ) => void;
   isGlobalMuted: boolean;
   setIsGlobalMuted: (muted: boolean) => void;
@@ -50,8 +55,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<{
-    type: "ciudad" | "municipio" | "colonia";
+    type: "estado" | "municipio" | "colonia";
     name: string;
+    estado_id: number;
   } | null>(null);
   const [isGlobalMuted, setIsGlobalMuted] = useState(true);
 

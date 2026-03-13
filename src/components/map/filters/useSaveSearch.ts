@@ -116,7 +116,9 @@ export const useSaveSearch = (userId?: string) => {
           estado: filters.locationFilter.estado,
           ciudad: filters.locationFilter.ciudad,
           municipio: filters.locationFilter.municipio,
-          colonia: filters.locationFilter.colonia,
+          colonia: Array.isArray(filters.locationFilter.colonia) 
+            ? filters.locationFilter.colonia.join(", ") 
+            : filters.locationFilter.colonia,
           icon: "location-outline",
         },
         caracteristicas: {
@@ -152,7 +154,7 @@ export const useSaveSearch = (userId?: string) => {
       "🔍  BUSCO PROPIEDAD:",
       [],
       "busqueda",
-      busquedaMetadata
+      busquedaMetadata,
     );
 
     if (!postSuccess) {
@@ -176,11 +178,11 @@ export const useSaveSearch = (userId?: string) => {
     if (filters.subtipo) criterios_busqueda.subtipo = filters.subtipo;
     if (filters.precioMin)
       criterios_busqueda.precio_min = parseFloat(
-        filters.precioMin.toString().replace(/,/g, "")
+        filters.precioMin.toString().replace(/,/g, ""),
       );
     if (filters.precioMax)
       criterios_busqueda.precio_max = parseFloat(
-        filters.precioMax.toString().replace(/,/g, "")
+        filters.precioMax.toString().replace(/,/g, ""),
       );
     if (filters.habitaciones && filters.habitaciones !== "No indicado")
       criterios_busqueda.habitaciones = filters.habitaciones;
@@ -194,11 +196,11 @@ export const useSaveSearch = (userId?: string) => {
       criterios_busqueda.antiguedad = filters.antiguedad;
     if (filters.m2TerrenoMin)
       criterios_busqueda.m2_terreno_min = parseFloat(
-        filters.m2TerrenoMin.toString().replace(/,/g, "")
+        filters.m2TerrenoMin.toString().replace(/,/g, ""),
       );
     if (filters.m2ConstruccionMin)
       criterios_busqueda.m2_construccion_min = parseFloat(
-        filters.m2ConstruccionMin.toString().replace(/,/g, "")
+        filters.m2ConstruccionMin.toString().replace(/,/g, ""),
       );
     if (filters.locationFilter.estado)
       criterios_busqueda.estado = filters.locationFilter.estado;
@@ -206,8 +208,12 @@ export const useSaveSearch = (userId?: string) => {
       criterios_busqueda.ciudad = filters.locationFilter.ciudad;
     if (filters.locationFilter.municipio)
       criterios_busqueda.municipio = filters.locationFilter.municipio;
-    if (filters.locationFilter.colonia)
-      criterios_busqueda.colonia = filters.locationFilter.colonia;
+    if (filters.locationFilter.colonia) {
+      // Si es un array (nuevo formato) o un string (viejo), aseguramos que se guarde como array
+      criterios_busqueda.colonias = Array.isArray(filters.locationFilter.colonia) 
+        ? filters.locationFilter.colonia 
+        : [filters.locationFilter.colonia];
+    }
 
     const insertData: any = {
       usuario_id: userId,
@@ -224,7 +230,8 @@ export const useSaveSearch = (userId?: string) => {
       insertData.lead_id = leadId;
     }
 
-    if (filters.tipoPropiedad) insertData.tipo_propiedad = filters.tipoPropiedad;
+    if (filters.tipoPropiedad)
+      insertData.tipo_propiedad = filters.tipoPropiedad;
     if (filters.subtipo) insertData.subtipo = filters.subtipo;
     if (filters.precioMin) {
       const pMin = parseFloat(filters.precioMin.toString().replace(/,/g, ""));
@@ -241,8 +248,11 @@ export const useSaveSearch = (userId?: string) => {
       insertData.ciudad = filters.locationFilter.ciudad;
     if (filters.locationFilter.municipio)
       insertData.municipio = filters.locationFilter.municipio;
-    if (filters.locationFilter.colonia)
-      insertData.colonia = filters.locationFilter.colonia;
+    if (filters.locationFilter.colonia) {
+      insertData.colonias = Array.isArray(filters.locationFilter.colonia)
+        ? filters.locationFilter.colonia
+        : [filters.locationFilter.colonia];
+    }
 
     if (filters.habitaciones && filters.habitaciones !== "No indicado") {
       const habNum = parseInt(filters.habitaciones);
@@ -252,19 +262,22 @@ export const useSaveSearch = (userId?: string) => {
       const banosNum = parseInt(filters.banos);
       if (!isNaN(banosNum)) insertData.banos = banosNum;
     }
-    if (filters.estacionamientos && filters.estacionamientos !== "No indicado") {
+    if (
+      filters.estacionamientos &&
+      filters.estacionamientos !== "No indicado"
+    ) {
       const estNum = parseInt(filters.estacionamientos);
       if (!isNaN(estNum)) insertData.estacionamientos = estNum;
     }
     if (filters.m2ConstruccionMin) {
       const m2Cons = parseFloat(
-        filters.m2ConstruccionMin.toString().replace(/,/g, "")
+        filters.m2ConstruccionMin.toString().replace(/,/g, ""),
       );
       if (!isNaN(m2Cons)) insertData.metros_construccion = m2Cons;
     }
     if (filters.m2TerrenoMin) {
       const m2Terr = parseFloat(
-        filters.m2TerrenoMin.toString().replace(/,/g, "")
+        filters.m2TerrenoMin.toString().replace(/,/g, ""),
       );
       if (!isNaN(m2Terr)) insertData.metros_terreno = m2Terr;
     }
@@ -312,13 +325,14 @@ export const useSaveSearch = (userId?: string) => {
       let leadId = null;
 
       if (createLead) {
-        const postSuccess = await createSearchPost(filters);
-        if (!postSuccess) return false;
-
         leadId = await createLeadRecord();
       }
 
       await saveSearchToDatabase(filters, leadId);
+
+      if (createLead) {
+        await createSearchPost(filters);
+      }
 
       showToast("Búsqueda guardada correctamente", "success");
 

@@ -19,6 +19,8 @@ export interface UbicacionData {
   ciudad: string;
   municipio: string;
   colonia: string;
+  latitud?: number;
+  longitud?: number;
 }
 
 export interface LocationCoords {

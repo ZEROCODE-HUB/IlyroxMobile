@@ -10,7 +10,11 @@ import { FlatList } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../design-system/components/AppInput";
 import { COLORS } from "../constants/colors";
-import { getUniqueLocations, LocationSuggestion } from "../lib/locationService";
+import {
+  getUniqueLocations,
+  searchLocations,
+  LocationSuggestion,
+} from "../lib/locationService";
 
 interface LocationSearchBarProps {
   onLocationSelect: (location: LocationSuggestion | null) => void;
@@ -32,15 +36,20 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Cargar todas las ubicaciones disponibles al montar
+  // Buscar ubicaciones con debounce
   useEffect(() => {
-    fetchLocations();
-  }, []);
+    const delayDebounceFn = setTimeout(() => {
+      fetchLocations(query);
+    }, 300);
 
-  const fetchLocations = async () => {
+    return () => clearTimeout(delayDebounceFn);
+  }, [query]);
+
+  const fetchLocations = async (searchTerm: string) => {
     try {
       setIsLoading(true);
-      const locations = await getUniqueLocations();
+      // locationService ahora usa Supabase Geo
+      const locations = await searchLocations(searchTerm);
       setSuggestions(locations);
     } catch (err) {
       console.error("Error fetching locations:", err);
@@ -48,10 +57,6 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
       setIsLoading(false);
     }
   };
-
-  const filteredSuggestions = suggestions.filter((s) =>
-    s.name.toLowerCase().includes(query.toLowerCase()),
-  );
 
   useEffect(() => {
     onSearchingChange?.(showSuggestions);
@@ -86,10 +91,12 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
 
   const getIconName = (type: string) => {
     switch (type) {
-      case "ciudad":
-        return "business-outline";
-      case "municipio":
+      case "estado":
         return "map-outline";
+      case "municipio":
+        return "business-outline";
+      case "colonia":
+        return "location-outline";
       default:
         return "location-outline";
     }
@@ -122,7 +129,11 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
               />
             </TouchableOpacity>
           ) : (
-            <Ionicons name="search-outline" size={22} color={COLORS.textTertiary} />
+            <Ionicons
+              name="search-outline"
+              size={22}
+              color={COLORS.textTertiary}
+            />
           )
         }
       />
@@ -133,7 +144,7 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
           style={[styles.suggestionsContainer, { top: topOffset }]}
         >
           <FlatList
-            data={filteredSuggestions}
+            data={suggestions}
             keyExtractor={(item, index) => `${item.type}-${item.name}-${index}`}
             keyboardShouldPersistTaps="always"
             nestedScrollEnabled={true}

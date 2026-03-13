@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -22,6 +22,9 @@ import { CharacteristicsSection } from "./filters/CharacteristicsSection";
 import { COLORS } from "../../constants/colors";
 import { getCamposVisibles } from "../../constants/propertyData";
 import { KeyboardAvoidingView } from "react-native";
+import { useGeoLocation } from "../../hooks/useGeoLocation";
+import SelectionModal from "../modals/SelectionModal";
+import MultiSelectionModal from "../modals/MultiSelectionModal";
 
 const { height } = Dimensions.get("window");
 
@@ -33,6 +36,11 @@ interface SearchFiltersModalProps {
   onUpdateLocationFilter: (location: any) => void;
   filteredPropertiesCount: number;
   userId?: string;
+  selectedLocation?: {
+    type: "estado" | "municipio" | "colonia";
+    name: string;
+    estado_id: number;
+  } | null;
 }
 
 export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
@@ -43,6 +51,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   onUpdateLocationFilter,
   filteredPropertiesCount,
   userId,
+  selectedLocation,
 }) => {
   // Estados para modals
   const [showRecamarasModal, setShowRecamarasModal] = useState(false);
@@ -52,14 +61,71 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   const [showNivelesModal, setShowNivelesModal] = useState(false);
   const [showAntiguedadModal, setShowAntiguedadModal] = useState(false);
   const [showSaveSearchModal, setShowSaveSearchModal] = useState(false);
+  const [showColoniaModal, setShowColoniaModal] = useState(false);
+
+  // Geo Location Hook para las colonias
+  const [geoEstadoId, setGeoEstadoId] = useState<string | null>(null);
+  const { colonias, fetchColonias, fetchEstados, estados, isLoading } =
+    useGeoLocation();
+
+  // 1. Intentar obtener el ID del estado por nombre si no viene en el objeto
+  useEffect(() => {
+    if (
+      selectedLocation &&
+      !selectedLocation.estado_id &&
+      selectedLocation.name
+    ) {
+      if (selectedLocation.type === "estado") {
+        const findEstado = async () => {
+          try {
+            const { supabaseGeo } = await import("../../lib/supabase-geo");
+            // Limpiar el nombre (ej: "Nuevo León, México" -> "Nuevo León")
+            const parts = selectedLocation.name.split(",").map((p) => p.trim());
+            const searchName =
+              parts
+                .filter(
+                  (p) =>
+                    p.toLowerCase() !== "méxico" &&
+                    p.toLowerCase() !== "mexico",
+                )
+                .pop() || parts[0];
+
+            const { data } = await supabaseGeo.rpc("obtener_estados", {
+              p_nombre_busqueda: searchName,
+            });
+            if (data && data.length > 0) {
+              setGeoEstadoId(String(data[0].id));
+            } else {
+              setGeoEstadoId(null);
+            }
+          } catch (error) {
+            console.error("Error mapping state name to ID:", error);
+          }
+        };
+        findEstado();
+      } else {
+        // Es un municipio o colonia que debería traer ya el estado_id o estar en un formato que no podemos resolver así.
+        setGeoEstadoId(null);
+      }
+    } else if (selectedLocation && selectedLocation.estado_id) {
+      setGeoEstadoId(String(selectedLocation.estado_id));
+    } else {
+      setGeoEstadoId(null);
+    }
+  }, [selectedLocation?.name, selectedLocation?.estado_id]);
+  // 2. Cargar colonias cuando tenemos el ID del estado (de la DB Geo)
+  React.useEffect(() => {
+    if (geoEstadoId) {
+      fetchColonias("", geoEstadoId);
+    }
+  }, [geoEstadoId]);
 
   // Number Input Modal
   const [showNumberInput, setShowNumberInput] = useState(false);
   const [numberInputConfig, setNumberInputConfig] = useState({
     title: "",
-    onSave: (val: string) => { },
+    onSave: (val: string) => {},
   });
-
 
   const openNumberInput = (title: string, onSave: (val: string) => void) => {
     setNumberInputConfig({ title, onSave });
@@ -69,14 +135,14 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   const camposVisibles = filters.tipoPropiedad
     ? getCamposVisibles(filters.subtipo)
     : {
-      recamaras: false,
-      banos: false,
-      estacionamientos: false,
-      niveles: false,
-      antiguedad: false,
-      m2Terreno: false,
-      m2Construccion: false,
-    };
+        recamaras: false,
+        banos: false,
+        estacionamientos: false,
+        niveles: false,
+        antiguedad: false,
+        m2Terreno: false,
+        m2Construccion: false,
+      };
 
   const handleCurrencyChange = (
     text: string,
@@ -137,7 +203,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
                   !filters.operacion || filters.operacion === ""
                     ? "Todas"
                     : filters.operacion.charAt(0).toUpperCase() +
-                    filters.operacion.slice(1)
+                      filters.operacion.slice(1)
                 }
                 onSelect={(val) => {
                   if (val === "Todas") {
@@ -159,8 +225,6 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
               handleCurrencyChange={handleCurrencyChange}
             />
 
-
-
             {/* 4. TIPO DE PROPIEDAD */}
             <View style={styles.formSection}>
               <PropertyTypeSelector
@@ -172,6 +236,64 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
                 }
               />
             </View>
+
+            {/* UBICACION - COLONIA */}
+            {geoEstadoId && (
+              <View style={styles.formSection}>
+                <Text style={styles.sectionLabel}>Colonia</Text>
+
+                <TouchableOpacity
+                  style={[styles.selector, { marginTop: 12 }]}
+                  onPress={() => setShowColoniaModal(true)}
+                  disabled={colonias.length === 0}
+                >
+                  <Text
+                    style={
+                      Array.isArray(filters.locationFilter.colonia) &&
+                      filters.locationFilter.colonia.length > 0
+                        ? styles.selectorText
+                        : [styles.selectorText, { color: COLORS.textTertiary }]
+                    }
+                  >
+                    {isLoading
+                      ? "Cargando colonias..."
+                      : Array.isArray(filters.locationFilter.colonia) &&
+                          filters.locationFilter.colonia.length > 0
+                        ? `${filters.locationFilter.colonia.length} seleccionadas`
+                        : "Seleccionar Colonias"}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={20}
+                    color={COLORS.textSecondary}
+                  />
+                </TouchableOpacity>
+
+                <MultiSelectionModal
+                  visible={showColoniaModal}
+                  onClose={() => setShowColoniaModal(false)}
+                  onSelect={(vals) => {
+                    const names = vals.map(v => {
+                      const c = colonias.find(col => col.value === v);
+                      // Extraer solo el nombre de la colonia (eliminar " - Municipio")
+                      return c ? c.label.split(" - ")[0] : v; 
+                    });
+                    onUpdateLocationFilter({ ...filters.locationFilter, colonia: names });
+                  }}
+                  title="Selecciona Colonias"
+                  options={colonias}
+                  currentValues={
+                    Array.isArray(filters.locationFilter.colonia) 
+                      ? filters.locationFilter.colonia.map(name => {
+                          const f = colonias.find(c => c.label.split(" - ")[0] === name);
+                          return f ? f.value : name;
+                        }) 
+                      : []
+                  }
+                  searchable
+                />
+              </View>
+            )}
 
             {/* 5. CARACTERÍSTICAS */}
             <CharacteristicsSection
@@ -193,8 +315,6 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
             />
 
             <View style={styles.divider} />
-
-
           </ScrollView>
 
           {/* Footer */}
@@ -204,8 +324,8 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
                 Ver {filteredPropertiesCount} propiedades
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.saveSearchBtn} 
+            <TouchableOpacity
+              style={styles.saveSearchBtn}
               onPress={() => setShowSaveSearchModal(true)}
             >
               <Ionicons

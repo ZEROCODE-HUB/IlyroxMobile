@@ -20,17 +20,23 @@ interface LocationPickerProps {
   selectedLocation?: { latitude: number; longitude: number } | null;
   // Coordenadas para enfocar el mapa (sin poner pin necesariamente)
   focusLocation?: { latitude: number; longitude: number } | null;
+  isColonia?: boolean;
 }
 
 export default function LocationPicker({
   onLocationSelected,
   selectedLocation,
   focusLocation,
+  isColonia = false,
 }: LocationPickerProps) {
   /* eslint-disable react-hooks/exhaustive-deps */
   const mapRef = React.useRef<MapView>(null);
   const [isMapReady, setIsMapReady] = useState(false);
-  const pendingCoords = React.useRef<{ lat: number; lng: number } | null>(null);
+  const pendingCoords = React.useRef<{
+    lat: number;
+    lng: number;
+    isColonia: boolean;
+  } | null>(null);
 
   const [mapTypeId, setMapTypeId] = useState<"standard" | "satellite">(
     "standard",
@@ -53,17 +59,21 @@ export default function LocationPicker({
       : null,
   );
 
+  const getDeltas = (coloniaMode: boolean) => {
+    return {
+      latitudeDelta: coloniaMode ? 0.01 : 0.5, // 0.01 para colonias, 0.5 para estados
+      longitudeDelta: coloniaMode ? 0.01 : 0.5,
+    };
+  };
+
   // Actualizar región y marcador si cambian las props iniciales (ej. al seleccionar Estado)
-  // Usamos useEffect para reaccionar a cambios externos
-  // Efecto para enfocar el mapa cuando cambia focusLocation
   // Efecto para enfocar el mapa cuando cambia focusLocation
   useEffect(() => {
     if (focusLocation) {
       const newRegion = {
         latitude: focusLocation.latitude,
         longitude: focusLocation.longitude,
-        latitudeDelta: 0.5,
-        longitudeDelta: 0.5,
+        ...getDeltas(isColonia),
       };
       setRegion(newRegion);
       if (isMapReady) {
@@ -72,6 +82,7 @@ export default function LocationPicker({
         pendingCoords.current = {
           lat: focusLocation.latitude,
           lng: focusLocation.longitude,
+          isColonia,
         };
       }
     }
@@ -87,11 +98,11 @@ export default function LocationPicker({
   const handleMapReady = () => {
     setIsMapReady(true);
     if (pendingCoords.current) {
+      const deltas = getDeltas(pendingCoords.current.isColonia);
       const targetRegion = {
         latitude: pendingCoords.current.lat,
         longitude: pendingCoords.current.lng,
-        latitudeDelta: 1,
-        longitudeDelta: 1,
+        ...deltas,
       };
       mapRef.current?.animateToRegion(targetRegion, 1000);
       pendingCoords.current = null;

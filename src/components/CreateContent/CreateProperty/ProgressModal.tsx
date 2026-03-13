@@ -18,9 +18,10 @@ import type { PublishState } from "./types";
 interface ProgressModalProps {
   publishState: PublishState;
   onCancel: () => void;
+  onCloseError?: () => void;
 }
 
-export function ProgressModal({ publishState, onCancel }: ProgressModalProps) {
+export function ProgressModal({ publishState, onCancel, onCloseError }: ProgressModalProps) {
   const { uploading, uploadProgress, uploadStage, error, canCancel } =
     publishState;
 
@@ -38,6 +39,14 @@ export function ProgressModal({ publishState, onCancel }: ProgressModalProps) {
               </View>
               <Text style={styles.errorTitle}>Error</Text>
               <Text style={styles.errorMessage}>{error}</Text>
+              {onCloseError && (
+                <TouchableOpacity
+                  style={styles.closeErrorButton}
+                  onPress={onCloseError}
+                >
+                  <Text style={styles.closeErrorText}>Cerrar</Text>
+                </TouchableOpacity>
+              )}
             </>
           ) : (
             // Estado de progreso
@@ -177,5 +186,18 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: "center",
     lineHeight: 20,
+    marginBottom: 16,
+  },
+  closeErrorButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    backgroundColor: COLORS.error,
+    marginTop: 8,
+  },
+  closeErrorText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: "bold",
   },
 });

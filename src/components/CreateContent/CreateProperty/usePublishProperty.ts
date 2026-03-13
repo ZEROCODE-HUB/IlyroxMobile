@@ -99,6 +99,13 @@ export function usePublishProperty(
     Alert.alert("Cancelado", "La publicación fue cancelada.");
   }, []);
 
+  const clearPublishError = useCallback(() => {
+    setPublishState((prev) => ({
+      ...prev,
+      error: null,
+    }));
+  }, []);
+
   const handlePublish = useCallback(
     async (contractDataParam?: ContractData | null) => {
       const resolvedContractData = contractDataParam ?? form.contractData;
@@ -427,6 +434,7 @@ export function usePublishProperty(
     publishState,
     handlePublish,
     cancelPublish,
+    clearPublishError,
   };
 }
 
