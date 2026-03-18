@@ -26,6 +26,13 @@ export const PropertyTypeSelector: React.FC<PropertyTypeSelectorProps> = ({
 }) => {
   const [showSubtipoModal, setShowSubtipoModal] = React.useState(false);
 
+  const tipoProperty = [
+    { label: "Habitacional", value: "habitacional" },
+    { label: "Comercial", value: "comercial" },
+    { label: "Industrial", value: "industrial" },
+    { label: "Agrícola", value: "agricola" },
+  ];
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionLabel}>Tipo de Propiedad</Text>
@@ -35,30 +42,28 @@ export const PropertyTypeSelector: React.FC<PropertyTypeSelectorProps> = ({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chipsContainer}
       >
-        {(["Habitacional", "Comercial", "Industrial", "Agrícola"] as const).map(
-          (tipo) => (
-            <TouchableOpacity
-              key={tipo}
+        {tipoProperty.map((tipo) => (
+          <TouchableOpacity
+            key={tipo.value}
+            style={[
+              styles.chip,
+              tipoPropiedad === tipo.value && styles.chipActive,
+            ]}
+            onPress={() => {
+              onChangeTipo(tipo.value as TipoPrincipal);
+              onChangeSubtipo([]);
+            }}
+          >
+            <Text
               style={[
-                styles.chip,
-                tipoPropiedad === tipo.toLowerCase() && styles.chipActive,
+                styles.chipText,
+                tipoPropiedad === tipo.value && styles.chipTextActive,
               ]}
-              onPress={() => {
-                onChangeTipo(tipo.toLowerCase() as TipoPrincipal);
-                onChangeSubtipo([]);
-              }}
             >
-              <Text
-                style={[
-                  styles.chipText,
-                  tipoPropiedad === tipo.toLowerCase() && styles.chipTextActive,
-                ]}
-              >
-                {tipo}
-              </Text>
-            </TouchableOpacity>
-          ),
-        )}
+              {tipo.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
 
       {tipoPropiedad && (

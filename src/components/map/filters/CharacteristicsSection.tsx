@@ -1,19 +1,15 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { AppInput } from "../../../design-system/components/AppInput";
-import { SelectionMoreModal } from "../../modals/SelectionMoreModal";
-import { COLORS } from "../../../constants/colors";
-import {
-  TipoPrincipal,
-  getLabelRecamaras,
-} from "../../../constants/propertyData";
+import { AppInput } from "@/design-system/components/AppInput";
+import { SelectionMoreModal } from "@/components/modals/SelectionMoreModal";
+import { COLORS } from "@/constants/colors";
+import { TipoPrincipal, getLabelRecamaras } from "@/constants/propertyData";
 import { SelectionModal } from "@/components/modals";
+import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 
 interface CharacteristicsSectionProps {
-  filters: any;
   camposVisibles: any;
-  onUpdateFilter: (key: string, value: any) => void;
   showRecamarasModal: boolean;
   setShowRecamarasModal: (show: boolean) => void;
   showBanosModal: boolean;
@@ -29,9 +25,7 @@ interface CharacteristicsSectionProps {
 }
 
 export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
-  filters,
   camposVisibles,
-  onUpdateFilter,
   showRecamarasModal,
   setShowRecamarasModal,
   showBanosModal,
@@ -45,6 +39,8 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
   openNumberInput,
   setShowNumberInput,
 }) => {
+  const { filters, updateFilter: onUpdateFilter } = usePropertyFiltersStore();
+
   if (!filters.tipoPropiedad) return null;
 
   return (

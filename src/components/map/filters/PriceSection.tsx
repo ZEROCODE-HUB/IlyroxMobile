@@ -1,19 +1,17 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { AppInput } from "../../../design-system/components/AppInput";
-import { COLORS } from "../../../constants/colors";
+import { AppInput } from "@/design-system/components/AppInput";
+import { COLORS } from "@/constants/colors";
+import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 
 interface PriceSectionProps {
-  filters: any;
-  onUpdateFilter: (key: string, value: any) => void;
   handleCurrencyChange: (text: string, setter: (val: string) => void) => void;
 }
 
 export const PriceSection: React.FC<PriceSectionProps> = ({
-  filters,
-  onUpdateFilter,
   handleCurrencyChange,
 }) => {
+  const { filters, updateFilter: onUpdateFilter } = usePropertyFiltersStore();
   return (
     <View style={styles.formSection}>
       <View style={styles.sectionHeader}>

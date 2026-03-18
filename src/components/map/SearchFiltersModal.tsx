@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import RadioGroupSelector from "../common/RadioGroupSelector";
+import { usePropertyFiltersStore } from "../../store/propertyFiltersStore";
 
 import NumberInputModal from "../modals/NumberInputModal";
 import { PropertyTypeSelector } from "./PropertyTypeSelector";
@@ -31,9 +32,6 @@ const { height } = Dimensions.get("window");
 interface SearchFiltersModalProps {
   visible: boolean;
   onClose: () => void;
-  filters: any;
-  onUpdateFilter: (key: string, value: any) => void;
-  onUpdateLocationFilter: (location: any) => void;
   filteredPropertiesCount: number;
   userId?: string;
   selectedLocation?: {
@@ -46,13 +44,12 @@ interface SearchFiltersModalProps {
 export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   visible,
   onClose,
-  filters,
-  onUpdateFilter,
-  onUpdateLocationFilter,
   filteredPropertiesCount,
   userId,
   selectedLocation,
 }) => {
+  const { filters, updateFilter: onUpdateFilter, updateLocationFilter: onUpdateLocationFilter } = usePropertyFiltersStore();
+
   // Estados para modals
   const [showRecamarasModal, setShowRecamarasModal] = useState(false);
   const [showBanosModal, setShowBanosModal] = useState(false);
@@ -200,7 +197,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
                 label="Tipo de Operación"
                 options={["Todas", "Venta", "Renta"]}
                 selectedValue={
-                  !filters.operacion || filters.operacion === ""
+                  !filters.operacion
                     ? "Todas"
                     : filters.operacion.charAt(0).toUpperCase() +
                       filters.operacion.slice(1)
@@ -220,8 +217,6 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
 
             {/* 2. PRECIO Y DIVISA */}
             <PriceSection
-              filters={filters}
-              onUpdateFilter={onUpdateFilter}
               handleCurrencyChange={handleCurrencyChange}
             />
 
@@ -302,9 +297,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
 
             {/* 5. CARACTERÍSTICAS */}
             <CharacteristicsSection
-              filters={filters}
               camposVisibles={camposVisibles}
-              onUpdateFilter={onUpdateFilter}
               showRecamarasModal={showRecamarasModal}
               setShowRecamarasModal={setShowRecamarasModal}
               showBanosModal={showBanosModal}
@@ -361,7 +354,6 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
           setShowSaveSearchModal(false);
           onClose();
         }}
-        filters={filters}
         userId={userId}
       />
     </Modal>

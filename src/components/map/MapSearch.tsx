@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, ScrollView, StyleSheet, Modal, Platform } from "react-native";
+import { View, ScrollView, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Property } from "../../types";
-import { useAuth } from "../../context/AuthContext";
-import { useApp } from "../../context/AppContext";
-import { AppHeader } from "../../components/AppHeader";
+import { Property } from "@/types";
+import { useAuth } from "@/context/AuthContext";
+import { useApp } from "@/context/AppContext";
+import { AppHeader } from "@/components/AppHeader";
 import { SearchFiltersBar } from "./SearchFiltersBar";
 import { PropertyMap } from "./PropertyMap";
 import { PropertyMapCard } from "./PropertyMapCard";
@@ -12,8 +12,8 @@ import { SearchFiltersModal } from "./SearchFiltersModal";
 import {
   usePropertyFilters,
   GeofenceBounds,
-} from "../../hooks/hooks/usePropertyFilters";
-import { useStableSafeInsets } from "../../context/SafeInsetsContext";
+} from "@/hooks/hooks/usePropertyFilters";
+import { useStableSafeInsets } from "@/context/SafeInsetsContext";
 import { router } from "expo-router";
 
 interface MapSearchProps {
@@ -304,9 +304,6 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
       <SearchFiltersModal
         visible={showFiltersModal}
         onClose={() => setShowFiltersModal(false)}
-        filters={filters}
-        onUpdateFilter={updateFilter}
-        onUpdateLocationFilter={updateLocationFilter}
         filteredPropertiesCount={filteredProperties.length}
         userId={user?.id}
         selectedLocation={selectedLocation}

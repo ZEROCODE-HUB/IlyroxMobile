@@ -10,15 +10,15 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { AppInput } from "../../design-system/components/AppInput";
+import { AppInput } from "@/design-system/components/AppInput";
 import { useSaveSearch } from "./filters/useSaveSearch";
-import { COLORS } from "../../constants/colors";
+import { COLORS } from "@/constants/colors";
+import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 
 interface SaveSearchModalProps {
   visible: boolean;
   onClose: () => void;
   onSaveSuccess: () => void; // Callback para cerrar también el modal de filtros
-  filters: any;
   userId?: string;
 }
 
@@ -26,9 +26,9 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
   visible,
   onClose,
   onSaveSuccess,
-  filters,
   userId,
 }) => {
+  const { filters } = usePropertyFiltersStore();
   const {
     setCreateLead,
     leadName,
@@ -50,20 +50,23 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
 
   const getFilterSummary = () => {
     const parts = [];
-    if (filters.operacion && filters.operacion !== "Todas")
-      parts.push(filters.operacion);
+    if (filters.operacion) parts.push(filters.operacion);
     if (filters.tipoPropiedad) parts.push(filters.tipoPropiedad);
-    if (filters.subtipo && filters.subtipo !== "Todas")
-      parts.push(filters.subtipo);
+    if (filters.subtipo && filters.subtipo.length > 0)
+      parts.push(filters.subtipo.join(", "));
 
     const loc = filters.locationFilter;
-    if (loc?.ciudad && loc.ciudad !== "Cualquiera") parts.push(loc.ciudad);
-    if (filters.colonia) parts.push(`Colonia: ${filters.colonia}`);
+    if (loc?.ciudad) parts.push(loc.ciudad);
 
-    if (
-      filters.precioMin ||
-      (filters.precioMax && filters.precioMax !== "Sin límite")
-    ) {
+    if (loc?.colonia) {
+      if (Array.isArray(loc.colonia) && loc.colonia.length > 0) {
+        parts.push(`Colonia: ${loc.colonia.join(", ")}`);
+      } else if (typeof loc.colonia === "string" && loc.colonia.trim()) {
+        parts.push(`Colonia: ${loc.colonia}`);
+      }
+    }
+
+    if (filters.precioMin || filters.precioMax) {
       parts.push(
         `${filters.moneda} ${filters.precioMin || 0}-${filters.precioMax || "Max"}`,
       );
@@ -143,7 +146,9 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
                   value={leadName}
                   onChangeText={setLeadName}
                   placeholder="Ej. Juan Pérez"
-                  containerStyle={errors.leadName ? styles.inputError : undefined}
+                  containerStyle={
+                    errors.leadName ? styles.inputError : undefined
+                  }
                   leftIcon={
                     <Ionicons
                       name="person-outline"
@@ -219,16 +224,10 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
 
           {/* Footer */}
           <View style={styles.footer}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={onClose}
-            >
+            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
               <Text style={styles.cancelButtonText}>Cancelar</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={handleSave}
-            >
+            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
               <Ionicons
                 name="save-outline"
                 size={20}

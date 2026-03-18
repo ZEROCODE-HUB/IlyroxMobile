@@ -1,28 +1,12 @@
 import { useState, useEffect } from "react";
-import { Property } from "../../types";
+import { Property } from "@/types";
 import { useExchangeRate } from "./useExchangeRate";
+import {
+  usePropertyFiltersStore,
+  PropertyFilters,
+} from "@/store/propertyFiltersStore";
 
-export interface PropertyFilters {
-  tipoPropiedad: string;
-  subtipo: string[];
-  precioMin: string;
-  precioMax: string;
-  moneda: "MXN" | "USD";
-  operacion: "venta" | "renta" | ""; // Permitir vacío
-  locationFilter: {
-    estado: string;
-    ciudad: string;
-    municipio: string;
-    colonia: string | string[];
-  };
-  habitaciones: string;
-  banos: string;
-  estacionamientos: string;
-  antiguedad: string;
-  niveles: string;
-  m2TerrenoMin: string;
-  m2ConstruccionMin: string;
-}
+export type { PropertyFilters };
 
 export interface GeofenceBounds {
   minLat: number;
@@ -37,27 +21,8 @@ export const usePropertyFilters = (
 ) => {
   const { convertPrice } = useExchangeRate();
 
-  const [filters, setFilters] = useState<PropertyFilters>({
-    tipoPropiedad: "",
-    subtipo: [],
-    precioMin: "",
-    precioMax: "",
-    moneda: "MXN",
-    operacion: "", // ← VACÍO por defecto, no filtrar
-    locationFilter: {
-      estado: "",
-      ciudad: "",
-      municipio: "",
-      colonia: "",
-    },
-    habitaciones: "",
-    banos: "",
-    estacionamientos: "",
-    antiguedad: "",
-    niveles: "",
-    m2TerrenoMin: "",
-    m2ConstruccionMin: "",
-  });
+  const { filters, updateFilter, updateLocationFilter, clearFilters } =
+    usePropertyFiltersStore();
 
   const [filteredProperties, setFilteredProperties] =
     useState<Property[]>(properties);
@@ -365,40 +330,6 @@ export const usePropertyFilters = (
 
     setFilteredProperties(filtered);
   }, [properties, filters, geofenceBounds]);
-
-  const updateFilter = <K extends keyof PropertyFilters>(
-    key: K,
-    value: PropertyFilters[K],
-  ) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const updateLocationFilter = (
-    location: PropertyFilters["locationFilter"],
-  ) => {
-    setFilters((prev) => ({ ...prev, locationFilter: location }));
-  };
-
-  const clearFilters = (
-    newLocationFilter?: PropertyFilters["locationFilter"],
-  ) => {
-    setFilters((prev) => ({
-      tipoPropiedad: "",
-      subtipo: [],
-      precioMin: "",
-      precioMax: "",
-      moneda: "MXN",
-      operacion: "",
-      locationFilter: newLocationFilter || prev.locationFilter, // KEEP LOCATION or use new one
-      habitaciones: "",
-      banos: "",
-      estacionamientos: "",
-      antiguedad: "",
-      niveles: "",
-      m2TerrenoMin: "",
-      m2ConstruccionMin: "",
-    }));
-  };
 
   const hasActiveFilters =
     filters.tipoPropiedad !== "" ||

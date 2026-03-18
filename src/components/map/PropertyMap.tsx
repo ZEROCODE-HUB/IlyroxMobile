@@ -6,9 +6,9 @@ import MapView, {
   PROVIDER_DEFAULT,
   PROVIDER_GOOGLE,
 } from "../shared/MapComponents";
-import { Property } from "../../types";
-import { COLORS } from "../../constants/colors";
-import { useStableSafeInsets } from "../../context/SafeInsetsContext";
+import { Property } from "@/types";
+import { COLORS } from "@/constants/colors";
+import { useStableSafeInsets } from "@/context/SafeInsetsContext";
 import { Globe, MapIcon } from "lucide-react-native";
 
 interface PropertyMapProps {

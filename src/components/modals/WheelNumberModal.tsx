@@ -40,16 +40,20 @@ export default function WheelNumberModal({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
-  const data = Array.from({ length: max - min + 1 }, (_, i) => (i + min).toString());
+  const data = Array.from({ length: max - min + 1 }, (_, i) =>
+    (i + min).toString(),
+  );
+
+  data.push(`+ ${max}`);
 
   useEffect(() => {
     if (visible) {
       const initialValue = currentValue?.split(" ")[0] || "0";
       const index = data.indexOf(initialValue);
       const targetIndex = index !== -1 ? index : 0;
-      
+
       setSelectedIndex(targetIndex);
-      
+
       // Pequeño delay para asegurar que la lista esté lista
       setTimeout(() => {
         flatListRef.current?.scrollToOffset({
@@ -85,14 +89,25 @@ export default function WheelNumberModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <View style={styles.overlay}>
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
         <View style={styles.modalContent}>
           <View style={styles.header}>
             <View style={styles.titleContainer}>
               <Text style={styles.title}>{title}</Text>
-              {subtitle ? <Text style={styles.subtitle}> {subtitle}</Text> : null}
+              {subtitle ? (
+                <Text style={styles.subtitle}> {subtitle}</Text>
+              ) : null}
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={COLORS.textSecondary} />
@@ -122,7 +137,11 @@ export default function WheelNumberModal({
             />
           </View>
 
-          <TouchableOpacity style={styles.acceptButton} onPress={handleAccept} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={styles.acceptButton}
+            onPress={handleAccept}
+            activeOpacity={0.8}
+          >
             <Text style={styles.acceptButtonText}>Aceptar</Text>
           </TouchableOpacity>
         </View>
