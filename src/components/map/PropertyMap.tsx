@@ -459,6 +459,7 @@ const styles = StyleSheet.create({
     flex: 1,
     position: "relative",
     overflow: "hidden",
+    paddingLeft: 10,
   },
   markerWrapper: {
     display: "none",
