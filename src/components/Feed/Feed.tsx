@@ -196,7 +196,7 @@ const Feed: React.FC<FeedProps> = ({
     async (user: User) => {
       const success = await approveUser(user.id);
       if (success) {
-        showBanner("¡Usuario aprobado!");
+        showBanner("¡Aprobación enviada!");
       }
     },
     [approveUser, showBanner, onUserClick],
@@ -205,7 +205,7 @@ const Feed: React.FC<FeedProps> = ({
   const handleRejectUser = useCallback(
     (user: User) => {
       rejectUser(user.id);
-      showBanner("Usuario rechazado");
+      showBanner("Aprobación rechazada");
     },
     [rejectUser, showBanner],
   );

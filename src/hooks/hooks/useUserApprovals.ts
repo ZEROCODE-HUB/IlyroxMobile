@@ -32,7 +32,7 @@ export function useUserApprovals(
    * Cargar usuarios pendientes del mismo estado
    */
   const loadPendingUsers = useCallback(async () => {
-    if (!currentUserId || !currentUserState) {
+    if (!currentUserId) {
       setLoading(false);
       return;
     }
@@ -40,7 +40,7 @@ export function useUserApprovals(
     try {
       setLoading(true);
 
-      // 1. Obtener usuarios que ya procesaste
+      // 1. Obtener usuarios que ya procesaste (le diste check o x)
       const { data: alreadyProcessed } = await supabase
         .from("aprobaciones_usuarios")
         .select("usuario_solicitante_id")
@@ -50,24 +50,32 @@ export function useUserApprovals(
         alreadyProcessed?.map((a) => a.usuario_solicitante_id) || [],
       );
 
-      // 2. Cargar usuarios con menos de 3 aprobaciones que siguen en estado 'pendiente'
-      // El requisito es que tengan menos de 3 aprobaciones recibidas para aparecer en el slider.
-      // Y que sean del MISMO estado que el usuario actual
-      const { data, error } = await supabase
+      // 2. Cargar usuarios con estado 'pendiente'
+      // Si tenemos estado, priorizamos el mismo estado, pero si no hay resultados o no hay estado,
+      // podríamos mostrar de otros. Por ahora, si hay estado filtramos por él, si no, traemos todos.
+      let query = supabase
         .from("perfiles")
         .select("*")
         .eq("estado_registro", "pendiente")
-        .eq("estado", currentUserState)
-        .lt("aprobaciones_recibidas", 3) // Menos de 3 aprobaciones
         .neq("id", currentUserId)
-        .is("deleted_at", null)
+        .is("deleted_at", null);
+
+      const { data, error } = await query
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(50);
 
       if (error) throw error;
 
-      // 3. Filtrar ya procesados
-      const filtered = (data || []).filter((u) => !processedIds.has(u.id));
+      // 3. Filtrar en JS:
+      // - No procesados por este usuario
+      // - aprobaciones_recibidas < aprobaciones_requeridas
+      const filtered = (data || []).filter((u) => {
+        const isNotProcessed = !processedIds.has(u.id);
+        const needsMoreApprovals =
+          (u.aprobaciones_recibidas || 0) < (u.aprobaciones_requeridas || 3);
+
+        return isNotProcessed && needsMoreApprovals;
+      });
 
       // 4. Transformar a formato User
       const users: PendingUser[] = filtered.map((u) => ({
@@ -77,7 +85,7 @@ export function useUserApprovals(
         avatar: u.foto || "https://placehold.co/100x100",
         isFollowing: false,
         role: u.rol === "agente" ? "Agent" : "User",
-        location: `${u.estado}, México`,
+        location: u.estado ? `${u.estado}, México` : "México",
         phone: u.celular,
         aprobaciones_recibidas: u.aprobaciones_recibidas || 0,
         aprobaciones_requeridas: u.aprobaciones_requeridas || 3,
@@ -107,7 +115,7 @@ export function useUserApprovals(
       setPendingUsers((prev) => prev.filter((u) => u.id !== userId));
 
       // 3. Mostrar toast inmediato
-      showToast("¡Usuario aprobado!", "success");
+      showToast("¡Aprobación enviada!", "success");
 
       try {
         // 4. Insertar aprobación en BD
@@ -125,7 +133,7 @@ export function useUserApprovals(
         setPendingUsers(previousUsers);
 
         console.error("Error approving user:", error);
-        showToast("Error al aprobar usuario", "error");
+        showToast("Error al enviar aprobación", "error");
 
         return false;
       }
@@ -147,7 +155,7 @@ export function useUserApprovals(
       setPendingUsers((prev) => prev.filter((u) => u.id !== userId));
 
       // 3. Mostrar toast inmediato
-      showToast("Usuario rechazado", "info");
+      showToast("Aprobación rechazada", "info");
 
       try {
         // 4. Insertar rechazo en BD
@@ -165,7 +173,7 @@ export function useUserApprovals(
         setPendingUsers(previousUsers);
 
         console.error("Error rejecting user:", error);
-        showToast("Error al rechazar usuario", "error");
+        showToast("Error al enviar rechazo", "error");
 
         return false;
       }
