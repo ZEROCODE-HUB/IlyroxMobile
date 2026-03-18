@@ -258,8 +258,21 @@ export function useComments({
       queryClient.setQueryData(commentCountKey, context.previousCount);
 
       console.error("Error adding comment:", err);
-      showToast("Error al publicar comentario", "error");
+      showToast("Error de conexión", "error");
     },
+    retry: (failureCount, error: any) => {
+      // No reintentar errores de autenticación o lógica (400s)
+      if (
+        error?.message === "No auth" ||
+        error?.status === 400 ||
+        error?.status === 403 ||
+        error?.status === 401
+      ) {
+        return false;
+      }
+      return failureCount < 2; // Máximo 3 intentos total
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
 
   /**

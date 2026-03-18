@@ -91,11 +91,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const firstRecommender = recommendedByPreview[0];
   const recommendedText =
     positiveRecommendations > 0 && firstRecommender
-      ? `${firstRecommender.name}${
-          positiveRecommendations > 1
-            ? ` y ${positiveRecommendations - 1} más`
-            : ""
-        }`
+      ? `${firstRecommender.name}${positiveRecommendations > 1
+        ? ` y ${positiveRecommendations - 1} más`
+        : ""
+      }`
       : `Recomendado por ${positiveRecommendations} usuarios`;
   const [showRecommendedModal, setShowRecommendedModal] = React.useState(false);
 
@@ -186,9 +185,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             }}
             onTrackInteraction={trackInteraction}
             shareTitle={property.title}
-            shareDescription={`${
-              property.operation
-            } - $${property.price.toLocaleString()} ${property.currency}`}
+            shareDescription={`${property.operation
+              } - $${property.price.toLocaleString()} ${property.currency}`}
             shareImageUrl={images[0]}
             showContactButton={false}
             orientation="vertical"
@@ -216,10 +214,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           •{" "}
           {property.createdAt
             ? new Date(property.createdAt).toLocaleDateString("es-MX", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })
             : item.timestamp}
         </Text>
       </Pressable>
@@ -273,7 +271,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         </View>
       </View>
 
-      {/* Stats minimalistas */}
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
           <Ionicons name="bed-outline" size={14} color={COLORS.textTertiary} />

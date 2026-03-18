@@ -1,25 +1,4 @@
-/**
- * VideoPlayer - Reproductor de video reutilizable
- *
- * Componente centralizado para reproducir videos. Maneja:
- * - Play/Pause con indicador visual
- * - Barra de progreso
- * - Auto-pausa por visibilidad
- * - Limpieza de recursos
- *
- * MIGRADO A EXPO-VIDEO desde expo-av
- *
- * @example
- * <VideoPlayer
- *   videoUrl="https://example.com/video.mp4"
- *   isVisible={true}
- *   aspectRatio={1}
- *   showTimeline={true}
- *   showPlayIcon={true}
- * />
- */
-
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { View, StyleSheet, TouchableWithoutFeedback } from "react-native";
 import { VideoView } from "expo-video";
 import { useVideoPlayer } from "@/hooks/hooks/useVideoPlayer";
@@ -53,8 +32,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onPress,
   onLongPress,
 }) => {
+  const [dynamicContentFit, setDynamicContentFit] =
+    useState<"contain" | "cover">("cover");
   // Video de fallback si no hay URL
   const videoSource = videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
+
+  const [dynamicAspectRatio, setDynamicAspectRatio] = useState<number>(aspectRatio);
 
   const { player, isPlaying, progress, togglePlayPause } = useVideoPlayer({
     videoSource,
@@ -62,6 +45,32 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     autoPlay,
     muted: isMuted,
   });
+
+  // Efecto para detectar si el video es horizontal o vertical
+  useEffect(() => {
+    const subscription = (player as any).addListener(
+      "videoSizeChange",
+      (event: any) => {
+        if (event.videoSize) {
+          const { width, height } = event.videoSize;
+          if (width > height) {
+            // Video horizontal: ajusta el contenedor a su ratio real
+            setDynamicContentFit("contain");
+            setDynamicAspectRatio(width / height); // 👈 ej: 16/9
+          } else {
+            // Video vertical o cuadrado: mantiene el ratio del prop
+            setDynamicContentFit("cover");
+            setDynamicAspectRatio(aspectRatio); // 👈 restaura el original
+          }
+        }
+      }
+    );
+
+
+    return () => {
+      subscription.remove();
+    };
+  }, [player, aspectRatio]);
 
   const handlePress = () => {
     if (showControls) {
@@ -78,11 +87,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   return (
     <TouchableWithoutFeedback onPress={handlePress} onLongPress={onLongPress}>
-      <View style={[styles.container, { width: "100%", aspectRatio }]}>
+      <View style={[styles.container, { width: "100%", aspectRatio: dynamicAspectRatio }]}>
         <VideoView
           player={player}
-          style={StyleSheet.absoluteFillObject}
-          contentFit={contentFit}
+          style={StyleSheet.absoluteFill}
+          contentFit={"contain"}
           nativeControls={false}
         />
 

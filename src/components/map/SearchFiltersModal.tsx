@@ -225,18 +225,6 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
               handleCurrencyChange={handleCurrencyChange}
             />
 
-            {/* 4. TIPO DE PROPIEDAD */}
-            <View style={styles.formSection}>
-              <PropertyTypeSelector
-                tipoPropiedad={filters.tipoPropiedad}
-                subtipo={filters.subtipo}
-                onChangeTipo={(tipo) => onUpdateFilter("tipoPropiedad", tipo)}
-                onChangeSubtipo={(subtipo) =>
-                  onUpdateFilter("subtipo", subtipo)
-                }
-              />
-            </View>
-
             {/* UBICACION - COLONIA */}
             {geoEstadoId && (
               <View style={styles.formSection}>
@@ -273,27 +261,44 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
                   visible={showColoniaModal}
                   onClose={() => setShowColoniaModal(false)}
                   onSelect={(vals) => {
-                    const names = vals.map(v => {
-                      const c = colonias.find(col => col.value === v);
+                    const names = vals.map((v) => {
+                      const c = colonias.find((col) => col.value === v);
                       // Extraer solo el nombre de la colonia (eliminar " - Municipio")
-                      return c ? c.label.split(" - ")[0] : v; 
+                      return c ? c.label.split(" - ")[0] : v;
                     });
-                    onUpdateLocationFilter({ ...filters.locationFilter, colonia: names });
+                    onUpdateLocationFilter({
+                      ...filters.locationFilter,
+                      colonia: names,
+                    });
                   }}
                   title="Selecciona Colonias"
                   options={colonias}
                   currentValues={
-                    Array.isArray(filters.locationFilter.colonia) 
-                      ? filters.locationFilter.colonia.map(name => {
-                          const f = colonias.find(c => c.label.split(" - ")[0] === name);
+                    Array.isArray(filters.locationFilter.colonia)
+                      ? filters.locationFilter.colonia.map((name) => {
+                          const f = colonias.find(
+                            (c) => c.label.split(" - ")[0] === name,
+                          );
                           return f ? f.value : name;
-                        }) 
+                        })
                       : []
                   }
                   searchable
                 />
               </View>
             )}
+
+            {/* 4. TIPO DE PROPIEDAD */}
+            <View style={styles.formSection}>
+              <PropertyTypeSelector
+                tipoPropiedad={filters.tipoPropiedad}
+                subtipo={filters.subtipo}
+                onChangeTipo={(tipo) => onUpdateFilter("tipoPropiedad", tipo)}
+                onChangeSubtipo={(subtipo) =>
+                  onUpdateFilter("subtipo", subtipo)
+                }
+              />
+            </View>
 
             {/* 5. CARACTERÍSTICAS */}
             <CharacteristicsSection
@@ -418,7 +423,7 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === "ios" ? 140 : 100,
   },
   formSection: {
-    marginBottom: 32,
+    marginBottom: 20,
   },
   sectionHeader: {
     flexDirection: "row",

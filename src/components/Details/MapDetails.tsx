@@ -1,12 +1,13 @@
-import React, { useMemo, useRef } from "react";
+import React, { useMemo, useRef, useState, useDeferredValue } from "react";
 import MapView, {
   Marker,
   PROVIDER_DEFAULT,
   PROVIDER_GOOGLE,
 } from "../shared/MapComponents";
-import { View, StyleSheet, Text, Platform } from "react-native";
+import { View, StyleSheet, Text, Platform, Pressable } from "react-native";
 import { Property } from "../../types";
 import { COLORS } from "../../constants";
+import { Globe, MapIcon } from "lucide-react-native";
 
 interface PropertyMapProps {
   property: Property;
@@ -21,6 +22,11 @@ export const MapDetails: React.FC<PropertyMapProps> = ({
 
   const lat = property.latitud;
   const lng = property.longitud;
+
+  const [mapTypeId, setMapTypeId] = useState<"standard" | "satellite">(
+    "standard",
+  );
+  const deferredMapTypeId = useDeferredValue(mapTypeId);
 
   if (!lat || !lng || isNaN(Number(lat)) || isNaN(Number(lng))) {
     return (
@@ -68,9 +74,29 @@ export const MapDetails: React.FC<PropertyMapProps> = ({
 
   return (
     <View style={[styles.container, containerStyle]}>
+      <Pressable
+        style={styles.mapTypeButton}
+        onPress={() =>
+          setMapTypeId(
+            mapTypeId === "standard" ? "satellite" : "standard",
+          )
+        }
+      >
+        {mapTypeId === "standard" ? (
+          <View style={styles.mapTypeButtonIcon}>
+            <Globe size={10} />
+            <Text style={styles.mapTypeButtonText}>Satélite</Text>
+          </View>
+        ) : (
+          <View style={styles.mapTypeButtonIcon}>
+            <MapIcon size={10} />
+            <Text style={styles.mapTypeButtonText}>Mapa</Text>
+          </View>
+        )}
+      </Pressable>
       <MapView
         ref={nativeMapRef}
-        mapType="hybrid"
+        mapType={deferredMapTypeId}
         provider={
           Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
         }
@@ -79,7 +105,7 @@ export const MapDetails: React.FC<PropertyMapProps> = ({
         moveOnMarkerPress={true}
         scrollEnabled={true}
         zoomEnabled={true}
-        liteMode={true}
+        liteMode={Platform.OS === "android"}
       >
         <Marker
           key={property.id}
@@ -102,5 +128,28 @@ const styles = StyleSheet.create({
   },
   map: {
     ...StyleSheet.absoluteFillObject,
+  },
+  mapTypeButton: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    zIndex: 1,
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: COLORS.white,
+    elevation: 3,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  mapTypeButtonIcon: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  mapTypeButtonText: {
+    fontSize: 10,
+    fontWeight: "bold",
   },
 });

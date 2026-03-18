@@ -16,8 +16,8 @@ export const DIMENSIONS = {
 
   // Alturas de cards en el feed
   // CAMBIO CRÍTICO: Reels ahora son verticales (9:16)
-  REEL_HEIGHT: SCREEN_WIDTH * (4 / 3),
-  REEL_ASPECT_RATIO: 3 / 4,
+  REEL_HEIGHT: SCREEN_WIDTH * (16 / 9),
+  REEL_ASPECT_RATIO: 9 / 16,
 
   // CAMBIO CRÍTICO: Propiedades ahora son cuadradas (1.0 en lugar de 0.75)
   PROPERTY_HEIGHT: SCREEN_WIDTH * 1.0,

@@ -94,18 +94,23 @@ export function useLikes(options: UseLikesOptions) {
       await queryClient.cancelQueries({ queryKey });
       const previousData = queryClient.getQueryData(queryKey);
 
-      // Cambiar isLiked Y likesCount optimísticamente
-      queryClient.setQueryData(queryKey, (old: any) => ({
-        isLiked: !old.isLiked,
-        likesCount: !old.isLiked
-          ? old.likesCount + 1
-          : Math.max(0, old.likesCount - 1),
-      }));
+      // Cambiar isLiked Y likesCount optimísticamente con guardas
+      queryClient.setQueryData(queryKey, (old: any) => {
+        if (!old) return { isLiked: true, likesCount: initialLikes + 1 };
+        return {
+          isLiked: !old.isLiked,
+          likesCount: !old.isLiked
+            ? (old.likesCount || 0) + 1
+            : Math.max(0, (old.likesCount || 0) - 1),
+        };
+      });
 
       return { previousData };
     },
     onError: (err, variables, context: any) => {
-      queryClient.setQueryData(queryKey, context.previousData);
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
       console.error("Error toggling like:", err);
       showToast("Error al actualizar like", "error");
     },

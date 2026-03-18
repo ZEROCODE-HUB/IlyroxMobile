@@ -2,10 +2,12 @@ import React from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
+import { Property } from "@/types";
+import { Bath } from "lucide-react-native";
 
 interface PropertyMapCardProps {
   id: string;
-  title: string;
+  property: Property;
   price: number;
   currency?: string;
   image: string;
@@ -15,7 +17,7 @@ interface PropertyMapCardProps {
 
 export const PropertyMapCard: React.FC<PropertyMapCardProps> = ({
   id,
-  title,
+  property,
   price,
   currency = "MXN",
   image,
@@ -52,8 +54,54 @@ export const PropertyMapCard: React.FC<PropertyMapCardProps> = ({
 
         <View style={styles.info}>
           <Text style={styles.title}>
-            {title}
+            {property.title}
           </Text>
+        </View>
+        <View style={styles.statsRow}>
+          {(property.features?.beds || (property as any).habitaciones) ? (
+            <View style={styles.statItem}>
+              <Ionicons name="bed-outline" size={14} color={COLORS.textTertiary} />
+              <Text style={styles.statValue}>
+                {property.features?.beds || (property as any).habitaciones}
+              </Text>
+            </View>
+          ) : null}
+
+          {(property.features?.baths || (property as any).banos) ? (
+            <View style={styles.statItem}>
+              <Bath size={12} color={COLORS.textTertiary} />
+              <Text style={styles.statValue}>
+                {property.features?.baths || (property as any).banos}
+              </Text>
+            </View>
+          ) : null}
+
+          {(property.features?.parking !== undefined || (property as any).estacionamientos !== undefined) ? (
+            <View style={styles.statItem}>
+              <Ionicons name="car-outline" size={14} color={COLORS.textTertiary} />
+              <Text style={styles.statValue}>
+                {property.features?.parking ?? (property as any).estacionamientos}
+              </Text>
+            </View>
+          ) : null}
+
+          {(property.features?.constructionSqft || (property as any).metros_construccion) ? (
+            <View style={styles.statItem}>
+              <Ionicons name="home-outline" size={14} color={COLORS.textTertiary} />
+              <Text style={styles.statValue}>
+                {property.features?.constructionSqft || (property as any).metros_construccion}m²
+              </Text>
+            </View>
+          ) : null}
+
+          {(property.features?.landSqft || (property as any).metros_terreno) ? (
+            <View style={[styles.statItem, { borderRightWidth: 0 }]}>
+              <Ionicons name="resize-outline" size={14} color={COLORS.textTertiary} />
+              <Text style={styles.statValue}>
+                {property.features?.landSqft || (property as any).metros_terreno}m²
+              </Text>
+            </View>
+          ) : null}
         </View>
       </ScrollView>
 
@@ -69,7 +117,7 @@ export const PropertyMapCard: React.FC<PropertyMapCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     width: 200,
-    height: 180,
+    height: 230,
     backgroundColor: COLORS.white,
     borderRadius: 16,
     marginRight: 12,
@@ -138,5 +186,22 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.3,
     shadowRadius: 2,
+  },
+  statsRow: {
+    flexDirection: "row",
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  statItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  statValue: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
   },
 });

@@ -288,7 +288,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
               <PropertyMapCard
                 key={property.id}
                 id={property.id}
-                title={property.title || "Propiedad"}
+                property={property}
                 price={property.price || 0}
                 currency={propertyCurrency}
                 image={getPropertyImage(property)}
