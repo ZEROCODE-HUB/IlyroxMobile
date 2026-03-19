@@ -239,11 +239,11 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
               onCommentClick={() => setShowComments(true)}
               orientation="vertical"
               tintColor={COLORS.white}
-              shareTitle={item.content || "Mira este reel"}
+              shareTitle={"Mira este reel"}
               shareDescription={item.content}
               shareImageUrl={item.images?.[0]}
               authorId={item.user.id}
-              contentId={item.reelDetails?.id}
+              contentId={item.reelDetails?.id || (item.type === "reel" ? item.id : undefined)}
             />
           </View>
         </View>

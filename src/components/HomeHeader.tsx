@@ -108,6 +108,10 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
       <View style={styles.searchWrapper}>
         <LocationSearchBar
           onLocationSelect={(loc) => {
+            if (!loc) {
+              setSelectedLocation(null);
+              return;
+            }
             setSelectedLocation({
               type: loc.type,
               name: loc.name,

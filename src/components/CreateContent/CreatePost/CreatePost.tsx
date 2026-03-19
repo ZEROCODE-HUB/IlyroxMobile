@@ -294,13 +294,21 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             placeholder="¿Qué quieres compartir?"
             value={content}
             onChangeText={(text) => {
-              setContent(text);
+              if (text.length <= 2500) {
+                setContent(text);
+              } else {
+                setContent(text.substring(0, 2500));
+              }
+
               if (errors.content) {
                 setErrors({ ...errors, content: "" });
               }
             }}
             error={errors.content}
             inputStyle={styles.textArea}
+            numberOfLines={10}
+            maxLength={2500}
+            helperText={`${content.length}/2500`}
           />
         </View>
 

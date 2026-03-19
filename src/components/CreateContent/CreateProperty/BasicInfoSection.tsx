@@ -3,7 +3,13 @@
 // ============================================
 
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { SelectionModal } from "../../modals";
@@ -70,16 +76,16 @@ export const BasicInfoSection = React.memo(function BasicInfoSection({
         placeholder="Describe las características principales..."
         value={descripcion}
         onChangeText={(text) => {
-          if (text.length <= 500) {
+          if (text.length <= 2500) {
             setDescripcion(text);
           } else {
-            setDescripcion(text.substring(0, 500));
+            setDescripcion(text.substring(0, 2500));
           }
         }}
         multiline
-        numberOfLines={8}
-        maxLength={500}
-        helperText={`${descripcion.length}/500`}
+        numberOfLines={10}
+        maxLength={2500}
+        helperText={`${descripcion.length}/2500`}
         inputStyle={styles.textArea}
         error={errors.descripcion}
       />

@@ -152,6 +152,7 @@ const mapReelToFeedItem = (
     likes: reel.likes_count || 0,
     comments: reel.comentarios_count || 0,
     timestamp: reel.created_at,
+    reelDetails: reel,
   };
 };
 

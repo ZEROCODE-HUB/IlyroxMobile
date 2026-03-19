@@ -734,8 +734,8 @@ export function useFeedItem(feedItemId: string) {
           )
         `,
         )
-        .eq("id", feedItemId)
-        .single();
+        .or(`id.eq.${feedItemId},contenido_id.eq.${feedItemId}`)
+        .maybeSingle();
 
       if (feedError) throw feedError;
       if (!feedData) return;

@@ -34,7 +34,7 @@ export function useShare() {
 
       let url = `${baseUrl}?type=${type}&id=${feedItemId}`;
       if (sinDatos) {
-        url += `&sinDatos=true`;
+        url += `&sd=1`;
       }
       return url;
     },
@@ -46,11 +46,23 @@ export function useShare() {
    */
   const shareContent = useCallback(
     async (options: ShareOptions): Promise<boolean> => {
-      const { feedItemId, shareId, type, title, description, imageUrl, sinDatos } = options;
+      const {
+        feedItemId,
+        shareId,
+        type,
+        title,
+        description,
+        imageUrl,
+        sinDatos,
+      } = options;
 
       try {
         // 1. Generar deep link
-        const deepLink = generateDeepLink(shareId || feedItemId, type, sinDatos);
+        const deepLink = generateDeepLink(
+          shareId || feedItemId,
+          type,
+          sinDatos,
+        );
 
         // 2. Mensaje para compartir
         const message = `${title}\n\n${description}\n\n${deepLink}`;

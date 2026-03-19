@@ -26,6 +26,7 @@ import { supabase } from "../../lib/supabase";
 import { useCreateContent } from "@/hooks/hooks/useCreateContent";
 import { useVideoUpload } from "@/hooks/hooks";
 import { AppHeader } from "../AppHeader";
+import { uploadImage } from "../../services/uploadService";
 
 interface CreateReelProps {
   reelId?: string;
@@ -240,7 +241,19 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
       }
 
       const videoUrl = uploadResult.videoUrl;
-      const thumbnailUrl = uploadResult.thumbnailUrl || null;
+      let thumbnailUrl = uploadResult.thumbnailUrl || null;
+
+      // Si tenemos un thumbnail local generado, lo subimos manualmente para asegurar su existencia
+      if (thumbnailUri && !thumbnailUri.startsWith("http")) {
+        try {
+          const manualThumb = await uploadImage(thumbnailUri, "reels");
+          if (manualThumb) {
+            thumbnailUrl = manualThumb;
+          }
+        } catch (error) {
+          console.error("Error uploading manual thumbnail:", error);
+        }
+      }
 
       // 3. Crear o Actualizar el reel
       let success = false;
@@ -333,7 +346,9 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
               value={description}
               onChangeText={setDescription}
               multiline
-              maxLength={500}
+              maxLength={2500}
+              numberOfLines={10}
+              helperText={`${description.length}/2500`}
             />
           </View>
         </ScrollView>

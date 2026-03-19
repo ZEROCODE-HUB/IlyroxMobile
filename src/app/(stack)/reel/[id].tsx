@@ -1,7 +1,9 @@
 import React from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { View, ActivityIndicator, Text, TouchableOpacity } from "react-native";
 import ReelDetail from "@/components/Reel/ReelDetail";
 import { useAuth } from "@/context/AuthContext";
+import { useFeedItem } from "@/hooks/hooks";
 
 export default function ReelDetailScreen() {
   const params = useLocalSearchParams();
@@ -19,10 +21,55 @@ export default function ReelDetailScreen() {
     }
   }
 
-  if (!reelItem) {
-    return null;
+  // Use hook to fetch if not provided via state
+  const {
+    item: fetchedItem,
+    loading,
+    error,
+  } = useFeedItem(!reelItem ? (params.id as string) : "");
+
+  // Priority to fetched item if it was requested, or the passed item
+  const finalItem = reelItem || fetchedItem;
+
+  if (loading && !reelItem) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "#000",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
   }
 
+  if (!finalItem) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "#000",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ color: "#fff" }}>
+          {error ? "Error al cargar" : "Reel no encontrado"}
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{ marginTop: 20 }}
+        >
+          <Text style={{ color: "#fff", textDecorationLine: "underline" }}>
+            Volver
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
   return (
     <ReelDetail
       item={reelItem}

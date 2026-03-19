@@ -130,8 +130,10 @@ const styles = StyleSheet.create({
   gridItem: {
     width: ITEM_SIZE - 2,
     height: (ITEM_SIZE - 2) * 1.6,
-    marginBottom: 3,
-    marginRight: 3,
+    marginTop: 5,
+    marginBottom: 5,
+    marginRight: 5,
+    marginLeft: 5,
     backgroundColor: COLORS.background,
     borderRadius: 8,
     overflow: "hidden",

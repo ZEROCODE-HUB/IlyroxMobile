@@ -134,8 +134,8 @@ export default function LocationPicker({
         <Text style={styles.title}>Ubicación Exacta</Text>
       </View>
       <Text style={styles.subtitle}>
-        Mantén presionado el mapa (0.7s) o arrastra el pin para establecer la
-        ubicación exacta de la propiedad.
+        <Ionicons name="warning" size={16} color={COLORS.textSecondary} />{" "}
+        Mantén presionado el mapa para marcar la ubicación.
       </Text>
 
       <View style={styles.mapContainer}>
