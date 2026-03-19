@@ -42,7 +42,7 @@ import { useGridProfile } from "../../hooks/hooks/profile/useGridProfile";
 import ReelDetail from "../Reel/ReelDetail";
 import FeedDetail from "../Feed/FeedDetail";
 import CreateProperty from "../CreateContent/CreateProperty";
-import CreatePost from "../CreateContent/CreatePost";
+import CreatePost from "../CreateContent/CreatePost/CreatePost";
 import CreateReel from "../CreateContent/CreateReel";
 import AnimatedLike from "../../design-system/components/AnimatedLike";
 import { useChatInitiator } from "@/hooks/hooks/messaging/useChatInitiator";

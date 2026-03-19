@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
+import * as Haptics from "expo-haptics";
 import MapView, {
   Marker,
   Region,
@@ -113,6 +114,11 @@ export default function LocationPicker({
     const { latitude, longitude } = e.nativeEvent.coordinate;
     setMarker({ latitude, longitude });
     onLocationSelected({ latitude, longitude });
+
+    // Feedback háptico "Premium" al seleccionar
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
   };
 
   const handleDragEnd = (e: any) => {
@@ -128,8 +134,8 @@ export default function LocationPicker({
         <Text style={styles.title}>Ubicación Exacta</Text>
       </View>
       <Text style={styles.subtitle}>
-        Toca el mapa o arrastra el pin para establecer la ubicación exacta de la
-        propiedad.
+        Mantén presionado el mapa (0.7s) o arrastra el pin para establecer la
+        ubicación exacta de la propiedad.
       </Text>
 
       <View style={styles.mapContainer}>
@@ -169,7 +175,7 @@ export default function LocationPicker({
               style={styles.map}
               initialRegion={region}
               mapType={mapTypeId}
-              onPress={handleMapPress}
+              onLongPress={handleMapPress}
               onMapReady={handleMapReady}
               provider={
                 Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
@@ -191,7 +197,7 @@ export default function LocationPicker({
         {!marker && Platform.OS !== "web" && (
           <View style={styles.overlay} pointerEvents="none">
             <Text style={styles.overlayText}>
-              Toca el mapa para colocar el pin
+              Mantén presionado (0.7s) para colocar el pin
             </Text>
           </View>
         )}

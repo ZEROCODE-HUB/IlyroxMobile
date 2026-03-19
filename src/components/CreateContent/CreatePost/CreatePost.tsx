@@ -16,21 +16,23 @@ import {
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { AppInput } from "../../design-system/components/AppInput";
+import { AppInput } from "@/design-system/components/AppInput";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
-import { useAuth } from "../../context/AuthContext";
-import { COLORS } from "../../constants/colors";
-import { ScreenWrapper } from "../../screens/ScreenWrapper";
-import ReordenableImages from "./ReordenableImages";
-import { Post } from "../../types";
+import { useAuth } from "@/context/AuthContext";
+import { COLORS } from "@/constants/colors";
+import { ScreenWrapper } from "@/screens/ScreenWrapper";
+import ReordenableImages from "../ReordenableImages";
+import { Post } from "@/types";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Burnt from "burnt";
-import { supabase } from "../../lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { useCreateContent } from "@/hooks/hooks/useCreateContent";
-import { uploadImage as uploadImageService } from "../../services/uploadService";
-import { AppHeader } from "../AppHeader";
+import { uploadImage as uploadImageService } from "@/services/uploadService";
+import { AppHeader } from "@/components/AppHeader";
+import { OpenHousePost } from "./OpenHousePost";
+import { BusquedaPost } from "./BusquedaPost";
 
 interface CreatePostProps {
   post?: Post;
@@ -52,10 +54,13 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
+  const [fechaFinalizacion, setFechaFinalizacion] = useState<Date | null>(null);
+  const [fotoPropiedad, setFotoPropiedad] = useState<string | null>(null);
   const [precioMin, setPrecioMin] = useState("");
   const [precioMax, setPrecioMax] = useState("");
   const [habitaciones, setHabitaciones] = useState("");
   const [operacion, setOperacion] = useState("");
+  const [ubicacion, setUbicacion] = useState("");
 
   const isEditing = !!post;
   const [isUploadingManual, setIsUploadingManual] = useState(false);
@@ -80,17 +85,23 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
 
         if (data) {
           setContent(data.contenido);
+          setUbicacion(data.ubicacion);
           setImages(data.imagenes || []);
 
-          if (data.tipo === "openhouse" && data.fecha_hora) {
-            setFechaHora(new Date(data.fecha_hora));
+          if (data.tipo === "openhouse") {
+            if (data.fecha_hora) setFechaHora(new Date(data.fecha_hora));
+            if (data.fecha_finalizacion)
+              setFechaFinalizacion(new Date(data.fecha_finalizacion));
+            if (data.foto_propiedad) setFotoPropiedad(data.foto_propiedad);
           }
 
           if (data.tipo === "busqueda" && data.busquedas_json) {
             const filtros = data.busquedas_json.filtros || {};
             setPrecioMin(filtros.precio_min?.toString() || "");
             setPrecioMax(filtros.precio_max?.toString() || "");
-            setHabitaciones(filtros.caracteristicas?.habitaciones?.toString() || "");
+            setHabitaciones(
+              filtros.caracteristicas?.habitaciones?.toString() || "",
+            );
             setOperacion(filtros.operacion || "");
           }
         }
@@ -104,7 +115,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   /**
    * Seleccionar imagen de la galería
    */
-  const handlePickImage = async () => {
+  const handlePickImage = async (limit: number = 5) => {
     // Pedir permisos
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
@@ -115,15 +126,17 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
     // Abrir galería
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      allowsEditing: true,
+      allowsMultipleSelection: limit > 1,
       quality: 0.8,
-      selectionLimit: 5,
     });
 
-    if (!result.canceled && result.assets) {
-      const uris = result.assets.map((asset) => asset.uri);
-      setImages((prev) => [...prev, ...uris].slice(0, 5)); // Max 5 imágenes
+    if (!result.canceled) {
+      const uris = result.assets.map((a) => a.uri);
+      setImages((prev) => {
+        if (limit === 1) return uris;
+        return [...prev, ...uris].slice(0, limit);
+      });
+      setErrors((prev) => ({ ...prev, images: "" }));
     }
   };
 
@@ -191,6 +204,9 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
 
         if (post?.tipo === "openhouse") {
           updatedData.fecha_hora = fechaHora.toISOString();
+          updatedData.fecha_finalizacion = fechaFinalizacion?.toISOString();
+          updatedData.foto_propiedad = fotoPropiedad;
+          updatedData.ubicacion = ubicacion;
         }
 
         if (post?.tipo === "busqueda") {
@@ -203,13 +219,19 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             filtros: {
               ...currentFiltros,
               operacion: operacion || currentFiltros.operacion,
-              precio_min: precioMin ? Number(precioMin) : currentFiltros.precio_min,
-              precio_max: precioMax ? Number(precioMax) : currentFiltros.precio_max,
+              precio_min: precioMin
+                ? Number(precioMin)
+                : currentFiltros.precio_min,
+              precio_max: precioMax
+                ? Number(precioMax)
+                : currentFiltros.precio_max,
               caracteristicas: {
                 ...currentCaracteristicas,
-                habitaciones: habitaciones ? Number(habitaciones) : currentCaracteristicas.habitaciones
-              }
-            }
+                habitaciones: habitaciones
+                  ? Number(habitaciones)
+                  : currentCaracteristicas.habitaciones,
+              },
+            },
           };
         }
 
@@ -283,152 +305,79 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
         </View>
 
         {isEditing && post?.tipo === "openhouse" && (
-          <View style={styles.card}>
-            <Text style={styles.label}>Fecha y Hora del Open House</Text>
-            
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
-              <TouchableOpacity 
-                style={styles.dateButton} 
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
-                <Text style={styles.dateButtonText}>
-                  {fechaHora.toLocaleDateString("es-ES")}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.dateButton} 
-                onPress={() => setShowTimePicker(true)}
-              >
-                <Ionicons name="time-outline" size={20} color={COLORS.primary} />
-                <Text style={styles.dateButtonText}>
-                  {fechaHora.toLocaleTimeString("es-ES", { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {showDatePicker && (
-              <DateTimePicker
-                value={fechaHora}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  setShowDatePicker(false);
-                  if (selectedDate) {
-                    const newDate = new Date(fechaHora);
-                    newDate.setFullYear(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
-                    setFechaHora(newDate);
-                  }
-                }}
-              />
-            )}
-
-            {showTimePicker && (
-              <DateTimePicker
-                value={fechaHora}
-                mode="time"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  setShowTimePicker(false);
-                  if (selectedDate) {
-                    const newDate = new Date(fechaHora);
-                    newDate.setHours(selectedDate.getHours(), selectedDate.getMinutes());
-                    setFechaHora(newDate);
-                  }
-                }}
-              />
-            )}
-          </View>
+          <OpenHousePost
+            post={post}
+            errors={errors}
+            fechaHora={fechaHora}
+            setFechaHora={setFechaHora}
+            fechaFinalizacion={fechaFinalizacion}
+            setFechaFinalizacion={setFechaFinalizacion}
+            fotoPropiedad={fotoPropiedad}
+            setFotoPropiedad={setFotoPropiedad}
+            ubicacion={ubicacion}
+            setUbicacion={setUbicacion}
+          />
         )}
 
         {isEditing && post?.tipo === "busqueda" && (
-          <View style={styles.card}>
-            <Text style={styles.label}>Parámetros de Búsqueda</Text>
-            
-            <View style={{ marginTop: 12, gap: 16 }}>
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <AppInput
-                    label="Precio Mínimo"
-                    placeholder="Ej. 1000000"
-                    keyboardType="numeric"
-                    value={precioMin}
-                    onChangeText={setPrecioMin}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <AppInput
-                    label="Precio Máximo"
-                    placeholder="Ej. 5000000"
-                    keyboardType="numeric"
-                    value={precioMax}
-                    onChangeText={setPrecioMax}
-                  />
-                </View>
-              </View>
+          <BusquedaPost
+            post={post}
+            precioMin={precioMin}
+            setPrecioMin={setPrecioMin}
+            precioMax={precioMax}
+            setPrecioMax={setPrecioMax}
+            habitaciones={habitaciones}
+            setHabitaciones={setHabitaciones}
+            operacion={operacion}
+            setOperacion={setOperacion}
+          />
+        )}
 
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <AppInput
-                    label="Habitaciones"
-                    placeholder="Ej. 3"
-                    keyboardType="numeric"
-                    value={habitaciones}
-                    onChangeText={setHabitaciones}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <AppInput
-                    label="Operación"
-                    placeholder="Venta / Renta"
-                    value={operacion}
-                    onChangeText={setOperacion}
-                  />
-                </View>
+        {post?.tipo !== "busqueda" &&
+          post?.tipo !== "aniversario" &&
+          post?.tipo !== "openhouse" && (
+            <View style={styles.card}>
+              <Text style={styles.label}>Imágenes (opcional)</Text>
+              <Text style={styles.hint}>Máximo 5 imágenes</Text>
+
+              <View style={{ marginTop: 9 }}>
+                {images.length > 0 && (
+                  <GestureHandlerRootView>
+                    <ReordenableImages
+                      images={images}
+                      onReorder={setImages}
+                      onRemove={handleRemoveImage}
+                    />
+                  </GestureHandlerRootView>
+                )}
+
+                {images.length < 5 && (
+                  <View style={{ marginTop: 12 }}>
+                    <TouchableOpacity
+                      onPress={() => handlePickImage()}
+                      style={[
+                        styles.uploadBtn,
+                        errors.images && styles.uploadBtnError,
+                        {
+                          width: "100%",
+                          flexDirection: "row",
+                          gap: 8,
+                          height: 50,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name="camera"
+                        size={28}
+                        color={COLORS.textTertiary}
+                      />
+                      <Text style={styles.uploadText}>Agregar foto</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             </View>
-          </View>
-        )}
-
-        {post?.tipo !== "busqueda" && post?.tipo !== "aniversario" && (
-        <View style={styles.card}>
-          <Text style={styles.label}>Imágenes (opcional)</Text>
-          <Text style={styles.hint}>Máximo 5 imágenes</Text>
-
-          <View style={{ marginTop: 9 }}>
-            {images.length > 0 && (
-              <GestureHandlerRootView>
-                <ReordenableImages
-                  images={images}
-                  onReorder={setImages}
-                  onRemove={handleRemoveImage}
-                />
-              </GestureHandlerRootView>
-            )}
-
-            {images.length < 5 && (
-              <View style={{ marginTop: 12 }}>
-                <TouchableOpacity
-                  onPress={handlePickImage}
-                  style={[
-                    styles.uploadBtn,
-                    errors.images && styles.uploadBtnError,
-                    { width: "100%", flexDirection: "row", gap: 8, height: 50 },
-                  ]}
-                >
-                  <Ionicons
-                    name="camera"
-                    size={28}
-                    color={COLORS.textTertiary}
-                  />
-                  <Text style={styles.uploadText}>Agregar foto</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        </View>
-        )}
+          )}
       </ScrollView>
 
       {/* Botón Publicar */}

@@ -421,22 +421,6 @@ const generatePropertyHtml = (
     `;
   }
 
-  // Comisión
-  let comisionHtml = "";
-  if (showSensitiveData && config.showComision && operacionPrincipal) {
-    if (
-      operacionPrincipal.comision_porcentaje ||
-      operacionPrincipal.comision_monto_fijo
-    ) {
-      comisionHtml = `
-            <div class="internal-data-box">
-                Comisión: ${operacionPrincipal.comision_porcentaje ? operacionPrincipal.comision_porcentaje + "%" : formatPrice(operacionPrincipal.comision_monto_fijo)}
-                ${operacionPrincipal.comparte_comision ? `(Comparte: ${operacionPrincipal.porcentaje_comision_compartida ? operacionPrincipal.porcentaje_comision_compartida + "%" : "Sin especificar<"})` : ""}
-            </div>
-         `;
-    }
-  }
-
   // Descripción por plantas
   let descripcionHtml = "";
   if (data.descripcion) {
@@ -819,8 +803,6 @@ const generatePropertyHtml = (
         
         </div>
       </div>
-
-      ${comisionHtml}
 
       <div class="details-section">
          <h2>Descripción</h2>

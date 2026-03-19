@@ -15,6 +15,11 @@ export type Post = {
   foto_propiedad?: string;
   antiguedad?: number;
   busquedas_json?: any;
+  precio_min?: number;
+  precio_max?: number;
+  habitaciones?: number;
+  operacion?: string;
+  fecha_finalizacion?: string;
 };
 
 export type FeedItem = {
@@ -36,6 +41,7 @@ export type FeedItem = {
   postType?: "post" | "busqueda" | "openhouse" | "aniversario" | "sold";
   foto_perfil_usuario?: string;
   fecha_hora?: string;
+  fecha_finalizacion?: string;
   nombre_asesor?: string;
   ubicacion?: string;
   foto_propiedad?: string;

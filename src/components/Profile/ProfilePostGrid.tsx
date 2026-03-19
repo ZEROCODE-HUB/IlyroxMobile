@@ -22,7 +22,7 @@ import { Post } from "../../types";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
 
-import CreatePost from "../CreateContent/CreatePost";
+import CreatePost from "../CreateContent/CreatePost/CreatePost";
 import { useGridProfile } from "@/hooks/hooks/profile/useGridProfile";
 
 const { width } = Dimensions.get("window");
@@ -85,11 +85,11 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
     const hasImages = item.imagenes && item.imagenes.length > 0;
     const hasMultipleImages = item.imagenes && item.imagenes.length > 1;
 
-    const isStandardPost =
-      (item.tipo || "post").toLowerCase().replace(/\s+/g, "") === "post";
+    const postType = (item.tipo || "post").toLowerCase().replace(/\s+/g, "");
+    const canEdit = ["post", "openhouse", "busqueda"].includes(postType);
 
     const menuOptions: MenuOption[] = [
-      ...(isStandardPost
+      ...(canEdit
         ? [
             {
               icon: "pencil-outline",

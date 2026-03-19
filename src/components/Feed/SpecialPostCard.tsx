@@ -238,14 +238,34 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
             </Text>
 
             {!isSold && (
-              <Text style={styles.dateTimeText}>
-                {new Date(eventDate).toLocaleString("es-ES", {
-                  day: "numeric",
-                  month: "long",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </Text>
+              <View>
+                <Text style={styles.dateTimeText}>
+                  {new Date(eventDate).toLocaleString("es-ES", {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </Text>
+                {item.postDetails.fecha_finalizacion && (
+                  <Text
+                    style={[
+                      styles.dateTimeText,
+                      { marginTop: -4, fontSize: 10, opacity: 0.9 },
+                    ]}
+                  >
+                    finaliza el{" "}
+                    {new Date(
+                      item.postDetails.fecha_finalizacion,
+                    ).toLocaleString("es-ES", {
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </Text>
+                )}
+              </View>
             )}
 
             <View style={styles.addressRow}>

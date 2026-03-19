@@ -33,8 +33,17 @@ export function ViewImage({
   const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [aspectRatio, setAspectRatio] = useState(1);
 
   const isModalVisible = isVisibleAuto || visible;
+
+  useEffect(() => {
+    if (src) {
+      Image.getSize(src, (width, height) => {
+        setAspectRatio(width / height);
+      });
+    }
+  }, [src]);
 
   useEffect(() => {
     if (isModalVisible) {
@@ -59,8 +68,8 @@ export function ViewImage({
         >
           <Image
             source={{ uri: src }}
-            style={[styles.thumbnail, imageStyle]}
-            resizeMode="cover"
+            style={[styles.thumbnail, { aspectRatio }]}
+            resizeMode="contain"
           />
         </TouchableOpacity>
       )}
@@ -71,7 +80,11 @@ export function ViewImage({
         animationType="fade"
         onRequestClose={handleClose}
       >
-        <View style={styles.modalContainer}>
+        <TouchableOpacity
+          style={styles.modalContainer}
+          activeOpacity={1}
+          onPress={handleClose}
+        >
           <TouchableOpacity
             style={[styles.closeButton, { top: insets.top + 10 }]}
             onPress={handleClose}
@@ -89,12 +102,15 @@ export function ViewImage({
             )}
             <Image
               source={{ uri: src }}
-              style={styles.fullImage}
+              style={[
+                styles.fullImage,
+                { aspectRatio, maxHeight: SCREEN_HEIGHT },
+              ]}
               resizeMode="contain"
               onLoadEnd={() => setLoading(false)}
             />
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
     </>
   );
@@ -106,7 +122,6 @@ const styles = StyleSheet.create({
   },
   thumbnail: {
     width: "100%",
-    height: "100%", // Obligamos a que llene el espacio que le asigne el padre
     backgroundColor: "rgba(0,0,0,0.05)",
   },
   modalContainer: {
@@ -123,7 +138,6 @@ const styles = StyleSheet.create({
   },
   fullImage: {
     width: "100%",
-    height: "100%",
   },
   loading: {
     position: "absolute",
