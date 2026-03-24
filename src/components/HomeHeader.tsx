@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LocationSearchBar } from "./LocationSearchBar";
 import { COLORS } from "../constants";
 import { useApp } from "../context/AppContext";
+import { LocationSuggestionWithCount } from "../store/locationSearchStore";
 
 // Assuming Logo is in assets folder relative to src/components -> ../../assets/Logo.jpeg
 // Adjust path if necessary based on project structure.
@@ -107,7 +108,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
 
       <View style={styles.searchWrapper}>
         <LocationSearchBar
-          onLocationSelect={(loc) => {
+          onLocationSelect={(loc: LocationSuggestionWithCount | null) => {
             if (!loc) {
               setSelectedLocation(null);
               return;
@@ -115,9 +116,11 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
             setSelectedLocation({
               type: loc.type,
               name: loc.name,
-              estado_id: loc.estado_id,
+              estado_id: loc.estado_id ?? 0,
+              municipio_nombre: loc.municipio_nombre,
+              estado_nombre: loc.estado_nombre,
             });
-            if (loc) router.push("/(stack)/map");
+            router.push("/(stack)/map");
           }}
           onSearchingChange={onSearchingChange}
           isHeaderVisible={isHeaderVisible}

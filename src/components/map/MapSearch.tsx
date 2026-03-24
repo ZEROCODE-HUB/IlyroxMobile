@@ -68,18 +68,24 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   useEffect(() => {
     if (selectedLocation) {
       // Crear filtro de ubicación según el tipo
-      const newLocationFilter = {
+      const newLocationFilter: any = {
         estado: "",
         ciudad: "",
         municipio: "",
-        colonia: "",
+        colonia: [],
       };
 
       // Actualizar el campo correcto según el tipo de ubicación
       if (selectedLocation.type === "municipio") {
         newLocationFilter.municipio = selectedLocation.name;
       } else if (selectedLocation.type === "colonia") {
-        newLocationFilter.colonia = selectedLocation.name;
+        newLocationFilter.colonia = [selectedLocation.name];
+        if (selectedLocation.municipio_nombre) {
+          newLocationFilter.municipio = selectedLocation.municipio_nombre;
+        }
+        if (selectedLocation.estado_nombre) {
+          newLocationFilter.estado = selectedLocation.estado_nombre;
+        }
       } else if (selectedLocation.type === "estado") {
         newLocationFilter.estado = selectedLocation.name;
       } else {
@@ -188,18 +194,24 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
 
   // Limpiar filtros (mantiene ubicación actual del contexto global)
   const handleClearAll = () => {
-    let locationToKeep = {
+    let locationToKeep: any = {
       estado: "",
       ciudad: "",
       municipio: "",
-      colonia: "",
+      colonia: [],
     };
 
     if (selectedLocation) {
       if (selectedLocation.type === "municipio") {
         locationToKeep.municipio = selectedLocation.name;
       } else if (selectedLocation.type === "colonia") {
-        locationToKeep.colonia = selectedLocation.name;
+        locationToKeep.colonia = [selectedLocation.name];
+        if (selectedLocation.municipio_nombre) {
+          locationToKeep.municipio = selectedLocation.municipio_nombre;
+        }
+        if (selectedLocation.estado_nombre) {
+          locationToKeep.estado = selectedLocation.estado_nombre;
+        }
       } else if (selectedLocation.type === "estado") {
         locationToKeep.estado = selectedLocation.name;
       } else {

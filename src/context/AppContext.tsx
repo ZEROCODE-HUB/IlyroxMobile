@@ -32,12 +32,16 @@ interface AppContextType {
     type: "estado" | "municipio" | "colonia";
     name: string;
     estado_id: number;
+    municipio_nombre?: string;
+    estado_nombre?: string;
   } | null;
   setSelectedLocation: (
     location: {
       type: "estado" | "municipio" | "colonia";
       name: string;
       estado_id: number;
+      municipio_nombre?: string;
+      estado_nombre?: string;
     } | null,
   ) => void;
   isGlobalMuted: boolean;
@@ -58,6 +62,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     type: "estado" | "municipio" | "colonia";
     name: string;
     estado_id: number;
+    municipio_nombre?: string;
+    estado_nombre?: string;
   } | null>(null);
   const [isGlobalMuted, setIsGlobalMuted] = useState(true);
 

@@ -15,6 +15,14 @@ export interface GeofenceBounds {
   maxLng: number;
 }
 
+/** Normaliza strings: minúsculas, sin acentos, sin espacios extra */
+const normalizeStr = (s: string): string =>
+  s
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
 export const usePropertyFilters = (
   properties: Property[],
   geofenceBounds?: GeofenceBounds | null,
@@ -125,15 +133,11 @@ export const usePropertyFilters = (
 
       // Filtro de estado
       if (filters.locationFilter.estado) {
-        const pEstado = (anyP.estado || p.location?.state || "")
-          .toString()
-          .trim()
-          .toLowerCase();
-        const fEstado = filters.locationFilter.estado
-          .toString()
-          .trim()
-          .toLowerCase();
-        if (pEstado !== fEstado) {
+        const pEstado = normalizeStr(
+          anyP.estado || p.location?.state || ""
+        );
+        const fEstado = normalizeStr(filters.locationFilter.estado);
+        if (!pEstado.includes(fEstado) && !fEstado.includes(pEstado)) {
           return false;
         }
       }
@@ -149,13 +153,9 @@ export const usePropertyFilters = (
 
       // Filtro de municipio (Flexible: busca en municipio O ciudad)
       if (filters.locationFilter.municipio) {
-        const fMunicipio = filters.locationFilter.municipio
-          .toString()
-          .trim()
-          .toLowerCase();
-
-        const matchMunicipio = pMunicipio === fMunicipio;
-        const matchCiudad = pCiudad === fMunicipio;
+        const fMunicipio = normalizeStr(filters.locationFilter.municipio);
+        const matchMunicipio = normalizeStr(pMunicipio).includes(fMunicipio) || fMunicipio.includes(normalizeStr(pMunicipio));
+        const matchCiudad = normalizeStr(pCiudad).includes(fMunicipio) || fMunicipio.includes(normalizeStr(pCiudad));
 
         if (!matchMunicipio && !matchCiudad) {
           return false;
@@ -167,24 +167,19 @@ export const usePropertyFilters = (
         filters.locationFilter.colonia &&
         filters.locationFilter.colonia.length > 0
       ) {
-        const pColoniaRaw = anyP.colonia || p.location?.colony || "";
-        const pColonia = pColoniaRaw.toString().trim().toLowerCase();
+        const pColonia = normalizeStr(
+          anyP.colonia || p.location?.colony || ""
+        );
 
         if (Array.isArray(filters.locationFilter.colonia)) {
-          const fColonias = filters.locationFilter.colonia.map((c) =>
-            c.trim().toLowerCase(),
-          );
+          const fColonias = filters.locationFilter.colonia.map(normalizeStr);
           const isMatch = fColonias.some(
-            (f) => pColonia.includes(f) || f.includes(pColonia),
+            (f) => pColonia.includes(f) || f.includes(pColonia)
           );
           if (!isMatch) return false;
         } else {
-          const fColonia = filters.locationFilter.colonia
-            .toString()
-            .trim()
-            .toLowerCase();
-          const isMatch =
-            pColonia.includes(fColonia) || fColonia.includes(pColonia);
+          const fColonia = normalizeStr(filters.locationFilter.colonia);
+          const isMatch = pColonia.includes(fColonia) || fColonia.includes(pColonia);
           if (!isMatch) return false;
         }
       }

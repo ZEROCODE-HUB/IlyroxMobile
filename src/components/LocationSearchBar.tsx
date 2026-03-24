@@ -11,13 +11,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../design-system/components/AppInput";
 import { COLORS } from "../constants/colors";
 import {
-  getUniqueLocations,
-  searchLocations,
   LocationSuggestion,
 } from "../lib/locationService";
+import { useLocationSearchStore, LocationSuggestionWithCount } from "../store/locationSearchStore";
+
+
 
 interface LocationSearchBarProps {
-  onLocationSelect: (location: LocationSuggestion | null) => void;
+  onLocationSelect: (location: LocationSuggestionWithCount | null) => void;
   onSearchingChange?: (val: boolean) => void;
   isHeaderVisible?: boolean;
   containerStyle?: any;
@@ -33,30 +34,17 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
 }) => {
   const [query, setQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  
+  const { suggestions, isLoading, searchLocations, clearSuggestions } = useLocationSearchStore();
 
   // Buscar ubicaciones con debounce
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      fetchLocations(query);
+      searchLocations(query);
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [query]);
-
-  const fetchLocations = async (searchTerm: string) => {
-    try {
-      setIsLoading(true);
-      // locationService ahora usa Supabase Geo
-      const locations = await searchLocations(searchTerm);
-      setSuggestions(locations);
-    } catch (err) {
-      console.error("Error fetching locations:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [query, searchLocations]);
 
   useEffect(() => {
     onSearchingChange?.(showSuggestions);
@@ -69,7 +57,7 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
     }
   }, [isHeaderVisible]);
 
-  const handleSelectLocation = (location: LocationSuggestion) => {
+  const handleSelectLocation = (location: LocationSuggestionWithCount) => {
     setQuery(location.name);
     setShowSuggestions(false);
     onLocationSelect(location);
@@ -78,6 +66,7 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
   const handleClearSearch = () => {
     setQuery("");
     setShowSuggestions(false);
+    clearSuggestions();
     onLocationSelect(null);
   };
 
@@ -152,7 +141,7 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={styles.suggestionItem}
-                onPress={() => handleSelectLocation(item)}
+                onPress={() => handleSelectLocation(item as LocationSuggestionWithCount)}
                 activeOpacity={0.7}
               >
                 <View style={styles.suggestionIconContainer}>
@@ -162,11 +151,17 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
                     color={COLORS.textSecondary}
                   />
                 </View>
-                <View style={styles.suggestionTextContainer}>
+                <View style={[styles.suggestionTextContainer, { flex: 1 }]}>
                   <Text style={styles.suggestionName}>{item.name}</Text>
                   <Text style={styles.suggestionType}>
                     {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
                   </Text>
+                  {item.type === "colonia" && (
+                    <Text style={styles.propertyCountText}>
+                      {(item as any).municipio_nombre ? `${(item as any).municipio_nombre} • ` : ""}
+                      {(item as any).propertyCount || 0} {(item as any).propertyCount === 1 ? 'propiedad' : 'propiedades'}
+                    </Text>
+                  )}
                 </View>
               </TouchableOpacity>
             )}
@@ -250,5 +245,11 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 2,
     textTransform: "capitalize",
+  },
+  propertyCountText: {
+    fontSize: 11,
+    color: COLORS.primary,
+    marginTop: 2,
+    fontWeight: "500",
   },
 });
