@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,13 +14,13 @@ import {
   Platform,
   Pressable,
 } from "react-native";
-import { VideoView } from "expo-video";
+import { VideoView, useVideoPlayer as useExpoVideoPlayer } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { FeedItem, User } from "../../types";
-import { useVideoPlayer } from "../../hooks/hooks";
 import { COLORS } from "../../constants";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import ActionButtons from "../ActionButtons";
+import { Avatar } from "../shared";
 
 interface ReelDetailProps {
   item: FeedItem;
@@ -38,17 +38,40 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
   const { width, height } = useWindowDimensions();
   const [showComments, setShowComments] = useState(false);
 
-  // Video de fallback si no hay URL
   const videoSource =
     item.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
 
-  // Hook de video player con auto-play
-  const { player, isPlaying, progress, togglePlayPause } = useVideoPlayer({
-    videoSource,
-    isVisible: true,
-    autoPlay: true,
-    muted: false,
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [isVideoReady, setIsVideoReady] = useState(false);
+
+  const player = useExpoVideoPlayer(videoSource, (p) => {
+    p.loop = true;
+    p.muted = false;
+    p.play();
   });
+
+  const togglePlayPause = useCallback(() => {
+    try {
+      if (!player) return;
+      if (player.playing) { player.pause(); } else { player.play(); }
+    } catch { /* ignore released */ }
+  }, [player]);
+
+  // Poll status
+  useEffect(() => {
+    const interval = setInterval(() => {
+      try {
+        if (!player) return;
+        setIsPlaying(player.playing);
+        setIsVideoReady(player.status === "readyToPlay");
+        if (player.duration > 0) {
+          setProgress(Math.min(1, Math.max(0, player.currentTime / player.duration)));
+        }
+      } catch { /* ignore */ }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [player]);
 
   // Referencia para evitar swipe cuando hay comentarios abiertos
   const showCommentsRef = useRef(false);
@@ -130,18 +153,18 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
       >
         <View style={[styles.video, { width, height }]}>
           {/* Placeholder Image (Thumbnail) */}
-          {item.images && item.images.length > 0 && (
+          {item.images && item.images.length > 0 && item.images[0] ? (
             <Image
               source={{ uri: item.images[0] }}
               style={StyleSheet.absoluteFill}
               resizeMode="cover"
             />
-          )}
+          ) : null}
 
           {/* VIDEO - Pantalla completa manteniendo aspect ratio */}
           <VideoView
             player={player}
-            style={StyleSheet.absoluteFill}
+            style={[StyleSheet.absoluteFill, { opacity: isVideoReady ? 1 : 0 }]}
             contentFit="contain"
             nativeControls={false}
           />
@@ -196,7 +219,14 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
               style={styles.userInfo}
               onPress={() => onUserClick?.(item.user)}
             >
-              <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
+              {item.user.avatar ? (
+                <Image
+                  source={{ uri: item.user.avatar }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <Avatar name={item.user.name} size={10} />
+              )}
               <View style={styles.userTextContainer}>
                 <Text style={styles.userName}>
                   {item.user.name || item.user.nombre || "Usuario"}
@@ -243,7 +273,10 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
               shareDescription={item.content}
               shareImageUrl={item.images?.[0]}
               authorId={item.user.id}
-              contentId={item.reelDetails?.id || (item.type === "reel" ? item.id : undefined)}
+              contentId={
+                item.reelDetails?.id ||
+                (item.type === "reel" ? item.id : undefined)
+              }
             />
           </View>
         </View>

@@ -7,16 +7,16 @@ const mapContextualReelToFeedItem = (
 ): FeedItem & { tipo_match: string } => ({
   id: r.feed_item_id,
   type: "reel",
-  content: r.descripcion,
+  content: r.descripcion || "",
   timestamp: new Date().toISOString(),
-  images: r.thumbnail_url ? [r.thumbnail_url] : [],
-  videoUrl: r.video_url,
-  likes: r.likes_count,
-  comments: r.comentarios_count,
+  images: r.thumbnail_url && r.thumbnail_url !== "" ? [r.thumbnail_url] : [],
+  videoUrl: r.video_url || "",
+  likes: r.likes_count || 0,
+  comments: r.comentarios_count || 0,
   user: {
     id: r.autor_id,
-    name: r.autor_nombre,
-    avatar: r.autor_foto,
+    name: r.autor_nombre || "Usuario",
+    avatar: r.autor_foto && r.autor_foto !== "" ? r.autor_foto : undefined,
   } as any,
   reelDetails: {
     id: r.reel_id,
@@ -24,10 +24,14 @@ const mapContextualReelToFeedItem = (
   tipo_match: r.tipo_match,
 });
 
-export const useReelFeed = (initialReelId: string) => {
-  const [reels, setReels] = useState<any[]>([]);
+export const useReelFeed = (initialReelId: string, initialItem?: any) => {
+  const [reels, setReels] = useState<any[]>(
+    initialItem ? [{ ...initialItem, tipo_match: "actual" }] : [],
+  );
   const [loading, setLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+  // ✅ Track the index of the "actual" reel so ReelFeedList can scroll to it immediately
+  const [initialScrollIndex, setInitialScrollIndex] = useState(0);
   const limit = 5;
 
   const fetchInitialReels = useCallback(async () => {
@@ -38,7 +42,11 @@ export const useReelFeed = (initialReelId: string) => {
     });
 
     if (!error && data) {
-      setReels(data.map(mapContextualReelToFeedItem));
+      const mapped = data.map(mapContextualReelToFeedItem);
+      // ✅ Calculate the index here, right when data arrives, before setting state
+      const idx = mapped.findIndex((r: any) => r.tipo_match === "actual");
+      setInitialScrollIndex(idx !== -1 ? idx : 0);
+      setReels(mapped);
     }
     setLoading(false);
   }, [initialReelId]);
@@ -60,8 +68,6 @@ export const useReelFeed = (initialReelId: string) => {
     });
 
     if (data && !error) {
-      // El RPC tira "actual", "anterior", "posterior".
-      // Nos interesan los posteriores a ese "actual" de la paginacion
       const posteriors = data
         .filter((r: any) => r.tipo_match === "posterior")
         .map(mapContextualReelToFeedItem);
@@ -82,5 +88,5 @@ export const useReelFeed = (initialReelId: string) => {
     }
   }, [fetchInitialReels, initialReelId]);
 
-  return { reels, loading, fetchMoreReels, isFetchingMore };
+  return { reels, loading, fetchMoreReels, isFetchingMore, initialScrollIndex };
 };

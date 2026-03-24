@@ -48,6 +48,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Efecto para detectar si el video es horizontal o vertical
   useEffect(() => {
+    if (!player) return;
     const subscription = (player as any).addListener(
       "videoSizeChange",
       (event: any) => {
@@ -63,9 +64,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setDynamicAspectRatio(aspectRatio); // 👈 restaura el original
           }
         }
-      }
+      },
     );
-
 
     return () => {
       subscription.remove();
@@ -88,12 +88,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   return (
     <TouchableWithoutFeedback onPress={handlePress} onLongPress={onLongPress}>
       <View style={[styles.container, { width: "100%", aspectRatio: dynamicAspectRatio }]}>
-        <VideoView
-          player={player}
-          style={StyleSheet.absoluteFill}
-          contentFit={"contain"}
-          nativeControls={false}
-        />
+        {player && (
+          <VideoView
+            player={player}
+            style={StyleSheet.absoluteFill}
+            contentFit={"contain"}
+            nativeControls={false}
+          />
+        )}
 
         {/* Timeline de progreso */}
         {showTimeline && (

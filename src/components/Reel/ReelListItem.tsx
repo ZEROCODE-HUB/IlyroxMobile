@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,13 +9,110 @@ import {
   Platform,
   Pressable,
 } from "react-native";
-import { VideoView } from "expo-video";
+import { VideoView, useVideoPlayer as useExpoVideoPlayer } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { FeedItem, User } from "../../types";
-import { useVideoPlayer } from "../../hooks/hooks";
 import { COLORS } from "../../constants";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import ActionButtons from "../ActionButtons";
+import { Avatar } from "../shared";
+
+// ─── Sub-component: owns the native player lifecycle ─────────────────────────
+// Mounting this component creates the player; unmounting releases it cleanly.
+// This is the ONLY correct way to avoid "shared object already released" with
+// expo-video: the VideoView and useVideoPlayer hook MUST share the same
+// component mount/unmount cycle.
+
+interface ReelVideoPlayerProps {
+  videoSource: string;
+  isActive: boolean;
+  width: number;
+  height: number;
+  onPlayingChange: (playing: boolean) => void;
+  onProgressChange: (progress: number) => void;
+  onReadyChange: (ready: boolean) => void;
+  toggleRef: React.MutableRefObject<() => void>;
+}
+
+const ReelVideoPlayer: React.FC<ReelVideoPlayerProps> = ({
+  videoSource,
+  isActive,
+  width,
+  height,
+  onPlayingChange,
+  onProgressChange,
+  onReadyChange,
+  toggleRef,
+}) => {
+  const [isReady, setIsReady] = useState(false);
+
+  const player = useExpoVideoPlayer(videoSource, (p) => {
+    p.loop = true;
+    p.muted = false;
+    if (isActive) p.play();
+  });
+
+  // Sync play/pause with visibility
+  React.useEffect(() => {
+    if (!player) return;
+    if (isActive) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [isActive, player]);
+
+  // Poll status, progress and playing state
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      try {
+        if (!player) return;
+        onPlayingChange(player.playing);
+        const ready = player.status === "readyToPlay";
+        setIsReady(ready);
+        onReadyChange(ready);
+        if (player.duration > 0) {
+          onProgressChange(
+            Math.min(1, Math.max(0, player.currentTime / player.duration)),
+          );
+        }
+      } catch {
+        // player released — interval will be cleared on unmount
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [player, onPlayingChange, onProgressChange, onReadyChange]);
+
+  // Expose togglePlayPause to parent via ref
+  React.useEffect(() => {
+    toggleRef.current = () => {
+      try {
+        if (!player) return;
+        if (player.playing) {
+          player.pause();
+        } else {
+          player.play();
+        }
+      } catch {
+        // ignore released errors
+      }
+    };
+    return () => {
+      toggleRef.current = () => {};
+    };
+  }, [player, toggleRef]);
+
+  return (
+    <VideoView
+      player={player}
+      style={[StyleSheet.absoluteFill, { opacity: isReady ? 1 : 0 }]}
+      contentFit="contain"
+      nativeControls={false}
+    />
+  );
+};
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 interface ReelListItemProps {
   item: FeedItem;
@@ -37,50 +134,55 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
   const { width, height } = useWindowDimensions();
   const [showComments, setShowComments] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(isActive);
+  const [isVideoReady, setIsVideoReady] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  // Video de fallback si no hay URL
+  // togglePlayPause is wired up by ReelVideoPlayer via this ref
+  const toggleRef = React.useRef<() => void>(() => {});
+  const handleToggle = useCallback(() => toggleRef.current(), []);
+
   const videoSource =
     item.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
-
-  // Hook de video player con auto-play si es active.
-  // Solo se inicializa si `shouldInitialize` es verdadero
-  const { player, isPlaying, progress, togglePlayPause } = useVideoPlayer({
-    videoSource: shouldInitialize
-      ? videoSource
-      : "https://www.w3schools.com/html/mov_bbb.mp4",
-    isVisible: isActive,
-    autoPlay: isActive,
-    muted: false,
-  });
-
   const SAFE_BOTTOM = Platform.OS === "ios" ? 34 : 20;
 
-
+  const handlePlayingChange = useCallback((v: boolean) => setIsPlaying(v), []);
+  const handleProgressChange = useCallback((v: number) => setProgress(v), []);
+  const handleReadyChange = useCallback((v: boolean) => setIsVideoReady(v), []);
 
   return (
     <View style={[styles.container, { width, height }]}>
       <View style={[styles.video, { width, height }]}>
-        {/* Placeholder Image (Thumbnail) */}
-        {item.images && item.images.length > 0 && (
+        {/* Thumbnail — always visible while buffering */}
+        {item.images && item.images.length > 0 && item.images[0] ? (
           <Image
             source={{ uri: item.images[0] }}
             style={[StyleSheet.absoluteFill, { width, height }]}
             resizeMode="contain"
           />
+        ) : (
+          <View style={styles.placeholder} />
         )}
 
-        {isActive && shouldInitialize && player && (
-          <VideoView
-            player={player}
-            style={StyleSheet.absoluteFill}
-            contentFit="contain"
-            nativeControls={false}
+        {/* Video player only mounts when this item is in the ±1 window.
+            Unmounting it releases the native player safely BEFORE expo-video
+            can tear it down from the other side. */}
+        {shouldInitialize && (
+          <ReelVideoPlayer
+            videoSource={videoSource}
+            isActive={isActive}
+            width={width}
+            height={height}
+            onPlayingChange={handlePlayingChange}
+            onProgressChange={handleProgressChange}
+            onReadyChange={handleReadyChange}
+            toggleRef={toggleRef}
           />
         )}
       </View>
 
       <View style={styles.overlay} pointerEvents="box-none">
-        <Pressable style={StyleSheet.absoluteFill} onPress={togglePlayPause} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleToggle} />
 
         <TouchableOpacity
           onPress={onClose}
@@ -89,10 +191,10 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
           <Ionicons name="chevron-back" size={28} color={COLORS.white} />
         </TouchableOpacity>
 
-        {!isPlaying && isActive && shouldInitialize && (
+        {!isPlaying && isActive && shouldInitialize && isVideoReady && (
           <Pressable
             style={styles.playIndicator}
-            onPress={togglePlayPause}
+            onPress={handleToggle}
             pointerEvents="none"
           >
             <View style={styles.playIconContainer}>
@@ -115,7 +217,11 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
             style={styles.userInfo}
             onPress={() => onUserClick?.(item.user)}
           >
-            <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
+            {item.user.avatar ? (
+              <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
+            ) : (
+              <Avatar name={item.user.name} size={40} />
+            )}
             <View style={styles.userTextContainer}>
               <Text style={styles.userName}>
                 {item.user.name || item.user.nombre || "Usuario"}
@@ -295,6 +401,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.blackTransparent,
     borderRadius: 10,
     padding: 10,
+  },
+  placeholder: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: COLORS.black,
   },
 });
 

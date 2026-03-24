@@ -1,21 +1,22 @@
-import React, {
-  useState,
-  useCallback,
-  useMemo,
-  useEffect,
-  useRef,
-} from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
   useWindowDimensions,
   Modal,
   StatusBar,
+  FlatList,
 } from "react-native";
-import { FlashList } from "@shopify/flash-list";
 import ReelListItem from "./ReelListItem";
 import { useReelFeed } from "./useReelFeed";
 import { COLORS } from "../../constants";
+
+// NOTE: FlashList is intentionally NOT used here.
+// FlashList recycles native views across items which causes
+// "Cannot use shared object that was already released" errors
+// when expo-video's SurfaceVideoView gets reassigned to a new player
+// while the old one is still being torn down.
+// FlatList keeps one native view per item — required for VideoView.
 
 interface ReelFeedListProps {
   initialReelItem?: any;
@@ -33,37 +34,50 @@ const ReelFeedList: React.FC<ReelFeedListProps> = ({
   currentUserId,
 }) => {
   const { height, width } = useWindowDimensions();
-  const { reels, loading, fetchMoreReels } = useReelFeed(initialReelId);
-  const [currentIndex, setCurrentIndex] = useState(-1);
+  const { reels, loading, fetchMoreReels, initialScrollIndex } = useReelFeed(
+    initialReelId,
+    initialReelItem,
+  );
 
-  // When reels load, find initial index
-  const initialScrollIndex = useMemo(() => {
-    if (reels.length === 0) return 0;
-    const idx = reels.findIndex((r: any) => r.tipo_match === "actual");
-    return idx !== -1 ? idx : 0;
-  }, [reels]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
 
-  // Set initial currentIndex once we have data
-  useEffect(() => {
-    if (reels.length > 0 && currentIndex === -1) {
+  // Sync currentIndex when data is fully loaded
+  React.useEffect(() => {
+    if (reels.length > 1) {
       setCurrentIndex(initialScrollIndex);
     }
-  }, [reels.length, initialScrollIndex, currentIndex]);
+  }, [reels.length, initialScrollIndex]);
+
+  // Remove manual scroll effect — we'll use 'key' to remount with proper initialScrollIndex
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 80,
+    minimumViewTime: 50,
+  }).current;
 
   const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
-      // Tomamos el item que esta mas visible
       setCurrentIndex(viewableItems[0].index);
     }
   }, []);
 
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
-  }).current;
+  const viewabilityConfigCallbackPairs = useRef([
+    { viewabilityConfig, onViewableItemsChanged },
+  ]);
+
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({
+      length: height,
+      offset: height * index,
+      index,
+    }),
+    [height],
+  );
 
   const renderItem = useCallback(
     ({ item, index }: any) => {
-      // Solo inicializa el reproductor para index, index-1 e index+1
+      // Only initialize the player for the active item and its direct neighbors
       const shouldInitialize = Math.abs(index - currentIndex) <= 1;
       return (
         <View style={{ height, width }}>
@@ -96,39 +110,31 @@ const ReelFeedList: React.FC<ReelFeedListProps> = ({
       />
       <View style={styles.container}>
         {reels.length > 0 ? (
-          <FlashList
+          <FlatList
+            key={reels.length > 1 ? "loaded" : "initial"}
+            ref={flatListRef}
             data={reels}
             renderItem={renderItem}
-            /* @ts-ignore */
-            estimatedItemSize={height}
+            keyExtractor={(item) => item.id}
             pagingEnabled
-            disableIntervalMomentum={true}
+            showsVerticalScrollIndicator={false}
+            decelerationRate="fast"
+            disableIntervalMomentum
             snapToInterval={height}
             snapToAlignment="start"
-            decelerationRate="fast"
-            showsVerticalScrollIndicator={false}
-            onViewableItemsChanged={onViewableItemsChanged}
-            viewabilityConfig={viewabilityConfig}
+            getItemLayout={getItemLayout}
             initialScrollIndex={initialScrollIndex}
+            viewabilityConfigCallbackPairs={
+              viewabilityConfigCallbackPairs.current
+            }
             onEndReached={fetchMoreReels}
-            onEndReachedThreshold={0.5}
-            keyExtractor={(item) => item.id}
+            onEndReachedThreshold={1}
+            removeClippedSubviews={false}
+            windowSize={3}
+            maxToRenderPerBatch={2}
+            initialNumToRender={2}
           />
-        ) : (
-          <View style={{ flex: 1, backgroundColor: COLORS.black }}>
-            {/* Mientras carga, podriamos renderizar el Reel inicial si lo tenemos? */}
-            {initialReelItem && (
-              <ReelListItem
-                item={initialReelItem}
-                isActive={true}
-                shouldInitialize={true}
-                onClose={onClose}
-                onUserClick={onUserClick}
-                currentUserId={currentUserId}
-              />
-            )}
-          </View>
-        )}
+        ) : null}
       </View>
     </Modal>
   );

@@ -1,25 +1,11 @@
 /**
  * Hook personalizado para manejar reproducción de video
  *
- * Centraliza toda la lógica de control de video incluyendo:
- * - Play/Pause
- * - Tracking de progreso
- * - Auto-pausa por visibilidad
- * - Limpieza de recursos
- *
  * MIGRADO A EXPO-VIDEO desde expo-av
  *
- * @example
- * const {
- *   player,
- *   isPlaying,
- *   progress,
- *   togglePlayPause
- * } = useVideoPlayer({
- *   videoSource: 'https://example.com/video.mp4',
- *   isVisible: true,
- *   autoPlay: true
- * });
+ * NOTA: ReelListItem NO usa este hook — usa useExpoVideoPlayer directamente
+ * dentro de un sub-componente para garantizar que el player y VideoView
+ * comparten exactamente el mismo ciclo de vida de montaje/desmontaje.
  */
 
 import { useState, useCallback, useEffect } from "react";
@@ -36,6 +22,7 @@ export interface UseVideoPlayerOptions {
 export interface UseVideoPlayerReturn {
   player: ReturnType<typeof useExpoVideoPlayer>;
   isPlaying: boolean;
+  status: string;
   progress: number;
   togglePlayPause: () => void;
 }
@@ -53,65 +40,75 @@ export const useVideoPlayer = (
 
   const [isPlaying, setIsPlaying] = useState(autoPlay && isVisible);
   const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState<string>("idle");
 
-  // Crear player con expo-video
-  const player = useExpoVideoPlayer(videoSource, (player) => {
-    player.loop = loop;
-    player.muted = muted;
+  const player = useExpoVideoPlayer(videoSource, (p) => {
+    p.loop = loop;
+    p.muted = muted;
     if (autoPlay && isVisible) {
-      player.play();
+      p.play();
     }
   });
 
-  // Toggle play/pause
   const togglePlayPause = useCallback(() => {
-    if (player.playing) {
-      player.pause();
-      setIsPlaying(false);
-    } else {
-      player.play();
-      setIsPlaying(true);
+    try {
+      if (!player) return;
+      if (player.playing) {
+        player.pause();
+        setIsPlaying(false);
+      } else {
+        player.play();
+        setIsPlaying(true);
+      }
+    } catch {
+      // ignore if player was released
     }
   }, [player]);
 
-  // Sincronizar estado local cuando cambia la visibilidad
+  // Sincronizar play/pause con visibilidad
   useEffect(() => {
-    if (!isVisible) {
-      player.pause();
-      setIsPlaying(false);
-    } else if (isVisible && autoPlay) {
-      player.play();
-      setIsPlaying(true);
+    try {
+      if (!player) return;
+      if (!isVisible) {
+        player.pause();
+        setIsPlaying(false);
+      } else if (autoPlay) {
+        player.play();
+        setIsPlaying(true);
+      }
+    } catch {
+      // ignore released errors
     }
   }, [isVisible, autoPlay, player]);
 
-  // Sincronizar estado de mute global
+  // Sincronizar muted
   useEffect(() => {
-    if (player) {
-      player.muted = muted;
+    try {
+      if (player) player.muted = muted;
+    } catch {
+      // ignore released errors
     }
   }, [muted, player]);
 
-  // Monitorear el estado del player
+  // Polling de progreso y estado
   useEffect(() => {
-    // Actualizar progreso periódicamente
     const interval = setInterval(() => {
-      if (player.duration > 0) {
-        const currentProgress = player.currentTime / player.duration;
-        setProgress(Math.min(1, Math.max(0, currentProgress)));
+      try {
+        if (!player) return;
+        setIsPlaying(player.playing);
+        setStatus(player.status);
+        if (player.duration > 0) {
+          setProgress(
+            Math.min(1, Math.max(0, player.currentTime / player.duration)),
+          );
+        }
+      } catch {
+        // player was released between ticks
       }
-
-      // Sincronizar isPlaying con el estado real del player
-      setIsPlaying(player.playing);
-    }, 100); // Actualizar cada 100ms
+    }, 100);
 
     return () => clearInterval(interval);
   }, [player]);
 
-  return {
-    player,
-    isPlaying,
-    progress,
-    togglePlayPause,
-  };
+  return { player, isPlaying, status, progress, togglePlayPause };
 };
