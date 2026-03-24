@@ -143,7 +143,7 @@ const mapReelToFeedItem = (
   };
 
   return {
-    id: reel.feed_item_id || reel.id, // Prefer feed_item_id for likes/comments
+    id: reel.feed_item_id || reel.id,
     type: "reel",
     user: profile ? mapProfileToUser(profile) : defaultUser,
     content: reel.descripcion || "",
@@ -444,7 +444,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       router.push({
         pathname: "/(stack)/reel/[id]",
         params: {
-          id: reel.id,
+          id: reel.feed_item_id || reel.id,
           item: JSON.stringify(mapReelToFeedItem(reel, profile, targetUserId)),
         },
       });
@@ -1294,7 +1294,10 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
   chevronIcon: {
-    marginLeft: 4,
+    margin: 4,
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    marginHorizontal: 16,
   },
   statsPanel: {
     marginTop: 16,

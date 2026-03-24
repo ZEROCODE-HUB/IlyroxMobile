@@ -20,6 +20,7 @@ export type Post = {
   habitaciones?: number;
   operacion?: string;
   fecha_finalizacion?: string;
+  feed_item_id?: string;
 };
 
 export type FeedItem = {
@@ -60,6 +61,7 @@ export type Reel = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  feed_item_id?: string;
 };
 
 export type ProfileContentType = "properties" | "posts" | "reels";

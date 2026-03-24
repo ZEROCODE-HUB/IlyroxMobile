@@ -1,7 +1,7 @@
 import React from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { View, ActivityIndicator, Text, TouchableOpacity } from "react-native";
-import ReelDetail from "@/components/Reel/ReelDetail";
+import ReelFeedList from "@/components/Reel/ReelFeedList";
 import { useAuth } from "@/context/AuthContext";
 import { useFeedItem } from "@/hooks/hooks";
 
@@ -71,8 +71,12 @@ export default function ReelDetailScreen() {
     );
   }
   return (
-    <ReelDetail
-      item={reelItem}
+    <ReelFeedList
+      initialReelItem={reelItem}
+      initialReelId={
+        finalItem.reelDetails?.id ||
+        (finalItem.type === "reel" ? finalItem.id : finalItem.id)
+      }
       currentUserId={user?.id}
       onClose={() => {
         if (router.canGoBack()) {
