@@ -13,6 +13,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { AppState, AppStateStatus } from "react-native";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import { useChatStore } from "@/store/chatStore";
 
 interface Conversation {
   id: string;
@@ -434,7 +435,6 @@ export function useConversations(userId?: string) {
 
           return newList;
         });
-
       } catch (err) {
         console.error("Error updating conversation by users:", err);
       }
@@ -720,6 +720,22 @@ export function useConversations(userId?: string) {
       setupInProgressRef.current = false;
     }
   };
+
+  /**
+   * Effect para sincronizar el total de no leídos con el store global
+   */
+  useEffect(() => {
+    if (!userId) {
+      useChatStore.getState().setTotalUnreadCount(0);
+      return;
+    }
+
+    const totalUnread = conversations.reduce(
+      (sum, conv) => sum + (conv.total_mensajes_no_leidos || 0),
+      0,
+    );
+    useChatStore.getState().setTotalUnreadCount(totalUnread);
+  }, [conversations, userId]);
 
   /**
    * Effect principal

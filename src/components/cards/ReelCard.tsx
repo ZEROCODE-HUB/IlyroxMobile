@@ -8,10 +8,10 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Modal,
   ActivityIndicator,
   FlatList,
+  Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FeedItem, User } from "../../types";
@@ -97,11 +97,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
         showRecommendedPreview={false}
       />
       {positiveRecommendations > 0 && (
-        <TouchableOpacity
-          style={styles.recommendedRow}
-          onPress={openRecommendedModal}
-          activeOpacity={0.85}
-        >
+        <Pressable style={styles.recommendedRow} onPress={openRecommendedModal}>
           <View style={styles.recommendedAvatars}>
             {recommendedByPreview.slice(0, 2).map((u, idx) => (
               <View
@@ -123,7 +119,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
           <Text style={styles.recommendedText} numberOfLines={1}>
             {recommendedText}
           </Text>
-        </TouchableOpacity>
+        </Pressable>
       )}
 
       {/* Video Player */}
@@ -145,15 +141,11 @@ const ReelCard: React.FC<ReelCardProps> = ({
         </View>
 
         {/* Botón para expandir */}
-        <TouchableOpacity
-          style={styles.expandButton}
-          onPress={handleExpand}
-          activeOpacity={0.7}
-        >
+        <Pressable style={styles.expandButton} onPress={handleExpand}>
           <Ionicons name="expand" size={18} color={COLORS.white} />
-        </TouchableOpacity>
+        </Pressable>
         <View style={styles.previewOverlayControls}>
-          <TouchableOpacity
+          <Pressable
             onPress={() => setIsMuted(!isMuted)}
             style={styles.controlIconBadge}
           >
@@ -162,7 +154,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
               size={20}
               color={COLORS.white}
             />
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
 
@@ -188,10 +180,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
 
       {/* Descripción del reel - Estilo Instagram */}
       {item.content && (
-        <TouchableOpacity
-          style={styles.captionContainer}
-          onPress={handleSeeMore}
-        >
+        <Pressable style={styles.captionContainer} onPress={handleSeeMore}>
           <Text style={styles.captionText}>
             <Text style={styles.captionUser}>
               {item.user.nombre || item.user.name}
@@ -209,7 +198,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
               </Text>
             )}
           </Text>
-        </TouchableOpacity>
+        </Pressable>
       )}
       <RecommendedUsersModal
         visible={showRecommendedModal}

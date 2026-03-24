@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, TouchableWithoutFeedback } from "react-native";
+import {
+  View,
+  StyleSheet,
+  TouchableWithoutFeedback,
+  Pressable,
+} from "react-native";
 import { VideoView } from "expo-video";
 import { useVideoPlayer } from "@/hooks/hooks/useVideoPlayer";
 import { DIMENSIONS, COLORS } from "@/constants";
@@ -32,12 +37,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onPress,
   onLongPress,
 }) => {
-  const [dynamicContentFit, setDynamicContentFit] =
-    useState<"contain" | "cover">("cover");
+  const [dynamicContentFit, setDynamicContentFit] = useState<
+    "contain" | "cover"
+  >("cover");
   // Video de fallback si no hay URL
   const videoSource = videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
 
-  const [dynamicAspectRatio, setDynamicAspectRatio] = useState<number>(aspectRatio);
+  const [dynamicAspectRatio, setDynamicAspectRatio] =
+    useState<number>(aspectRatio);
 
   const { player, isPlaying, progress, togglePlayPause } = useVideoPlayer({
     videoSource,
@@ -86,8 +93,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // }, []);
 
   return (
-    <TouchableWithoutFeedback onPress={handlePress} onLongPress={onLongPress}>
-      <View style={[styles.container, { width: "100%", aspectRatio: dynamicAspectRatio }]}>
+    <Pressable onPress={handlePress} onLongPress={onLongPress}>
+      <View
+        style={[
+          styles.container,
+          { width: "100%", aspectRatio: dynamicAspectRatio },
+        ]}
+      >
         {player && (
           <VideoView
             player={player}
@@ -113,7 +125,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           </View>
         )}
       </View>
-    </TouchableWithoutFeedback>
+    </Pressable>
   );
 };
 

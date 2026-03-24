@@ -20,6 +20,7 @@ export const reportService = {
           propiedad_id: reporte.propiedad_id,
           reportado_por: reporte.reportado_por,
           propietario_id: reporte.propietario_id,
+          clasificacion: reporte.clasificacion,
           motivo: reporte.motivo,
           descripcion: reporte.descripcion,
           estado: reporte.estado || "pendiente",

@@ -9,6 +9,8 @@ import {
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuth } from "../../context/AuthContext";
+import { useConversations } from "../../hooks/hooks/messaging/useConversations";
 
 const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   const insets = useSafeAreaInsets();
@@ -71,6 +73,10 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
 };
 
 export default function TabLayout() {
+  const { user } = useAuth();
+  // Tracker global de mensajes no leídos (actualiza el useChatStore internamente)
+  useConversations(user?.id);
+
   return (
     <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}

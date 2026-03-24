@@ -1,6 +1,7 @@
 import React from "react";
 import {
   View,
+  Text,
   StyleSheet,
   TouchableOpacity,
   Image,
@@ -13,6 +14,7 @@ import { LocationSearchBar } from "./LocationSearchBar";
 import { COLORS } from "../constants";
 import { useApp } from "../context/AppContext";
 import { LocationSuggestionWithCount } from "../store/locationSearchStore";
+import { useChatStore } from "../store/chatStore";
 
 // Assuming Logo is in assets folder relative to src/components -> ../../assets/Logo.jpeg
 // Adjust path if necessary based on project structure.
@@ -33,6 +35,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { setSelectedLocation } = useApp();
+  const unreadCount = useChatStore((state) => state.totalUnreadCount);
 
   const handleNavigation = (screen: string) => {
     switch (screen) {
@@ -100,6 +103,13 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
                   size={22}
                   color={COLORS.white}
                 />
+                {screen === "Messages" && unreadCount > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             ),
           )}
@@ -175,5 +185,24 @@ const styles = StyleSheet.create({
   searchWrapper: {
     justifyContent: "center",
     zIndex: 100,
+  },
+  badge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    backgroundColor: COLORS.error,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+  },
+  badgeText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: "700",
   },
 });

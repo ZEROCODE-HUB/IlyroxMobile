@@ -285,6 +285,7 @@ export type ReportesPropiedades = {
   propiedad_id: string;
   reportado_por: string;
   propietario_id: string;
+  clasificacion?: string;
   motivo: string;
   descripcion: string;
   estado: "pendiente" | "revisado" | "accion_tomada";

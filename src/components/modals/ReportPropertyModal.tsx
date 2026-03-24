@@ -32,13 +32,22 @@ interface ReportPropertyModalProps {
   onSuccess?: () => void;
 }
 
+const CLASIFICACION = [
+  { id: 1, label: "Problemas con la propiedad" },
+  { id: 2, label: "Problemas con el Perfil" },
+  { id: 3, label: "Contenido Inapropiado" },
+  { id: 4, label: "Otro" },
+];
+
 const MOTIVOS = [
-  "Información falsa",
-  "Spam / Publicidad engañosa",
-  "Propiedad ya vendida o rentada",
-  "Estafa o fraude",
-  "Inapropiado / Ofensivo",
-  "Otro",
+  { clasificacion_id: 1, label: "Información falsa" },
+  { clasificacion_id: 1, label: "Propiedad ya vendida o rentada" },
+  { clasificacion_id: 2, label: "Suplantación de identidad" },
+  { clasificacion_id: 2, label: "Perfil falso / No verificado" },
+  { clasificacion_id: 3, label: "Estafa o fraude" },
+  { clasificacion_id: 3, label: "Spam / Publicidad engañosa" },
+  { clasificacion_id: 3, label: "Inapropiado / Ofensivo" },
+  { clasificacion_id: 4, label: "Otro" },
 ];
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -53,6 +62,7 @@ export default function ReportPropertyModal({
 }: ReportPropertyModalProps) {
   const insets = useSafeAreaInsets();
   const [view, setView] = useState<"list" | "create">("list");
+  const [clasificacionId, setClasificacionId] = useState<number | null>(null);
   const [motivo, setMotivo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [reports, setReports] = useState<any[]>([]);
@@ -89,6 +99,7 @@ export default function ReportPropertyModal({
       propiedad_id: propiedadId,
       reportado_por: reportadoPorId,
       propietario_id: propietarioId,
+      clasificacion: CLASIFICACION.find((c) => c.id === clasificacionId)?.label,
       motivo,
       descripcion,
       estado: "pendiente",
@@ -96,6 +107,7 @@ export default function ReportPropertyModal({
 
     if (success) {
       if (onSuccess) onSuccess();
+      setClasificacionId(null);
       setMotivo("");
       setDescripcion("");
       await loadReports();
@@ -146,6 +158,11 @@ export default function ReportPropertyModal({
                     <Ionicons name="flag" size={16} color={COLORS.error} />
                   </View>
                   <View style={styles.reportCardInfo}>
+                    {report.clasificacion && (
+                      <Text style={styles.reportClasificacion}>
+                        {report.clasificacion}
+                      </Text>
+                    )}
                     <Text style={styles.reportMotivo}>{report.motivo}</Text>
                     <Text style={styles.reportDate}>
                       {new Date(report.created_at).toLocaleDateString("es-ES", {
@@ -236,11 +253,8 @@ export default function ReportPropertyModal({
             <Text style={styles.backButtonText}>Volver</Text>
           </TouchableOpacity>
 
-          {/* Selección de motivo */}
-          <Text style={styles.formLabel}>
-            Descripción adicional
-            <Text style={styles.optionalLabel}> (opcional)</Text>
-          </Text>
+          {/* Descripción */}
+          <Text style={styles.formLabel}>Descripción del reporte</Text>
           <TextInput
             style={styles.textArea}
             placeholder="Cuéntanos más detalles sobre el problema..."
@@ -252,39 +266,67 @@ export default function ReportPropertyModal({
             textAlignVertical="top"
           />
 
-          <Text style={styles.formLabel}>¿Cuál es el motivo del reporte?</Text>
-          <View style={styles.motivosGrid}>
-            {MOTIVOS.map((item) => {
-              const isSelected = motivo === item;
+          <Text style={styles.formLabel}>
+            ¿Cuál es el motivo del reporte?
+            <Text style={styles.optionalLabel}> *</Text>
+          </Text>
+
+          <View style={styles.groupedList}>
+            {CLASIFICACION.map((category) => {
+              const categoryReasons = MOTIVOS.filter(
+                (m) => m.clasificacion_id === category.id,
+              );
+              const isOther = category.id === 4 || category.label === "Otro";
               return (
-                <TouchableOpacity
-                  key={item}
-                  style={[
-                    styles.motivoChip,
-                    isSelected && styles.motivoChipSelected,
-                  ]}
-                  onPress={() => setMotivo(item)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name={isSelected ? "checkmark-circle" : "ellipse-outline"}
-                    size={18}
-                    color={isSelected ? COLORS.primary : COLORS.textTertiary}
-                  />
-                  <Text
-                    style={[
-                      styles.motivoChipText,
-                      isSelected && styles.motivoChipTextSelected,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
+                <View key={category.id} style={styles.categoryContainer}>
+                  {!isOther && (
+                    <View style={styles.categoryHeader}>
+                      <Text style={styles.categoryHeaderText}>
+                        {category.label}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.reasonsList}>
+                    {categoryReasons.map((item, idx) => {
+                      const isSelected = motivo === item.label;
+                      return (
+                        <TouchableOpacity
+                          key={item.label}
+                          style={[
+                            styles.reasonRow,
+                            idx === categoryReasons.length - 1 &&
+                              styles.noBorder,
+                          ]}
+                          onPress={() => {
+                            setClasificacionId(category.id);
+                            setMotivo(item.label);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View
+                            style={[
+                              styles.radioCircle,
+                              isSelected && styles.radioCircleSelected,
+                            ]}
+                          >
+                            {isSelected && <View style={styles.radioInner} />}
+                          </View>
+                          <Text
+                            style={[
+                              styles.reasonText,
+                              isSelected && styles.reasonTextSelected,
+                            ]}
+                          >
+                            {item.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
               );
             })}
           </View>
-
-          {/* Descripción */}
         </ScrollView>
 
         {/* Footer con botón enviar */}
@@ -501,6 +543,13 @@ const styles = StyleSheet.create({
   reportCardInfo: {
     flex: 1,
   },
+  reportClasificacion: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: COLORS.textTertiary,
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
   reportMotivo: {
     fontSize: 15,
     fontWeight: "600",
@@ -600,34 +649,7 @@ const styles = StyleSheet.create({
   },
   optionalLabel: {
     fontWeight: "400",
-    color: COLORS.textTertiary,
-  },
-  motivosGrid: {
-    gap: 8,
-    marginBottom: 24,
-  },
-  motivoChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#E5E5E5",
-    backgroundColor: COLORS.white,
-    gap: 10,
-  },
-  motivoChipSelected: {
-    borderColor: COLORS.primary,
-    backgroundColor: "#F0FDFA",
-  },
-  motivoChipText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    flex: 1,
-  },
-  motivoChipTextSelected: {
-    color: COLORS.primary,
-    fontWeight: "600",
+    color: COLORS.error,
   },
   textArea: {
     backgroundColor: "#F9FAFB",
@@ -657,5 +679,70 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: "600",
+  },
+
+  // New Grouped List Styles
+  groupedList: {
+    gap: 16,
+    marginBottom: 24,
+  },
+  categoryContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E5E5",
+    overflow: "hidden",
+  },
+  categoryHeader: {
+    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E5E5",
+  },
+  categoryHeaderText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
+  reasonsList: {
+    paddingHorizontal: 16,
+  },
+  reasonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+    gap: 12,
+  },
+  noBorder: {
+    borderBottomWidth: 0,
+  },
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: COLORS.textTertiary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  radioCircleSelected: {
+    borderColor: COLORS.primary,
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: COLORS.primary,
+  },
+  reasonText: {
+    fontSize: 14,
+    color: COLORS.textPrimary,
+    flex: 1,
+  },
+  reasonTextSelected: {
+    fontWeight: "500",
   },
 });
