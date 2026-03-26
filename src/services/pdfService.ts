@@ -3,7 +3,7 @@ import * as Sharing from "expo-sharing";
 import { documentDirectory, moveAsync } from "expo-file-system/legacy";
 import { supabase } from "@/lib/supabase";
 import firstUpperCase from "@/utils/firstUpperCase";
-
+import { LogoBase64 } from "@/assets/logoBase64";
 // ============================================================================
 // CONFIGURACION DE CAMPOS - Editar aquí qué información mostrar en el PDF
 // ============================================================================
@@ -320,7 +320,7 @@ const generatePropertyHtml = (
   );
 
   const heroImage = validPhotos.length > 0 ? validPhotos[0] : "";
-  const galleryPhotos = validPhotos.slice(1, MAX_IMAGES);
+  const galleryPhotos = validPhotos.slice(0, MAX_IMAGES);
 
   // 2. Iconos SVG (Inline para asegurar que se vean en el PDF sin dependencias externas)
   const icons = {
@@ -404,8 +404,9 @@ const generatePropertyHtml = (
                 ${idDateHtml}
             </div>
         </div>
-        <div class="footer-logo">
-            ilyrox
+        <div class="footer-logo-container">
+          <img src="https://www.ilyrox.com/Logo.jpeg" alt="Logo" class="Logo" />
+          <div class="footer-logo-text">ilyrox</div>
         </div>
       </div>
     `;
@@ -414,7 +415,10 @@ const generatePropertyHtml = (
     creatorHtml = `
       <div class="footer-agent">
          <div class="agent-details">
-            <div class="without-agent-name">ilyrox</div>
+            <div class="footer-logo-container">
+              <img src="https://www.ilyrox.com/Logo.jpeg" alt="Logo" class="Logo" />
+              <div class="footer-logo-text">ilyrox</div>
+            </div>
             ${idDateHtml}
          </div>
       </div>
@@ -679,10 +683,23 @@ const generatePropertyHtml = (
             color: #666;
         }
 
-        .footer-logo {
-            color: #008f86e4;
+        .footer-logo-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .Logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            object-fit: cover;
+        }
+
+        .footer-logo-text {
+            color: #3cc3ec;
             font-weight: 900;
-            font-size: 20px;
+            font-size: 24px;
         }
         
         .id-date-footer {
