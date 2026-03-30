@@ -59,6 +59,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   const [showAntiguedadModal, setShowAntiguedadModal] = useState(false);
   const [showSaveSearchModal, setShowSaveSearchModal] = useState(false);
   const [showColoniaModal, setShowColoniaModal] = useState(false);
+  const [showComisionModal, setShowComisionModal] = useState(false);
 
   // Geo Location Hook para las colonias
   const [geoEstadoId, setGeoEstadoId] = useState<string | null>(null);
@@ -308,6 +309,8 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
               setShowNivelesModal={setShowNivelesModal}
               showAntiguedadModal={showAntiguedadModal}
               setShowAntiguedadModal={setShowAntiguedadModal}
+              showComisionModal={showComisionModal}
+              setShowComisionModal={setShowComisionModal}
               openNumberInput={openNumberInput}
               setShowNumberInput={setShowNumberInput}
             />

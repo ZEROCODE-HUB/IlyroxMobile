@@ -337,6 +337,46 @@ export const usePropertyFilters = (
         }
       }
 
+      if (filters.comision && filters.comision.length > 0) {
+        let matchingOpsForCommission: any[] = [];
+        if (filters.operacion && operaciones && Array.isArray(operaciones)) {
+          const matchingOp = operaciones.find((op: any) => {
+            const tipoOp = op?.tipo_operacion;
+            if (!tipoOp) return false;
+            const lower = String(tipoOp).toLowerCase();
+            let normalized = lower;
+            if (lower === "sale") normalized = "venta";
+            else if (lower === "rent") normalized = "renta";
+            return normalized === filters.operacion.toLowerCase();
+          });
+          if (matchingOp) matchingOpsForCommission = [matchingOp];
+        } else if (operaciones && Array.isArray(operaciones)) {
+          matchingOpsForCommission = operaciones;
+        }
+
+        const passesCommission = filters.comision.some((opt) => {
+          const threshold = parseFloat(opt);
+          if (!isNaN(threshold)) {
+            return matchingOpsForCommission.some((op) => {
+              const tipo = op.comision_tipo;
+              const valor = op.comision_porcentaje;
+              return tipo === "porcentaje" && valor >= threshold;
+            });
+          }
+          // Fallback legacy por si quedó el string antiguo en store
+          if (opt === "Mostrar solo 1% o más") {
+            return matchingOpsForCommission.some((op) => {
+              const tipo = op.comision_tipo;
+              const valor = op.comision_porcentaje;
+              return tipo === "porcentaje" && valor >= 1;
+            });
+          }
+          return true;
+        });
+
+        if (!passesCommission) return false;
+      }
+
       return true;
     });
 
@@ -356,6 +396,7 @@ export const usePropertyFilters = (
     filters.m2TerrenoMin !== "" ||
     filters.m2ConstruccionMin !== "" ||
     filters.operacion !== "" ||
+    (filters.comision && filters.comision.length > 0) ||
     !!(
       filters.locationFilter.estado ||
       filters.locationFilter.ciudad ||

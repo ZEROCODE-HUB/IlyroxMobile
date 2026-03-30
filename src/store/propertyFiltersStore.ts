@@ -20,6 +20,7 @@ export interface PropertyFilters {
   niveles: string;
   m2TerrenoMin: string;
   m2ConstruccionMin: string;
+  comision: string[];
 }
 
 interface PropertyFiltersState {
@@ -53,6 +54,7 @@ const initialFilters: PropertyFilters = {
   niveles: "",
   m2TerrenoMin: "",
   m2ConstruccionMin: "",
+  comision: [],
 };
 
 export const usePropertyFiltersStore = create<PropertyFiltersState>(
@@ -92,6 +94,7 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
         filters.m2TerrenoMin !== "" ||
         filters.m2ConstruccionMin !== "" ||
         filters.operacion !== "" ||
+        (filters.comision && filters.comision.length > 0) ||
         !!(
           filters.locationFilter.estado ||
           filters.locationFilter.ciudad ||

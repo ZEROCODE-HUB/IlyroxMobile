@@ -4,6 +4,7 @@ import { FeedItem, Post } from "../../types";
 import { Ionicons } from "@expo/vector-icons";
 import { Avatar, CircularImageWithRays } from "../shared/Avatar";
 import { COLORS } from "../../constants";
+import { Clock } from "lucide-react-native";
 
 interface SpecialPostCardProps {
   item: FeedItem;
@@ -240,6 +241,7 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
             {!isSold && (
               <View>
                 <Text style={styles.dateTimeText}>
+                  Inicia:{" "}
                   {new Date(eventDate).toLocaleString("es-ES", {
                     day: "numeric",
                     month: "short",
@@ -248,13 +250,8 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
                   })}
                 </Text>
                 {item.postDetails.fecha_finalizacion && (
-                  <Text
-                    style={[
-                      styles.dateTimeText,
-                      { marginTop: -4, fontSize: 10, opacity: 0.9 },
-                    ]}
-                  >
-                    finaliza el{" "}
+                  <Text style={[styles.dateTimeText]}>
+                    Finaliza:{" "}
                     {new Date(
                       item.postDetails.fecha_finalizacion,
                     ).toLocaleString("es-ES", {
