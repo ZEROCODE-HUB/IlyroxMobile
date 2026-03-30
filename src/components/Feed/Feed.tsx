@@ -84,6 +84,17 @@ const Feed: React.FC<FeedProps> = ({
     }
   }, [refreshTimestamp, refresh]);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("tabPress", (e: any) => {
+      if (navigation.isFocused()) {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        refresh();
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, refresh]);
+
   const dynamicPaddingTop = useMemo(() => {
     return Platform.OS === "ios" ? insets.top + 140 : insets.top + 130;
   }, [insets.top]);

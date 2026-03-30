@@ -260,9 +260,12 @@ export const usePropertyFilters = (
           filters.habitaciones.includes("Más")
         ) {
           if (beds < 5) return false;
-        } else {
+        } else if (filters.habitaciones.includes("+")) {
           const hMin = parseInt(filters.habitaciones);
           if (!isNaN(hMin) && beds < hMin) return false;
+        } else {
+          const hExact = parseInt(filters.habitaciones);
+          if (!isNaN(hExact) && beds !== hExact) return false;
         }
       }
 
@@ -270,9 +273,12 @@ export const usePropertyFilters = (
         const baths = p.features?.baths || 0;
         if (filters.banos === "Más" || filters.banos.includes("Más")) {
           if (baths < 5) return false;
-        } else {
+        } else if (filters.banos.includes("+")) {
           const bMin = parseInt(filters.banos);
           if (!isNaN(bMin) && baths < bMin) return false;
+        } else {
+          const bExact = parseInt(filters.banos);
+          if (!isNaN(bExact) && baths !== bExact) return false;
         }
       }
 
@@ -286,9 +292,12 @@ export const usePropertyFilters = (
           filters.estacionamientos.includes("Más")
         ) {
           if (parking < 5) return false;
-        } else {
+        } else if (filters.estacionamientos.includes("+")) {
           const pMin = parseInt(filters.estacionamientos);
           if (!isNaN(pMin) && parking < pMin) return false;
+        } else {
+          const pExact = parseInt(filters.estacionamientos);
+          if (!isNaN(pExact) && parking !== pExact) return false;
         }
       }
 
@@ -314,10 +323,18 @@ export const usePropertyFilters = (
 
       if (
         filters.niveles &&
-        filters.niveles !== "No indicado" &&
-        (p as any).niveles
+        filters.niveles !== "No indicado"
       ) {
-        if ((p as any).niveles !== filters.niveles) return false;
+        const pLevels = parseInt((p as any).niveles || p.features?.floors || "0");
+        if (filters.niveles === "Más" || filters.niveles.includes("Más")) {
+          if (pLevels < 4) return false;
+        } else if (filters.niveles.includes("+")) {
+          const nMin = parseInt(filters.niveles);
+          if (!isNaN(nMin) && pLevels < nMin) return false;
+        } else {
+          const nExact = parseInt(filters.niveles);
+          if (!isNaN(nExact) && pLevels !== nExact) return false;
+        }
       }
 
       return true;

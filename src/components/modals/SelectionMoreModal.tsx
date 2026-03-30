@@ -105,8 +105,8 @@ export const SelectionMoreModal: React.FC<SelectionMoreModalProps> = ({
             {/* Buscar desde section */}
             <Text style={styles.sectionLabel}>O buscar desde</Text>
             <View style={styles.buttonGrid}>
-              {["1+", "2+", "3+", "4+", "5+"].map((num) =>
-                renderButton(num, num),
+              {[1, 2, 3, 4, 5].map((num) =>
+                renderButton(`${num}+`, `+${num}`),
               )}
             </View>
           </View>
