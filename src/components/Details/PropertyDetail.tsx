@@ -12,6 +12,7 @@ import {
   Platform,
   Modal,
   RefreshControl,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
@@ -656,15 +657,14 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
               <TouchableOpacity
                 style={styles.mainContactBtn}
                 onPress={() => {
-                  if (onContact) {
-                    onContact(profile.id, propertyDetails.id);
+                  const phone = `${profile.prefijo_celular || ""}${profile.celular || ""}`;
+                  if (phone && phone.trim().length > 0) {
+                    Linking.openURL(`tel:${phone.replace(/\s/g, "")}`);
                   } else {
-                    handleContact(profile.id, propertyDetails.id, {
-                      id: profile.id,
-                      nombre: profile.nombre,
-                      foto: profile.foto,
-                      apellido_paterno: profile.apellido_paterno || "",
-                    });
+                    Alert.alert(
+                      "Sin número de contacto",
+                      "Este usuario no cuenta con un número registrado para llamadas directas.",
+                    );
                   }
                 }}
               >

@@ -190,12 +190,21 @@ export function RegisterStepTwo({
         currentValue={formState.anosExperiencia}
       />
 
+      <AppInput
+        placeholder="Biografía *"
+        autoCapitalize="sentences"
+        keyboardType="default"
+        value={formState.biografia}
+        onChangeText={(v) => onUpdateField("biografia", v)}
+      />
+
       <SubmitButton
         loading={loading}
         onPress={onSubmit}
         text="Finalizar Registro"
         disabled={!formState.avatarUri}
       />
+
       <BackButton onPress={onBack} text="Volver al paso 1" />
     </KeyboardAwareScrollView>
   );

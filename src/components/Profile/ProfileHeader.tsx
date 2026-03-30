@@ -7,12 +7,14 @@ interface ProfileHeaderProps {
   isOwnProfile: boolean;
   onBack?: () => void;
   onSettings?: () => void;
+  onSupport?: () => void;
 }
 
 export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   isOwnProfile,
   onBack,
   onSettings,
+  onSupport,
 }) => {
   return (
     <View style={styles.headerInner}>
@@ -22,11 +24,29 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         disabled={isOwnProfile && !onBack}
       >
         {!isOwnProfile && (
-          <Ionicons name="chevron-back-outline" size={24} color={COLORS.textPrimary} />
+          <Ionicons
+            name="chevron-back-outline"
+            size={24}
+            color={COLORS.textPrimary}
+          />
         )}
       </TouchableOpacity>
 
       <Text style={styles.title}>{isOwnProfile ? "Mi Perfil" : "Perfil"}</Text>
+
+      <TouchableOpacity
+        onPress={onSupport}
+        style={styles.iconButton}
+        disabled={!isOwnProfile}
+      >
+        {isOwnProfile && (
+          <Ionicons
+            name="help-circle-outline"
+            size={27}
+            color={COLORS.textPrimary}
+          />
+        )}
+      </TouchableOpacity>
 
       <TouchableOpacity
         onPress={onSettings}

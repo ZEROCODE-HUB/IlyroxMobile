@@ -457,6 +457,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       <ProfileHeader
         isOwnProfile={isMe}
         onBack={onBack}
+        onSupport={() => router.push("/support")}
         onSettings={() => router.push("/settings")}
       />
       {/* Profile Info */}
@@ -473,6 +474,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
           <View style={styles.infoRight}>
             <Text style={styles.name}>{profileData.name}</Text>
+            <Text style={styles.biography}>{profileData.biography}</Text>
             {profileData.role === "Cliente" ? (
               <></>
             ) : (
@@ -1574,6 +1576,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: COLORS.textTertiary,
+  },
+  biography: {
+    fontSize: 12,
+    color: COLORS.textQuaternary,
+    marginBottom: 4,
   },
 });
 

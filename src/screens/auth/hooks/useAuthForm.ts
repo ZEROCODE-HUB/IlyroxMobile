@@ -31,6 +31,7 @@ export interface AuthFormState {
   modalidad: string;
   nombreInmobiliaria: string;
   anosExperiencia: string;
+  biografia: string;
 }
 
 const initialFormState: AuthFormState = {
@@ -48,6 +49,7 @@ const initialFormState: AuthFormState = {
   modalidad: "",
   nombreInmobiliaria: "",
   anosExperiencia: "",
+  biografia: "",
 };
 
 export function useAuthForm() {
@@ -139,6 +141,7 @@ export function useAuthForm() {
         modalidad,
         nombreInmobiliaria,
         anosExperiencia,
+        biografia,
       } = formState;
 
       if (requireEstado && !estado) {
@@ -179,6 +182,14 @@ export function useAuthForm() {
         showModal({
           title: "Error",
           message: "Selecciona tus años de experiencia",
+          confirmText: "OK",
+        });
+        return false;
+      }
+      if (!biografia) {
+        showModal({
+          title: "Error",
+          message: "Ingrese su biografía",
           confirmText: "OK",
         });
         return false;
@@ -263,8 +274,12 @@ export function useAuthForm() {
           nombre: formState.name,
           apellido_paterno: formState.lastNamePaterno,
           apellido_materno: formState.lastNameMaterno,
-          prefijo_celular: formState.phone.includes(" ") ? formState.phone.split(" ")[0] : "+52",
-          celular: formState.phone.includes(" ") ? formState.phone.split(" ").slice(1).join(" ") : formState.phone,
+          prefijo_celular: formState.phone.includes(" ")
+            ? formState.phone.split(" ")[0]
+            : "+52",
+          celular: formState.phone.includes(" ")
+            ? formState.phone.split(" ").slice(1).join(" ")
+            : formState.phone,
           email: formState.email,
           rol: "cliente",
           pais: "Mexico",
@@ -282,7 +297,7 @@ export function useAuthForm() {
           nombre_completo: `${formState.name} ${formState.lastNamePaterno} ${formState.lastNameMaterno}`,
           activado_en: null,
           deleted_at: null,
-          biografia: null,
+          biografia: formState.biografia,
           sitio_web: null,
           calificacion_promedio: null,
           total_calificaciones: null,
