@@ -75,11 +75,14 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
       />
 
       <View style={styles.headerTopRow}>
-        <Image
-          source={LOGO_SOURCE}
-          style={styles.headerLogo}
-          resizeMode="cover"
-        />
+        <View style={styles.headerLogoContainer}>
+          <Image
+            source={LOGO_SOURCE}
+            style={styles.headerLogo}
+            resizeMode="cover"
+          />
+          <Text style={styles.headerTitle}>ilyrox</Text>
+        </View>
         <View style={styles.headerIcons}>
           {["Matches", "Messages", "Requests", "Appointments"].map(
             (screen, idx) => (
@@ -156,6 +159,16 @@ const styles = StyleSheet.create({
       },
       android: { elevation: 5 },
     }),
+  },
+  headerLogoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: COLORS.white,
   },
   headerTopRow: {
     flexDirection: "row",

@@ -12,3 +12,4 @@ export { default as UserHeader } from "../UserHeader";
 export { default as ActionButtons } from "../ActionButtons";
 export { default as RatingStars } from "./RatingStars";
 export { RichText } from "./RichText";
+export { default as ExpandableText } from "./ExpandableText";

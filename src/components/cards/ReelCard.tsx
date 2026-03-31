@@ -18,7 +18,7 @@ import { FeedItem, User } from "../../types";
 import { useFeedInteractions, useViewTracking } from "@/hooks/hooks";
 import { DIMENSIONS, COLORS } from "../../constants";
 import { commonStyles } from "../../../styles";
-import { UserHeader, VideoPlayer, Avatar } from "../shared";
+import { UserHeader, VideoPlayer, Avatar, ExpandableText } from "../shared";
 import ActionButtons from "../ActionButtons";
 // import { supabase } from "../../lib/supabase";
 import { useUserRecommendations } from "@/hooks/hooks/useUserRecommendations";
@@ -65,8 +65,6 @@ const ReelCard: React.FC<ReelCardProps> = ({
       : `Recomendado por ${positiveRecommendations} usuarios`;
   const [showRecommendedModal, setShowRecommendedModal] = React.useState(false);
 
-  const [showFullCaption, setShowFullCaption] = React.useState(false);
-
   const { recommendedList, loadingRecommended, fetchRecommendations } =
     useUserRecommendations(item.user.id);
 
@@ -80,22 +78,20 @@ const ReelCard: React.FC<ReelCardProps> = ({
     onClick();
   };
 
-  const handleSeeMore = () => {
-    setShowFullCaption(!showFullCaption);
-  };
-
   return (
     <View style={commonStyles.card}>
-      <UserHeader
-        user={item.user}
-        timestamp={item.timestamp}
-        onUserClick={onUserClick}
-        showOptions={showOptions}
-        setShowOptions={setShowOptions}
-        onReport={() => setShowReportModal(true)}
-        totalRatings={item.user.totalRatings}
-        showRecommendedPreview={false}
-      />
+      <View style={styles.userRow}>
+        <UserHeader
+          user={item.user}
+          timestamp={item.timestamp}
+          onUserClick={onUserClick}
+          showOptions={showOptions}
+          setShowOptions={setShowOptions}
+          onReport={() => setShowReportModal(true)}
+          totalRatings={item.user.totalRatings}
+          showRecommendedPreview={false}
+        />
+      </View>
       {positiveRecommendations > 0 && (
         <Pressable style={styles.recommendedRow} onPress={openRecommendedModal}>
           <View style={styles.recommendedAvatars}>
@@ -110,7 +106,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
                 <Avatar
                   uri={u.avatar || undefined}
                   name={u.name}
-                  size={18}
+                  size={25}
                   style={{ borderWidth: 1, borderColor: COLORS.white }}
                 />
               </View>
@@ -132,18 +128,16 @@ const ReelCard: React.FC<ReelCardProps> = ({
           showTimeline={true}
           showPlayIcon={true}
           isMuted={isMuted}
+          onPress={handleExpand}
+          showControls={false}
         />
 
         {/* Badge de Reel */}
-        <View style={styles.reelBadge}>
+        <View style={styles.reelBadge} pointerEvents="none">
           <Ionicons name="videocam" size={10} color={COLORS.white} />
           <Text style={styles.reelBadgeText}>Reel</Text>
         </View>
 
-        {/* Botón para expandir */}
-        <Pressable style={styles.expandButton} onPress={handleExpand}>
-          <Ionicons name="expand" size={18} color={COLORS.white} />
-        </Pressable>
         <View style={styles.previewOverlayControls}>
           <Pressable
             onPress={() => setIsMuted(!isMuted)}
@@ -180,25 +174,14 @@ const ReelCard: React.FC<ReelCardProps> = ({
 
       {/* Descripción del reel - Estilo Instagram */}
       {item.content && (
-        <Pressable style={styles.captionContainer} onPress={handleSeeMore}>
-          <Text style={styles.captionText}>
-            <Text style={styles.captionUser}>
-              {item.user.nombre || item.user.name}
-            </Text>
-            {" " +
-              (item.content.length > 100
-                ? item.content.substring(0, 100)
-                : item.content)}
-            {!showFullCaption && item.content.length > 100 && (
-              <Text style={styles.seeMoreText}>... más</Text>
-            )}
-            {showFullCaption && (
-              <Text style={styles.captionText}>
-                {item.content.substring(100)}
-              </Text>
-            )}
-          </Text>
-        </Pressable>
+        <View style={styles.captionContainer}>
+          <ExpandableText
+            text={item.content}
+            userName={item.user.nombre || item.user.name}
+            maxLines={2}
+            style={styles.captionText}
+          />
+        </View>
       )}
       <RecommendedUsersModal
         visible={showRecommendedModal}
@@ -232,9 +215,14 @@ const styles = StyleSheet.create({
   captionUser: {
     fontWeight: "bold",
   },
+  userRow: {
+    paddingBottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+  },
   recommendedRow: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingBottom: 5,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,

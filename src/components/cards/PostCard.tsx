@@ -15,6 +15,7 @@ import {
   ReportModal,
   Avatar,
   RichText,
+  ExpandableText,
 } from "../shared";
 import ActionButtons from "../ActionButtons";
 
@@ -214,25 +215,14 @@ const PostCard: React.FC<PostCardProps> = ({
         />
       </TouchableOpacity>
       {hasImages && (
-        <TouchableOpacity
-          style={styles.captionContainer}
-          onPress={handleSeeMore}
-        >
-          <Text style={styles.captionText}>
-            <Text style={styles.captionUser}>
-              {item.user.nombre || item.user.name}
-            </Text>
-            {" " + item.content.substring(0, 100)}
-            {!showFullCaption && (
-              <Text style={styles.seeMoreText}>... más</Text>
-            )}
-            {showFullCaption && (
-              <Text style={styles.captionText}>
-                {item.content.substring(100)}
-              </Text>
-            )}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.captionContainer}>
+          <ExpandableText
+            text={item.content}
+            userName={item.user.nombre || item.user.name}
+            maxLines={2}
+            style={styles.captionText}
+          />
+        </View>
       )}
     </View>
   );
@@ -251,6 +241,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     marginBottom: 2,
   },
+
   actionsContainer: {
     paddingHorizontal: 12,
     width: "100%",
