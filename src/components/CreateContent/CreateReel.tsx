@@ -243,8 +243,8 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
       const videoUrl = uploadResult.videoUrl;
       let thumbnailUrl = uploadResult.thumbnailUrl || null;
 
-      // Si tenemos un thumbnail local generado, lo subimos manualmente para asegurar su existencia
-      if (thumbnailUri && !thumbnailUri.startsWith("http")) {
+      // Solo subimos el thumbnail manual si el servicio NO nos devolvió uno ya procesado
+      if (!thumbnailUrl && thumbnailUri && !thumbnailUri.startsWith("http")) {
         try {
           const manualThumb = await uploadImage(thumbnailUri, "reels");
           if (manualThumb) {

@@ -172,7 +172,11 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
                 onPress={() => handleShare(false)}
                 activeOpacity={0.85}
               >
-                <Ionicons name="share-social" size={18} color={COLORS.primary} />
+                <Ionicons
+                  name="share-social"
+                  size={18}
+                  color={COLORS.primary}
+                />
                 <Text style={styles.actionText}>Compartir propiedad</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -211,7 +215,11 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
                 onPress={() => handleShare(true)}
                 activeOpacity={0.85}
               >
-                <Ionicons name="share-social" size={18} color={COLORS.primary} />
+                <Ionicons
+                  name="share-social"
+                  size={18}
+                  color={COLORS.primary}
+                />
                 <Text style={styles.actionText}>Compartir propiedad</Text>
               </TouchableOpacity>
               <TouchableOpacity

@@ -201,6 +201,10 @@ export function RegisterStepTwo({
         keyboardType="default"
         value={formState.biografia}
         onChangeText={(v) => onUpdateField("biografia", v)}
+        numberOfLines={4}
+        inputStyle={{ height: 100 }}
+        maxLength={200}
+        showCounter
       />
 
       <SubmitButton

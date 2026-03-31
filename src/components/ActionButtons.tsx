@@ -19,6 +19,7 @@ import { useReportProperty } from "@/hooks/hooks/useReportProperty";
 import { useLikes, useShare } from "@/hooks/hooks";
 import { useCommentCount } from "@/hooks/hooks/useCommentCount";
 import { propertyService } from "../services/propertyService";
+import firstUpperCase from "@/utils/firstUpperCase";
 
 interface ActionButtonsProps {
   feedItemId: string;
@@ -251,7 +252,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
         <SharePropertyModal
           visible={showShareModal}
           onClose={() => setShowShareModal(false)}
-          propertyTitle={shareTitle || "Propiedad"}
+          propertyTitle={firstUpperCase(shareTitle) || "Propiedad"}
           propertyId={propertyId}
           shareCode={shareCode}
           feedItemId={feedItemId}

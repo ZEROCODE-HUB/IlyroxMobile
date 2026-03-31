@@ -98,12 +98,14 @@ export async function uploadVideo(
       type: "video/mp4",
       name: `reel-${Date.now()}.mp4`,
     } as any);
-    formData.append("quality", "medium");
-    formData.append("maxWidth", "1080");
+    formData.append("quality", "low"); // Changed to low for faster processing
+    formData.append("maxWidth", "720"); // Changed to 720 for mobile optimization
     formData.append("type", "reels");
 
     return new Promise((resolve, reject) => {
+      const startTime = Date.now();
       const xhr = new XMLHttpRequest();
+      console.log(`🚀 Starting video upload and processing...`);
 
       xhr.upload.addEventListener("progress", (event) => {
         if (event.lengthComputable && onProgress) {
@@ -112,8 +114,10 @@ export async function uploadVideo(
         }
       });
       xhr.addEventListener("load", () => {
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
         try {
           if (xhr.status >= 200 && xhr.status < 300) {
+            console.log(`✅ Video processed successfully in ${duration}s`);
             const response = JSON.parse(xhr.responseText);
             resolve({
               videoUrl: response.videoUrl || response.video_url,
@@ -121,26 +125,32 @@ export async function uploadVideo(
             });
           } else {
             console.error(
-              `Upload failed with status ${xhr.status}: ${xhr.responseText}`,
+              `❌ Upload failed after ${duration}s with status ${xhr.status}: ${xhr.responseText}`,
             );
             reject(new Error(`Error al subir el video: ${xhr.status}`));
           }
         } catch (e: any) {
-          console.error("Error procesando respuesta del servidor:", e);
+          console.error(`❌ Error parsing server response after ${duration}s:`, e);
           reject(new Error(`Error en el formato de respuesta: ${e.message}`));
         }
       });
       xhr.addEventListener("error", () => {
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.error(`❌ Network error after ${duration}s`);
         reject(new Error("Error de red al subir el video"));
       });
       xhr.addEventListener("timeout", () => {
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.error(`❌ Timeout after ${duration}s`);
         reject(new Error("La subida tardó demasiado (Timeout)"));
       });
       xhr.addEventListener("abort", () => {
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.log(`⏹️ Upload aborted after ${duration}s`);
         reject(new Error("La subida fue cancelada"));
       });
       xhr.open("POST", `${VIDEO_API_URL}/process-video`);
-      xhr.timeout = 120000; // 2 minutos para process-video (lento)
+      xhr.timeout = 180000; // Increased to 3 minutes for slow processing
       xhr.send(formData);
     });
   } catch (error) {
