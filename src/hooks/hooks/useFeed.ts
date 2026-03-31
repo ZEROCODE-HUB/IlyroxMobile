@@ -541,11 +541,11 @@ export function useFeed(options: UseFeedOptions = {}) {
                     property.tipo ||
                     ""
                   ).toLowerCase(),
-                  operation:
-                    operation?.tipo_operacion === "venta"
-                      ? "Publicada"
-                      : "Rentada",
-                  status: "Publicada" as const,
+                  operations: Array.isArray(property.operaciones_propiedad)
+                    ? property.operaciones_propiedad
+                    : property.operaciones_propiedad
+                    ? [property.operaciones_propiedad]
+                    : [],
                   colonia: property.colonia || "",
                 },
               };

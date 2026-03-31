@@ -465,10 +465,12 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
               </View>
             )}
             <View style={styles.metaList}>
-              <View style={styles.metaItem}>
-                <Ionicons name="call" size={12} color={COLORS.textTertiary} />
-                <Text style={styles.metaText}>{profileData.phone}</Text>
-              </View>
+              {profileData.phone && (
+                <View style={styles.metaItem}>
+                  <Ionicons name="call" size={12} color={COLORS.textTertiary} />
+                  <Text style={styles.metaText}>{profileData.phone}</Text>
+                </View>
+              )}
               <View style={styles.metaItem}>
                 <Ionicons
                   name="location"

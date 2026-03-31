@@ -151,6 +151,7 @@ export type Property = {
   colonia?: string;
   subtipo?: string;
   codigo_propiedad?: string;
+  operations?: any[];
 };
 
 export type Comment = {

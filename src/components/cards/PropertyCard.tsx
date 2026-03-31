@@ -31,6 +31,7 @@ import { useChatInitiator } from "@/hooks/hooks/messaging/useChatInitiator";
 import { MapModal } from "../shared/MapModal";
 import * as Clipboard from "expo-clipboard";
 import { useToast } from "@/context/ToastContext";
+import firstUpperCase from "@/utils/firstUpperCase";
 
 interface PropertyCardProps {
   item: FeedItem;
@@ -91,10 +92,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const firstRecommender = recommendedByPreview[0];
   const recommendedText =
     positiveRecommendations > 0 && firstRecommender
-      ? `${firstRecommender.name}${positiveRecommendations > 1
-        ? ` y ${positiveRecommendations - 1} más`
-        : ""
-      }`
+      ? `${firstRecommender.name}${
+          positiveRecommendations > 1
+            ? ` y ${positiveRecommendations - 1} más`
+            : ""
+        }`
       : `Recomendado por ${positiveRecommendations} usuarios`;
   const [showRecommendedModal, setShowRecommendedModal] = React.useState(false);
 
@@ -113,6 +115,22 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   };
 
   const location = `${property.colonia ? property.colonia + ", " : ""}${property.location.municipio ? property.location.municipio + ", " : ""}${property.location.state ? property.location.state : ""}`;
+
+  const renderOperationsLabel = () => {
+    if (property.operations && property.operations.length > 0) {
+      return property.operations
+        .map((op, idx) => {
+          const type = op.tipo_operacion === "venta" ? "Venta" : "Renta";
+          return `${type}: $${op.precio?.toLocaleString()} ${op.moneda}`;
+        })
+        .join(" / ");
+    }
+    // Fallback for single operation
+    const type = property.operation === "Sale" ? "Venta" : "Renta";
+    return `${type}: $${property.price.toLocaleString()} ${property.currency}`;
+  };
+
+  const title = `${firstUpperCase(property.subtype) || firstUpperCase(property.type)} en ${property.location.municipio || property.location.state}`;
 
   return (
     <View style={commonStyles.card}>
@@ -185,8 +203,9 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             }}
             onTrackInteraction={trackInteraction}
             shareTitle={property.title}
-            shareDescription={`${property.operation
-              } - $${property.price.toLocaleString()} ${property.currency}`}
+            shareDescription={`${renderOperationsLabel()} - ${
+              property.location?.city
+            }`}
             shareImageUrl={images[0]}
             showContactButton={false}
             orientation="vertical"
@@ -214,10 +233,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           •{" "}
           {property.createdAt
             ? new Date(property.createdAt).toLocaleDateString("es-MX", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })
             : item.timestamp}
         </Text>
       </Pressable>
@@ -226,21 +245,20 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       <TouchableOpacity activeOpacity={0.9} onPress={onClick}>
         <View style={[commonStyles.cardContent, styles.compactContent]}>
           <Text style={commonStyles.title} numberOfLines={1}>
-            {property.title.charAt(0).toUpperCase() + property.title.slice(1)}
+            {title}
           </Text>
 
           <View style={styles.priceRow}>
-            <Text style={styles.priceText}>
-              ${property.price.toLocaleString()} {property.currency}
-            </Text>
-            <Pressable
-              style={styles.locationInline}
-              onPress={() => setShowMap(true)}
-            >
-              <Ionicons name="location" size={12} color={COLORS.textSecondary} />
-              <Text style={styles.locationText}>{location}</Text>
-            </Pressable>
+            <Text style={styles.priceText}>{renderOperationsLabel()}</Text>
+            <View></View>
           </View>
+          <Pressable
+            style={styles.locationInline}
+            onPress={() => setShowMap(true)}
+          >
+            <Ionicons name="location" size={12} color={COLORS.textSecondary} />
+            <Text style={styles.locationText}>{location}</Text>
+          </Pressable>
 
           <View style={styles.descriptionRow}>
             <View style={styles.textContainer}>
@@ -271,7 +289,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       <TouchableOpacity activeOpacity={0.9} onPress={onClick}>
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Ionicons name="bed-outline" size={14} color={COLORS.textTertiary} />
+            <Ionicons
+              name="bed-outline"
+              size={14}
+              color={COLORS.textTertiary}
+            />
             <Text style={styles.statValue}>{property.features.beds}</Text>
           </View>
 
@@ -292,7 +314,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           )}
 
           <View style={styles.statItem}>
-            <Ionicons name="home-outline" size={14} color={COLORS.textTertiary} />
+            <Ionicons
+              name="home-outline"
+              size={14}
+              color={COLORS.textTertiary}
+            />
             <Text style={styles.statValue}>
               {property.features.constructionSqft}m²
             </Text>
@@ -305,7 +331,9 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                 size={14}
                 color={COLORS.textTertiary}
               />
-              <Text style={styles.statValue}>{property.features.landSqft}m²</Text>
+              <Text style={styles.statValue}>
+                {property.features.landSqft}m²
+              </Text>
             </View>
           )}
         </View>
@@ -427,6 +455,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    paddingTop: 5,
   },
   locationText: {
     fontSize: 12,

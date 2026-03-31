@@ -147,15 +147,14 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   const financiamientos =
     propertyDetails.financiamientos?.map((f: any) => f.tipo.nombre) || [];
 
-  const StatItem = ({ icon, label, value, subLabel }: any) => (
+  const StatItem = ({ icon, label, value }: any) => (
     <View style={styles.statItem}>
       <View style={styles.statIconContainer}>
         <Ionicons name={icon} size={16} color={COLORS.textSecondary} />
       </View>
-      <View>
+      <View style={styles.statTextContainer}>
         <Text style={styles.statValue}>{value}</Text>
         <Text style={styles.statLabel}>{label}</Text>
-        {subLabel && <Text style={styles.statSubLabel}>{subLabel}</Text>}
       </View>
     </View>
   );
@@ -358,12 +357,10 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
               {propertyDetails.banos > 0 && (
                 <View style={styles.statItem}>
                   <View style={styles.statIconContainer}>
-                    <Bath size={14} color={COLORS.textSecondary} />
+                    <Bath size={16} color={COLORS.textSecondary} />
                   </View>
-                  <View>
-                    <Text style={styles.statValue}>
-                      {propertyDetails.banos}
-                    </Text>
+                  <View style={styles.statTextContainer}>
+                    <Text style={styles.statValue}>{propertyDetails.banos}</Text>
                     <Text style={styles.statLabel}>Baños</Text>
                   </View>
                 </View>
@@ -900,22 +897,26 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   statItem: {
-    width: "31%",
+    width: "48%",
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.white,
-    padding: 12,
-    borderRadius: 16,
+    padding: 10,
+    borderRadius: 12,
     gap: 8,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
   statIconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: COLORS.gradientBackground,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 4,
+  },
+  statTextContainer: {
+    flex: 1,
   },
   statValue: {
     fontSize: 14,
