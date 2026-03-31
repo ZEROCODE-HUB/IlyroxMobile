@@ -115,22 +115,21 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const location = `${property.colonia ? property.colonia + ", " : ""}${property.location.municipio ? property.location.municipio + ", " : ""}${property.location.state ? property.location.state : ""}`;
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.95}
-      style={commonStyles.card}
-      onPress={onClick}
-    >
-      <UserHeader
-        user={item.user}
-        timestamp={item.timestamp}
-        onUserClick={onUserClick}
-        showOptions={showOptions}
-        setShowOptions={setShowOptions}
-        onReport={() => setShowReportModal(true)}
-        totalRatings={item.user.totalRatings}
-        showRecommendedPreview={false}
-        feedItemType="property"
-      />
+    <View style={commonStyles.card}>
+      {/* Header y recomendaciones clickeables */}
+      <TouchableOpacity activeOpacity={0.9} onPress={onClick}>
+        <UserHeader
+          user={item.user}
+          timestamp={item.timestamp}
+          onUserClick={onUserClick}
+          showOptions={showOptions}
+          setShowOptions={setShowOptions}
+          onReport={() => setShowReportModal(true)}
+          totalRatings={item.user.totalRatings}
+          showRecommendedPreview={false}
+          feedItemType="property"
+        />
+      </TouchableOpacity>
 
       {positiveRecommendations > 0 && (
         <TouchableOpacity
@@ -162,16 +161,17 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         </TouchableOpacity>
       )}
 
-      {/* Galería de imágenes con botones flotantes */}
+      {/* Galería de imágenes - independiente para evitar conflictos de gestos */}
       <View style={styles.imageContainer}>
         <ImageGallery
           images={images.slice(0, 3)}
           aspectRatio={DIMENSIONS.POST_ASPECT_RATIO}
           showDots={true}
           showImageCount={false}
+          onImagePress={onClick}
         />
 
-        {/* Botones de acción flotantes (Columna derecha) */}
+        {/* Botones de acción flotantes */}
         <View style={styles.floatingActions}>
           <ActionButtons
             feedItemId={item.id}
@@ -222,95 +222,94 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         </Text>
       </Pressable>
 
-      {/* Información de la propiedad */}
-      <View style={[commonStyles.cardContent, styles.compactContent]}>
-        <Text style={commonStyles.title} numberOfLines={1}>
-          {property.title.charAt(0).toUpperCase() + property.title.slice(1)}
-        </Text>
-
-        <View style={styles.priceRow}>
-          <Text style={styles.priceText}>
-            ${property.price.toLocaleString()} {property.currency}
+      {/* Información de la propiedad clickeable */}
+      <TouchableOpacity activeOpacity={0.9} onPress={onClick}>
+        <View style={[commonStyles.cardContent, styles.compactContent]}>
+          <Text style={commonStyles.title} numberOfLines={1}>
+            {property.title.charAt(0).toUpperCase() + property.title.slice(1)}
           </Text>
-          <Pressable
-            style={styles.locationInline}
-            onPress={() => setShowMap(true)}
-          >
-            <Ionicons name="location" size={12} color={COLORS.textSecondary} />
-            <Text style={styles.locationText}>{location}</Text>
-          </Pressable>
-        </View>
 
-        {/* Contenedor de Fila Principal */}
-        <View style={styles.descriptionRow}>
-          <View style={styles.textContainer}>
-            {item.content ? (
-              <Text style={commonStyles.description} numberOfLines={2}>
-                {item.content}
-              </Text>
-            ) : null}
+          <View style={styles.priceRow}>
+            <Text style={styles.priceText}>
+              ${property.price.toLocaleString()} {property.currency}
+            </Text>
+            <Pressable
+              style={styles.locationInline}
+              onPress={() => setShowMap(true)}
+            >
+              <Ionicons name="location" size={12} color={COLORS.textSecondary} />
+              <Text style={styles.locationText}>{location}</Text>
+            </Pressable>
           </View>
 
-          {userId === item.user.id ? (
-            <View></View>
-          ) : (
-            <TouchableOpacity
-              style={styles.smallContactBtn}
-              accessibilityLabel="Contactar asesor"
-              accessibilityRole="button"
-              onPress={handleContactPress}
-            >
+          <View style={styles.descriptionRow}>
+            <View style={styles.textContainer}>
+              {item.content ? (
+                <Text style={commonStyles.description} numberOfLines={2}>
+                  {item.content}
+                </Text>
+              ) : null}
+            </View>
+
+            {userId !== item.user.id && (
+              <TouchableOpacity
+                style={styles.smallContactBtn}
+                onPress={handleContactPress}
+              >
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={14}
+                  color={COLORS.white}
+                />
+                <Text style={styles.smallContactText}>Contactar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity activeOpacity={0.9} onPress={onClick}>
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Ionicons name="bed-outline" size={14} color={COLORS.textTertiary} />
+            <Text style={styles.statValue}>{property.features.beds}</Text>
+          </View>
+
+          <View style={styles.statItem}>
+            <Bath size={12} color={COLORS.textTertiary} />
+            <Text style={styles.statValue}>{property.features.baths}</Text>
+          </View>
+
+          {property.features.parking !== undefined && (
+            <View style={styles.statItem}>
               <Ionicons
-                name="chatbubble-outline"
+                name="car-outline"
                 size={14}
-                color={COLORS.white}
+                color={COLORS.textTertiary}
               />
-              <Text style={styles.smallContactText}>Contactar</Text>
-            </TouchableOpacity>
+              <Text style={styles.statValue}>{property.features.parking}</Text>
+            </View>
+          )}
+
+          <View style={styles.statItem}>
+            <Ionicons name="home-outline" size={14} color={COLORS.textTertiary} />
+            <Text style={styles.statValue}>
+              {property.features.constructionSqft}m²
+            </Text>
+          </View>
+
+          {property.features.landSqft && (
+            <View style={[styles.statItem, { borderRightWidth: 0 }]}>
+              <Ionicons
+                name="resize-outline"
+                size={14}
+                color={COLORS.textTertiary}
+              />
+              <Text style={styles.statValue}>{property.features.landSqft}m²</Text>
+            </View>
           )}
         </View>
-      </View>
-
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Ionicons name="bed-outline" size={14} color={COLORS.textTertiary} />
-          <Text style={styles.statValue}>{property.features.beds}</Text>
-        </View>
-
-        <View style={styles.statItem}>
-          <Bath size={12} color={COLORS.textTertiary} />
-          <Text style={styles.statValue}>{property.features.baths}</Text>
-        </View>
-
-        {property.features.parking !== undefined && (
-          <View style={styles.statItem}>
-            <Ionicons
-              name="car-outline"
-              size={14}
-              color={COLORS.textTertiary}
-            />
-            <Text style={styles.statValue}>{property.features.parking}</Text>
-          </View>
-        )}
-
-        <View style={styles.statItem}>
-          <Ionicons name="home-outline" size={14} color={COLORS.textTertiary} />
-          <Text style={styles.statValue}>
-            {property.features.constructionSqft}m²
-          </Text>
-        </View>
-
-        {property.features.landSqft && (
-          <View style={[styles.statItem, { borderRightWidth: 0 }]}>
-            <Ionicons
-              name="resize-outline"
-              size={14}
-              color={COLORS.textTertiary}
-            />
-            <Text style={styles.statValue}>{property.features.landSqft}m²</Text>
-          </View>
-        )}
-      </View>
+      </TouchableOpacity>
 
       <MapModal
         visible={showMap}
@@ -332,7 +331,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         users={recommendedList}
         totalCount={positiveRecommendations}
       />
-    </TouchableOpacity>
+    </View>
   );
 };
 
@@ -402,60 +401,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontWeight: "600",
     maxWidth: 220,
-  },
-  recommendedModal: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    width: 320,
-    maxHeight: 420,
-  },
-  recommendedModalHeader: {
-    alignItems: "center",
-    paddingBottom: 8,
-  },
-  recommendedModalTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  recommendedModalSubtitle: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  recommendedModalLoading: {
-    padding: 16,
-    alignItems: "center",
-  },
-  recommendedModalList: {
-    paddingVertical: 6,
-  },
-  recommendedModalItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 8,
-  },
-  recommendedModalInfo: {
-    flex: 1,
-  },
-  recommendedModalName: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-  },
-  recommendedModalRole: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  recommendedModalEmpty: {
-    padding: 16,
-    alignItems: "center",
-  },
-  recommendedModalEmptyText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
   },
   descriptionRow: {
     flexDirection: "row",

@@ -22,6 +22,7 @@ import {
   Dimensions,
   ViewToken,
   LayoutChangeEvent,
+  TouchableOpacity,
 } from "react-native";
 import { FlatList } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
@@ -50,7 +51,6 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [containerWidth, setContainerWidth] = useState(SCREEN_WIDTH);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Referencia al FlatList
   // Referencia al FlatList - Tipado correcto para GH FlatList
   const flatListRef = useRef<FlatList<string>>(null);
 
@@ -58,7 +58,6 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
   const onLayout = useCallback(
     (event: LayoutChangeEvent) => {
       const { width } = event.nativeEvent.layout;
-      // Solo actualizamos si hay una diferencia notable para evitar re-renders excesivos
       if (width > 0 && Math.abs(width - containerWidth) > 1) {
         setContainerWidth(width);
       }
@@ -82,12 +81,21 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
   // Renderizado de cada item de la galería
   const renderItem = useCallback(
     ({ item }: { item: string }) => (
-      <LazyImage
-        source={{ uri: item }}
-        style={[styles.image, { width: containerWidth }]}
-      />
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={onImagePress}
+        style={{ width: containerWidth }}
+        // delayPressIn permite que el gesto de scroll se inicie sin que el componente
+        // intercepte el toque inmediatamente como un tap.
+        delayPressIn={80}
+      >
+        <LazyImage
+          source={{ uri: item }}
+          style={[styles.image, { width: containerWidth }]}
+        />
+      </TouchableOpacity>
     ),
-    [containerWidth],
+    [containerWidth, onImagePress],
   );
 
   const keyExtractor = useCallback(
@@ -124,7 +132,6 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
         removeClippedSubviews={true}
         nestedScrollEnabled={true}
         style={styles.scroll}
-        // Optimizamos el cálculo de layout ya que sabemos el ancho
         getItemLayout={(_, index) => ({
           length: containerWidth,
           offset: containerWidth * index,

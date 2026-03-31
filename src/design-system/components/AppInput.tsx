@@ -19,6 +19,7 @@ interface AppInputProps extends TextInputProps {
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   inputStyle?: object;
+  showCounter?: boolean;
 }
 
 export const AppInput = forwardRef<TextInput, AppInputProps>(
@@ -34,6 +35,7 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(
       onBlur,
       style,
       inputStyle,
+      showCounter,
       ...props
     },
     ref,
@@ -148,10 +150,19 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(
             </View>
           )}
         </View>
-        {error && <Text style={styles.errorText}>{error}</Text>}
-        {helperText && !error && (
-          <Text style={styles.helperText}>{helperText}</Text>
-        )}
+        <View style={styles.footerContainer}>
+          <View style={{ flex: 1 }}>
+            {error && <Text style={styles.errorText}>{error}</Text>}
+            {helperText && !error && (
+              <Text style={styles.helperText}>{helperText}</Text>
+            )}
+          </View>
+          {showCounter && props.maxLength && (
+            <Text style={styles.counterText}>
+              {String(props.value || "").length}/{props.maxLength}
+            </Text>
+          )}
+        </View>
       </View>
     );
   },
@@ -206,5 +217,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     marginLeft: 4,
+  },
+  footerContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  counterText: {
+    fontSize: 12,
+    color: COLORS.textTertiary,
+    marginTop: 4,
+    marginRight: 4,
   },
 });

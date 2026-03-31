@@ -31,7 +31,7 @@ import {
 } from "../../types";
 
 // Components
-import { Avatar } from "../shared";
+import { Avatar, ExpandableText } from "../shared";
 import { ProfileHeader } from "./ProfileHeader";
 import ProfileAvatarPicker from "./ProfileAvatarPicker";
 import ProfileTabs from "./ProfileTabs";
@@ -52,6 +52,7 @@ import ProfilePostItem from "./ProfilePostItem";
 import ProfilePropertyItem from "./ProfilePropertyItem";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import { supabase } from "../../lib/supabase";
+import { RecommendedSection } from "./RecommendedSection";
 
 interface ProfileProps {
   userId?: string | null;
@@ -178,6 +179,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     handleRecommendation,
     loadRecommendedByUsers,
     updateProfilePhoto,
+    isMe,
   } = useProfile(userId);
 
   const { deletePost, deleteReel } = useGridProfile();
@@ -231,7 +233,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
   // Computed
   const targetUserId = userId || authUser?.id;
-  const isMe = !userId || targetUserId === authUser?.id;
 
   useFocusEffect(
     useCallback(() => {
@@ -275,31 +276,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     };
     return roleMap[rol] || rol;
   }, []);
-
-  /**
-   * useEffect ÚNICO optimizado for Recommended Users
-   */
-  useEffect(() => {
-    const shouldLoad = showRatingDetails || showRecommendedByModal;
-
-    if (!shouldLoad) return;
-    if (!targetUserId) return;
-    if (recommendedByUsers.length > 0) return;
-    if (loadingRecommendedBy) return;
-    if ((reviewStats?.total_recomiendan || 0) <= 0) {
-      // Just to be safe, though hook handles data
-      return;
-    }
-
-    loadRecommendedByUsers({ reset: true });
-  }, [
-    showRatingDetails,
-    showRecommendedByModal,
-    targetUserId,
-    recommendedByUsers.length,
-    loadingRecommendedBy,
-    reviewStats?.total_recomiendan,
-  ]);
 
   /**
    * Wrapper for recommendation to also reload list if needed
@@ -463,26 +439,36 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       {/* Profile Info */}
       <View style={styles.infoContainer}>
         <View style={styles.infoRow}>
-          <ProfileAvatarPicker
-            uri={profileData.avatar}
-            name={profileData.name}
-            size={100}
-            userId={targetUserId!}
-            isOwnProfile={isMe}
-            onPhotoUpdated={updateProfilePhoto}
-          />
+          <View style={styles.infoLeft}>
+            <ProfileAvatarPicker
+              uri={profileData.avatar}
+              name={profileData.name}
+              size={85}
+              userId={targetUserId!}
+              isOwnProfile={isMe}
+              onPhotoUpdated={updateProfilePhoto}
+            />
+          </View>
 
           <View style={styles.infoRight}>
             <Text style={styles.name}>{profileData.name}</Text>
-            <Text style={styles.biography}>{profileData.biography}</Text>
-            {profileData.role === "Cliente" ? (
-              <></>
-            ) : (
+            {profileData.biography && (
+              <ExpandableText
+                text={profileData.biography}
+                maxLines={2}
+                style={styles.biography}
+              />
+            )}
+            {profileData.role && (
               <View style={styles.roleBadge}>
                 <Text style={styles.roleText}>{profileData.role}</Text>
               </View>
             )}
             <View style={styles.metaList}>
+              <View style={styles.metaItem}>
+                <Ionicons name="call" size={12} color={COLORS.textTertiary} />
+                <Text style={styles.metaText}>{profileData.phone}</Text>
+              </View>
               <View style={styles.metaItem}>
                 <Ionicons
                   name="location"
@@ -567,204 +553,14 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         </TouchableOpacity>
 
         {showRatingDetails && (
-          <View style={styles.statsPanel}>
-            {/* Recommends Row moved here */}
-            <View style={styles.recommendsRow}>
-              <TouchableOpacity
-                style={[
-                  styles.recItem,
-                  isMe && styles.recItemDisabled,
-                  { borderRightWidth: 1 },
-                ]}
-                onPress={() => handleRecommendation(true)}
-                disabled={isMe || submittingRecommendation}
-              >
-                <AnimatedLike
-                  isActive={userRecommendation === true}
-                  onPress={() => handleRecommendation(true)}
-                  activeColor={COLORS.primary}
-                  inactiveColor={COLORS.textSecondary}
-                  variant="thumbs-up"
-                />
-                <Text style={styles.recVal}>
-                  {profileData.positiveRecommendations}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.recItem, isMe && styles.recItemDisabled]}
-                onPress={() => handleRecommendation(false)}
-                disabled={isMe || submittingRecommendation}
-              >
-                <AnimatedLike
-                  isActive={userRecommendation === false}
-                  onPress={() => handleRecommendation(false)}
-                  activeColor={COLORS.error}
-                  inactiveColor={COLORS.textSecondary}
-                  variant="thumbs-down"
-                />
-                <Text style={styles.recVal}>
-                  {profileData.negativeRecommendations}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Recommended By Section */}
-            <View style={styles.recommendedBySection}>
-              <View style={styles.recommendedByHeader}>
-                <Text style={styles.recommendedByTitle}>Recomendado por</Text>
-                <Text style={styles.recommendedByCount}>
-                  {profileData.positiveRecommendations} usuarios
-                </Text>
-              </View>
-
-              {loadingRecommendedBy ? (
-                <View style={styles.recommendedByLoading}>
-                  <ActivityIndicator size="small" color={COLORS.primary} />
-                </View>
-              ) : recommendedByError ? (
-                <Text style={styles.recommendedByEmptyText}>
-                  {recommendedByError}
-                </Text>
-              ) : recommendedByUsers.length === 0 ? (
-                <Text style={styles.recommendedByEmptyText}>
-                  Aún no hay recomendaciones
-                </Text>
-              ) : (
-                <TouchableOpacity
-                  style={styles.recommendedByPreviewRow}
-                  onPress={() => setShowRecommendedByModal(true)}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.recommendedByAvatars}>
-                    {recommendedByUsers.slice(0, 2).map((u, idx) => {
-                      const fullName = [
-                        u.nombre,
-                        u.apellido_paterno,
-                        u.apellido_materno,
-                      ]
-                        .filter(Boolean)
-                        .join(" ")
-                        .trim();
-
-                      return (
-                        <View
-                          key={u.id}
-                          style={[
-                            styles.recommendedByAvatarWrap,
-                            idx === 1 && styles.recommendedByAvatarWrapSecond,
-                          ]}
-                        >
-                          <Avatar
-                            uri={u.foto || undefined}
-                            name={fullName || "Usuario"}
-                            size={26}
-                            style={styles.recommendedByAvatarSmall}
-                          />
-                        </View>
-                      );
-                    })}
-                  </View>
-
-                  <Text
-                    style={styles.recommendedByPreviewText}
-                    numberOfLines={1}
-                  >
-                    {(() => {
-                      const first = recommendedByUsers[0];
-                      const firstName = first
-                        ? [first.nombre, first.apellido_paterno]
-                            .filter(Boolean)
-                            .join(" ")
-                            .trim()
-                        : "Usuario";
-                      const total = profileData.positiveRecommendations || 0;
-                      const rest = Math.max(0, total - 1);
-                      return rest > 0
-                        ? `${firstName} y ${rest} más`
-                        : firstName;
-                    })()}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Progress Section */}
-            <View style={styles.progressSection}>
-              {[5, 4, 3, 2, 1].map((stars) => {
-                const starCounts = {
-                  5: reviewStats?.total_5_estrellas || 0,
-                  4: reviewStats?.total_4_estrellas || 0,
-                  3: reviewStats?.total_3_estrellas || 0,
-                  2: reviewStats?.total_2_estrellas || 0,
-                  1: reviewStats?.total_1_estrella || 0,
-                };
-
-                const count = starCounts[stars as keyof typeof starCounts];
-                const totalReviews = reviewStats?.total_resenas || 0;
-                const percentage =
-                  totalReviews > 0 ? (count / totalReviews) * 100 : 0;
-
-                return (
-                  <View key={stars} style={styles.progressRow}>
-                    <Text style={styles.progressLabel}>{stars} estrellas</Text>
-                    <View style={styles.progressBar}>
-                      <View
-                        style={[
-                          styles.progressFill,
-                          { width: `${Math.round(percentage)}%` },
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.progressPerc}>
-                      {Math.round(percentage)}%
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-
-            {/* Features Section */}
-            <View style={styles.featuresSection}>
-              <Text style={styles.featuresTitle}>
-                Calificación de características
-              </Text>
-              {[
-                {
-                  label: "Disponibilidad",
-                  rating: profileData.disponibilidad,
-                },
-                {
-                  label: "Profesionalismo",
-                  rating: profileData.profesionalismo,
-                },
-                { label: "Comunicación", rating: profileData.comunicacion },
-                {
-                  label: "Conocimiento del Mercado",
-                  rating: profileData.conocimientoMercado,
-                },
-              ].map((f) => (
-                <View key={f.label} style={styles.featureRow}>
-                  <Text style={styles.featureLabel}>{f.label}</Text>
-                  <View style={styles.featureStars}>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Ionicons
-                        key={i}
-                        name={
-                          i < Math.round(f.rating) ? "star" : "star-outline"
-                        }
-                        size={16}
-                        color={
-                          i < Math.round(f.rating)
-                            ? COLORS.primary
-                            : COLORS.textDisabled
-                        }
-                      />
-                    ))}
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
+          <RecommendedSection
+            setShowRecommendedByModal={setShowRecommendedByModal}
+            showRecommendedByModal={showRecommendedByModal}
+            formatRole={formatRole}
+            navigation={navigation}
+            isMe={isMe}
+            loadRecommendedByUsers={loadRecommendedByUsers}
+          />
         )}
       </View>
 
@@ -926,125 +722,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       />
 
       {/* Modal de "Recomendado por" Completo */}
-      <Modal
-        visible={showRecommendedByModal}
-        animationType="slide"
-        onRequestClose={() => setShowRecommendedByModal(false)}
-      >
-        <SafeAreaView style={styles.recommendedByModalContainer}>
-          <View style={styles.recommendedByModalHeader}>
-            <TouchableOpacity
-              onPress={() => setShowRecommendedByModal(false)}
-              style={styles.recommendedByModalBackBtn}
-            >
-              <Ionicons
-                name="chevron-back"
-                size={22}
-                color={COLORS.textPrimary}
-              />
-            </TouchableOpacity>
-
-            <View style={styles.recommendedByModalTitleWrap}>
-              <Text style={styles.recommendedByModalTitle}>
-                Recomendado por
-              </Text>
-              <Text style={styles.recommendedByModalSubtitle}>
-                {profileData.positiveRecommendations} usuarios
-              </Text>
-            </View>
-            <View style={styles.recommendedByModalBackBtn} />
-          </View>
-
-          {recommendedByError ? (
-            <View style={styles.recommendedByModalEmpty}>
-              <Text style={styles.recommendedByEmptyText}>
-                {recommendedByError}
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={recommendedByUsers}
-              keyExtractor={(u, idx) => `${u.id}-${idx}`}
-              contentContainerStyle={styles.recommendedByModalList}
-              onEndReached={() => {
-                if (loadingRecommendedBy || !recommendedByHasMore) return;
-                loadRecommendedByUsers();
-              }}
-              onEndReachedThreshold={0.6}
-              ListEmptyComponent={
-                loadingRecommendedBy ? (
-                  <View style={styles.recommendedByLoading}>
-                    <ActivityIndicator size="small" color={COLORS.primary} />
-                  </View>
-                ) : (
-                  <View style={styles.recommendedByModalEmpty}>
-                    <Text style={styles.recommendedByEmptyText}>
-                      Aún no hay recomendaciones
-                    </Text>
-                  </View>
-                )
-              }
-              renderItem={({ item: u }) => {
-                const fullName = [
-                  u.nombre,
-                  u.apellido_paterno,
-                  u.apellido_materno,
-                ]
-                  .filter(Boolean)
-                  .join(" ")
-                  .trim();
-
-                return (
-                  <TouchableOpacity
-                    style={styles.recommendedByModalItem}
-                    onPress={() => {
-                      setShowRecommendedByModal(false);
-                      navigation.navigate("user/[id]", { id: u.id });
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Avatar
-                      uri={u.foto || undefined}
-                      name={fullName || "Usuario"}
-                      size={44}
-                      style={styles.recommendedByAvatar}
-                    />
-                    <View style={styles.recommendedByInfo}>
-                      <Text style={styles.recommendedByName} numberOfLines={1}>
-                        {fullName || "Usuario"}
-                      </Text>
-                      <Text style={styles.recommendedByRole} numberOfLines={1}>
-                        {formatRole(u.rol)}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              }}
-              ListFooterComponent={
-                loadingRecommendedBy ? (
-                  <View style={styles.recommendedByModalFooter}>
-                    <ActivityIndicator size="small" color={COLORS.primary} />
-                  </View>
-                ) : recommendedByHasMore ? (
-                  <View style={styles.recommendedByModalFooter}>
-                    <TouchableOpacity
-                      style={styles.recommendedByLoadMoreBtn}
-                      onPress={() => loadRecommendedByUsers()}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={styles.recommendedByLoadMoreText}>
-                        Cargar más
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={styles.recommendedByModalFooter} />
-                )
-              }
-            />
-          )}
-        </SafeAreaView>
-      </Modal>
 
       {/* Modal Rating Details */}
       {selectedPost && (
@@ -1181,18 +858,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, // Apply padding here for Property rows
   },
   infoContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 12,
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 16,
+    backgroundColor: COLORS.white,
   },
   infoRow: {
     flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  infoLeft: {
+    marginRight: 16,
     alignItems: "center",
   },
   infoRight: {
     flex: 1,
-    justifyContent: "center",
-    marginLeft: 16,
+    paddingTop: 4,
   },
   name: {
     fontSize: 20,
@@ -1337,207 +1018,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textSecondary,
   },
-  recommendedBySection: {
-    paddingTop: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
-  },
-  recommendedByHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  recommendedByTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  recommendedByCount: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-  },
-  recommendedByLoading: {
-    paddingVertical: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  recommendedByEmptyText: {
-    fontSize: 12,
-    color: COLORS.textTertiary,
-  },
-  recommendedByPreviewRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  recommendedByAvatars: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: 46,
-  },
-  recommendedByAvatarWrap: {
-    borderRadius: 999,
-    backgroundColor: COLORS.white,
-  },
-  recommendedByAvatarWrapSecond: {
-    marginLeft: -10,
-  },
-  recommendedByAvatarSmall: {
-    borderWidth: 1,
-    borderColor: COLORS.white,
-  },
-  recommendedByPreviewText: {
-    flex: 1,
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    fontWeight: "600",
-  },
-  recommendedByModalContainer: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  recommendedByModalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
-  },
-  recommendedByModalBackBtn: {
-    width: 34,
-    height: 34,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  recommendedByModalTitleWrap: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  recommendedByModalTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: COLORS.textPrimary,
-  },
-  recommendedByModalSubtitle: {
-    marginTop: 2,
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-  },
-  recommendedByModalList: {
-    padding: 16,
-    paddingBottom: 30,
-  },
-  recommendedByModalItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 10,
-  },
-  recommendedByAvatar: {
-    borderWidth: 1,
-    borderColor: COLORS.white,
-  },
-  recommendedByInfo: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  recommendedByName: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  recommendedByRole: {
-    marginTop: 2,
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  recommendedByModalFooter: {
-    paddingVertical: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  recommendedByLoadMoreBtn: {
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
-  recommendedByLoadMoreText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  recommendedByModalEmpty: {
-    padding: 20,
-    alignItems: "center",
-  },
-  progressSection: {
-    marginTop: 16,
-    gap: 8,
-  },
-  progressRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  progressLabel: {
-    width: 80,
-    fontSize: 12,
-    color: COLORS.textPrimary,
-  },
-  progressBar: {
-    flex: 1,
-    height: 8,
-    backgroundColor: COLORS.cardBorder,
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
-  },
-  progressPerc: {
-    width: 40,
-    textAlign: "right",
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    fontWeight: "500",
-  },
-  featuresSection: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.cardBorder,
-  },
-  featuresTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-    marginBottom: 12,
-  },
-  featureRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-  },
-  featureLabel: {
-    fontSize: 13,
-    color: COLORS.textPrimary,
-  },
-  featureStars: {
-    flexDirection: "row",
-    gap: 4,
-  },
+
   toolbar: {
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
@@ -1578,9 +1059,10 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
   },
   biography: {
-    fontSize: 12,
-    color: COLORS.textQuaternary,
-    marginBottom: 4,
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+    lineHeight: 18,
   },
 });
 

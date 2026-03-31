@@ -147,8 +147,9 @@ const EditProfile: React.FC<EditProfileProps> = ({
       const updates: any = {
         ...formData,
         foto: photoUrl || "",
-        nombre_completo: `${formData.nombre} ${formData.apellido_paterno} ${formData.apellido_materno || ""
-          }`.trim(),
+        nombre_completo: `${formData.nombre} ${formData.apellido_paterno} ${
+          formData.apellido_materno || ""
+        }`.trim(),
         modalidad: cleanValue(formData.modalidad),
         sitio_web: cleanValue(formData.sitio_web),
         nombre_inmobiliaria: cleanValue(formData.nombre_inmobiliaria),
@@ -238,6 +239,7 @@ const EditProfile: React.FC<EditProfileProps> = ({
               value={formData.nombre}
               onChangeText={(t) => handleInputChange("nombre", t)}
               placeholder="Tu nombre"
+              maxLength={50}
             />
 
             <AppInput
@@ -245,6 +247,7 @@ const EditProfile: React.FC<EditProfileProps> = ({
               value={formData.apellido_paterno}
               onChangeText={(t) => handleInputChange("apellido_paterno", t)}
               placeholder="Primer apellido"
+              maxLength={50}
             />
 
             <AppInput
@@ -252,6 +255,7 @@ const EditProfile: React.FC<EditProfileProps> = ({
               value={formData.apellido_materno}
               onChangeText={(t) => handleInputChange("apellido_materno", t)}
               placeholder="Segundo apellido"
+              maxLength={50}
             />
 
             <AppInput
@@ -262,6 +266,8 @@ const EditProfile: React.FC<EditProfileProps> = ({
               multiline
               numberOfLines={4}
               inputStyle={{ height: 100 }}
+              maxLength={200}
+              showCounter
             />
           </View>
 

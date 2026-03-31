@@ -60,10 +60,6 @@ const PostCard: React.FC<PostCardProps> = ({
 
   const images = item.images || [];
   const hasImages = images.length > 0;
-  const isOpenHouse = item.postType === "openhouse";
-  const isAniversary = item.postType === "aniversario";
-  const isSold = item.postType === "sold";
-  const isSearchPost = item.postType === "busqueda";
   const isShortContent = item.content.length < 100;
   const positiveRecommendations = item.user.positiveRecommendations ?? 0;
   const recommendedByPreview = item.user.recommendedByPreview ?? [];
@@ -78,8 +74,6 @@ const PostCard: React.FC<PostCardProps> = ({
       : `Recomendado por ${positiveRecommendations} usuarios`;
   const [showRecommendedModal, setShowRecommendedModal] = React.useState(false);
 
-  const [showFullCaption, setShowFullCaption] = React.useState(false);
-
   const { recommendedList, loadingRecommended, fetchRecommendations } =
     useUserRecommendations(item.user.id);
 
@@ -88,27 +82,23 @@ const PostCard: React.FC<PostCardProps> = ({
     fetchRecommendations();
   };
 
-  const handleSeeMore = () => {
-    setShowFullCaption(!showFullCaption);
-  };
-
   return (
     <View style={commonStyles.card}>
-      <TouchableOpacity
-        activeOpacity={0.95}
-        style={styles.contentCard}
-        onPress={onClick}
-      >
-        <UserHeader
-          user={item.user}
-          timestamp={item.timestamp}
-          onUserClick={onUserClick}
-          showOptions={showOptions}
-          setShowOptions={setShowOptions}
-          onReport={() => setShowReportModal(true)}
-          totalRatings={item.user.totalRatings}
-          showRecommendedPreview={false}
-        />
+      <View style={styles.contentCard}>
+        {/* Usamos TouchableOpacity solo para las áreas que deben disparar el click general */}
+        <TouchableOpacity activeOpacity={0.9} onPress={onClick}>
+          <UserHeader
+            user={item.user}
+            timestamp={item.timestamp}
+            onUserClick={onUserClick}
+            showOptions={showOptions}
+            setShowOptions={setShowOptions}
+            onReport={() => setShowReportModal(true)}
+            totalRatings={item.user.totalRatings}
+            showRecommendedPreview={false}
+          />
+        </TouchableOpacity>
+
         {positiveRecommendations > 0 && (
           <TouchableOpacity
             style={styles.recommendedRow}
@@ -138,39 +128,38 @@ const PostCard: React.FC<PostCardProps> = ({
             </Text>
           </TouchableOpacity>
         )}
+
         {/* Imágenes o Contenido de Texto */}
         <View style={styles.contentContainer}>
           {isSpecialPost ? (
-            <SpecialPostCard item={item} mode="preview" />
+            <TouchableOpacity activeOpacity={0.95} onPress={onClick}>
+              <SpecialPostCard item={item} mode="preview" />
+            </TouchableOpacity>
           ) : !hasImages ? (
-            <View
-              style={[
-                styles.textPostContainer,
-                isShortContent && styles.textPostGradient,
-                isSearchPost && commonStyles.cardDetail,
-              ]}
-            >
-              <RichText
+            <TouchableOpacity activeOpacity={0.95} onPress={onClick}>
+              <View
                 style={[
-                  isShortContent ? styles.textPostLarge : styles.textPostNormal,
-                  isSearchPost && commonStyles.textDetail,
-                  isOpenHouse && commonStyles.textDetail,
-                  isAniversary && commonStyles.textDetail,
-                  isSold && commonStyles.textDetail,
+                  styles.textPostContainer,
+                  isShortContent && styles.textPostGradient,
+                  item.postType === "busqueda" && commonStyles.cardDetail,
                 ]}
-                content={item.content}
-                iconSize={isSearchPost ? 18 : 16}
-                iconColor={
-                  isSearchPost ? COLORS.primaryDark : COLORS.textPrimary
-                }
-              />
-            </View>
+              >
+                <RichText
+                  style={[
+                    isShortContent ? styles.textPostLarge : styles.textPostNormal,
+                    item.postType === "busqueda" && commonStyles.textDetail,
+                  ]}
+                  content={item.content}
+                />
+              </View>
+            </TouchableOpacity>
           ) : (
             <ImageGallery
               images={images}
               aspectRatio={DIMENSIONS.POST_ASPECT_RATIO}
               showDots={true}
               showImageCount={false}
+              onImagePress={onClick}
             />
           )}
         </View>
@@ -197,8 +186,6 @@ const PostCard: React.FC<PostCardProps> = ({
           />
         </View>
 
-        {/* Descripción del post (solo si tiene imágenes) */}
-
         {/* Modal de reporte */}
         <ReportModal
           visible={showReportModal}
@@ -213,7 +200,7 @@ const PostCard: React.FC<PostCardProps> = ({
           users={recommendedList}
           totalCount={positiveRecommendations}
         />
-      </TouchableOpacity>
+      </View>
       {hasImages && (
         <View style={styles.captionContainer}>
           <ExpandableText
@@ -241,7 +228,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     marginBottom: 2,
   },
-
   actionsContainer: {
     paddingHorizontal: 12,
     width: "100%",
@@ -281,7 +267,6 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     lineHeight: 22,
   },
-
   recommendedRow: {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -306,147 +291,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontWeight: "600",
     maxWidth: 220,
-  },
-  recommendedModal: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    width: 320,
-    maxHeight: 420,
-  },
-  recommendedModalHeader: {
-    alignItems: "center",
-    paddingBottom: 8,
-  },
-  recommendedModalTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  recommendedModalSubtitle: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  recommendedModalLoading: {
-    padding: 16,
-    alignItems: "center",
-  },
-  recommendedModalList: {
-    paddingVertical: 6,
-  },
-  recommendedModalItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 8,
-  },
-  recommendedModalInfo: {
-    flex: 1,
-  },
-  recommendedModalName: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-  },
-  recommendedModalRole: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  recommendedModalEmpty: {
-    padding: 16,
-    alignItems: "center",
-  },
-  recommendedModalEmptyText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  searchPostContainer: {
-    padding: 16,
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    marginHorizontal: 12,
-    marginVertical: 8,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  searchHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.background,
-    paddingBottom: 8,
-  },
-  searchTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: COLORS.primaryDark,
-    letterSpacing: 1,
-  },
-  searchInfoContent: {
-    gap: 10,
-  },
-  searchMainRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  searchBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  searchBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  searchLocationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  searchLocationText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    fontWeight: "500",
-  },
-  searchPriceRow: {
-    backgroundColor: COLORS.background,
-    padding: 12,
-    borderRadius: 10,
-  },
-  searchPriceText: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  searchCharacteristicsGrid: {
-    flexDirection: "row",
-    gap: 16,
-    paddingTop: 4,
-  },
-  searchCharItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  searchCharText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    fontWeight: "600",
-  },
-  seeMoreText: {
-    color: COLORS.primaryDark,
-    fontWeight: "700",
   },
 });
 

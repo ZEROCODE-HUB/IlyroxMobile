@@ -1,40 +1,32 @@
-import { useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { profileService } from "../../../services/profileService";
 import { propertyService } from "../../../services/propertyService";
 import { postsService } from "../../../services/postsService";
 import { reelService } from "../../../services/reelService";
 import { perfiles, EstadisticasResenas, Property, Post, Reel } from "@/types";
+import {
+  useProfileStore,
+  useAuthProfileStore,
+  RecommendedByUser,
+} from "@/store/profileStore";
 
-export type RecommendedByUser = {
-  id: string;
-  nombre: string;
-  apellido_paterno: string;
-  apellido_materno: string;
-  foto: string | null;
-  rol: "admin" | "agente" | "cliente";
-};
+export type { RecommendedByUser };
 
 interface UseProfileReturn {
-  // Data
   profile: perfiles | null;
   reviewStats: EstadisticasResenas | null;
   userRecommendation: boolean | null;
   properties: Property[];
   posts: Post[];
   reels: Reel[];
-
-  // Recommended Users Pagination
   recommendedByUsers: RecommendedByUser[];
   recommendedByHasMore: boolean;
   loadingRecommendedBy: boolean;
   recommendedByError: string | null;
-
-  // Status
   loading: boolean;
   submittingRecommendation: boolean;
-
-  // Actions
+  isMe: boolean;
   fetchProfileData: () => Promise<void>;
   handleRecommendation: (recomienda: boolean) => Promise<void>;
   loadRecommendedByUsers: (options?: { reset?: boolean }) => Promise<void>;
@@ -43,76 +35,51 @@ interface UseProfileReturn {
 
 export const useProfile = (userId?: string | null): UseProfileReturn => {
   const { user: authUser, profile: authProfile } = useAuth();
-
-  // Target User Logic
   const targetUserId = userId || authUser?.id;
   const isMe = !userId || targetUserId === authUser?.id;
 
-  // Data State
-  const [profile, setProfile] = useState<perfiles | null>(null);
-  const [reviewStats, setReviewStats] = useState<EstadisticasResenas | null>(
-    null,
-  );
-  const [userRecommendation, setUserRecommendation] = useState<boolean | null>(
-    null,
-  );
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [reels, setReels] = useState<Reel[]>([]);
+  // Use selectors for data to ensure stability of the hook itself
+  // and to only trigger re-renders on relevant data changes
+  const activeStore = isMe ? useAuthProfileStore : useProfileStore;
+  const state = activeStore();
 
-  // Recommended By State
-  const [recommendedByUsers, setRecommendedByUsers] = useState<
-    RecommendedByUser[]
-  >([]);
-  const [recommendedByHasMore, setRecommendedByHasMore] = useState(false);
-  const [recommendedByPage, setRecommendedByPage] = useState(0);
-  const [loadingRecommendedBy, setLoadingRecommendedBy] = useState(false);
-  const [recommendedByError, setRecommendedByError] = useState<string | null>(
-    null,
-  );
+  // Prevents infinite loop by using a ref to check if a fetch is in progress
+  // and by NOT depending on the whole 'state' object in callbacks
+  const isFetchingRef = useRef(false);
+  const prevUserId = useRef<string | null | undefined>(null);
 
-  // Status State
-  const [loading, setLoading] = useState(true);
-  const [submittingRecommendation, setSubmittingRecommendation] =
-    useState(false);
-
-  /**
-   * Fetch All Data
-   */
-  const fetchProfileData = useCallback(async () => {
-    if (!targetUserId) {
-      setLoading(false);
-      return;
+  useEffect(() => {
+    if (targetUserId !== prevUserId.current) {
+      if (!isMe) {
+        useProfileStore.getState().resetProfileState();
+      }
+      prevUserId.current = targetUserId;
     }
+  }, [targetUserId, isMe]);
+
+  const fetchProfileData = useCallback(async () => {
+    if (!targetUserId || isFetchingRef.current) return;
 
     try {
-      setLoading(true);
+      isFetchingRef.current = true;
+      const storeActions = activeStore.getState();
+      storeActions.setLoading(true);
 
-      // Parallelize requests for speed
-      // 1. Profile Data
       const profilePromise = (async () => {
-        if (isMe && authProfile) {
-          // Use cached auth profile if available and it's me
-          return authProfile;
-        }
+        if (isMe && authProfile) return authProfile;
         return await profileService.getProfile(targetUserId);
       })();
 
-      // 2. Stats
       const statsPromise = profileService.getReviewStats(targetUserId);
-
-      // 3. User Recommendation (if looking at someone else)
       const recommendationPromise =
         !isMe && authUser?.id
           ? profileService.getUserRecommendation(authUser.id, targetUserId)
           : Promise.resolve(null);
 
-      // 4. Content (Properties, Posts, Videos)
       const propertiesPromise = propertyService.propertiesByUser(targetUserId);
       const postsPromise = postsService.postsByUser(targetUserId);
       const reelsPromise = reelService.reelsByUser(targetUserId);
 
-      // Await all
       const [
         fetchedProfile,
         fetchedStats,
@@ -129,66 +96,59 @@ export const useProfile = (userId?: string | null): UseProfileReturn => {
         reelsPromise,
       ]);
 
-      setProfile(fetchedProfile);
-      setReviewStats(fetchedStats);
-      setUserRecommendation(fetchedRecommendation);
-      setProperties(fetchedProperties as Property[]);
-      setPosts(fetchedPosts as Post[]);
-      setReels(fetchedReels as Reel[]);
+      storeActions.setProfile(fetchedProfile);
+      storeActions.setReviewStats(fetchedStats);
+      storeActions.setUserRecommendation(fetchedRecommendation);
+      storeActions.setProperties(fetchedProperties as Property[]);
+      storeActions.setPosts(fetchedPosts as Post[]);
+      storeActions.setReels(fetchedReels as Reel[]);
     } catch (error) {
       console.error("Error fetching profile data:", error);
     } finally {
-      setLoading(false);
+      activeStore.getState().setLoading(false);
+      isFetchingRef.current = false;
     }
-  }, [targetUserId, isMe, authProfile, authUser?.id]);
+  }, [targetUserId, isMe, authProfile, authUser?.id, activeStore]);
 
-  /**
-   * Recommendation Logic
-   */
-  const handleRecommendation = async (recomienda: boolean) => {
-    if (!authUser?.id || !targetUserId || isMe || submittingRecommendation)
+  const handleRecommendation = useCallback(async (recomienda: boolean) => {
+    const storeState = activeStore.getState();
+    if (!authUser?.id || !targetUserId || isMe || storeState.submittingRecommendation)
       return;
 
     try {
-      setSubmittingRecommendation(true);
+      storeState.setSubmittingRecommendation(true);
 
       const newStatus = await profileService.toggleRecommendation(
         authUser.id,
         targetUserId,
-        userRecommendation,
+        storeState.userRecommendation,
         recomienda,
       );
 
-      setUserRecommendation(newStatus);
+      storeState.setUserRecommendation(newStatus);
 
-      // Update stats immediately
       const newStats = await profileService.getReviewStats(targetUserId);
       if (newStats) {
-        setReviewStats(newStats);
+        storeState.setReviewStats(newStats);
       }
-
-      // If we are viewing the "recommended by" list, we might want to refresh it
-      // but usually this is triggered by the UI.
     } catch (error) {
       console.error("Error updating recommendation:", error);
     } finally {
-      setSubmittingRecommendation(false);
+      activeStore.getState().setSubmittingRecommendation(false);
     }
-  };
+  }, [authUser?.id, targetUserId, isMe, activeStore]);
 
-  /**
-   * Load Recommended By Users (Pagination)
-   */
-  const loadRecommendedByUsers = async (options?: { reset?: boolean }) => {
+  const loadRecommendedByUsers = useCallback(async (options?: { reset?: boolean }) => {
     if (!targetUserId) return;
 
     try {
+      const storeState = activeStore.getState();
       const reset = options?.reset === true;
-      setLoadingRecommendedBy(true);
-      setRecommendedByError(null);
+      storeState.setLoadingRecommendedBy(true);
+      storeState.setRecommendedByError(null);
 
       const pageSize = 30;
-      const nextPage = reset ? 0 : recommendedByPage;
+      const nextPage = reset ? 0 : storeState.recommendedByPage;
       const from = nextPage * pageSize;
       const to = from + pageSize - 1;
 
@@ -200,54 +160,54 @@ export const useProfile = (userId?: string | null): UseProfileReturn => {
 
       const mappedUsers = results as RecommendedByUser[];
 
-      if (reset) {
-        setRecommendedByUsers(mappedUsers);
-      } else {
-        setRecommendedByUsers((prev) => [...prev, ...mappedUsers]);
-      }
+      storeState.setRecommendedByUsers((prev) =>
+        reset ? mappedUsers : [...prev, ...mappedUsers],
+      );
 
-      setRecommendedByHasMore(mappedUsers.length === pageSize);
-      setRecommendedByPage(nextPage + 1);
+      storeState.setRecommendedByHasMore(mappedUsers.length === pageSize);
+      storeState.setRecommendedByPage((p) => (reset ? 1 : p + 1));
     } catch (error: any) {
+      const storeState = activeStore.getState();
       if (options?.reset) {
-        setRecommendedByUsers([]);
+        storeState.setRecommendedByUsers([]);
       }
-      setRecommendedByHasMore(false);
-      setRecommendedByError(
+      storeState.setRecommendedByHasMore(false);
+      storeState.setRecommendedByError(
         error?.message || "Error al cargar recomendaciones",
       );
     } finally {
-      setLoadingRecommendedBy(false);
+      activeStore.getState().setLoadingRecommendedBy(false);
     }
-  };
+  }, [targetUserId, activeStore]);
 
-  /**
-   * Optimistic Update for Profile Photo
-   */
-  const updateProfilePhoto = useCallback((newUrl: string) => {
-    setProfile((prev) => (prev ? { ...prev, foto: newUrl } : null));
-  }, []);
+  const updateProfilePhoto = useCallback(
+    (newUrl: string) => {
+      const currentProfile = activeStore.getState().profile;
+      activeStore.getState().setProfile(
+        currentProfile ? { ...currentProfile, foto: newUrl } : null,
+      );
+    },
+    [activeStore],
+  );
 
   useEffect(() => {
     fetchProfileData();
   }, [fetchProfileData]);
 
   return {
-    profile,
-    reviewStats,
-    userRecommendation,
-    properties,
-    posts,
-    reels,
-
-    recommendedByUsers,
-    recommendedByHasMore,
-    loadingRecommendedBy,
-    recommendedByError,
-
-    loading,
-    submittingRecommendation,
-
+    profile: state.profile,
+    reviewStats: state.reviewStats,
+    userRecommendation: state.userRecommendation,
+    properties: state.properties,
+    posts: state.posts,
+    reels: state.reels,
+    recommendedByUsers: state.recommendedByUsers,
+    recommendedByHasMore: state.recommendedByHasMore,
+    loadingRecommendedBy: state.loadingRecommendedBy,
+    recommendedByError: state.recommendedByError,
+    loading: state.loading,
+    submittingRecommendation: state.submittingRecommendation,
+    isMe,
     fetchProfileData,
     handleRecommendation,
     loadRecommendedByUsers,
