@@ -15,6 +15,7 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { uploadImage } from "../../../services/uploadService";
 import { AppInput } from "@/design-system/components/AppInput";
+import { SelectionModal } from "@/components/modals";
 
 interface OpenHousePostProps {
   post: Post;
@@ -27,6 +28,8 @@ interface OpenHousePostProps {
   setFotoPropiedad: (url: string | null) => void;
   ubicacion: string;
   setUbicacion: (ubicacion: string) => void;
+  statusPost: string;
+  setStatusPost: (status: string) => void;
 }
 
 export const OpenHousePost = ({
@@ -40,12 +43,15 @@ export const OpenHousePost = ({
   setFotoPropiedad,
   ubicacion,
   setUbicacion,
+  statusPost,
+  setStatusPost,
 }: OpenHousePostProps) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showStatusPost, setShowStatusPost] = useState(false);
 
   const handlePickAndUpload = async () => {
     try {
@@ -157,6 +163,28 @@ export const OpenHousePost = ({
             </Text>
           </Pressable>
         </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.label}>Visibilidad del Post</Text>
+        <Pressable
+          style={styles.statusButton}
+          onPress={() => setShowStatusPost(true)}
+        >
+          <Text>{statusPost || "Seleccionar"}</Text>
+          <Ionicons name="chevron-down" size={20} color={COLORS.primary} />
+        </Pressable>
+        <SelectionModal
+          visible={showStatusPost}
+          onClose={() => setShowStatusPost(false)}
+          onSelect={(val) => {
+            setStatusPost(val);
+            setShowStatusPost(false);
+          }}
+          title="Estatus"
+          options={["Oculto", "Visible"]}
+          currentValue={statusPost}
+        />
       </View>
 
       {showDatePicker && (
@@ -316,6 +344,18 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginBottom: 4,
     textTransform: "uppercase",
+  },
+  statusButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.background,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    gap: 8,
   },
   dateButton: {
     flex: 1,

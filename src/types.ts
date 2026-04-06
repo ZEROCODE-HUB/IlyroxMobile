@@ -6,7 +6,7 @@ export type Post = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
-  status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
+  status?: "Visible" | "Oculto";
   tipo?: "post" | "busqueda" | "openhouse" | "aniversario" | "sold";
   foto_perfil_usuario?: string;
   fecha_hora?: string;

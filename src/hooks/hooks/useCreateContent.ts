@@ -29,9 +29,14 @@ export function useCreateContent(userId?: string) {
     images: string[],
     type: "post" | "busqueda" | "openhouse" | "aniversario" | "sold" = "post",
     metadata: any = null,
+    status: string = "visible",
   ) => {
     if (!userId) {
-      showModal({ title: "Error", message: "Debes iniciar sesión", confirmText: "OK" });
+      showModal({
+        title: "Error",
+        message: "Debes iniciar sesión",
+        confirmText: "OK",
+      });
       return false;
     }
 
@@ -42,14 +47,16 @@ export function useCreateContent(userId?: string) {
       const uploadedUrls = await uploadImages(images, "feed-images", "posts");
 
       // 2. Crear post en BD con URLs de Supabase
+      // NOTA: El feed_item se crea automáticamente vía trigger en la BD
       const { data: post, error: postError } = await supabase
         .from("posts")
         .insert({
           publicado_por: userId,
           contenido: content,
-          tipo: type, // Agregado tipo
+          tipo: type,
           imagenes: uploadedUrls.length > 0 ? uploadedUrls : null,
           busquedas_json: metadata,
+          status: status.toLowerCase(),
         })
         .select()
         .single();
@@ -95,7 +102,11 @@ export function useCreateContent(userId?: string) {
     thumbnailUrl?: string | null,
   ) => {
     if (!userId) {
-      showModal({ title: "Error", message: "Debes iniciar sesión", confirmText: "OK" });
+      showModal({
+        title: "Error",
+        message: "Debes iniciar sesión",
+        confirmText: "OK",
+      });
       return false;
     }
 
@@ -168,26 +179,17 @@ export function useCreateContent(userId?: string) {
     thumbnailUrl?: string | null,
   ) => {
     if (!userId) {
-      showModal({ title: "Error", message: "Debes iniciar sesión", confirmText: "OK" });
+      showModal({
+        title: "Error",
+        message: "Debes iniciar sesión",
+        confirmText: "OK",
+      });
       return false;
     }
 
     setIsCreatingInDB(true);
 
     try {
-      // 1. Subir video a Supabase Storage (si es local)
-      // Nota: la lógica de "si es local" ya se maneja fuera o en uploadVideo,
-      // pero si el hook useVideoUpload ya lo maneja, perfecto.
-      // Aquí asumimos que videoUrl ya es la URL final o que se procesará antes.
-      // Pero para mantener consistencia con createReel, podríamos repetir la lógica o asumir que se pasa la URL final.
-      // Dado que el componente CreateReel pasará la URL final, aquí solo hacemos el update.
-      // Sin embargo, createReel hacía la subida adentro si no era http.
-      // Vamos a asumir que el componente se encarga de llamar a uploadVideo y nos pasa la URL final aquí para simplificar,
-      // O podemos duplicar la lógica de uploadVideo si queremos encapsularlo, pero CreateReel ya llama a uploadVideo.
-      // REVISIÓN: CreateReel llama a uploadVideo ANTES de createReel.
-      // En createReel (arriba) también hay una lógica redundante de uploadImage, pero CreateReel.tsx ya llama a uploadVideo.
-      // Está bien, solo actualizamos la BD.
-
       // 2. Actualizar reel en BD
       const updateData: any = {
         descripcion: description,
@@ -251,7 +253,11 @@ export function useCreateContent(userId?: string) {
     coordinates?: { lat: number; lng: number };
   }) => {
     if (!userId) {
-      showModal({ title: "Error", message: "Debes iniciar sesión", confirmText: "OK" });
+      showModal({
+        title: "Error",
+        message: "Debes iniciar sesión",
+        confirmText: "OK",
+      });
       return false;
     }
 
@@ -313,7 +319,11 @@ export function useCreateContent(userId?: string) {
       return true;
     } catch (error: any) {
       console.error("Error creating property:", error);
-      showModal({ title: "Error", message: error.message || "No se pudo publicar la propiedad", confirmText: "OK" });
+      showModal({
+        title: "Error",
+        message: error.message || "No se pudo publicar la propiedad",
+        confirmText: "OK",
+      });
       return false;
     } finally {
       setIsCreatingInDB(false);

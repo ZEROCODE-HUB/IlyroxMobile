@@ -61,6 +61,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   const [habitaciones, setHabitaciones] = useState("");
   const [operacion, setOperacion] = useState("");
   const [ubicacion, setUbicacion] = useState("");
+  const [statusPost, setStatusPost] = useState("Visible");
 
   const isEditing = !!post;
   const [isUploadingManual, setIsUploadingManual] = useState(false);
@@ -87,6 +88,9 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
           setContent(data.contenido);
           setUbicacion(data.ubicacion);
           setImages(data.imagenes || []);
+          if (data.status) {
+            setStatusPost(data.status.charAt(0).toUpperCase() + data.status.slice(1));
+          }
 
           if (data.tipo === "openhouse") {
             if (data.fecha_hora) setFechaHora(new Date(data.fecha_hora));
@@ -176,19 +180,15 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
 
       const uploadedImages: string[] = [];
       if (images.length > 0) {
-        if (isEditing) {
-          for (let i = 0; i < images.length; i++) {
-            const img = images[i];
-            // Si ya es remota, simplemente agregarla
-            if (img.startsWith("http")) {
-              uploadedImages.push(img);
-            } else {
-              // Si es local, subir usando el servicio directo
-              const url = await uploadImageService(img, "posts");
-              if (url) uploadedImages.push(url);
-            }
-            setUploadProgress(10 + ((i + 1) / images.length) * 40);
+        for (let i = 0; i < images.length; i++) {
+          const img = images[i];
+          if (img.startsWith("http")) {
+            uploadedImages.push(img);
+          } else {
+            const url = await uploadImageService(img, "posts");
+            if (url) uploadedImages.push(url);
           }
+          setUploadProgress(10 + ((i + 1) / images.length) * 40);
         }
       }
 
@@ -199,6 +199,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
         let updatedData: any = {
           contenido: content,
           imagenes: uploadedImages.length > 0 ? uploadedImages : null,
+          status: statusPost.toLowerCase(),
           updated_at: new Date(),
         };
 
@@ -245,7 +246,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
         Burnt.toast({ title: "Post actualizado!", preset: "done" });
       } else {
         // CREAR
-        const success = await createPost(content, images);
+        const success = await createPost(content, uploadedImages, "post", null, statusPost);
         if (!success) throw new Error("Error creando post");
         Burnt.toast({ title: "Post publicado!", preset: "done" });
       }
@@ -324,6 +325,8 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             setFotoPropiedad={setFotoPropiedad}
             ubicacion={ubicacion}
             setUbicacion={setUbicacion}
+            statusPost={statusPost}
+            setStatusPost={setStatusPost}
           />
         )}
 
