@@ -5,7 +5,14 @@ import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { OneSignal } from "react-native-onesignal";
 import { useEffect } from "react";
-import { Platform, StatusBar, StyleSheet, View, Text, LogBox } from "react-native";
+import {
+  Platform,
+  StatusBar,
+  StyleSheet,
+  View,
+  Text,
+  LogBox,
+} from "react-native";
 import { COLORS } from "../constants";
 
 import { AppProvider, useApp } from "@/context/AppContext";
@@ -64,10 +71,14 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   const { session, profile, loading: authLoading } = useAuth();
-  const { updateRequired, versionInfo, loading: versionLoading } = useVersionCheck();
+  const {
+    updateRequired,
+    versionInfo,
+    loading: versionLoading,
+  } = useVersionCheck();
   const segments = useSegments();
   const router = useRouter();
-  
+
   const loading = authLoading || versionLoading;
 
   // Global StatusBar setup
@@ -111,7 +122,7 @@ function RootLayoutNav() {
     if (
       !isAdmin &&
       (profile.aprobaciones_recibidas || 0) <
-      (profile.aprobaciones_requeridas || 3)
+        (profile.aprobaciones_requeridas || 3)
     ) {
       return <PendingApprovalScreen />;
     }
@@ -126,9 +137,9 @@ function RootLayoutNav() {
         <Stack.Screen name="(stack)" />
       </Stack>
       {updateRequired && versionInfo && (
-        <VersionUpdateModal 
-          visible={updateRequired} 
-          storeUrl={versionInfo.store_url} 
+        <VersionUpdateModal
+          visible={updateRequired}
+          storeUrl={versionInfo.store_url}
         />
       )}
     </>
