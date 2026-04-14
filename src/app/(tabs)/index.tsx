@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Text,
   TouchableOpacity,
+  Modal,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import Feed from "../../components/Feed/Feed";
@@ -89,16 +90,16 @@ export default function FeedScreen() {
 
   const handleOpenMap = () => {
     setIsMapOpening(true);
-    // Be very explicit with the snap
-    requestAnimationFrame(() => {
-      bottomSheetRef.current?.snapToIndex(0);
-    });
-    if (!isMapReady) {
-      setTimeout(() => {
-        setIsMapReady(true);
-      }, 600);
-    }
   };
+
+  useEffect(() => {
+    if (isMapOpening && !isMapReady) {
+      const timer = setTimeout(() => {
+        setIsMapReady(true);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isMapOpening]);
 
   return (
     <View style={styles.container}>
@@ -140,32 +141,30 @@ export default function FeedScreen() {
           style={{ height: TOTAL_HEADER_HEIGHT }}
           onSearchingChange={setIsSearching}
           isHeaderVisible={headerShown}
-          onOpenMap={handleOpenMap}
+          onOpenMap={() => setIsMapOpening(true)}
         />
       </Animated.View>
 
-      <BottomSheet
-        ref={bottomSheetRef}
-        index={-1}
-        snapPoints={[
-          Dimensions.get("window").height - TOTAL_HEADER_HEIGHT - 10,
-        ]}
-        enablePanDownToClose
-        handleIndicatorStyle={{ backgroundColor: "#ccc", width: 40 }}
-        backgroundStyle={{ backgroundColor: "white", borderRadius: 24 }}
-        style={{ zIndex: 9999, elevation: 20 }}
-        onChange={(index) => {
-          if (index === -1) {
-            setIsMapOpening(false);
-            setIsMapReady(false);
-          } else {
-            setIsMapOpening(true);
-          }
-        }}
+      <Modal
+        visible={isMapOpening}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsMapOpening(false)}
       >
-        <View style={{ flex: 1 }}>
-          {isMapOpening ? (
-            isMapReady ? (
+        <View style={[styles.modalOverlay, { marginTop: TOTAL_HEADER_HEIGHT }]}>
+          <View style={styles.modalContent}>
+            {/* Header del Modal con botón cerrar */}
+            <View style={styles.modalHeader}>
+              <View style={styles.modalIndicator} />
+              <TouchableOpacity 
+                onPress={() => setIsMapOpening(false)}
+                style={styles.closeModalButton}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            {isMapReady ? (
               <MapSearch
                 properties={properties}
                 onSaveSearch={(name, leadName, leadPhone) =>
@@ -179,20 +178,10 @@ export default function FeedScreen() {
                   Cargando mapa interactivo...
                 </Text>
               </View>
-            )
-          ) : (
-            <View
-              style={{
-                flex: 1,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <ActivityIndicator size="small" color="#ccc" />
-            </View>
-          )}
+            )}
+          </View>
         </View>
-      </BottomSheet>
+      </Modal>
     </View>
   );
 }
@@ -220,5 +209,39 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 100,
     elevation: 5,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "transparent",
+  },
+  modalContent: {
+    flex: 1,
+    backgroundColor: "white",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 20,
+    overflow: "hidden",
+  },
+  modalHeader: {
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  modalIndicator: {
+    width: 40,
+    height: 4,
+    backgroundColor: "#ccc",
+    borderRadius: 2,
+  },
+  closeModalButton: {
+    position: "absolute",
+    right: 16,
+    top: 8,
   },
 });

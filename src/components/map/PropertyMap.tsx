@@ -45,20 +45,72 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     "standard",
   );
 
-  const updateOverlayPositions = async () => {
+  // Fast lookup map for properties
+  const propertyMap = useMemo(() => {
+    const map = new Map<string, Property>();
+    properties.forEach((p) => map.set(p.id, p));
+    return map;
+  }, [properties]);
+
+  const lastUpdateRef = useRef<number>(0);
+  const regionRef = useRef<any>(null);
+  const isCalculatingRef = useRef(false);
+
+  // Optimized function to calculate positions only for visible elements
+  const updateOverlayPositions = async (region?: any) => {
     if (
       Platform.OS === "web" ||
       !nativeMapRef.current ||
-      properties.length === 0
+      properties.length === 0 ||
+      !mapReady
     )
       return;
 
-    const newPositions: any = {};
-    const promises = properties.map(async (p) => {
-      const lat = p.coordinates?.lat || (p as any).latitud;
-      const lng = p.coordinates?.lng || (p as any).longitud;
+    // Use the passed region or the last known one
+    const activeRegion = region || regionRef.current;
+    if (!activeRegion) return;
 
-      if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+    // Throttle: avoid overlapping calculations
+    if (isCalculatingRef.current) return;
+    
+    const now = Date.now();
+    // Only update every ~32ms during motion to keep bridge clear (30fps)
+    if (region && now - lastUpdateRef.current < 32) return;
+    
+    isCalculatingRef.current = true;
+    lastUpdateRef.current = now;
+
+    try {
+      const { latitude, longitude, latitudeDelta, longitudeDelta } = activeRegion;
+      
+      // Buffer of 0.5 deltas to avoid markers popping in abruptly
+      const latBuffer = latitudeDelta * 0.5;
+      const lngBuffer = longitudeDelta * 0.5;
+      
+      const minLat = latitude - latitudeDelta - latBuffer;
+      const maxLat = latitude + latitudeDelta + latBuffer;
+      const minLng = longitude - longitudeDelta - lngBuffer;
+      const maxLng = longitude + longitudeDelta + lngBuffer;
+
+      // Filter properties to only those within the extended viewport
+      const visibleProps = properties.filter((p) => {
+        const lat = p.coordinates?.lat || (p as any).latitud;
+        const lng = p.coordinates?.lng || (p as any).longitud;
+        if (!lat || !lng || isNaN(lat) || isNaN(lng)) return false;
+        
+        return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
+      });
+
+      // Limit max simultaneous calculations to avoid lag (even if visible, 200 markers is plenty)
+      const limitedProps = visibleProps.slice(0, 200);
+      const newPositions: any = {};
+
+      // Process in small batches if the list is very large, 
+      // but for 200, Promise.all is usually fine with the filtered list
+      const promises = limitedProps.map(async (p) => {
+        const lat = p.coordinates?.lat || (p as any).latitud;
+        const lng = p.coordinates?.lng || (p as any).longitud;
+
         try {
           const point = await nativeMapRef.current.pointForCoordinate({
             latitude: Number(lat),
@@ -66,20 +118,26 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           });
           newPositions[p.id] = point;
         } catch (e) {
-          // ignore errors during projection
+          // ignore
         }
-      }
-    });
+      });
 
-    await Promise.all(promises);
-    setOverlayPositions(newPositions);
+      await Promise.all(promises);
+      
+      // Batch update the UI
+      requestAnimationFrame(() => {
+        setOverlayPositions(newPositions);
+      });
+    } finally {
+      isCalculatingRef.current = false;
+    }
   };
 
   useEffect(() => {
     if (mapReady) {
       updateOverlayPositions();
     }
-  }, [properties, mapReady]);
+  }, [properties.length, mapReady]); // Fixed: only re-calculate fully if length changes or map ready
 
   const formatPrice = (
     price: number,
@@ -353,8 +411,15 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         }
         initialRegion={initialRegion}
         onMapReady={() => setMapReady(true)}
-        onRegionChange={updateOverlayPositions}
-        onRegionChangeComplete={updateOverlayPositions}
+        onRegionChange={(region) => {
+          regionRef.current = region;
+          updateOverlayPositions(region);
+        }}
+        onRegionChangeComplete={(region) => {
+          regionRef.current = region;
+          // Forced update on completion to ensure final position is exact
+          updateOverlayPositions(region);
+        }}
         mapPadding={{ top: 20, right: 20, bottom: 20, left: 20 }}
         moveOnMarkerPress={false}
       >
@@ -363,6 +428,19 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           const lng = p.coordinates?.lng || (p as any).longitud;
 
           if (!lat || !lng || isNaN(lat) || isNaN(lng)) return null;
+
+          // Optional: Only render invisible markers if they are some-what visible 
+          // to reduce native marker count
+          const region = regionRef.current || initialRegion;
+          const buffer = region.latitudeDelta * 2;
+          if (
+            lat < region.latitude - buffer ||
+            lat > region.latitude + buffer ||
+            lng < region.longitude - buffer ||
+            lng > region.longitude + buffer
+          ) {
+            return null;
+          }
 
           return (
             <Marker
@@ -373,7 +451,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
                 nativeMapRef.current?.animateToRegion(region, 600);
                 onMarkerPress(p.id, p);
               }}
-              opacity={0} // Marcador invisible pero interactuable
+              opacity={0}
+              tracksViewChanges={false} // Optimization: invisible markers don't change
             />
           );
         })}
@@ -382,9 +461,9 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       {/* Overlay absoluto para los precios (Inmune a los recortes de Android) */}
       {Platform.OS !== "web" && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          {properties.map((p) => {
-            const pos = overlayPositions[p.id];
-            if (!pos) return null;
+          {Object.entries(overlayPositions).map(([id, pos]) => {
+            const p = propertyMap.get(id);
+            if (!p) return null;
 
             const isHighlighted = p.id === highlightedPropertyId;
             const priceText = formatPrice(p.price || 0, p.currency);
@@ -395,8 +474,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
                 key={`price-${p.id}`}
                 style={{
                   position: "absolute",
-                  left: Math.max(6, pos.x - 35),
-                  top: Math.max(6, pos.y - 35),
+                  left: Math.max(6, (pos as any).x - 35),
+                  top: Math.max(6, (pos as any).y - 35),
                   alignItems: "center",
                   justifyContent: "center",
                 }}
