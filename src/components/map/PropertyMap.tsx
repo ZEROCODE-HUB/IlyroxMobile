@@ -355,7 +355,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         onMapReady={() => setMapReady(true)}
         onRegionChange={updateOverlayPositions}
         onRegionChangeComplete={updateOverlayPositions}
-        mapPadding={{ top: 160, right: 30, bottom: 220 + bottom, left: 30 }}
+        mapPadding={{ top: 20, right: 20, bottom: 20, left: 20 }}
         moveOnMarkerPress={false}
       >
         {properties.map((p) => {

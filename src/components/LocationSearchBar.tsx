@@ -18,6 +18,7 @@ import {
 import { useRouter } from "expo-router";
 import { supabase } from "../lib/supabase";
 import { Image } from "expo-image";
+import { useApp } from "@/context/AppContext";
 
 interface LocationSearchBarProps {
   onLocationSelect: (location: LocationSuggestionWithCount | null) => void;
@@ -25,6 +26,8 @@ interface LocationSearchBarProps {
   isHeaderVisible?: boolean;
   containerStyle?: any;
   topOffset?: number;
+  onOpenMap?: () => void;
+  showMapButton?: boolean;
 }
 
 export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
@@ -33,10 +36,13 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
   isHeaderVisible = true,
   containerStyle,
   topOffset = 75,
+  onOpenMap,
+  showMapButton = true,
 }) => {
   const [query, setQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [propertySuggestions, setPropertySuggestions] = useState<any[]>([]);
+  const { selectedLocation } = useApp();
 
   const router = useRouter();
   const { suggestions, isLoading, searchLocations, clearSuggestions } =
@@ -143,39 +149,51 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
 
   return (
     <>
-      <AppInput
-        containerStyle={[styles.searchWrapper, containerStyle]}
-        placeholder="Ingresa una ubicación..."
-        value={query}
-        onChangeText={handleChangeText}
-        onFocus={() => {
-          if (query.trim()) setShowSuggestions(true);
-        }}
-        onBlur={() => {
-          // Delay para permitir el click en sugerencias
-          setTimeout(() => setShowSuggestions(false), 200);
-        }}
-        autoCorrect={false}
-        autoCapitalize="words"
-        returnKeyType="search"
-        rightIcon={
-          query.length > 0 ? (
-            <TouchableOpacity onPress={handleClearSearch}>
+      <View style={styles.inputRow}>
+        <AppInput
+          containerStyle={[styles.searchWrapper, containerStyle]}
+          placeholder="Ingresa una ubicación..."
+          value={query}
+          onChangeText={handleChangeText}
+          onFocus={() => {
+            if (query.trim()) setShowSuggestions(true);
+          }}
+          onBlur={() => {
+            // Delay para permitir el click en sugerencias
+            setTimeout(() => setShowSuggestions(false), 200);
+          }}
+          autoCorrect={false}
+          autoCapitalize="words"
+          returnKeyType="search"
+          rightIcon={
+            query.length > 0 ? (
+              <TouchableOpacity onPress={handleClearSearch}>
+                <Ionicons
+                  name="close-circle-outline"
+                  size={22}
+                  color={COLORS.textTertiary}
+                />
+              </TouchableOpacity>
+            ) : (
               <Ionicons
-                name="close-circle-outline"
+                name="search-outline"
                 size={22}
                 color={COLORS.textTertiary}
               />
-            </TouchableOpacity>
-          ) : (
-            <Ionicons
-              name="search-outline"
-              size={22}
-              color={COLORS.textTertiary}
-            />
-          )
-        }
-      />
+            )
+          }
+        />
+
+        {showMapButton && !showSuggestions && selectedLocation && (
+          <TouchableOpacity
+            onPress={onOpenMap}
+            style={styles.mapSmallButton}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="map-outline" size={20} color={COLORS.primary} />
+          </TouchableOpacity>
+        )}
+      </View>
 
       {showSuggestions && query.trim() && (
         <View
@@ -265,7 +283,26 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
 
 const styles = StyleSheet.create({
   searchWrapper: {
+    flex: 1,
     marginBottom: 0,
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  mapSmallButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: COLORS.white,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   suggestionsContainer: {
     position: "absolute",

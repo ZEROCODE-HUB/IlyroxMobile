@@ -28,6 +28,7 @@ import { COLORS } from "../../constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import { useFeed, useUserApprovals } from "@/hooks/hooks";
+import { usePropertyFilters } from "@/hooks/hooks/usePropertyFilters";
 
 interface FeedProps {
   currentUserId?: string;
@@ -110,6 +111,35 @@ const Feed: React.FC<FeedProps> = ({
   const [bannerText, setBannerText] = useState("");
   const [bannerVisible, setBannerVisible] = useState(false);
   const bannerAnim = useRef(new Animated.Value(0)).current;
+
+  // Filtrar los items de Feed que pasen por el filtro global del mapa/propiedades
+  const extractedProperties = useMemo(() => {
+    return items
+      .filter((it) => it.type === "property" && it.propertyDetails)
+      .map((it) => it.propertyDetails!);
+  }, [items]);
+
+  const { filteredProperties, hasActiveFilters } = usePropertyFilters(
+    extractedProperties,
+    null // Geo bounds form MapSearch is handled elsewhere or via named search
+  );
+
+  const finalItems = useMemo(() => {
+    // Si no hay filtros activos, mostrar todo tal cual
+    if (!hasActiveFilters) {
+      return items;
+    }
+
+    const validPropertyIds = new Set(filteredProperties.map((p) => p.id));
+    return items.filter((it) => {
+      // Solo mostramos las propiedades que pasan el filtro y ocultamos posts/reels
+      if (it.type === "property" && it.propertyDetails) {
+        return validPropertyIds.has(it.propertyDetails.id);
+      }
+      // Ocultar posts y reels si hay una búsqueda o filtro de propiedades activo
+      return false; 
+    });
+  }, [items, filteredProperties, hasActiveFilters]);
 
   // Viewability config
 
@@ -288,14 +318,14 @@ const Feed: React.FC<FeedProps> = ({
   );
 
   const ListFooter = useMemo(() => {
-    if (!hasMore && items.length > 0) {
+    if (!hasMore && finalItems.length > 0) {
       return (
         <View style={styles.endMessage}>
           <Text style={styles.endMessageText}>¡Has visto todo! 🎉</Text>
         </View>
       );
     }
-    if (loading && items.length > 0) {
+    if (loading && finalItems.length > 0) {
       return (
         <View style={styles.loadingMore}>
           <Text style={styles.loadingMoreText}>Cargando más...</Text>
@@ -303,7 +333,7 @@ const Feed: React.FC<FeedProps> = ({
       );
     }
     return null;
-  }, [hasMore, loading, items.length]);
+  }, [hasMore, loading, finalItems.length]);
 
   const ListEmpty = useMemo(() => {
     if (loading) {
@@ -325,7 +355,7 @@ const Feed: React.FC<FeedProps> = ({
     <>
       <FlashList
         ref={flatListRef}
-        data={items}
+        data={finalItems}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         estimatedItemSize={400} // Altura aproximada promedio de un post/reel

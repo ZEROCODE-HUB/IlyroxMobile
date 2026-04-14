@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,10 @@ import { LocationSearchBar } from "./LocationSearchBar";
 import { COLORS } from "../constants";
 import { useApp } from "../context/AppContext";
 import { LocationSuggestionWithCount } from "../store/locationSearchStore";
+import { usePropertyFiltersStore } from "../store/propertyFiltersStore";
 import { useChatStore } from "../store/chatStore";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import MapScreen from "@/app/(stack)/map";
 
 // Assuming Logo is in assets folder relative to src/components -> ../../assets/Logo.jpeg
 // Adjust path if necessary based on project structure.
@@ -25,17 +28,23 @@ interface HomeHeaderProps {
   style?: any;
   onSearchingChange?: (val: boolean) => void;
   isHeaderVisible?: boolean;
+  onOpenMap?: () => void;
 }
 
 export const HomeHeader: React.FC<HomeHeaderProps> = ({
   style,
   onSearchingChange,
   isHeaderVisible = true,
+  onOpenMap,
 }) => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { setSelectedLocation } = useApp();
   const unreadCount = useChatStore((state) => state.totalUnreadCount);
+
+  const handleSheetChanges = (index: number) => {
+    console.log("Sheet index:", index);
+  };
 
   const handleNavigation = (screen: string) => {
     switch (screen) {
@@ -122,8 +131,16 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
       <View style={styles.searchWrapper}>
         <LocationSearchBar
           onLocationSelect={(loc: LocationSuggestionWithCount | null) => {
+            const { updateLocationFilter } = usePropertyFiltersStore.getState();
             if (!loc) {
               setSelectedLocation(null);
+              // Limpiar filtros globales instantaneamente
+              updateLocationFilter({
+                estado: "",
+                ciudad: "",
+                municipio: "",
+                colonia: [],
+              });
               return;
             }
             setSelectedLocation({
@@ -133,10 +150,33 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
               municipio_nombre: loc.municipio_nombre,
               estado_nombre: loc.estado_nombre,
             });
-            router.push("/(stack)/map");
+
+            // Aplicar filtros globales de busqueda instantaneamente sin esperar a que cargue el mapa
+            const newLocationFilter: any = {
+              estado: "",
+              ciudad: "",
+              municipio: "",
+              colonia: [],
+            };
+            // Mapeo detallado de jerarquia
+            if (loc.estado_nombre) newLocationFilter.estado = loc.estado_nombre;
+            if (loc.municipio_nombre)
+              newLocationFilter.municipio = loc.municipio_nombre;
+
+            if (loc.type === "colonia") {
+              newLocationFilter.colonia = loc.name;
+            } else if (loc.type === "estado" && !loc.estado_nombre) {
+              newLocationFilter.estado = loc.name;
+            } else if (loc.type === "municipio" && !loc.municipio_nombre) {
+              newLocationFilter.municipio = loc.name;
+            }
+            updateLocationFilter(newLocationFilter);
+
+            onOpenMap?.();
           }}
           onSearchingChange={onSearchingChange}
           isHeaderVisible={isHeaderVisible}
+          onOpenMap={onOpenMap}
         />
       </View>
     </View>

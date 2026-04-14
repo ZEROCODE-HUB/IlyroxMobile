@@ -256,12 +256,6 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
 
   return (
     <View style={styles.container}>
-      <AppHeader
-        title="Buscar Propiedades"
-        showBackButton
-        onBack={() => navigation.goBack()}
-      />
-
       <SearchFiltersBar
         hasActiveFilters={hasActiveFilters}
         onOpenFilters={() => setShowFiltersModal(true)}
@@ -279,38 +273,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         />
       </View>
 
-      {/* Lista horizontal de cards - 35% de la altura */}
-      <View style={styles.cardsContainer}>
-        <ScrollView
-          ref={scrollViewRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.cardsContent,
-            { paddingBottom: 16 + safeBottom },
-          ]}
-          decelerationRate="fast"
-          snapToInterval={212} // 200 + 12 margin
-        >
-          {filteredProperties.map((property) => {
-            // La moneda ya está mapeada en property.currency desde AppContext
-            const propertyCurrency = property.currency || "MXN";
 
-            return (
-              <PropertyMapCard
-                key={property.id}
-                id={property.id}
-                property={property}
-                price={property.price || 0}
-                currency={propertyCurrency}
-                image={getPropertyImage(property)}
-                isHighlighted={property.id === highlightedPropertyId}
-                onPress={() => handleCardPress(property.id)}
-              />
-            );
-          })}
-        </ScrollView>
-      </View>
 
       {/* Modal de filtros */}
       <SearchFiltersModal
@@ -330,7 +293,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   mapContainer: {
-    flex: 0.7, // 70% del espacio (antes era 65%)
+    flex: 1, // Full space
   },
   cardsContainer: {
     flex: 0.3, // 30% del espacio (antes era 35%)
