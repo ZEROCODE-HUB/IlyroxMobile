@@ -12,26 +12,27 @@ import {
   Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
 
 import { FeedItem, User } from "../../types";
 import {
   useCurrentUserId,
   useFeedInteractions,
   useViewTracking,
-} from "@/hooks/hooks";
+} from "@/hooks";
 import { DIMENSIONS, COLORS } from "../../constants";
 import { commonStyles } from "../../../styles";
 import { UserHeader, ImageGallery, ReportModal, Avatar } from "../shared";
 import ActionButtons from "../ActionButtons";
-import { Bath } from "lucide-react-native";
-import { useUserRecommendations } from "@/hooks/hooks/useUserRecommendations";
+import { Toilet } from "lucide-react-native";
+import { useUserRecommendations } from "@/hooks/useUserRecommendations";
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
-import { useChatInitiator } from "@/hooks/hooks/messaging/useChatInitiator";
+import { useChatInitiator } from "@/hooks/messaging/useChatInitiator";
 import { MapModal } from "../shared/MapModal";
 import * as Clipboard from "expo-clipboard";
 import { useToast } from "@/context/ToastContext";
 import firstUpperCase from "@/utils/firstUpperCase";
+import { formatOperation } from "@/utils/priceFormatter";
+import { formatDateShort } from "@/utils/dateFormatter";
 
 interface PropertyCardProps {
   item: FeedItem;
@@ -71,7 +72,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
   const images = property.images || [];
 
-  const navigation = useNavigation<any>();
   const { handleContact } = useChatInitiator();
 
   const [showMap, setShowMap] = React.useState(false);
@@ -119,15 +119,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const renderOperationsLabel = () => {
     if (property.operations && property.operations.length > 0) {
       return property.operations
-        .map((op, idx) => {
-          const type = op.tipo_operacion === "venta" ? "Venta" : "Renta";
-          return `${type}: $${op.precio?.toLocaleString()} ${op.moneda}`;
-        })
+        .map((op) => formatOperation(op.tipo_operacion, op.precio, op.moneda))
         .join(" / ");
     }
-    // Fallback for single operation
-    const type = property.operation === "Sale" ? "Venta" : "Renta";
-    return `${type}: $${property.price.toLocaleString()} ${property.currency}`;
+    const tipo = property.operation === "Sale" ? "venta" : "renta";
+    return formatOperation(tipo, property.price, property.currency);
   };
 
   const title = `${firstUpperCase(property.subtype) || firstUpperCase(property.type)} en ${property.location.municipio || property.location.state}`;
@@ -182,7 +178,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       {/* Galería de imágenes - independiente para evitar conflictos de gestos */}
       <View style={styles.imageContainer}>
         <ImageGallery
-          images={images.slice(0, 3)}
+          images={images}
           aspectRatio={DIMENSIONS.POST_ASPECT_RATIO}
           showDots={true}
           showImageCount={false}
@@ -220,7 +216,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       <Pressable
         style={styles.metaRow}
         onPress={() =>
-          copyToClipboard(property.code || property.codigo_propiedad, "ID")
+          copyToClipboard(property.code || property.codigo_propiedad || "", "ID")
         }
       >
         <Text style={styles.metaText}>
@@ -232,11 +228,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           />{" "}
           •{" "}
           {property.createdAt
-            ? new Date(property.createdAt).toLocaleDateString("es-MX", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })
+            ? formatDateShort(property.createdAt)
             : item.timestamp}
         </Text>
       </Pressable>
@@ -298,7 +290,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           </View>
 
           <View style={styles.statItem}>
-            <Bath size={12} color={COLORS.textTertiary} />
+            <Toilet size={12} color={COLORS.textTertiary} />
             <Text style={styles.statValue}>{property.features.baths}</Text>
           </View>
 
@@ -324,7 +316,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             </Text>
           </View>
 
-          {property.features.landSqft && (
+          {property.features.landSqft > 0 && (
             <View style={[styles.statItem, { borderRightWidth: 0 }]}>
               <Ionicons
                 name="resize-outline"

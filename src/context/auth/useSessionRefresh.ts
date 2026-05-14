@@ -6,6 +6,9 @@
 import { useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { Session } from "@supabase/supabase-js";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("session-refresh");
 
 export const useSessionRefresh = (session: Session | null) => {
   useEffect(() => {
@@ -19,17 +22,17 @@ export const useSessionRefresh = (session: Session | null) => {
         } = await supabase.auth.getSession();
 
         if (currentSession) {
-          console.log("🔄 Refreshing session...");
-          const { data, error } = await supabase.auth.refreshSession();
+          log.info("Refreshing session...");
+          const { error } = await supabase.auth.refreshSession();
 
           if (error) {
-            console.error("❌ Error refreshing session:", error);
+            log.error("Error refreshing session:", error);
           } else {
-            console.log("✅ Session refreshed successfully");
+            log.info("Session refreshed successfully");
           }
         }
       } catch (err) {
-        console.error("❌ Error in refresh interval:", err);
+        log.error("Error in refresh interval:", err);
       }
     }, 50 * 60 * 1000); // 50 minutos
 

@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { COLORS } from "../../constants/colors";
-import Svg, { Circle, Line } from "react-native-svg";
+import Svg, { Line } from "react-native-svg";
 
 interface AvatarProps {
   uri?: string;

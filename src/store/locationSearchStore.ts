@@ -5,6 +5,9 @@ import {
   searchLocations as fetchFromService,
   LocationSuggestion,
 } from "../lib/locationService";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("locationSearchStore");
 
 export interface LocationSuggestionWithCount extends LocationSuggestion {
   propertyCount?: number;
@@ -33,11 +36,29 @@ export const useLocationSearchStore = create<LocationSearchState>((set) => ({
     set({ isLoading: true });
 
     try {
-      // 1. Búsqueda de estados usando search_locations_geo (solo estados)
-      const baseLocations = await fetchFromService(searchTerm, 4);
-      const baseSuggestions: LocationSuggestionWithCount[] = baseLocations
-        .filter((loc) => loc.type === "estado")
-        .map((loc) => ({ ...loc }));
+      // 1. Búsqueda de estados y municipios usando search_locations_geo
+      const baseLocations = await fetchFromService(searchTerm, 6);
+      const filteredBase = baseLocations.filter(
+        (loc) => loc.type === "estado" || loc.type === "municipio",
+      );
+
+      // Contar propiedades para cada estado/municipio
+      const baseCountPromises = filteredBase.map(async (loc) => {
+        let query = supabase
+          .from("propiedades")
+          .select("*", { count: "exact", head: true })
+          .eq("activo", true)
+          .is("deleted_at", null);
+        if (loc.type === "estado") {
+          query = query.eq("estado", loc.name);
+        } else {
+          query = query.eq("municipio", loc.name);
+        }
+        const { count } = await query;
+        return { ...loc, propertyCount: count || 0 } as LocationSuggestionWithCount;
+      });
+
+      const baseSuggestions = await Promise.all(baseCountPromises);
 
       // 2. Búsqueda de colonias con el nuevo RPC que incluye estado y municipio
       const { data: coloniasData, error: coloniasError } =
@@ -86,18 +107,21 @@ export const useLocationSearchStore = create<LocationSearchState>((set) => ({
           (a, b) => (b.propertyCount || 0) - (a.propertyCount || 0)
         );
       } else if (coloniasError) {
-        console.warn("[LocationSearch] Error fetching colonias:", coloniasError);
+        log.warn("[LocationSearch] Error fetching colonias:", coloniasError);
       }
 
-      // Combinar: estados primero, colonias después (ya ordenadas por propertyCount)
+      // Combinar: estados/municipios primero (ordenados por conteo), luego colonias
+      const sortedBase = baseSuggestions.sort(
+        (a, b) => (b.propertyCount || 0) - (a.propertyCount || 0),
+      );
       const combined: LocationSuggestionWithCount[] = [
-        ...baseSuggestions,
+        ...sortedBase,
         ...coloniasSuggestions,
       ];
 
       set({ suggestions: combined });
     } catch (error) {
-      console.error("Error fetching location suggestions:", error);
+      log.error("Error fetching location suggestions:", error);
       set({ suggestions: [] });
     } finally {
       set({ isLoading: false });

@@ -1,4 +1,4 @@
-// components/Charts/Chart09_PublishedVsSold.tsx
+﻿// components/Charts/Chart09_PublishedVsSold.tsx
 
 import React, { useEffect, useState } from "react";
 import {
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 20,
     elevation: 2,
-    shadowColor: "#000",
+    shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
   barBackground: {
     width: "100%",
     height: "100%",
-    backgroundColor: "#F0F0F0",
+    backgroundColor: COLORS.dividerGray,
     borderRadius: 6,
     overflow: "hidden",
     justifyContent: "flex-end",

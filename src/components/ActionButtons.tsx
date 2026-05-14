@@ -8,16 +8,17 @@
  */
 
 import React, { useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
+import { useToast } from "@/context/ToastContext";
 import { COLORS } from "../constants";
 
 import ReportPropertyModal from "./modals/ReportPropertyModal";
 import SharePropertyModal from "./modals/SharePropertyModal";
-import { useReportProperty } from "@/hooks/hooks/useReportProperty";
-import { useLikes, useShare } from "@/hooks/hooks";
-import { useCommentCount } from "@/hooks/hooks/useCommentCount";
+import { useReportProperty } from "@/hooks/useReportProperty";
+import { useLikes, useShare } from "@/hooks";
+import { useCommentCount } from "@/hooks/useCommentCount";
 import { propertyService } from "../services/propertyService";
 import firstUpperCase from "@/utils/firstUpperCase";
 
@@ -62,11 +63,10 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   propertyId,
   shareCode,
 }) => {
+  const { showToast } = useToast();
   // Hook de likes con optimistic updates
   const {
     getCounterReportsProperty,
-    reportProperty,
-    loading: reporting,
   } = useReportProperty();
   const [reportCount, setReportCount] = React.useState(0);
   const [showReportModal, setShowReportModal] = React.useState(false);
@@ -129,7 +129,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
       imageUrl: shareImageUrl,
     });
     if (success) {
-      Alert.alert("¡Compartido!", "Contenido compartido exitosamente");
+      showToast("Contenido compartido exitosamente", "success");
     }
   };
 

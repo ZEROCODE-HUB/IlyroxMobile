@@ -1,5 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import { Property } from "@/types";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("propertyService");
 
 const normalizePropertyStatus = (
   value: unknown,
@@ -38,6 +41,8 @@ export const propertyService = {
           metros_cuadrados_terreno,
           activo,
           status,
+          sin_comision,
+          es_easybroker,
           codigo_propiedad,
           created_at,
           operaciones_propiedad (
@@ -47,15 +52,18 @@ export const propertyService = {
             comision_tipo,
             comision_porcentaje,
             comision_monto_fijo,
-            comparte_comision
+            comision_meses,
+            comparte_comision,
+            porcentaje_comision_compartida
           )
         `,
       )
       .eq("created_by", targetUserId)
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
 
     if (propsError) {
-      console.error("Error fetching properties:", propsError);
+      log.error("Error fetching properties:", propsError);
       return [];
     }
 
@@ -66,10 +74,11 @@ export const propertyService = {
       const status = normalizePropertyStatus(p.status, p.activo);
 
       let commission: Property["commission"] | undefined;
-      if (operation?.comision_porcentaje || operation?.comision_monto_fijo) {
+      if (operation?.comision_porcentaje || operation?.comision_monto_fijo || operation?.comision_meses) {
         commission = {
           shared: operation?.comparte_comision || false,
           percentage: operation?.comision_porcentaje || undefined,
+          months: operation?.comision_meses || undefined,
         };
       }
 
@@ -101,6 +110,8 @@ export const propertyService = {
         subtype: p.subtipo,
         operation: operation?.tipo_operacion === "venta" ? "Sale" : "Rent",
         status: status,
+        sin_comision: p.sin_comision || false,
+        es_easybroker: p.es_easybroker || false,
         commission,
       };
     });

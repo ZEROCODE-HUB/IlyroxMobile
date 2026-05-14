@@ -20,19 +20,13 @@ const GOOGLE_CONFIG = {
     "542422641306-2nst8bt4aul54kveivu2qpg5i4gobn0b.apps.googleusercontent.com",
 };
 
-import { Platform } from "react-native";
+import { logger } from "@/utils/logger";const log = logger.scoped("useGoogleAuth");
 
 export function useGoogleAuth() {
   const [loading, setLoading] = useState(false);
   const { showModal } = useModal();
 
-  const redirectUri = Platform.select({
-    android: "com.ilyrox.app:/oauth2redirect",
-    ios: "com.ilyrox.app:/oauth2redirect",
-    web: "ilyroxapp://",
-  });
-
-  const [request, response, promptAsync] = Google.useAuthRequest({
+  const [request, , promptAsync] = Google.useAuthRequest({
     clientId: GOOGLE_CONFIG.webClientId,
   });
 
@@ -65,7 +59,7 @@ export function useGoogleAuth() {
 
       return { user: data.user, error: null };
     } catch (error: any) {
-      console.error("Error en Google Auth:", error);
+      log.error("Error en Google Auth:", error);
       showModal({ title: "Error", message: error.message, confirmText: "OK" });
       return { error: error.message };
     } finally {

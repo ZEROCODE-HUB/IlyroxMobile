@@ -10,11 +10,10 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { View, Text, StyleSheet, BackHandler } from "react-native";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import ConversationsList from "./Messaging/ConversationsList";
 import ChatScreen from "./Messaging/ChatScreen";
 import { useAuth } from "../context/AuthContext";
-import { useConversations } from "../hooks/hooks/messaging/useConversations";
+import { useConversations } from "../hooks/messaging/useConversations";
 import { AppHeader } from "./AppHeader";
 import { User } from "../types";
 import { COLORS } from "../constants";
@@ -41,7 +40,6 @@ export default function MessagingScreen({
 }: MessagingScreenProps) {
   const { top } = useStableSafeInsets();
   const { profile } = useAuth();
-  const navigation = useNavigation<any>();
 
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
@@ -67,7 +65,7 @@ export default function MessagingScreen({
     if (onBack) {
       onBack();
     } else {
-      navigation.goBack();
+      router.back();
     }
   };
 
@@ -92,8 +90,8 @@ export default function MessagingScreen({
       } else if (onBack) {
         onBack();
       } else {
-        if (navigation.canGoBack()) {
-          navigation.goBack();
+        if (router.canGoBack()) {
+          router.back();
         } else {
           router.replace("/(tabs)/feed");
         }
@@ -105,7 +103,6 @@ export default function MessagingScreen({
     otherUser,
     isAppointment,
     onBack,
-    navigation,
   ]);
 
   // Manejar botón físico de atrás en Android
@@ -147,7 +144,7 @@ export default function MessagingScreen({
 
     // Reset de estado para nueva inicialización
     isInitializedRef.current = true;
-    lastProcessedUserId.current = targetUserId;
+    lastProcessedUserId.current = targetUserId ?? null;
 
     // Si tenemos un conversationId explícito (aunque sea "new")
     if (targetConvId && initialUser) {
@@ -292,14 +289,14 @@ export default function MessagingScreen({
               otherUser={otherUser}
               userId={profile.id}
               propertyId={activePropertyId}
-              conversationId={activeConversationId}
+              conversationId={activeConversationId!}
             />
           </View>
 
           {/* Contenido del chat */}
           <View style={[styles.chatContent, { marginTop: headerHeight }]}>
             <ChatScreen
-              conversationId={activeConversationId}
+              conversationId={activeConversationId!}
               userId={profile.id}
               otherUser={otherUser}
               propertyId={activePropertyId}

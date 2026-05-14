@@ -135,6 +135,36 @@ export interface PropertyFormState {
   // Contract data (venta/renta)
   contractData: ContractData | null;
 
+  // EasyBroker
+  sinComision: boolean;
+
+  // Campos especializados — Agrícola
+  tiposAgua: string[];
+  concesionAgua: boolean;
+  usoTerreno: string;
+  tipoRiego: string;
+  infraElectricidad: boolean;
+  infraCaminoAcceso: boolean;
+  infraCercado: boolean;
+  accesoCarretera: boolean;
+  accesoCamiones: boolean;
+
+  // Campos especializados — Comercial
+  tipoUbicacionComercial: string;
+  frenteMetros: string;
+  nivelPiso: string;
+  sobreAvenidaPrincipal: boolean;
+  enEsquina: boolean;
+  altaVisibilidad: boolean;
+  altoFlujoVehicular: boolean;
+
+  // Campos especializados — Industrial
+  ubicacionIndustrial: string;
+  alturaLibreM: string;
+  tipoEnergiaKva: string[];
+  areaOficinas: string;
+  patioManiobras: string;
+
   // Errores
   errors: Record<string, string>;
 }

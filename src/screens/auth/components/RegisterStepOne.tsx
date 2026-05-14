@@ -11,29 +11,36 @@ import { AppInput } from "../../../design-system/components/AppInput";
 import { SubmitButton } from "./SubmitButton";
 import { BackButton } from "./BackButton";
 import SelectionModal from "../../../components/modals/SelectionModal";
-import { AuthFormState } from "../hooks/useAuthForm";
+import { AuthFormState, getPasswordStrength } from "../hooks/useAuthForm";
 import { ESTADOS_MEXICO } from "../../../constants/locations";
 import { COLORS } from "../../../constants/colors";
 
 interface RegisterStepOneProps {
   formState: AuthFormState;
+  fieldErrors: Record<string, string>;
   onUpdateField: <K extends keyof AuthFormState>(
     field: K,
     value: AuthFormState[K],
   ) => void;
+  onValidateField: (field: keyof AuthFormState, value: string) => void;
   onNext: () => void;
   onBack: () => void;
 }
 
 export function RegisterStepOne({
   formState,
+  fieldErrors,
   onUpdateField,
+  onValidateField,
   onNext,
   onBack,
 }: RegisterStepOneProps) {
   const [showEstadoModal, setShowEstadoModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [pwdFocused, setPwdFocused] = useState(false);
+
+  const passwordStrength = getPasswordStrength(formState.password);
 
   return (
     <KeyboardAwareScrollView
@@ -53,6 +60,8 @@ export function RegisterStepOne({
         placeholder="Nombre *"
         value={formState.name}
         onChangeText={(v) => onUpdateField("name", v)}
+        onBlur={() => onValidateField("name", formState.name)}
+        error={fieldErrors.name}
         autoComplete="given-name"
         textContentType="givenName"
       />
@@ -63,6 +72,8 @@ export function RegisterStepOne({
             placeholder="Apellido Paterno *"
             value={formState.lastNamePaterno}
             onChangeText={(v) => onUpdateField("lastNamePaterno", v)}
+            onBlur={() => onValidateField("lastNamePaterno", formState.lastNamePaterno)}
+            error={fieldErrors.lastNamePaterno}
             autoComplete="family-name"
             textContentType="familyName"
           />
@@ -72,6 +83,8 @@ export function RegisterStepOne({
             placeholder="Apellido Materno *"
             value={formState.lastNameMaterno}
             onChangeText={(v) => onUpdateField("lastNameMaterno", v)}
+            onBlur={() => onValidateField("lastNameMaterno", formState.lastNameMaterno)}
+            error={fieldErrors.lastNameMaterno}
           />
         </View>
       </View>
@@ -82,6 +95,8 @@ export function RegisterStepOne({
         keyboardType="email-address"
         value={formState.email}
         onChangeText={(v) => onUpdateField("email", v)}
+        onBlur={() => onValidateField("email", formState.email)}
+        error={fieldErrors.email}
         autoComplete="email"
         textContentType="emailAddress"
       />
@@ -91,6 +106,8 @@ export function RegisterStepOne({
         keyboardType="phone-pad"
         value={formState.phone}
         onChangeText={(v) => onUpdateField("phone", v)}
+        onBlur={() => onValidateField("phone", formState.phone)}
+        error={fieldErrors.phone}
         textContentType="telephoneNumber"
       />
 
@@ -125,6 +142,9 @@ export function RegisterStepOne({
         secureTextEntry={!showPassword}
         value={formState.password}
         onChangeText={(v) => onUpdateField("password", v)}
+        onFocus={() => setPwdFocused(true)}
+        onBlur={() => { setPwdFocused(false); onValidateField("password", formState.password); }}
+        error={fieldErrors.password}
         autoComplete="new-password"
         textContentType="newPassword"
         rightIcon={
@@ -137,12 +157,28 @@ export function RegisterStepOne({
           </TouchableOpacity>
         }
       />
+      {(pwdFocused || (formState.password.length > 0 && !!fieldErrors.password)) && (
+        <View style={styles.pwdStrength}>
+          {passwordStrength.map((r) => (
+            <View key={r.label} style={styles.pwdRule}>
+              <Ionicons
+                name={r.met ? "checkmark-circle" : "ellipse-outline"}
+                size={13}
+                color={r.met ? COLORS.success : COLORS.textTertiary}
+              />
+              <Text style={[styles.pwdRuleText, r.met && styles.pwdRuleMet]}>{r.label}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       <AppInput
         placeholder="Confirmar contraseña *"
         secureTextEntry={!showConfirmPassword}
         value={formState.confirmPassword}
         onChangeText={(v) => onUpdateField("confirmPassword", v)}
+        onBlur={() => onValidateField("confirmPassword", formState.confirmPassword)}
+        error={fieldErrors.confirmPassword}
         autoComplete="new-password"
         textContentType="newPassword"
         rightIcon={
@@ -200,5 +236,23 @@ const styles = StyleSheet.create({
   },
   selectPlaceholder: {
     color: COLORS.textTertiary,
+  },
+  pwdStrength: {
+    marginTop: -10,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+    gap: 4,
+  },
+  pwdRule: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  pwdRuleText: {
+    fontSize: 11,
+    color: COLORS.textTertiary,
+  },
+  pwdRuleMet: {
+    color: COLORS.success,
   },
 });

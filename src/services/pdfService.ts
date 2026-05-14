@@ -3,7 +3,9 @@ import * as Sharing from "expo-sharing";
 import { documentDirectory, moveAsync } from "expo-file-system/legacy";
 import { supabase } from "@/lib/supabase";
 import firstUpperCase from "@/utils/firstUpperCase";
-import { LogoBase64 } from "@/assets/logoBase64";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("pdfService");
 // ============================================================================
 // CONFIGURACION DE CAMPOS - Editar aquí qué información mostrar en el PDF
 // ============================================================================
@@ -50,10 +52,6 @@ export const PDF_FIELD_CONFIG = {
   showMontoEnganche: true,
   showFinanciamientos: true,
 
-  // Comisiones (ocultas por defecto)
-  showComision: false,
-  showComisionCompartida: false,
-
   // Gravámenes
   showGravamenes: true,
 
@@ -73,8 +71,6 @@ export const PDF_FIELD_CONFIG = {
 
 // Configuración para "Sin Datos" - campos a ocultar cuando se elige esta opción
 export const PDF_SIN_DATOS_OVERRIDE: Partial<typeof PDF_FIELD_CONFIG> = {
-  showComision: false,
-  showComisionCompartida: false,
   showGravamenes: false,
   showTelefonoCreador: false,
   showEmailCreador: false,
@@ -143,12 +139,6 @@ interface OperacionPropiedad {
   precio: number;
   moneda: string;
   periodo_renta: string | null;
-  comision_tipo: string | null;
-  comision_porcentaje: number | null;
-  comision_monto_fijo: number | null;
-  comparte_comision: boolean;
-  porcentaje_comision_compartida: number | null;
-  condiciones_comision_compartida: string | null;
 }
 
 interface PerfilCreador {
@@ -202,41 +192,6 @@ const formatPrice = (
   }
 };
 
-const formatOperationType = (tipo: string | null | undefined): string => {
-  if (!tipo) return "";
-  const tipos: Record<string, string> = {
-    venta: "Venta",
-    renta: "Renta",
-  };
-  const tipoLower = String(tipo).toLowerCase();
-  return tipos[tipoLower] || String(tipo);
-};
-
-const formatPeriod = (periodo: string | null | undefined): string => {
-  if (!periodo) return "";
-  const periodos: Record<string, string> = {
-    mensual: "/mes",
-    anual: "/año",
-    semanal: "/semana",
-    diario: "/día",
-  };
-  const periodoLower = String(periodo).toLowerCase();
-  return periodos[periodoLower] || `/${periodo}`;
-};
-
-const buildAddress = (data: PropertyPdfData): string => {
-  const parts: string[] = [];
-
-  if (data.calle) {
-    let street = data.calle;
-    if (data.numero_exterior) street += ` #${data.numero_exterior}`;
-    if (data.numero_interior) street += ` Int. ${data.numero_interior}`;
-    parts.push(street);
-  }
-
-  return parts.join(", ");
-};
-
 const getCreatorFullName = (perfil: PerfilCreador | null): string => {
   if (!perfil) return "Agente";
 
@@ -280,13 +235,13 @@ export const fetchPropertyData = async (
       .single();
 
     if (error) {
-      console.error("Error fetching property data:", error);
+      log.error("Error fetching property data:", error);
       return null;
     }
 
     return data as PropertyPdfData;
   } catch (err) {
-    console.error("Error in fetchPropertyData:", err);
+    log.error("Error in fetchPropertyData:", err);
     return null;
   }
 };
@@ -307,8 +262,9 @@ const generatePropertyHtml = (
         ? "EN RENTA"
         : "EN VENTA";
 
-  // LOGICA CONDICIONAL: Mostrar datos sensibles (Usuario y Comisión)
-  // Si config.showDatosCompletos es true, mostramos todo. Si no, ocultamos agente y comisión.
+  // LOGICA CONDICIONAL: Mostrar datos sensibles del agente.
+  // Si config.showDatosCompletos es true, mostramos los datos del agente. Si no, los ocultamos.
+  // Nota: las comisiones NUNCA se renderizan en el PDF, sin importar esta flag.
   const showSensitiveData = config.showDatosCompletos === true;
 
   // --- PREPARACIÓN DE DATOS ---
@@ -458,7 +414,7 @@ const generatePropertyHtml = (
         .hero-container {
             position: relative;
             width: 100%;
-            height: 380px; /* Ajuste para que se vea la imagen principal grande */
+            height: 420px; /* Ajuste para que se vea la imagen principal grande */
             background-color: #ddd;
             overflow: hidden;
         }
@@ -485,7 +441,7 @@ const generatePropertyHtml = (
         /* --- MAIN CARD --- */
         .content-wrapper {
             padding: 0 40px;
-            margin-top: -100px; /* Efecto de superposición */
+            margin-top: -40px; /* Efecto de superposición */
             position: relative;
             z-index: 10;
         }
@@ -875,7 +831,7 @@ export const pdfService = {
       });
       uri = result.uri;
     } catch (printError) {
-      console.warn(
+      log.warn(
         "Error generando PDF con imágenes, reintentando sin imágenes:",
         printError,
       );
@@ -916,7 +872,7 @@ export const pdfService = {
         });
         opened = true;
       } catch (error) {
-        console.error("Error sharing PDF:", error);
+        log.error("Error sharing PDF:", error);
       }
     }
 
@@ -932,7 +888,7 @@ export const pdfService = {
           opened = true;
         }
       } catch (error) {
-        console.warn("FileViewer not available:", error);
+        log.warn("FileViewer not available:", error);
       }
     }
 

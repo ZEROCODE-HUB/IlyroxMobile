@@ -1,49 +1,49 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  ScrollView,
-  Image,
-  StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
-  Dimensions,
-  Alert,
-  Platform,
   Modal,
   RefreshControl,
-  Linking,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS } from "@/constants";
 import { Bath } from "lucide-react-native";
-import { ActionButtons, Avatar } from "../shared";
 
-import { useViewTracking } from "@/hooks/hooks";
-import usePropertyDetails from "@/hooks/hooks/usePropertyDetails";
+import { useViewTracking } from "@/hooks";
+import usePropertyDetails from "@/hooks/usePropertyDetails";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import { useToast } from "@/context/ToastContext";
 import { MapDetails } from "./MapDetails";
 import CreateProperty from "../CreateContent/CreateProperty";
-import { useChatInitiator } from "@/hooks/hooks/messaging/useChatInitiator";
-import { fetchPropertyData } from "@/services/pdfService";
+import { useChatInitiator } from "@/hooks/messaging/useChatInitiator";
+import { logger } from "@/utils/logger";
+import { parseImages } from "@/utils/imageParser";
+import { formatDateShort } from "@/utils/dateFormatter";
+import { router } from "expo-router";
 
-const { width } = Dimensions.get("window");
+import { PropertyDetailImages } from "./PropertyDetailImages";
+import { PropertyFinancialSection } from "./PropertyFinancialSection";
+import { PropertyOwnerContact } from "./PropertyOwnerContact";
+import { propertyDetailStyles as styles } from "./propertyDetailStyles";
+
+const log = logger.scoped("PropertyDetail");
 
 interface PropertyDetailProps {
   propertyId: string;
-  navigation: any;
   onContact?: (ownerId: string, propertyId: string) => void;
   onRefresh?: () => void;
   sinDatos?: boolean;
 }
 
+
 const PropertyDetail: React.FC<PropertyDetailProps> = ({
   propertyId,
-  navigation,
   onContact,
   onRefresh,
   sinDatos,
@@ -52,13 +52,13 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   const { propertyDetails, loading, refetch } = usePropertyDetails(
     propertyId || "",
   );
-  const [property, setProperty] = useState<any>(null);
+  const [, setProperty] = useState<any>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showComments, setShowComments] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [propertyIdModal, setPropertyIdModal] = useState<string | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [, setHasChanges] = useState(false);
 
   const { handleContact } = useChatInitiator();
 
@@ -77,13 +77,12 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
       setHasChanges(true);
       if (onRefresh) onRefresh();
     } catch (error) {
-      console.error("Error refreshing property detail:", error);
+      log.error("Error refreshing property detail:", error);
     } finally {
       setRefreshing(false);
     }
   };
 
-  // Hook de view tracking
   const { trackInteraction } = useViewTracking({
     feedItemId: propertyDetails?.feed_items?.id,
     userId: user?.id,
@@ -109,7 +108,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
       <View style={styles.errorContainer}>
         <Text>No se encontró la propiedad</Text>
         <TouchableOpacity
-          onPress={() => navigation.goBack(hasChanges)}
+          onPress={() => router.back()}
           style={styles.backButton}
         >
           <Text style={styles.backButtonText}>Regresar</Text>
@@ -118,27 +117,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
     );
   }
 
-  let images: string[] = [];
-  const rawFotos = propertyDetails.fotos;
-
-  if (Array.isArray(rawFotos)) {
-    images = rawFotos;
-  } else if (typeof rawFotos === "string" && rawFotos.trim().startsWith("[")) {
-    try {
-      images = JSON.parse(rawFotos);
-    } catch (e) {
-      images = rawFotos.split(",").map((s) => s.trim());
-    }
-  } else if (typeof rawFotos === "string") {
-    // Handle comma-separated strings that are NOT JSON arrays
-    if (rawFotos.includes(",")) {
-      images = rawFotos.split(",").map((s) => s.trim());
-    } else {
-      images = [rawFotos];
-    }
-  }
-
-  const hasImages = images.length > 0;
+  const images = parseImages(propertyDetails.fotos);
   const operations = propertyDetails.operaciones || [];
   const profile = propertyDetails.perfil;
   const amenities =
@@ -147,7 +126,12 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   const financiamientos =
     propertyDetails.financiamientos?.map((f: any) => f.tipo.nombre) || [];
 
-  const StatItem = ({ icon, label, value }: any) => (
+  interface LocalStatItemProps {
+    icon: keyof typeof Ionicons.glyphMap;
+    label: string;
+    value: string | number;
+  }
+  const StatItem = ({ icon, label, value }: LocalStatItemProps) => (
     <View style={styles.statItem}>
       <View style={styles.statIconContainer}>
         <Ionicons name={icon} size={16} color={COLORS.textSecondary} />
@@ -173,70 +157,24 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           />
         }
       >
-        <View style={styles.imageContainer}>
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={(e) => {
-              const offset = e.nativeEvent.contentOffset.x;
-              setCurrentImageIndex(Math.round(offset / width));
-            }}
-          >
-            {hasImages ? (
-              images.map((img: string, index: number) => (
-                <Image key={index} source={{ uri: img }} style={styles.image} />
-              ))
-            ) : (
-              <Image
-                source={{
-                  uri: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1080&q=80",
-                }}
-                style={styles.image}
-              />
-            )}
-          </ScrollView>
-
-          <View style={styles.floatingActions}>
-            <ActionButtons
-              feedItemId={propertyDetails.feed_items.id}
-              feedItemType="property"
-              initialLikes={propertyDetails.feed_items.likes_count || 0}
-              comments={propertyDetails.feed_items.comentarios_count || 0}
-              userId={user?.id}
-              onCommentClick={() => {
-                trackInteraction("comentario");
-                setShowComments(true);
-              }}
-              onTrackInteraction={trackInteraction}
-              shareTitle={`Propiedad: ${propertyDetails.subtipo} en ${propertyDetails.municipio}`}
-              shareDescription={propertyDetails.descripcion?.substring(0, 100)}
-              shareImageUrl={hasImages ? images[0] : undefined}
-              orientation="vertical"
-              tintColor={COLORS.white}
-              showContactButton={false}
-              propertyId={propertyDetails.id}
-              shareCode={
-                propertyDetails.codigo_propiedad || propertyDetails.code
-              }
-            />
-          </View>
-
-          <TouchableOpacity
-            onPress={() => navigation.goBack(hasChanges)}
-            style={styles.backFloating}
-          >
-            <Ionicons name="arrow-back" size={24} color={COLORS.white} />
-          </TouchableOpacity>
-
-          {images.length > 1 && (
-            <View style={styles.imageBadge}>
-              <Text style={styles.imageBadgeText}>
-                {currentImageIndex + 1} / {images.length}
-              </Text>
-            </View>
-          )}
-        </View>
+        <PropertyDetailImages
+          images={images}
+          currentImageIndex={currentImageIndex}
+          onImageIndexChange={setCurrentImageIndex}
+          onBack={() => router.back()}
+          feedItemId={propertyDetails.feed_items.id}
+          feedItemLikes={propertyDetails.feed_items.likes_count || 0}
+          feedItemComments={propertyDetails.feed_items.comentarios_count || 0}
+          userId={user?.id}
+          propertyId={propertyDetails.id}
+          shareTitle={`Propiedad: ${propertyDetails.subtipo} en ${propertyDetails.municipio}`}
+          shareDescription={propertyDetails.descripcion?.substring(0, 100)}
+          shareCode={
+            propertyDetails.codigo_propiedad || propertyDetails.code
+          }
+          onCommentClick={() => setShowComments(true)}
+          onTrackInteraction={trackInteraction as (kind: string) => void}
+        />
 
         <View style={styles.content}>
           {/* Header Principal */}
@@ -266,14 +204,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
 
               <Text style={styles.metaText}>
                 {propertyDetails.created_at
-                  ? new Date(propertyDetails.created_at).toLocaleDateString(
-                      "es-MX",
-                      {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      },
-                    )
+                  ? formatDateShort(propertyDetails.created_at)
                   : ""}
               </Text>
             </View>
@@ -468,216 +399,44 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
 
           <View style={styles.divider} />
 
-          {/* Financiamiento y Gravamen */}
-          {(financiamientos.length > 0 || gravamenes.length > 0) && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Financiero y Legal</Text>
-
-              {gravamenes.length > 0 && (
-                <View style={styles.warningBox}>
-                  <Ionicons
-                    name="warning-outline"
-                    size={20}
-                    color={COLORS.error}
-                  />
-                  <View>
-                    <Text style={styles.warningTitle}>
-                      Propiedad con Gravamen
-                    </Text>
-                    {gravamenes.map((g: any, i: number) => (
-                      <Text key={i} style={styles.warningText}>
-                        {g.institucion?.nombre} :
-                        {g.monto ? g.monto : " Monto no especificado"}
-                      </Text>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {financiamientos.length > 0 && (
-                <View style={{ marginTop: 12 }}>
-                  <Text style={[styles.label, { marginBottom: 8 }]}>
-                    Acepta Financiamiento:
-                  </Text>
-                  <View style={styles.amenitiesContainer}>
-                    {financiamientos.map((f: string, i: number) => (
-                      <View
-                        key={i}
-                        style={[
-                          styles.amenityChip,
-                          { borderColor: COLORS.cardBorder },
-                        ]}
-                      >
-                        <Ionicons
-                          name="cash-outline"
-                          size={14}
-                          color={COLORS.textSecondary}
-                        />
-                        <Text
-                          style={[
-                            styles.amenityText,
-                            { color: COLORS.textSecondary },
-                          ]}
-                        >
-                          {f}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Comisiones (Solo visible si comparte) */}
-          {!sinDatos && operations.some((op: any) => op.comparte_comision) && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Esquema de Comisión</Text>
-              {operations.map((op: any, i: number) =>
-                op.comparte_comision ? (
-                  <View key={i} style={styles.commissionBox}>
-                    <Text style={styles.commissionTitle}>
-                      {op.tipo_operacion === "venta" ? "Venta" : "Renta"}
-                    </Text>
-                    <View style={styles.commissionRow}>
-                      <Text style={styles.commissionLabel}>Comisión:</Text>
-                      <Text style={styles.commissionValue}>
-                        {op.comision_porcentaje
-                          ? `${op.comision_porcentaje}%`
-                          : op.comision_monto_fijo
-                            ? `$${op.comision_monto_fijo}`
-                            : "No especificado"}
-                      </Text>
-                    </View>
-                    <View style={styles.commissionRow}>
-                      <Text style={styles.commissionLabel}>Comparte:</Text>
-                      <Text style={styles.commissionValue}>
-                        {op.porcentaje_comision_compartida
-                          ? `${op.porcentaje_comision_compartida}%`
-                          : op.monto_comision_compartida
-                            ? `$${op.monto_comision_compartida.toLocaleString()}`
-                            : "No especificado"}
-                      </Text>
-                    </View>
-                    {op.condiciones_comision_compartida && (
-                      <View style={styles.commissionRow}>
-                        <Text style={styles.commissionLabel}>Condiciones:</Text>
-                        <Text style={styles.commissionValue} numberOfLines={2}>
-                          {op.condiciones_comision_compartida}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                ) : null,
-              )}
-            </View>
-          )}
+          {/* Financiamiento, Gravamen y Comisiones */}
+          <PropertyFinancialSection
+            operations={operations}
+            gravamenes={gravamenes}
+            financiamientos={financiamientos}
+            sinDatos={sinDatos}
+          />
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Ubicación</Text>
             <MapDetails property={propertyDetails} />
           </View>
 
-          {/* Perfil del Publicador */}
-          {!sinDatos && profile && (
-            <View style={styles.profileSection}>
-              <Avatar
-                uri={profile.foto}
-                name={profile.nombre}
-                size={50}
-                style={styles.profileFoto}
-              />
-              <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>{profile.nombre}</Text>
-                <Text style={styles.profileRole}>Agente Inmobiliario</Text>
-              </View>
-
-              {user.id === profile.id ? (
-                <View></View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.contactIconBtn}
-                  onPress={() => {
-                    if (onContact) {
-                      onContact(profile.id, propertyDetails.id);
-                    } else {
-                      handleContact(profile.id, propertyDetails.id, {
-                        id: profile.id,
-                        nombre: profile.nombre,
-                        foto: profile.foto,
-                        apellido_paterno: profile.apellido_paterno || "",
-                      });
-                    }
-                  }}
-                >
-                  <Ionicons
-                    name="chatbubble-ellipses"
-                    size={24}
-                    color={COLORS.primary}
-                  />
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-
-          {/* Botón de Acción Principal */}
-          {!sinDatos &&
-            (user?.id === profile?.id ? (
-              <TouchableOpacity
-                style={[
-                  styles.mainContactBtn,
-                  { backgroundColor: COLORS.info },
-                ]}
-                onPress={() => {
-                  setLoadingEdit(true);
-                  setShowModal(true);
-                  setPropertyIdModal(propertyDetails.id);
-                }}
-              >
-                <Text style={styles.mainContactBtnText}>
-                  {loadingEdit ? (
-                    <ActivityIndicator size="small" color={COLORS.primary} />
-                  ) : (
-                    <>
-                      <Ionicons
-                        name="pencil"
-                        size={20}
-                        color={COLORS.white}
-                        style={{ marginRight: 8, gap: 8 }}
-                      />
-                      <Text style={{ marginLeft: 8 }}>Editar Propiedad</Text>
-                    </>
-                  )}
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={styles.mainContactBtn}
-                onPress={() => {
-                  const phone = `${profile.prefijo_celular || ""}${profile.celular || ""}`;
-                  if (phone && phone.trim().length > 0) {
-                    Linking.openURL(`tel:${phone.replace(/\s/g, "")}`);
-                  } else {
-                    Alert.alert(
-                      "Sin número de contacto",
-                      "Este usuario no cuenta con un número registrado para llamadas directas.",
-                    );
-                  }
-                }}
-              >
-                <Ionicons
-                  name="call"
-                  size={20}
-                  color={COLORS.white}
-                  style={{ marginRight: 8 }}
-                />
-                <Text style={styles.mainContactBtnText}>Contactar ahora</Text>
-              </TouchableOpacity>
-            ))}
+          {/* Perfil del Publicador y botón de acción */}
+          <PropertyOwnerContact
+            profile={profile}
+            propertyId={propertyDetails.id}
+            currentUserId={user?.id}
+            sinDatos={sinDatos}
+            loadingEdit={loadingEdit}
+            onContactExternal={onContact}
+            onContactInternal={(p) =>
+              handleContact(p.id, propertyDetails.id, {
+                id: p.id,
+                nombre: p.nombre,
+                foto: p.foto,
+                apellido_paterno: p.apellido_paterno || "",
+              })
+            }
+            onEditProperty={() => {
+              setLoadingEdit(true);
+              setShowModal(true);
+              setPropertyIdModal(propertyDetails.id);
+            }}
+          />
         </View>
       </ScrollView>
 
-      {/* Modal de comentarios */}
       <CommentsBottomSheet
         visible={showComments}
         onClose={() => setShowComments(false)}
@@ -692,431 +451,11 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
             setLoadingEdit(false);
             if (shouldRefresh) handleRefresh();
           }}
-          propertyId={propertyIdModal}
+          propertyId={propertyIdModal ?? undefined}
         />
       </Modal>
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  statIcon: {
-    backgroundColor: COLORS.primaryLight,
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  backButton: {
-    marginTop: 20,
-    padding: 12,
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
-  },
-  backButtonText: {
-    color: COLORS.white,
-    fontWeight: "600",
-  },
-  imageContainer: {
-    width: "100%",
-    backgroundColor: COLORS.white,
-  },
-  image: {
-    width: width,
-    height: 350,
-    resizeMode: "cover",
-  },
-  placeholderImage: {
-    backgroundColor: COLORS.background,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  backFloating: {
-    position: "absolute",
-    top: Platform.OS === "ios" ? 60 : 40,
-    left: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.blackTransparent50,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10,
-  },
-  imageBadge: {
-    position: "absolute",
-    bottom: 26,
-    right: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: COLORS.blackTransparent60,
-  },
-  imageBadgeText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  content: {
-    paddingTop: Platform.OS === "ios" ? 50 : 30,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: -24,
-  },
-
-  floatingActions: {
-    position: "absolute",
-    right: 8,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-    zIndex: 10,
-    alignItems: "center",
-  },
-  headerInfo: {
-    marginBottom: 16,
-  },
-  metaRowContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  idContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  copyIcon: {
-    marginLeft: 4,
-  },
-  metaSeparator: {
-    marginHorizontal: 8,
-    color: COLORS.textSecondary,
-    fontSize: 12,
-  },
-  metaText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    fontWeight: "600",
-  },
-  tagRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 12,
-  },
-  typeTag: {
-    backgroundColor: COLORS.gradientBackground,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  typeTagText: {
-    color: COLORS.primary,
-    fontSize: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-    marginBottom: 8,
-    lineHeight: 30,
-  },
-  priceContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 16,
-  },
-  priceBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.textPrimary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 8,
-  },
-  operationType: {
-    color: COLORS.textTertiary,
-    fontSize: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
-  },
-  price: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: COLORS.white,
-  },
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 6,
-  },
-  locationText: {
-    fontSize: 15,
-    color: COLORS.textSecondary,
-    flex: 1,
-    lineHeight: 20,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.cardBorder,
-    marginVertical: 24,
-  },
-  section: {
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-    marginBottom: 16,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  statItem: {
-    width: "48%",
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.white,
-    padding: 10,
-    borderRadius: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
-  statIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.gradientBackground,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  statTextContainer: {
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-  },
-  statLabel: {
-    fontSize: 10,
-    color: COLORS.textSecondary,
-    textTransform: "uppercase",
-    fontWeight: "600",
-  },
-  statSubLabel: {
-    fontSize: 9,
-    color: COLORS.textTertiary,
-  },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-  },
-  chipText: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    fontWeight: "500",
-  },
-  amenitiesContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  amenityChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.primaryLight,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-  },
-  amenityText: {
-    color: COLORS.primaryDark,
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  descriptionText: {
-    fontSize: 15,
-    color: COLORS.textSecondary,
-    lineHeight: 26,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-  },
-  warningBox: {
-    flexDirection: "row",
-    padding: 16,
-    backgroundColor: COLORS.warningLight,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.warning,
-    gap: 12,
-  },
-  warningTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: COLORS.warningDark,
-    marginBottom: 4,
-  },
-  warningText: {
-    fontSize: 14,
-    color: COLORS.warning,
-    lineHeight: 20,
-    flex: 1,
-  },
-  infoBox: {
-    flexDirection: "row",
-    padding: 16,
-    backgroundColor: COLORS.infoLight,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.info,
-    gap: 12,
-    marginTop: 16,
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: COLORS.infoDark,
-    marginBottom: 4,
-  },
-  infoText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    lineHeight: 20,
-    flex: 1,
-  },
-  infoIcon: {
-    color: COLORS.info,
-  },
-  infoLink: {
-    color: COLORS.infoDark,
-    fontWeight: "600",
-    textDecorationLine: "underline",
-  },
-  commissionBox: {
-    backgroundColor: COLORS.infoLight,
-    borderWidth: 1,
-    borderColor: COLORS.info,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-  },
-  commissionTitle: {
-    fontWeight: "bold",
-    color: COLORS.infoDark,
-    marginBottom: 8,
-    fontSize: 14,
-  },
-  commissionRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  commissionLabel: {
-    fontSize: 13,
-    color: COLORS.info,
-  },
-  commissionValue: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.infoDark,
-    maxWidth: "60%",
-    textAlign: "right",
-  },
-  profileSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
-  profileFoto: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  profileName: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-  },
-  profileRole: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  contactIconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.white,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
-  mainContactBtn: {
-    backgroundColor: COLORS.primary,
-    padding: 18,
-    borderRadius: 16,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 40,
-  },
-  mainContactBtnText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  bottomContainer: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: COLORS.white,
-    marginBottom: 25,
-  },
-});
 
 export default PropertyDetail;

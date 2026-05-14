@@ -7,21 +7,15 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../../constants/colors";
 import { AMENIDADES } from "../../../constants/propertyData";
+import { usePropertyFormContext } from "./PropertyFormContext";
 
-interface AmenitiesSectionProps {
-  amenidadesSeleccionadas: string[];
-  toggleAmenidad: (amenidad: string) => void;
-}
-
-export const AmenitiesSection = React.memo(function AmenitiesSection({
-  amenidadesSeleccionadas,
-  toggleAmenidad,
-}: AmenitiesSectionProps) {
+export const AmenitiesSection = React.memo(function AmenitiesSection() {
+  const { amenidadesSeleccionadas, toggleAmenidad } = usePropertyFormContext();
   return (
     <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Ionicons name="star" size={24} color={COLORS.primary} />
-        <Text style={styles.sectionTitle}>Amenidades</Text>
+      <View style={styles.sectionHeaderBand}>
+        <Ionicons name="star-outline" size={18} color={COLORS.primary} />
+        <Text style={styles.sectionTitleBand}>Amenidades</Text>
       </View>
 
       <View style={styles.amenidadesGrid}>
@@ -65,16 +59,20 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  sectionHeader: {
+  sectionHeaderBand: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
     gap: 8,
+    backgroundColor: COLORS.primary + "12",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
+  sectionTitleBand: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.primary,
   },
   amenidadesGrid: {
     flexDirection: "row",

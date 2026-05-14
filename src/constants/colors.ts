@@ -79,4 +79,22 @@ export const COLORS = {
   facebook: "#1877f2",
   google: "#ea4335",
   apple: "#000000",
+
+  // Estados de propiedad (usados en SpecialPostCard, LeadMatchCard, badges)
+  sold: "#D32F2F",
+  eventAnniversary: "#74b5c3ff",
+  tagPurpleDark: "#6A1B9A",
+
+  // Grises de UI (reemplazan hardcoded #F9FAFB, #E5E5E5, #F0F0F0)
+  lightGray: "#F9FAFB",
+  mediumGray: "#E5E5E5",
+  dividerGray: "#F0F0F0",
+
+  // Colores para gráficas
+  chartBlue: "#2196F3",
+  chartYellow: "#FFEB3B",
+  chartPurple: "#A78BFA",
+  chartGold: "#FFD700",
+  chartSilver: "#C0C0C0",
+  chartBronze: "#CD7F32",
 } as const;

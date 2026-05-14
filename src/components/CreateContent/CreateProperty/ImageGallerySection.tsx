@@ -3,33 +3,28 @@
 // ============================================
 
 import React, { useCallback } from "react";
-import { View, Text, TouchableOpacity, Alert, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useModal } from "@/context/ModalContext";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import ReordenableImages from "../ReordenableImages";
 import { COLORS } from "../../../constants/colors";
+import { usePropertyFormContext } from "./PropertyFormContext";
 
-interface ImageGallerySectionProps {
-  images: string[];
-  setImages: React.Dispatch<React.SetStateAction<string[]>>;
-  error?: string;
-}
-
-export const ImageGallerySection = React.memo(function ImageGallerySection({
-  images,
-  setImages,
-  error,
-}: ImageGallerySectionProps) {
+export const ImageGallerySection = React.memo(function ImageGallerySection() {
+  const { images, setImages, errors } = usePropertyFormContext();
+  const error = errors.images;
+  const { showModal } = useModal();
   const handlePickImages = useCallback(async () => {
     if (images.length >= 15) {
-      Alert.alert("Límite alcanzado", "Puedes subir máximo 15 imágenes");
+      showModal({ title: "Límite alcanzado", message: "Puedes subir máximo 15 imágenes", confirmText: "OK" });
       return;
     }
 
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permiso denegado", "Necesitamos acceso a tu galería");
+      showModal({ title: "Permiso denegado", message: "Necesitamos acceso a tu galería", confirmText: "OK" });
       return;
     }
 
@@ -55,9 +50,9 @@ export const ImageGallerySection = React.memo(function ImageGallerySection({
 
   return (
     <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Ionicons name="images" size={24} color={COLORS.primary} />
-        <Text style={styles.sectionTitle}>Fotos de la Propiedad</Text>
+      <View style={styles.sectionHeaderBand}>
+        <Ionicons name="camera-outline" size={18} color={COLORS.primary} />
+        <Text style={styles.sectionTitleBand}>Fotos de la Propiedad</Text>
       </View>
       <Text style={styles.hint}>
         Mínimo 1 imagen, máximo 15 ({images.length}/15)
@@ -103,16 +98,20 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  sectionHeader: {
+  sectionHeaderBand: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
     gap: 8,
+    backgroundColor: COLORS.primary + "12",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
+  sectionTitleBand: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.primary,
   },
   hint: {
     fontSize: 12,

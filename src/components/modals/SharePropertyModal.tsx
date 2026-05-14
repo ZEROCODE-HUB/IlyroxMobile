@@ -1,17 +1,20 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
-  Modal,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 import { pdfService } from "../../services/pdfService";
-import { useShare } from "../../hooks/hooks";
+import { useShare } from "../../hooks";
+import { Modal } from "@/design-system/components";
+import { useToast } from "../../context/ToastContext";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("SharePropertyModal");
 
 //////////////////////////////////////
 // URL a futuro:
@@ -45,8 +48,9 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
   const [downloading, setDownloading] = useState(false);
 
   const { shareContent } = useShare();
+  const { showToast } = useToast();
 
-  const handleShare = async (sinDatos: boolean = false) => {
+  const handleShare = async () => {
     const success = await shareContent({
       feedItemId: feedItemId || propertyId,
       shareId: shareCode || propertyId,
@@ -54,7 +58,6 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
       title: propertyTitle,
       description: shareDescription || "Mira esta propiedad en ilyrox",
       imageUrl: shareImageUrl,
-      sinDatos,
     });
 
     if (success) {
@@ -89,218 +92,141 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
       );
 
       if (!result?.opened && result?.filePath) {
-        Alert.alert(
-          "PDF guardado",
-          `El PDF se ha generado correctamente.\nRuta: ${result.filePath}`,
-        );
+        showToast("PDF generado correctamente", "success");
       }
 
       onClose();
     } catch (e: any) {
-      console.error("Error generating PDF:", e);
-      Alert.alert("Error", e?.message || "No se pudo generar el PDF");
+      log.error("Error generating PDF:", e);
+      showToast(e?.message || "No se pudo generar el PDF", "error");
     } finally {
       setDownloading(false);
     }
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.overlay}>
-        <TouchableOpacity
-          style={styles.backdrop}
-          activeOpacity={1}
-          onPress={onClose}
-        />
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Compartir Propiedad</Text>
-            <TouchableOpacity
-              onPress={onClose}
-              style={styles.closeBtn}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close" size={20} color={COLORS.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.tabs}>
-            <TouchableOpacity
+    <Modal
+      visible={visible}
+      onClose={onClose}
+      variant="bottom"
+      title="Compartir Propiedad"
+      contentStyle={styles.container}
+    >
+      <View style={styles.body}>
+        <View style={styles.tabs}>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === "con" && styles.tabBtnActive]}
+            onPress={() => setActiveTab("con")}
+          >
+            <Text
               style={[
-                styles.tabBtn,
-                activeTab === "con" && styles.tabBtnActive,
+                styles.tabText,
+                activeTab === "con" && styles.tabTextActive,
               ]}
-              onPress={() => setActiveTab("con")}
             >
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === "con" && styles.tabTextActive,
-                ]}
-              >
-                Con datos
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
+              Con datos
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === "sin" && styles.tabBtnActive]}
+            onPress={() => setActiveTab("sin")}
+          >
+            <Text
               style={[
-                styles.tabBtn,
-                activeTab === "sin" && styles.tabBtnActive,
+                styles.tabText,
+                activeTab === "sin" && styles.tabTextActive,
               ]}
-              onPress={() => setActiveTab("sin")}
             >
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === "sin" && styles.tabTextActive,
-                ]}
-              >
-                Sin datos
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.tabDescription}>
-            {activeTab === "con"
-              ? "Incluye todos los datos de la propiedad e información del agente."
-              : "PDF simplificado sin información de contacto ni gravámenes."}
-          </Text>
-
-          {activeTab === "con" ? (
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={() => handleShare(false)}
-                activeOpacity={0.85}
-              >
-                <Ionicons
-                  name="share-social"
-                  size={18}
-                  color={COLORS.primary}
-                />
-                <Text style={styles.actionText}>Compartir propiedad</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.actionBtn,
-                  downloading && styles.actionBtnDisabled,
-                  { marginBottom: 30 },
-                ]}
-                onPress={() => downloadPdf(true)}
-                activeOpacity={0.85}
-                disabled={downloading}
-              >
-                {downloading ? (
-                  <>
-                    <ActivityIndicator size="small" color={COLORS.primary} />
-                    <Text style={styles.actionText}>Generando PDF...</Text>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons
-                      name="download"
-                      size={18}
-                      color={COLORS.primary}
-                    />
-                    <Text style={styles.actionText}>
-                      Descargar PDF completo
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={() => handleShare(true)}
-                activeOpacity={0.85}
-              >
-                <Ionicons
-                  name="share-social"
-                  size={18}
-                  color={COLORS.primary}
-                />
-                <Text style={styles.actionText}>Compartir propiedad</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.actionBtn,
-                  downloading && styles.actionBtnDisabled,
-                  { marginBottom: 30 },
-                ]}
-                onPress={() => downloadPdf(false)}
-                activeOpacity={0.85}
-                disabled={downloading}
-              >
-                {downloading ? (
-                  <>
-                    <ActivityIndicator size="small" color={COLORS.primary} />
-                    <Text style={styles.actionText}>Generando PDF...</Text>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons
-                      name="download"
-                      size={18}
-                      color={COLORS.primary}
-                    />
-                    <Text style={styles.actionText}>
-                      Descargar PDF simplificado
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
+              Sin datos
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        <Text style={styles.tabDescription}>
+          {activeTab === "con"
+            ? "Incluye todos los datos de la propiedad, información del agente y comisiones."
+            : "PDF simplificado sin información de contacto, comisiones ni gravámenes."}
+        </Text>
+
+        {activeTab === "con" ? (
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={handleShare}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="share-social" size={18} color={COLORS.primary} />
+              <Text style={styles.actionText}>Compartir propiedad</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.actionBtn,
+                downloading && styles.actionBtnDisabled,
+                { marginBottom: 30 },
+              ]}
+              onPress={() => downloadPdf(true)}
+              activeOpacity={0.85}
+              disabled={downloading}
+            >
+              {downloading ? (
+                <>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                  <Text style={styles.actionText}>Generando PDF...</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="download" size={18} color={COLORS.primary} />
+                  <Text style={styles.actionText}>
+                    Descargar PDF completo
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={[
+                styles.actionBtn,
+                downloading && styles.actionBtnDisabled,
+                { marginBottom: 30 },
+              ]}
+              onPress={() => downloadPdf(false)}
+              activeOpacity={0.85}
+              disabled={downloading}
+            >
+              {downloading ? (
+                <>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                  <Text style={styles.actionText}>Generando PDF...</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="download" size={18} color={COLORS.primary} />
+                  <Text style={styles.actionText}>
+                    Descargar PDF simplificado
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.3)",
-  },
-  backdrop: {
-    flex: 1,
-  },
   container: {
-    width: "100%",
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    // bottom-sheet provisto por primitivo
+  },
+  body: {
     padding: 16,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  closeBtn: {
-    width: 34,
-    height: 34,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 8,
+    paddingTop: 12,
   },
   tabs: {
     flexDirection: "row",
     gap: 8,
-    marginTop: 8,
     marginBottom: 8,
   },
   tabBtn: {

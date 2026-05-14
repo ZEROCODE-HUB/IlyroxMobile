@@ -7,29 +7,22 @@ import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { COLORS } from "../../../constants/colors";
+import { usePropertyFormContext } from "./PropertyFormContext";
 
-interface OwnerSectionProps {
-  nombreCompletoPropietario: string;
-  setNombreCompletoPropietario: (val: string) => void;
-  emailPropietario: string;
-  setEmailPropietario: (val: string) => void;
-  telefonoPropietario: string;
-  setTelefonoPropietario: (val: string) => void;
-}
-
-export const OwnerSection = React.memo(function OwnerSection({
-  nombreCompletoPropietario,
-  setNombreCompletoPropietario,
-  emailPropietario,
-  setEmailPropietario,
-  telefonoPropietario,
-  setTelefonoPropietario,
-}: OwnerSectionProps) {
+export const OwnerSection = React.memo(function OwnerSection() {
+  const {
+    nombreCompletoPropietario,
+    setNombreCompletoPropietario,
+    emailPropietario,
+    setEmailPropietario,
+    telefonoPropietario,
+    setTelefonoPropietario,
+  } = usePropertyFormContext();
   return (
     <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Ionicons name="person" size={24} color={COLORS.primary} />
-        <Text style={styles.sectionTitle}>Propietario (Opcional)</Text>
+      <View style={styles.sectionHeaderBand}>
+        <Ionicons name="person-outline" size={18} color={COLORS.primary} />
+        <Text style={styles.sectionTitleBand}>Propietario (Opcional)</Text>
       </View>
 
       <View>
@@ -76,16 +69,20 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  sectionHeader: {
+  sectionHeaderBand: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
     gap: 8,
+    backgroundColor: COLORS.primary + "12",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
+  sectionTitleBand: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.primary,
   },
   hint: {
     fontSize: 12,

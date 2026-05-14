@@ -4,13 +4,11 @@
  */
 
 import { useState, useCallback } from "react";
-import { Alert } from "react-native";
 import { supabase } from "@/lib/supabase";
 import { perfiles } from "@/types";
-import { useApp } from "@/context/AppContext";
 
 import { OneSignal } from "react-native-onesignal";
-import { useImageUpload } from "@/hooks/hooks";
+import { useImageUpload } from "@/hooks";
 import { useModal } from "@/context/ModalContext";
 
 export interface AuthFormState {
@@ -52,13 +50,32 @@ const initialFormState: AuthFormState = {
   biografia: "",
 };
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const PASSWORD_RULES = [
+  { test: (p: string) => p.length >= 8,          label: "mínimo 8 caracteres" },
+  { test: (p: string) => /[A-Z]/.test(p),        label: "una mayúscula" },
+  { test: (p: string) => /[a-z]/.test(p),        label: "una minúscula" },
+  { test: (p: string) => /\d/.test(p),            label: "un número" },
+  { test: (p: string) => /[!@#$%^&*()_+\-=\[\]{}|;':",.<>?/\\]/.test(p), label: "un carácter especial (!@#...)" },
+];
+
+function getPasswordError(password: string): string {
+  const missing = PASSWORD_RULES.filter((r) => !r.test(password)).map((r) => r.label);
+  return missing.length ? `Falta${missing.length > 1 ? "n" : ""}: ${missing.join(", ")}` : "";
+}
+
+export function getPasswordStrength(password: string): { label: string; met: boolean }[] {
+  return PASSWORD_RULES.map((r) => ({ label: r.label, met: r.test(password) }));
+}
+
 export function useAuthForm() {
   const [formState, setFormState] = useState<AuthFormState>(initialFormState);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [mode, setMode] = useState<"login" | "register">("login");
 
-  const { setCurrentUser } = useApp();
   const { uploadImage } = useImageUpload();
   const { showModal } = useModal();
 
@@ -68,6 +85,25 @@ export function useAuthForm() {
       setFormState((prev) => ({ ...prev, [field]: value }));
     },
     [],
+  );
+
+  // Validación inline por campo (llamar en onBlur)
+  const validateField = useCallback(
+    (field: keyof AuthFormState, value: string) => {
+      let error = "";
+      if (field === "email" && value && !EMAIL_REGEX.test(value))
+        error = "Email inválido";
+      if (field === "password" && value)
+        error = getPasswordError(value);
+      if (field === "confirmPassword" && value && value !== formState.password)
+        error = "Las contraseñas no coinciden";
+      if (field === "phone" && value) {
+        const digits = value.replace(/\D/g, "");
+        if (digits.length < 10) error = "Teléfono debe tener 10 dígitos";
+      }
+      setFieldErrors((prev) => ({ ...prev, [field]: error }));
+    },
+    [formState.password],
   );
 
   // Resetear formulario
@@ -105,7 +141,7 @@ export function useAuthForm() {
       });
       return false;
     }
-    if (!email.includes("@")) {
+    if (!EMAIL_REGEX.test(email)) {
       showModal({
         title: "Error",
         message: "Email inválido",
@@ -113,10 +149,11 @@ export function useAuthForm() {
       });
       return false;
     }
-    if (password.length < 6) {
+    const pwdError = getPasswordError(password);
+    if (pwdError) {
       showModal({
-        title: "Error",
-        message: "La contraseña debe tener al menos 6 caracteres",
+        title: "Contraseña insegura",
+        message: pwdError,
         confirmText: "OK",
       });
       return false;
@@ -248,6 +285,27 @@ export function useAuthForm() {
 
     setLoading(true);
     try {
+      // Verificar teléfono duplicado antes de crear la cuenta
+      const celularDigits = formState.phone.includes(" ")
+        ? formState.phone.split(" ").slice(1).join(" ")
+        : formState.phone;
+
+      const { data: existingPhone } = await supabase
+        .from("perfiles")
+        .select("id")
+        .eq("celular", celularDigits)
+        .maybeSingle();
+
+      if (existingPhone) {
+        showModal({
+          title: "Número ya registrado",
+          message: "Ya existe una cuenta registrada con este número de teléfono.",
+          confirmText: "OK",
+        });
+        setLoading(false);
+        return false;
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email: formState.email,
         password: formState.password,
@@ -290,19 +348,19 @@ export function useAuthForm() {
           aprobaciones_requeridas: 3,
           anos_experiencia: formState.anosExperiencia,
           ocupacion: formState.ocupacion,
-          otro_ocupacion: null,
-          modalidad: formState.modalidad || null,
-          nombre_inmobiliaria: formState.nombreInmobiliaria || null,
-          curso_certificacion: null,
+          otro_ocupacion: undefined,
+          modalidad: formState.modalidad || undefined,
+          nombre_inmobiliaria: formState.nombreInmobiliaria || undefined,
+          curso_certificacion: undefined,
           nombre_completo: `${formState.name} ${formState.lastNamePaterno} ${formState.lastNameMaterno}`,
-          activado_en: null,
-          deleted_at: null,
+          activado_en: undefined,
+          deleted_at: undefined,
           biografia: formState.biografia,
-          sitio_web: null,
-          calificacion_promedio: null,
-          total_calificaciones: null,
-          total_recomendaciones_positivas: null,
-          total_recomendaciones_negativas: null,
+          sitio_web: undefined,
+          calificacion_promedio: undefined,
+          total_calificaciones: undefined,
+          total_recomendaciones_positivas: undefined,
+          total_recomendaciones_negativas: undefined,
         };
 
         const { error: profileError } = await supabase
@@ -315,9 +373,15 @@ export function useAuthForm() {
 
       return true;
     } catch (error: any) {
+      const msg = error?.message || "";
+      const isEmailDup =
+        msg.toLowerCase().includes("already registered") ||
+        msg.toLowerCase().includes("already in use");
       showModal({
         title: "Error",
-        message: error.message || "Ocurrió un error al registrarse",
+        message: isEmailDup
+          ? "Ya existe una cuenta registrada con este correo electrónico."
+          : msg || "Ocurrió un error al registrarse",
         confirmText: "OK",
       });
       return false;
@@ -329,6 +393,7 @@ export function useAuthForm() {
   return {
     // Estado
     formState,
+    fieldErrors,
     loading,
     step,
     mode,
@@ -339,6 +404,7 @@ export function useAuthForm() {
     resetForm,
     setFormState,
     // Validaciones
+    validateField,
     validateStep1,
     validateProfessionalData,
     validateLogin,

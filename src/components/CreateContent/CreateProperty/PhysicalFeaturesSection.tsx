@@ -22,73 +22,44 @@ import {
   esTerreno,
   TipoPrincipal,
 } from "../../../constants/propertyData";
+import { formatThousands } from "../../../utils/numberFormatter";
 import type {
   SiNo,
   AmuebladoType,
-  TipoOperacion,
   NumberInputConfig,
 } from "./types";
-
-interface PhysicalFeaturesSectionProps {
-  tipoPrincipal: string;
-  subtipo: string;
-  tipoOperacion: TipoOperacion;
-  camposVisibles: ReturnType<
-    typeof import("../../../constants/propertyData").getCamposVisibles
-  >;
-  recamaras: string;
-  setRecamaras: (val: string) => void;
-  banosCompletos: string;
-  setBanosCompletos: (val: string) => void;
-  mediosBanos: string;
-  setMediosBanos: (val: string) => void;
-  estacionamientos: string;
-  setEstacionamientos: (val: string) => void;
-  m2Construccion: string;
-  setM2Construccion: (val: string) => void;
-  m2Terreno: string;
-  setM2Terreno: (val: string) => void;
-  niveles: string;
-  setNiveles: (val: string) => void;
-  antiguedad: string;
-  setAntiguedad: (val: string) => void;
-  amueblado: AmuebladoType;
-  setAmueblado: (val: AmuebladoType) => void;
-  petFriendly: SiNo;
-  setPetFriendly: (val: SiNo) => void;
-  errors: Record<string, string>;
-  clearError: (key: string) => void;
-}
+import { usePropertyFormContext } from "./PropertyFormContext";
 
 export const PhysicalFeaturesSection = React.memo(
-  function PhysicalFeaturesSection({
-    tipoPrincipal,
-    subtipo,
-    tipoOperacion,
-    camposVisibles,
-    recamaras,
-    setRecamaras,
-    banosCompletos,
-    setBanosCompletos,
-    mediosBanos,
-    setMediosBanos,
-    estacionamientos,
-    setEstacionamientos,
-    m2Construccion,
-    setM2Construccion,
-    m2Terreno,
-    setM2Terreno,
-    niveles,
-    setNiveles,
-    antiguedad,
-    setAntiguedad,
-    amueblado,
-    setAmueblado,
-    petFriendly,
-    setPetFriendly,
-    errors,
-    clearError,
-  }: PhysicalFeaturesSectionProps) {
+  function PhysicalFeaturesSection() {
+    const {
+      tipoPrincipal,
+      subtipo,
+      tipoOperacion,
+      camposVisibles,
+      recamaras,
+      setRecamaras,
+      banosCompletos,
+      setBanosCompletos,
+      mediosBanos,
+      setMediosBanos,
+      estacionamientos,
+      setEstacionamientos,
+      m2Construccion,
+      setM2Construccion,
+      m2Terreno,
+      setM2Terreno,
+      niveles,
+      setNiveles,
+      antiguedad,
+      setAntiguedad,
+      amueblado,
+      setAmueblado,
+      petFriendly,
+      setPetFriendly,
+      errors,
+      clearError,
+    } = usePropertyFormContext();
     // Modal states locales
     const [showRecamarasModal, setShowRecamarasModal] = useState(false);
     const [showBanosModal, setShowBanosModal] = useState(false);
@@ -114,9 +85,9 @@ export const PhysicalFeaturesSection = React.memo(
 
     return (
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Ionicons name="home" size={24} color={COLORS.primary} />
-          <Text style={styles.sectionTitle}>Características Físicas</Text>
+        <View style={styles.sectionHeaderBand}>
+          <Ionicons name="home-outline" size={18} color={COLORS.primary} />
+          <Text style={styles.sectionTitleBand}>Características Físicas</Text>
         </View>
 
         {/* RECÁMARAS */}
@@ -325,40 +296,46 @@ export const PhysicalFeaturesSection = React.memo(
           </>
         )}
 
-        {/* M2 CONSTRUCCIÓN */}
-        {camposVisibles.m2Construccion && (
-          <AppInput
-            label="m² de Construcción *"
-            placeholder="m²"
-            keyboardType="decimal-pad"
-            value={m2Construccion || ""}
-            onChangeText={(text) => {
-              setM2Construccion(text);
-              if (text) {
-                clearError("m2");
-                clearError("m2Construccion");
-              }
-            }}
-            error={errors.m2}
-          />
-        )}
-
-        {/* M2 TERRENO */}
-        {camposVisibles.m2Terreno && (
-          <AppInput
-            label={`m² de Terreno ${esTerreno(subtipo) ? "*" : ""}`}
-            placeholder="m²"
-            keyboardType="decimal-pad"
-            value={m2Terreno || ""}
-            onChangeText={(text) => {
-              setM2Terreno(text);
-              if (text) {
-                clearError("m2");
-                clearError("m2Terreno");
-              }
-            }}
-            error={errors.m2 || errors.m2Terreno}
-          />
+        {/* M2 CONSTRUCCIÓN + TERRENO — fila de 2 columnas */}
+        {(camposVisibles.m2Construccion || camposVisibles.m2Terreno) && (
+          <View style={styles.m2Row}>
+            {camposVisibles.m2Construccion && (
+              <View style={styles.m2Col}>
+                <AppInput
+                  label="m² Construcción *"
+                  placeholder="m²"
+                  keyboardType="decimal-pad"
+                  value={m2Construccion || ""}
+                  onChangeText={(text) => {
+                    setM2Construccion(formatThousands(text));
+                    if (text) {
+                      clearError("m2");
+                      clearError("m2Construccion");
+                    }
+                  }}
+                  error={errors.m2}
+                />
+              </View>
+            )}
+            {camposVisibles.m2Terreno && (
+              <View style={styles.m2Col}>
+                <AppInput
+                  label={`m² Terreno ${esTerreno(subtipo) ? "*" : ""}`}
+                  placeholder="m²"
+                  keyboardType="decimal-pad"
+                  value={m2Terreno || ""}
+                  onChangeText={(text) => {
+                    setM2Terreno(formatThousands(text));
+                    if (text) {
+                      clearError("m2");
+                      clearError("m2Terreno");
+                    }
+                  }}
+                  error={errors.m2 || errors.m2Terreno}
+                />
+              </View>
+            )}
+          </View>
         )}
 
         {/* AMUEBLADO */}
@@ -412,16 +389,27 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  sectionHeader: {
+  sectionHeaderBand: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
     gap: 8,
+    backgroundColor: COLORS.primary + "12",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
+  sectionTitleBand: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.primary,
+  },
+  m2Row: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  m2Col: {
+    flex: 1,
   },
   label: {
     fontSize: 13,

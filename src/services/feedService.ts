@@ -1,0 +1,446 @@
+/**
+ * feedService.ts
+ * Acceso a datos del feed principal. Combina feed_items + posts + reels +
+ * propiedades + estadísticas de reseñas. Pura capa de datos: no hace
+ * caching, memoization ni maneja estado — eso queda para React Query en
+ * el hook consumidor.
+ */
+
+import { supabase } from "@/lib/supabase";
+import { logger } from "@/utils/logger";
+import {
+  FeedItem,
+  PropertyType,
+  User,
+} from "@/types";
+
+const log = logger.scoped("feedService");
+
+export type ReviewStatsRow = {
+  profesional_id: string;
+  calificacion_promedio: number | null;
+  total_resenas: number | null;
+  total_recomiendan: number | null;
+  total_no_recomiendan: number | null;
+};
+
+const FEED_SELECT = `
+  id,
+  tipo_contenido,
+  contenido_id,
+  publicado_por,
+  publicado_en,
+  engagement_score,
+  vistas_count,
+  likes_count,
+  comentarios_count,
+  estado_moderacion,
+  perfiles!feed_items_publicado_por_fkey (
+    id,
+    nombre,
+    foto,
+    rol
+  )
+` as const;
+
+const PROPERTY_SELECT = `
+  id,
+  created_at,
+  created_by,
+  codigo_propiedad,
+  tipo,
+  subtipo,
+  ciudad,
+  colonia,
+  municipio,
+  estado,
+  fotos,
+  habitaciones,
+  banos,
+  estacionamientos,
+  metros_cuadrados_construccion,
+  metros_cuadrados_terreno,
+  descripcion,
+  longitud,
+  latitud,
+  operaciones_propiedad!inner (
+    tipo_operacion,
+    precio,
+    moneda
+  )
+` as const;
+
+/**
+ * Factor de decaimiento temporal para el ranking.
+ * 0-24h: 1.0, 1-3d: 0.8, 3-7d: 0.5, 7-30d: 0.3, 30+d: 0.1
+ */
+export function calculateTimeFactor(timestamp: string): number {
+  const now = new Date();
+  const postDate = new Date(timestamp);
+  const hoursDiff = (now.getTime() - postDate.getTime()) / (1000 * 60 * 60);
+
+  if (hoursDiff < 24) return 1.0;
+  if (hoursDiff < 72) return 0.8;
+  if (hoursDiff < 168) return 0.5;
+  if (hoursDiff < 720) return 0.3;
+  return 0.1;
+}
+
+export function formatTimestamp(timestamp: string): string {
+  const now = new Date();
+  const date = new Date(timestamp);
+  const diff = now.getTime() - date.getTime();
+
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return "Ahora";
+  if (minutes < 60) return `${minutes}m`;
+  if (hours < 24) return `${hours}h`;
+  if (days < 7) return `${days}d`;
+
+  return date.toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+const buildUser = (perfil: any, stats?: ReviewStatsRow | null): User => ({
+  id: perfil?.id || "",
+  nombre: perfil?.nombre || "Usuario",
+  name: perfil?.nombre || "Usuario",
+  avatar: perfil?.foto || "https://placehold.co/100x100",
+  isFollowing: false,
+  role: (perfil?.rol === "agente" ? "Agent" : "User") as any,
+  rating:
+    typeof stats?.calificacion_promedio === "number"
+      ? stats.calificacion_promedio
+      : 0,
+  totalRatings:
+    typeof stats?.total_resenas === "number" ? stats.total_resenas : 0,
+  positiveRecommendations:
+    typeof stats?.total_recomiendan === "number" ? stats.total_recomiendan : 0,
+  negativeRecommendations:
+    typeof stats?.total_no_recomiendan === "number"
+      ? stats.total_no_recomiendan
+      : 0,
+});
+
+const normalizePostType = (tipo?: string) =>
+  tipo
+    ?.toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/\s+/g, "") ?? "post";
+
+const mapPostToFeedItem = (
+  feedData: any,
+  post: any,
+  user: User,
+): FeedItem => ({
+  id: feedData.id,
+  type: "post",
+  user,
+  content: post.contenido || "",
+  postType: normalizePostType(post.tipo) as FeedItem["postType"],
+  images: post.imagenes || [],
+  likes: feedData.likes_count,
+  comments: feedData.comentarios_count,
+  timestamp: formatTimestamp(feedData.publicado_en),
+  commentsList: [],
+  foto_perfil_usuario: post.foto_perfil,
+  fecha_hora: post.fecha_hora,
+  nombre_asesor: post.nombre_asesor,
+  ubicacion: post.ubicacion,
+  foto_propiedad: post.foto_propiedad,
+  antiguedad: post.antiguedad,
+  postDetails: post,
+  busquedas_json: post.busquedas_json,
+});
+
+const mapReelToFeedItem = (
+  feedData: any,
+  reel: any,
+  user: User,
+): FeedItem => ({
+  id: feedData.id,
+  type: "reel",
+  user,
+  content: reel.descripcion || "",
+  videoUrl: reel.video_url,
+  likes: feedData.likes_count,
+  comments: feedData.comentarios_count,
+  timestamp: formatTimestamp(feedData.publicado_en),
+  commentsList: [],
+  reelDetails: reel,
+});
+
+const mapPropertyToFeedItem = (
+  feedData: any,
+  property: any,
+  user: User,
+): FeedItem => {
+  const operation = Array.isArray(property.operaciones_propiedad)
+    ? property.operaciones_propiedad[0]
+    : property.operaciones_propiedad;
+
+  return {
+    id: feedData.id,
+    type: "property",
+    user,
+    content: property.descripcion || "",
+    likes: feedData.likes_count,
+    comments: feedData.comentarios_count,
+    timestamp: formatTimestamp(feedData.publicado_en),
+    commentsList: [],
+    propertyDetails: {
+      id: property.id,
+      code: property.codigo_propiedad || undefined,
+      title: `${property.tipo} en ${property.ciudad}`,
+      description: property.descripcion,
+      longitud: property.longitud,
+      latitud: property.latitud,
+      price: operation?.precio || 0,
+      currency: (operation?.moneda || "MXN") as "USD" | "MXN",
+      createdAt: property.created_at,
+      location: {
+        address: `${property.municipio}, ${property.ciudad}, ${property.estado}`,
+        country: "México",
+        state: property.estado || "",
+        city: property.ciudad || "",
+        municipio: property.municipio || "",
+        colony: property.colonia || "",
+      },
+      images: property.fotos || [],
+      features: {
+        beds: property.habitaciones || 0,
+        baths: property.banos || 0,
+        parking: property.estacionamientos,
+        constructionSqft: property.metros_cuadrados_construccion || 0,
+        landSqft: property.metros_cuadrados_terreno || 0,
+      },
+      amenities: [],
+      type: (property.tipo || "habitacional").toLowerCase() as PropertyType,
+      subtype: (property.subtipo || property.tipo || "").toLowerCase(),
+      operation: operation?.tipo_operacion === "renta" ? "Rent" : "Sale",
+      status: "Publicada",
+      operations: Array.isArray(property.operaciones_propiedad)
+        ? property.operaciones_propiedad
+        : property.operaciones_propiedad
+          ? [property.operaciones_propiedad]
+          : [],
+      colonia: property.colonia || "",
+    },
+  };
+};
+
+export interface FeedPage {
+  items: FeedItem[];
+  nextPage: number | null;
+}
+
+export const feedService = {
+  async getReviewStats(userIds: string[]): Promise<ReviewStatsRow[]> {
+    const ids = Array.from(new Set(userIds.filter(Boolean)));
+    if (ids.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from("vw_estadisticas_resenas")
+      .select(
+        "profesional_id,calificacion_promedio,total_resenas,total_recomiendan,total_no_recomiendan",
+      )
+      .in("profesional_id", ids);
+
+    if (error) {
+      log.warn("getReviewStats failed", error);
+      return [];
+    }
+    return ((data || []) as unknown as ReviewStatsRow[]) ?? [];
+  },
+
+  async getFeedPage(pageNum: number, pageSize: number): Promise<FeedPage> {
+    const { data: feedData, error: feedError } = await supabase
+      .from("feed_items")
+      .select(FEED_SELECT)
+      .eq("estado_moderacion", "activo")
+      .is("deleted_at", null)
+      .order("engagement_score", { ascending: false })
+      .order("publicado_en", { ascending: false })
+      .range(pageNum * pageSize, (pageNum + 1) * pageSize - 1);
+
+    if (feedError) throw feedError;
+    if (!feedData || feedData.length === 0) {
+      return { items: [], nextPage: null };
+    }
+
+    const perfilIds = Array.from(
+      new Set(
+        feedData
+          .map((item: any) => (item.perfiles as any)?.id)
+          .filter(Boolean) as string[],
+      ),
+    );
+
+    const postIds = feedData
+      .filter((i) => i.tipo_contenido === "post")
+      .map((i) => i.contenido_id);
+    const reelIds = feedData
+      .filter((i) => i.tipo_contenido === "reel")
+      .map((i) => i.contenido_id);
+    const propertyIds = feedData
+      .filter((i) => i.tipo_contenido === "propiedad")
+      .map((i) => i.contenido_id);
+
+    const [postsRes, reelsRes, propertiesRes, statsRows] = await Promise.all([
+      postIds.length > 0
+        ? supabase
+            .from("posts")
+            .select("*")
+            .in("id", postIds)
+            .is("deleted_at", null)
+        : Promise.resolve({ data: [], error: null } as any),
+      reelIds.length > 0
+        ? supabase
+            .from("reels")
+            .select("*")
+            .in("id", reelIds)
+            .is("deleted_at", null)
+        : Promise.resolve({ data: [], error: null } as any),
+      propertyIds.length > 0
+        ? supabase
+            .from("propiedades")
+            .select(PROPERTY_SELECT)
+            .in("id", propertyIds)
+            .eq("activo", true)
+            .is("deleted_at", null)
+        : Promise.resolve({ data: [], error: null } as any),
+      feedService.getReviewStats(perfilIds),
+    ]);
+
+    const postsMap = new Map((postsRes.data || []).map((p: any) => [p.id, p]));
+    const reelsMap = new Map((reelsRes.data || []).map((r: any) => [r.id, r]));
+    const propertiesMap = new Map(
+      (propertiesRes.data || []).map((p: any) => [p.id, p]),
+    );
+    const statsByUserId = new Map<string, ReviewStatsRow>(
+      statsRows.map((s) => [s.profesional_id, s]),
+    );
+
+    const items = feedData
+      .map((item: any) => {
+        const perfil = item.perfiles as any;
+        const stats = perfil?.id ? statsByUserId.get(perfil.id) : null;
+        const user = buildUser(perfil, stats);
+
+        if (item.tipo_contenido === "post") {
+          const post = postsMap.get(item.contenido_id);
+          return post ? mapPostToFeedItem(item, post, user) : null;
+        }
+        if (item.tipo_contenido === "reel") {
+          const reel = reelsMap.get(item.contenido_id);
+          return reel ? mapReelToFeedItem(item, reel, user) : null;
+        }
+        if (item.tipo_contenido === "propiedad") {
+          const property = propertiesMap.get(item.contenido_id);
+          return property ? mapPropertyToFeedItem(item, property, user) : null;
+        }
+        return null;
+      })
+      .filter((it): it is FeedItem => it !== null);
+
+    return {
+      items,
+      nextPage: feedData.length === pageSize ? pageNum + 1 : null,
+    };
+  },
+
+  async getPropertiesAsFeedItems(propertyIds: string[]): Promise<FeedItem[]> {
+    if (!propertyIds.length) return [];
+
+    const { data: feedData, error: feedError } = await supabase
+      .from("feed_items")
+      .select(FEED_SELECT)
+      .eq("tipo_contenido", "propiedad")
+      .eq("estado_moderacion", "activo")
+      .is("deleted_at", null)
+      .in("contenido_id", propertyIds)
+      .order("engagement_score", { ascending: false });
+
+    if (feedError) throw feedError;
+    if (!feedData || feedData.length === 0) return [];
+
+    const foundIds = feedData.map((i: any) => i.contenido_id);
+    const perfilIds = Array.from(
+      new Set(feedData.map((i: any) => (i.perfiles as any)?.id).filter(Boolean)),
+    ) as string[];
+
+    const [propertiesRes, statsRows] = await Promise.all([
+      supabase
+        .from("propiedades")
+        .select(PROPERTY_SELECT)
+        .in("id", foundIds)
+        .eq("activo", true)
+        .is("deleted_at", null),
+      feedService.getReviewStats(perfilIds),
+    ]);
+
+    const propertiesMap = new Map(
+      (propertiesRes.data || []).map((p: any) => [p.id, p]),
+    );
+    const statsByUserId = new Map<string, ReviewStatsRow>(
+      statsRows.map((s) => [s.profesional_id, s]),
+    );
+
+    return feedData
+      .map((item: any) => {
+        const perfil = item.perfiles as any;
+        const stats = perfil?.id ? statsByUserId.get(perfil.id) : null;
+        const user = buildUser(perfil, stats);
+        const property = propertiesMap.get(item.contenido_id);
+        return property ? mapPropertyToFeedItem(item, property, user) : null;
+      })
+      .filter((it): it is FeedItem => it !== null);
+  },
+
+  async getFeedItem(feedItemId: string): Promise<FeedItem | null> {
+    const { data: feedData, error: feedError } = await supabase
+      .from("feed_items")
+      .select(FEED_SELECT)
+      .or(`id.eq.${feedItemId},contenido_id.eq.${feedItemId}`)
+      .maybeSingle();
+
+    if (feedError) throw feedError;
+    if (!feedData) return null;
+
+    const { tipo_contenido, contenido_id } = feedData;
+    const perfil = (feedData as any).perfiles as any;
+    const user = buildUser(perfil);
+
+    if (tipo_contenido === "post") {
+      const { data } = await supabase
+        .from("posts")
+        .select("*")
+        .eq("id", contenido_id)
+        .single();
+      return data ? mapPostToFeedItem(feedData, data, user) : null;
+    }
+    if (tipo_contenido === "reel") {
+      const { data } = await supabase
+        .from("reels")
+        .select("*")
+        .eq("id", contenido_id)
+        .single();
+      return data ? mapReelToFeedItem(feedData, data, user) : null;
+    }
+    if (tipo_contenido === "propiedad") {
+      const { data } = await supabase
+        .from("propiedades")
+        .select(PROPERTY_SELECT)
+        .eq("id", contenido_id)
+        .single();
+      return data ? mapPropertyToFeedItem(feedData, data, user) : null;
+    }
+    return null;
+  },
+};

@@ -10,6 +10,9 @@ export default function StackLayout() {
       <Stack.Screen name="post/[id]" options={{ presentation: "card" }} />
       <Stack.Screen name="reel/[id]" options={{ presentation: "modal" }} />
       <Stack.Screen name="easy-broker" options={{ presentation: "card" }} />
+      <Stack.Screen name="map" options={{ presentation: "card" }} />
+      <Stack.Screen name="map-results" options={{ presentation: "card" }} />
+      <Stack.Screen name="matches" options={{ presentation: "card" }} />
     </Stack>
   );
 }

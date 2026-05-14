@@ -6,23 +6,11 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import LocationPicker from "../LocationPicker";
 import { COLORS } from "../../../constants/colors";
-import type { LocationCoords, MapCenter } from "./types";
+import { usePropertyFormContext } from "./PropertyFormContext";
 
-interface MapSectionProps {
-  location: LocationCoords;
-  setLocation: (loc: LocationCoords) => void;
-  mapCenter: MapCenter | null;
-  isColonia?: boolean;
-  error?: string;
-}
+export const MapSection = React.memo(function MapSection() {
+  const { location, setLocation, mapCenter, isColoniaMode, errors } = usePropertyFormContext();
 
-export const MapSection = React.memo(function MapSection({
-  location,
-  setLocation,
-  mapCenter,
-  isColonia = false,
-  error,
-}: MapSectionProps) {
   return (
     <View style={[styles.section, { paddingBottom: 50 }]}>
       <LocationPicker
@@ -35,9 +23,9 @@ export const MapSection = React.memo(function MapSection({
             ? { latitude: mapCenter.lat, longitude: mapCenter.lng }
             : null
         }
-        isColonia={isColonia}
+        isColonia={isColoniaMode}
       />
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
     </View>
   );
 });

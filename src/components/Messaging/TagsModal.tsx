@@ -3,7 +3,7 @@
  * Modal para gestionar etiquetas de conversaciones
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -11,11 +11,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
+import { useModal } from "@/context/ModalContext";
 import { COLORS } from "../../constants";
 
 interface Tag {
@@ -62,6 +62,7 @@ export default function TagsModal({
   onUpdateTag,
   onDeleteTag,
 }: TagsModalProps) {
+  const { showModal } = useModal();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [selectedColor, setSelectedColor] = useState<string>(PRESET_COLORS[0]);
@@ -130,20 +131,15 @@ export default function TagsModal({
   const handleDeleteTag = async (tagId: string) => {
     if (!onDeleteTag) return;
 
-    Alert.alert(
-      "Eliminar etiqueta",
-      "¿Estás seguro? Se eliminará de todas las conversaciones.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: async () => {
-            await onDeleteTag(tagId);
-          },
-        },
-      ]
-    );
+    showModal({
+      title: "Eliminar etiqueta",
+      message: "¿Estás seguro? Se eliminará de todas las conversaciones.",
+      confirmText: "Eliminar",
+      cancelText: "Cancelar",
+      onConfirm: async () => {
+        await onDeleteTag(tagId);
+      },
+    });
   };
 
   return (

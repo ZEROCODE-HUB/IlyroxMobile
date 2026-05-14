@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { HouseHeart } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LocationSearchBar } from "./LocationSearchBar";
@@ -16,8 +17,6 @@ import { useApp } from "../context/AppContext";
 import { LocationSuggestionWithCount } from "../store/locationSearchStore";
 import { usePropertyFiltersStore } from "../store/propertyFiltersStore";
 import { useChatStore } from "../store/chatStore";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import MapScreen from "@/app/(stack)/map";
 
 // Assuming Logo is in assets folder relative to src/components -> ../../assets/Logo.jpeg
 // Adjust path if necessary based on project structure.
@@ -41,10 +40,6 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   const router = useRouter();
   const { setSelectedLocation } = useApp();
   const unreadCount = useChatStore((state) => state.totalUnreadCount);
-
-  const handleSheetChanges = (index: number) => {
-    console.log("Sheet index:", index);
-  };
 
   const handleNavigation = (screen: string) => {
     switch (screen) {
@@ -93,28 +88,28 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
           <Text style={styles.headerTitle}>ilyrox</Text>
         </View>
         <View style={styles.headerIcons}>
-          {["Matches", "Messages", "Requests", "Appointments"].map(
+          {(["Matches", "Messages", "Requests", "Appointments"] as const).map(
             (screen, idx) => (
               <TouchableOpacity
                 key={idx}
                 onPress={() => handleNavigation(screen)}
                 style={styles.iconButton}
               >
-                <Ionicons
-                  name={
-                    screen === "Matches"
-                      ? "git-compare-outline"
-                      : screen === "Messages"
+                {screen === "Matches" ? (
+                  <HouseHeart size={22} color={COLORS.white} strokeWidth={1.8} />
+                ) : (
+                  <Ionicons
+                    name={
+                      screen === "Messages"
                         ? "chatbubble-outline"
                         : screen === "Requests"
-                          ? "reader-outline"
-                          : screen === "Appointments"
-                            ? "calendar-outline"
-                            : "calendar-outline"
-                  }
-                  size={22}
-                  color={COLORS.white}
-                />
+                          ? "people-outline"
+                          : "calendar-outline"
+                    }
+                    size={22}
+                    color={COLORS.white}
+                  />
+                )}
                 {screen === "Messages" && unreadCount > 0 && (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
@@ -131,18 +126,13 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
       <View style={styles.searchWrapper}>
         <LocationSearchBar
           onLocationSelect={(loc: LocationSuggestionWithCount | null) => {
-            const { updateLocationFilter } = usePropertyFiltersStore.getState();
+            const { clearFilters } = usePropertyFiltersStore.getState();
             if (!loc) {
               setSelectedLocation(null);
-              // Limpiar filtros globales instantaneamente
-              updateLocationFilter({
-                estado: "",
-                ciudad: "",
-                municipio: "",
-                colonia: [],
-              });
+              clearFilters({ estado: "", ciudad: "", municipio: "", colonia: "" });
               return;
             }
+            clearFilters({ estado: "", ciudad: "", municipio: "", colonia: "" });
             setSelectedLocation({
               type: loc.type,
               name: loc.name,
@@ -150,33 +140,12 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
               municipio_nombre: loc.municipio_nombre,
               estado_nombre: loc.estado_nombre,
             });
-
-            // Aplicar filtros globales de busqueda instantaneamente sin esperar a que cargue el mapa
-            const newLocationFilter: any = {
-              estado: "",
-              ciudad: "",
-              municipio: "",
-              colonia: [],
-            };
-            // Mapeo detallado de jerarquia
-            if (loc.estado_nombre) newLocationFilter.estado = loc.estado_nombre;
-            if (loc.municipio_nombre)
-              newLocationFilter.municipio = loc.municipio_nombre;
-
-            if (loc.type === "colonia") {
-              newLocationFilter.colonia = loc.name;
-            } else if (loc.type === "estado" && !loc.estado_nombre) {
-              newLocationFilter.estado = loc.name;
-            } else if (loc.type === "municipio" && !loc.municipio_nombre) {
-              newLocationFilter.municipio = loc.name;
-            }
-            updateLocationFilter(newLocationFilter);
-
             onOpenMap?.();
           }}
           onSearchingChange={onSearchingChange}
           isHeaderVisible={isHeaderVisible}
           onOpenMap={onOpenMap}
+          showMapButton={false}
         />
       </View>
     </View>
@@ -192,7 +161,7 @@ const styles = StyleSheet.create({
     // Shadows
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: COLORS.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 4,
@@ -221,7 +190,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.3)",
+    borderColor: COLORS.whiteTransparent30,
   },
   headerIcons: {
     flexDirection: "row",

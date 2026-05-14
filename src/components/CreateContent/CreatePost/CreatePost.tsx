@@ -11,16 +11,16 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "@/design-system/components/AppInput";
 import * as ImagePicker from "expo-image-picker";
-import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { useAuth } from "@/context/AuthContext";
+import { useModal } from "@/context/ModalContext";
+import { useToast } from "@/context/ToastContext";
 import { COLORS } from "@/constants/colors";
 import { ScreenWrapper } from "@/screens/ScreenWrapper";
 import ReordenableImages from "../ReordenableImages";
@@ -28,11 +28,14 @@ import { Post } from "@/types";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Burnt from "burnt";
 import { supabase } from "@/lib/supabase";
-import { useCreateContent } from "@/hooks/hooks/useCreateContent";
+import { useCreateContent } from "@/hooks/useCreateContent";
 import { uploadImage as uploadImageService } from "@/services/uploadService";
 import { AppHeader } from "@/components/AppHeader";
 import { OpenHousePost } from "./OpenHousePost";
 import { BusquedaPost } from "./BusquedaPost";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("CreatePost");
 
 interface CreatePostProps {
   post?: Post;
@@ -41,6 +44,8 @@ interface CreatePostProps {
 
 export default function CreatePost({ post, onBack }: CreatePostProps) {
   const { user } = useAuth();
+  const { showModal } = useModal();
+  const { showToast } = useToast();
   const router = useRouter();
   const { createPost, uploading: creatingPost } = useCreateContent(user?.id);
 
@@ -51,8 +56,6 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
 
   // Campos específicos de edición
   const [fechaHora, setFechaHora] = useState<Date>(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
 
   const [fechaFinalizacion, setFechaFinalizacion] = useState<Date | null>(null);
   const [fotoPropiedad, setFotoPropiedad] = useState<string | null>(null);
@@ -60,6 +63,8 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   const [precioMax, setPrecioMax] = useState("");
   const [habitaciones, setHabitaciones] = useState("");
   const [operacion, setOperacion] = useState("");
+  const [subtipo, setSubtipo] = useState<string[]>([]);
+  const [tipoPropiedad, setTipoPropiedad] = useState("");
   const [ubicacion, setUbicacion] = useState("");
   const [statusPost, setStatusPost] = useState("Visible");
 
@@ -107,11 +112,14 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
               filtros.caracteristicas?.habitaciones?.toString() || "",
             );
             setOperacion(filtros.operacion || "");
+            setTipoPropiedad(filtros.tipo_propiedad || "");
+            const rawSubtipo = filtros.subtipo;
+            setSubtipo(Array.isArray(rawSubtipo) ? rawSubtipo : rawSubtipo ? [rawSubtipo] : []);
           }
         }
       } catch (err) {
-        console.error("Error loading post:", err);
-        Alert.alert("Error", "No se pudo cargar el post");
+        log.error("Error loading post:", err);
+        showToast("No se pudo cargar el post", "error");
       }
     }
   };
@@ -123,7 +131,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
     // Pedir permisos
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permiso denegado", "Necesitamos acceso a tu galería");
+      showModal({ title: "Permiso denegado", message: "Necesitamos acceso a tu galería", confirmText: "OK" });
       return;
     }
 
@@ -170,7 +178,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
    */
   const handlePublish = async () => {
     if (!validate()) {
-      Alert.alert("Error", "Por favor completa todos los campos");
+      showModal({ title: "Error", message: "Por favor completa todos los campos", confirmText: "OK" });
       return;
     }
 
@@ -220,6 +228,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             filtros: {
               ...currentFiltros,
               operacion: operacion || currentFiltros.operacion,
+              subtipo: subtipo.length > 0 ? subtipo : currentFiltros.subtipo,
               precio_min: precioMin
                 ? Number(precioMin)
                 : currentFiltros.precio_min,
@@ -267,8 +276,8 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
         }
       }, 500);
     } catch (error) {
-      console.error("Error publishing:", error);
-      Alert.alert("Error", "No se pudo guardar el post");
+      log.error("Error publishing:", error);
+      showToast("No se pudo guardar el post", "error");
       setUploadProgress(0);
       setIsUploadingManual(false);
     }
@@ -341,6 +350,9 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             setHabitaciones={setHabitaciones}
             operacion={operacion}
             setOperacion={setOperacion}
+            subtipo={subtipo}
+            setSubtipo={setSubtipo}
+            tipoPropiedad={tipoPropiedad}
           />
         )}
 

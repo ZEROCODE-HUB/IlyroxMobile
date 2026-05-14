@@ -1,17 +1,14 @@
 import React from "react";
 import {
-  Modal,
   View,
   Text,
-  TouchableOpacity,
   FlatList,
-  ActivityIndicator,
   StyleSheet,
 } from "react-native";
 import { COLORS } from "../../constants/colors";
 import { Avatar } from "../shared";
-import { RecommendedUser } from "../../hooks/hooks/useUserRecommendations";
-import { commonStyles } from "../../../styles";
+import { RecommendedUser } from "../../hooks/useUserRecommendations";
+import { Modal, EmptyState, LoadingState } from "@/design-system/components";
 
 interface RecommendedUsersModalProps {
   visible: boolean;
@@ -31,67 +28,59 @@ const RecommendedUsersModal: React.FC<RecommendedUsersModalProps> = ({
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <TouchableOpacity
-        style={commonStyles.modalOverlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View style={styles.recommendedModal}>
-          <View style={styles.recommendedModalHeader}>
-            <Text style={styles.recommendedModalTitle}>Recomendado por</Text>
-            <Text style={styles.recommendedModalSubtitle}>
-              {totalCount} usuarios
-            </Text>
-          </View>
-          {loading ? (
-            <View style={styles.recommendedModalLoading}>
-              <ActivityIndicator size="small" color={COLORS.primary} />
+    <Modal
+      visible={visible}
+      onClose={onClose}
+      variant="center"
+      showCloseButton={false}
+      contentStyle={styles.container}
+    >
+      <View style={styles.recommendedModalHeader}>
+        <Text style={styles.recommendedModalTitle}>Recomendado por</Text>
+        <Text style={styles.recommendedModalSubtitle}>
+          {totalCount} usuarios
+        </Text>
+      </View>
+      {loading ? (
+        <LoadingState size="small" style={styles.recommendedModalLoading} />
+      ) : (
+        <FlatList
+          data={users}
+          keyExtractor={(u) => u.id}
+          contentContainerStyle={styles.recommendedModalList}
+          renderItem={({ item }) => (
+            <View style={styles.recommendedModalItem}>
+              <Avatar
+                uri={item.avatar || undefined}
+                name={item.name}
+                size={40}
+              />
+              <View style={styles.recommendedModalInfo}>
+                <Text style={styles.recommendedModalName} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={styles.recommendedModalRole} numberOfLines={1}>
+                  {item.role === "agente" ? "Agente" : "Cliente"}
+                </Text>
+              </View>
             </View>
-          ) : (
-            <FlatList
-              data={users}
-              keyExtractor={(u) => u.id}
-              contentContainerStyle={styles.recommendedModalList}
-              renderItem={({ item }) => (
-                <View style={styles.recommendedModalItem}>
-                  <Avatar
-                    uri={item.avatar || undefined}
-                    name={item.name}
-                    size={40}
-                  />
-                  <View style={styles.recommendedModalInfo}>
-                    <Text style={styles.recommendedModalName} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={styles.recommendedModalRole} numberOfLines={1}>
-                      {item.role === "agente" ? "Agente" : "Cliente"}
-                    </Text>
-                  </View>
-                </View>
-              )}
-              ListEmptyComponent={
-                <View style={styles.recommendedModalEmpty}>
-                  <Text style={styles.recommendedModalEmptyText}>
-                    Aún no hay recomendaciones
-                  </Text>
-                </View>
-              }
-            />
           )}
-        </View>
-      </TouchableOpacity>
+          ListEmptyComponent={
+            <EmptyState title="Aún no hay recomendaciones" />
+          }
+        />
+      )}
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  recommendedModal: {
-    backgroundColor: COLORS.white,
+  container: {
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 10,
     width: 320,
+    maxWidth: 320,
     maxHeight: 420,
   },
   recommendedModalHeader: {

@@ -4,16 +4,10 @@
  */
 
 import React from "react";
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-} from "react-native";
+import { View, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
+import { Modal, Button, Typography } from "@/design-system/components";
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -38,95 +32,56 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   danger = false,
   loading = false,
 }) => {
-  const handleConfirm = async () => {
-    await onConfirm();
-  };
-
   return (
     <Modal
       visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onCancel}
+      onClose={onCancel}
+      variant="center"
+      showCloseButton={false}
+      dismissOnBackdropPress={!loading}
+      contentStyle={styles.content}
     >
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
-        onPress={onCancel}
+      <View
+        style={[
+          styles.iconContainer,
+          danger ? styles.iconContainerDanger : styles.iconContainerPrimary,
+        ]}
       >
-        <View style={styles.dialog}>
-          {/* Icon */}
-          <View
-            style={[
-              styles.iconContainer,
-              danger ? styles.iconContainerDanger : styles.iconContainerPrimary,
-            ]}
-          >
-            <Ionicons
-              name={danger ? "alert-circle" : "help-circle"}
-              size={32}
-              color={danger ? COLORS.error : COLORS.primary}
-            />
-          </View>
+        <Ionicons
+          name={danger ? "alert-circle" : "help-circle"}
+          size={32}
+          color={danger ? COLORS.error : COLORS.primary}
+        />
+      </View>
 
-          {/* Content */}
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
+      <Typography variant="subheading" style={styles.title}>{title}</Typography>
+      <Typography variant="body" tone="secondary" style={styles.message}>{message}</Typography>
 
-          {/* Buttons */}
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.button, styles.buttonCancel]}
-              onPress={onCancel}
-              disabled={loading}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.buttonTextCancel}>{cancelText}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.button,
-                danger ? styles.buttonDanger : styles.buttonPrimary,
-                loading && styles.buttonDisabled,
-              ]}
-              onPress={handleConfirm}
-              disabled={loading}
-              activeOpacity={0.7}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color={COLORS.white} />
-              ) : (
-                <Text style={styles.buttonTextConfirm}>{confirmText}</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </TouchableOpacity>
+      <View style={styles.buttonRow}>
+        <Button
+          variant="outline"
+          label={cancelText}
+          onPress={onCancel}
+          disabled={loading}
+          style={styles.button}
+        />
+        <Button
+          variant={danger ? "danger" : "primary"}
+          label={confirmText}
+          loading={loading}
+          onPress={onConfirm}
+          style={styles.button}
+        />
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: COLORS.overlay,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  dialog: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
+  content: {
     padding: 24,
-    width: "100%",
     maxWidth: 340,
     alignItems: "center",
-    elevation: 8,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
   },
   iconContainer: {
     width: 64,
@@ -143,17 +98,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.errorTransparent,
   },
   title: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-    marginBottom: 8,
     textAlign: "center",
+    marginBottom: 8,
   },
   message: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
     textAlign: "center",
-    lineHeight: 20,
     marginBottom: 24,
   },
   buttonRow: {
@@ -163,34 +112,6 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonCancel: {
-    backgroundColor: COLORS.background,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
-  buttonPrimary: {
-    backgroundColor: COLORS.primary,
-  },
-  buttonDanger: {
-    backgroundColor: COLORS.error,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonTextCancel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-  },
-  buttonTextConfirm: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.white,
   },
 });
 

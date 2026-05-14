@@ -4,15 +4,17 @@
  */
 
 import { useState, useCallback } from "react";
-import { Alert } from "react-native";
 import { supabase } from "@/lib/supabase";
 import { perfiles } from "@/types";
 import { useApp } from "@/context/AppContext";
-import { useImageUpload } from "@/hooks/hooks/useImageUpload";
+import { useImageUpload } from "@/hooks/useImageUpload";
 import { useGoogleAuth } from "@/lib/useGoogleAuth";
 import { OneSignal } from "react-native-onesignal";
 import { Platform } from "react-native";
 import { useModal } from "@/context/ModalContext";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("useExternalAuth");
 
 export type AuthProvider = "google" | "facebook" | "apple";
 
@@ -156,6 +158,34 @@ export function useExternalAuth() {
     ): Promise<boolean> => {
       if (!pendingUser) return false;
 
+      // Validar campos requeridos
+      if (!formData.name.trim()) {
+        showModal({ title: "Error", message: "El nombre es obligatorio", confirmText: "OK" });
+        return false;
+      }
+      if (!formData.estado) {
+        showModal({ title: "Error", message: "Selecciona tu estado", confirmText: "OK" });
+        return false;
+      }
+      if (!formData.ocupacion) {
+        showModal({ title: "Error", message: "Selecciona tu ocupación", confirmText: "OK" });
+        return false;
+      }
+      if (formData.ocupacion === "Asesor Inmobiliario") {
+        if (!formData.modalidad) {
+          showModal({ title: "Error", message: "Selecciona tu modalidad", confirmText: "OK" });
+          return false;
+        }
+        if (formData.modalidad === "Inmobiliaria" && !formData.nombreInmobiliaria) {
+          showModal({ title: "Error", message: "Ingresa el nombre de la inmobiliaria", confirmText: "OK" });
+          return false;
+        }
+      }
+      if (!formData.anosExperiencia) {
+        showModal({ title: "Error", message: "Selecciona tus años de experiencia", confirmText: "OK" });
+        return false;
+      }
+
       setLoading(true);
       try {
         // Subir avatar si hay uno nuevo
@@ -176,7 +206,7 @@ export function useExternalAuth() {
           apellido_paterno: formData.lastNamePaterno,
           apellido_materno: formData.lastNameMaterno,
           celular: formData.phone || "",
-          prefijo_celular: null,
+          prefijo_celular: undefined,
           rol: "cliente",
           pais: "Mexico",
           estado: formData.estado,
@@ -186,20 +216,20 @@ export function useExternalAuth() {
           aprobaciones_requeridas: 3,
           anos_experiencia: formData.anosExperiencia,
           ocupacion: formData.ocupacion,
-          otro_ocupacion: null,
-          modalidad: formData.modalidad || null,
-          nombre_inmobiliaria: formData.nombreInmobiliaria || null,
-          curso_certificacion: null,
+          otro_ocupacion: undefined,
+          modalidad: formData.modalidad || undefined,
+          nombre_inmobiliaria: formData.nombreInmobiliaria || undefined,
+          curso_certificacion: undefined,
           nombre_completo:
             `${formData.name} ${formData.lastNamePaterno} ${formData.lastNameMaterno}`.trim(),
-          activado_en: null,
-          deleted_at: null,
-          biografia: null,
-          sitio_web: null,
-          calificacion_promedio: null,
-          total_calificaciones: null,
-          total_recomendaciones_positivas: null,
-          total_recomendaciones_negativas: null,
+          activado_en: undefined,
+          deleted_at: undefined,
+          biografia: undefined,
+          sitio_web: undefined,
+          calificacion_promedio: undefined,
+          total_calificaciones: undefined,
+          total_recomendaciones_positivas: undefined,
+          total_recomendaciones_negativas: undefined,
         };
 
         const { data, error } = await supabase
@@ -234,7 +264,7 @@ export function useExternalAuth() {
         await OneSignal.logout();
       }
     } catch (error) {
-      console.error("Error al cancelar registro:", error);
+      log.error("Error al cancelar registro:", error);
     } finally {
       setPendingUser(null);
     }

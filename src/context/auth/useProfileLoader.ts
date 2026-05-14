@@ -6,6 +6,9 @@
 import { useRef } from "react";
 import { supabase } from "../../lib/supabase";
 import { perfiles } from "../../types";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("profile-loader");
 
 export const useProfileLoader = () => {
   // Cache para evitar llamadas redundantes
@@ -22,7 +25,7 @@ export const useProfileLoader = () => {
     maxRetries = 3,
   ): Promise<perfiles | null> => {
     if (!userId) {
-      console.warn("⚠️ loadProfile: No userId provided");
+      log.warn("loadProfile: No userId provided");
       return null;
     }
 
@@ -32,13 +35,13 @@ export const useProfileLoader = () => {
     }
 
     // Si ya está cargando, retornar la promesa existente
-    if (loadingProfileRef.current[userId]) {
+    if (userId in loadingProfileRef.current) {
       return loadingProfileRef.current[userId];
     }
 
     // Crear nueva promesa de carga
     const loadPromise = (async () => {
-      let lastError: any = null;
+      let lastError: unknown = null;
 
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
@@ -69,11 +72,12 @@ export const useProfileLoader = () => {
           }
 
           return null;
-        } catch (err: any) {
+        } catch (err: unknown) {
           lastError = err;
 
-          const errorMsg = err.message || err.toString();
-          console.warn(`⚠️ Attempt ${attempt}/${maxRetries} failed:`, errorMsg);
+          const errorMsg =
+            err instanceof Error ? err.message : String(err);
+          log.warn(`Attempt ${attempt}/${maxRetries} failed: ${errorMsg}`);
 
           // Si es el último intento, no esperar más
           if (attempt === maxRetries) {
@@ -86,15 +90,17 @@ export const useProfileLoader = () => {
             errorMsg.includes("JWT") ||
             errorMsg.includes("permission")
           ) {
-            console.error("❌ Fatal error, stopping retries:", errorMsg);
+            log.error("Fatal error, stopping retries:", errorMsg);
             break;
           }
         }
       }
 
-      console.error(
-        `❌ All attempts failed to load profile for ${userId.substring(0, 8)}:`,
-        lastError?.message || lastError,
+      const lastErrorMsg =
+        lastError instanceof Error ? lastError.message : String(lastError);
+      log.error(
+        `All attempts failed to load profile for ${userId.substring(0, 8)}:`,
+        lastErrorMsg,
       );
 
       return null;

@@ -13,7 +13,6 @@ import {
 import { MapDetails } from "../Details/MapDetails";
 import { COLORS } from "@/constants";
 import { Property } from "@/types";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 

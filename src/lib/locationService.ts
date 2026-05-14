@@ -1,4 +1,5 @@
 import { supabaseGeo } from "./supabase-geo";
+import { logger } from "@/utils/logger";const log = logger.scoped("locationService");
 
 export interface LocationSuggestion {
   type: "estado" | "municipio" | "colonia";
@@ -20,7 +21,7 @@ export async function getUniqueLocations(): Promise<LocationSuggestion[]> {
 
     return (data || []) as LocationSuggestion[];
   } catch (error) {
-    console.error("Error fetching unique locations:", error);
+    log.error("Error fetching unique locations:", error);
     return [];
   }
 }
@@ -44,7 +45,7 @@ export async function searchLocations(
 
     return (data || []).slice(0, limit) as LocationSuggestion[];
   } catch (error) {
-    console.error("Error fetching searched locations:", error);
+    log.error("Error fetching searched locations:", error);
     return [];
   }
 }

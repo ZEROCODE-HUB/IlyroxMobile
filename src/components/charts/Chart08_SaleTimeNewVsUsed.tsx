@@ -1,4 +1,4 @@
-// components/Charts/Chart08_SaleTimeNewVsUsed.tsx
+﻿// components/Charts/Chart08_SaleTimeNewVsUsed.tsx
 
 import React, { useEffect, useState } from "react";
 import {
@@ -8,7 +8,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
-import { BaseChartProps, SaleTimeData, Chart08Props } from "./types";
+import { BaseChartProps, SaleTimeData } from "./types";
 import { COLORS } from "../../constants/colors";
 import { statsService } from "../../services/statsService";
 
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 20,
     elevation: 2,
-    shadowColor: "#000",
+    shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
     width: "80%",
     height: "65%",
     justifyContent: "flex-end",
-    backgroundColor: "#F0F0F0",
+    backgroundColor: COLORS.dividerGray,
     borderRadius: 12,
     overflow: "hidden",
   },
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     gap: 20,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
+    borderTopColor: COLORS.dividerGray,
     marginBottom: 12,
   },
   legendItem: {

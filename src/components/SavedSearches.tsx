@@ -7,17 +7,21 @@ import {
   TouchableOpacity,
   Switch,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { useModal } from "../context/ModalContext";
 import { COLORS } from "../constants/colors";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("SavedSearches");
 
 const SavedSearches: React.FC = () => {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { showModal } = useModal();
   const [loading, setLoading] = useState(true);
   const [searches, setSearches] = useState<any[]>([]);
 
@@ -40,8 +44,8 @@ const SavedSearches: React.FC = () => {
       if (error) throw error;
       setSearches(data || []);
     } catch (error) {
-      console.error("Error fetching saved searches:", error);
-      Alert.alert("Error", "No se pudieron cargar tus búsquedas");
+      log.error("Error fetching saved searches:", error);
+      showToast("No se pudieron cargar tus búsquedas", "error");
     } finally {
       setLoading(false);
     }
@@ -66,42 +70,36 @@ const SavedSearches: React.FC = () => {
         "info"
       );
     } catch (error) {
-      console.error("Error toggling search:", error);
+      log.error("Error toggling search:", error);
       showToast("Error al actualizar el estado", "error");
     }
   };
 
-  const deleteSearch = async (id: string) => {
-    Alert.alert(
-      "Eliminar búsqueda",
-      "¿Estás seguro de que quieres eliminar esta búsqueda guardada?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from("busquedas_guardadas")
-                .update({ deleted_at: new Date().toISOString(), activa: false })
-                .eq("id", id);
+  const deleteSearch = (id: string) => {
+    showModal({
+      title: "Eliminar búsqueda",
+      message: "¿Estás seguro de que quieres eliminar esta búsqueda guardada?",
+      confirmText: "Eliminar",
+      cancelText: "Cancelar",
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from("busquedas_guardadas")
+            .update({ deleted_at: new Date().toISOString(), activa: false })
+            .eq("id", id);
 
-              if (error) throw error;
-              setSearches((prev) => prev.filter((s) => s.id !== id));
-              showToast("Búsqueda eliminada", "success");
-            } catch (error) {
-              console.error("Error deleting search:", error);
-              showToast("No se pudo eliminar la búsqueda", "error");
-            }
-          },
-        },
-      ]
-    );
+          if (error) throw error;
+          setSearches((prev) => prev.filter((s) => s.id !== id));
+          showToast("Búsqueda eliminada", "success");
+        } catch (error) {
+          log.error("Error deleting search:", error);
+          showToast("No se pudo eliminar la búsqueda", "error");
+        }
+      },
+    });
   };
 
   const renderSearchItem = ({ item }: { item: any }) => {
-    const criteria = item.criterios_busqueda || {};
     const priceRange = item.precio_max
       ? `$${(
           item.precio_min || 0

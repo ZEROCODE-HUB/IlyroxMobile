@@ -3,7 +3,7 @@
  * Pantalla de chat con manejo robusto de teclado usando react-native-keyboard-controller
  */
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,16 +12,14 @@ import {
   StyleSheet,
   Platform,
   ActivityIndicator,
-  Alert,
-  AppState,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import MessageBubble from "./MessageBubble";
 import PropertyMessageBubble from "./PropertyMessageBubble";
 import MessageInput from "./MessageInput";
-import { useMessages } from "../../hooks/hooks/messaging/useMessages";
+import { useMessages } from "../../hooks/messaging/useMessages";
+import { useModal } from "@/context/ModalContext";
 import { COLORS } from "../../constants";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 
@@ -52,7 +50,7 @@ export default function ChatScreen({
   keyboardOffset = 0,
 }: ChatScreenProps) {
   const flatListRef = useRef<FlatList>(null);
-  const insets = useSafeAreaInsets();
+  const { showModal } = useModal();
   const actualConversationId = conversationId === "new" ? null : conversationId;
 
   const {
@@ -144,11 +142,11 @@ export default function ChatScreen({
   }, [messages.length]);
 
   const handleSendProperty = () => {
-    Alert.alert(
-      "Compartir propiedad",
-      "Esta función abrirá un selector de propiedades en la versión completa.",
-      [{ text: "OK" }],
-    );
+    showModal({
+      title: "Compartir propiedad",
+      message: "Esta función abrirá un selector de propiedades en la versión completa.",
+      confirmText: "OK",
+    });
   };
 
   const renderMessage = ({ item }: { item: any }) => {

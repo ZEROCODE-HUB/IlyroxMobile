@@ -4,17 +4,16 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { router } from "expo-router";
 import { ActivePoint } from "./charts/types";
 import { AppHeader } from "./AppHeader";
 import { COLORS } from "../constants/colors";
-import { useStatisticsData } from "./hooks/useStatisticsData";
+import { useStatisticsData } from "@/hooks/statistics/useStatisticsData";
 import { Ionicons } from "@expo/vector-icons";
 import { StatisticsFilterModal } from "./modals/StatisticsFilterModal";
-import { PROPERTY_TYPES } from "../constants/propertyData";
+import { TipoPrincipal } from "../constants/propertyData";
 
 // Import chart components
 import Chart01_PricePerM2 from "./charts/Chart01_PricePerM2";
@@ -35,7 +34,6 @@ import Chart13_PriceByRooms from "./charts/Chart13_PriceByRooms";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
 
 const Statistics = () => {
-  const navigation = useNavigation<any>();
   const isVisible = true;
 
   if (isVisible) {
@@ -99,7 +97,7 @@ const Statistics = () => {
   });
 
   // Data Loading
-  const { data, loading, error, refresh } = useStatisticsData();
+  const { data, loading } = useStatisticsData();
 
   const handlePress = (chart: string, index: number, value: any) => {
     setActivePoint({ chart, index, value });
@@ -233,7 +231,7 @@ const Statistics = () => {
       ciudad: filters.location.ciudad || "Todos",
       municipio: filters.location.municipio || "Todos",
       colonia: filters.location.colonia || "Todos",
-      tipoPropiedad: filters.propertyType.type as any,
+      tipoPropiedad: filters.propertyType.type as TipoPrincipal | "Todos",
       subtipo: filters.propertyType.subtype || "Todos",
       tipoOperacion: filters.operationType,
     };
@@ -244,7 +242,7 @@ const Statistics = () => {
       <AppHeader
         title="Dashboard ilyrox"
         showBackButton
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       // rightComponent={
       //   <TouchableOpacity onPress={() => setShowFiltersModal(true)}>
       //     <Ionicons name="filter" size={24} color={COLORS.primary} />

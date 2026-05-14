@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import {
   View,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   Modal,
   Image,
@@ -20,13 +19,18 @@ import * as VideoThumbnails from "expo-video-thumbnails";
 import { useVideoPlayer, VideoView } from "expo-video"; // Asegúrate de tener expo-video instalado
 
 import { useAuth } from "../../context/AuthContext";
+import { useModal } from "@/context/ModalContext";
+import { useToast } from "@/context/ToastContext";
 import { COLORS } from "../../constants/colors";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
 import { supabase } from "../../lib/supabase";
-import { useCreateContent } from "@/hooks/hooks/useCreateContent";
-import { useVideoUpload } from "@/hooks/hooks";
+import { useCreateContent } from "@/hooks/useCreateContent";
+import { useVideoUpload } from "@/hooks";
 import { AppHeader } from "../AppHeader";
 import { uploadImage } from "../../services/uploadService";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("CreateReel");
 
 interface CreateReelProps {
   reelId?: string;
@@ -103,6 +107,8 @@ const VideoPreview = ({
 
 export default function CreateReel({ onBack, reelId }: CreateReelProps) {
   const { user } = useAuth();
+  const { showModal } = useModal();
+  const { showToast } = useToast();
   const router = useRouter();
   const isEditing = !!reelId;
 
@@ -121,7 +127,7 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
   const [videoUri, setVideoUri] = useState("");
   const [thumbnailUri, setThumbnailUri] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [loadingReel, setLoadingReel] = useState(false);
+  const [, setLoadingReel] = useState(false);
 
   const uploading = uploadingVideo || creatingReel;
 
@@ -148,8 +154,8 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
         setThumbnailUri(data.thumbnail_url || "");
       }
     } catch (error) {
-      console.error("Error loading reel:", error);
-      Alert.alert("Error", "No se pudo cargar la información del reel");
+      log.error("Error loading reel:", error);
+      showToast("No se pudo cargar la información del reel", "error");
     } finally {
       setLoadingReel(false);
     }
@@ -167,7 +173,7 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
       setThumbnailUri(uri);
       return uri;
     } catch (error) {
-      console.error("Error generando thumbnail:", error);
+      log.error("Error generando thumbnail:", error);
       return null;
     }
   };
@@ -179,7 +185,7 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
     // Pedir permisos
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permiso denegado", "Necesitamos acceso a tu galería");
+      showModal({ title: "Permiso denegado", message: "Necesitamos acceso a tu galería", confirmText: "OK" });
       return;
     }
 
@@ -227,7 +233,7 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
    */
   const handlePublish = async () => {
     if (!validate()) {
-      Alert.alert("Error", "Por favor completa todos los campos");
+      showModal({ title: "Error", message: "Por favor completa todos los campos", confirmText: "OK" });
       return;
     }
 
@@ -236,7 +242,7 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
       const uploadResult = await uploadVideo(videoUri);
 
       if (!uploadResult) {
-        Alert.alert("Error", "No se pudo subir el video. Intenta de nuevo.");
+        showToast("No se pudo subir el video. Intenta de nuevo.", "error");
         return;
       }
 
@@ -251,7 +257,7 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
             thumbnailUrl = manualThumb;
           }
         } catch (error) {
-          console.error("Error uploading manual thumbnail:", error);
+          log.error("Error uploading manual thumbnail:", error);
         }
       }
 
@@ -280,8 +286,8 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
         }, 500);
       }
     } catch (error) {
-      console.error("Error publishing reel:", error);
-      Alert.alert("Error", "Hubo un problema al publicar el reel");
+      log.error("Error publishing reel:", error);
+      showToast("Hubo un problema al publicar el reel", "error");
     }
   };
 

@@ -1,18 +1,15 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
 } from "react-native";
-import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
+import { normalizePostType } from "../../utils/stringNormalizer";
 import { Post, User } from "../../types";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
-import { commonStyles } from "styles";
-import { RichText } from "../shared";
 import { SpecialPostCard } from "../Feed/SpecialPostCard";
 import PostCard from "../cards/PostCard";
 
@@ -31,15 +28,9 @@ interface ProfilePostItemProps {
 
 const ProfilePostItem: React.FC<ProfilePostItemProps> = React.memo(
   ({ item, user, onPress, isOwnProfile, onEdit, onDelete }) => {
-    const hasImages = item.imagenes && item.imagenes.length > 0;
     const hasMultipleImages = item.imagenes && item.imagenes.length > 1;
-    const isSearchPost = item.tipo === "busqueda";
 
-    const cleanPostType = (item.tipo || "")
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/\s+/g, "");
+    const cleanPostType = normalizePostType(item.tipo);
 
     const isSpecialPost = [
       "openhouse",
@@ -78,17 +69,16 @@ const ProfilePostItem: React.FC<ProfilePostItemProps> = React.memo(
       },
       content: item.contenido || "",
       images: item.imagenes || [],
-      likes: (item as any).likes_count || 0,
-      comments: (item as any).comentarios_count || 0,
+      likes: item.likes_count || 0,
+      comments: item.comentarios_count || 0,
       timestamp: item.created_at,
-      postType: cleanPostType as any,
-      foto_perfil_usuario: item.foto_perfil,
+      postType: cleanPostType as "post" | "busqueda" | "openhouse" | "aniversario" | "sold",
+      foto_perfil_usuario: item.foto_perfil_usuario,
       fecha_hora: item.fecha_hora,
       nombre_asesor: item.nombre_asesor,
       ubicacion: item.ubicacion,
       foto_propiedad: item.foto_propiedad,
       antiguedad: item.antiguedad,
-      status: item.status,
       postDetails: item,
       busquedas_json: item.busquedas_json,
     };

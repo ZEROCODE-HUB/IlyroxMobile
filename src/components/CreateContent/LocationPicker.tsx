@@ -4,7 +4,7 @@ import * as Haptics from "expo-haptics";
 import MapView, {
   Marker,
   Region,
-  MapPressEvent,
+  LongPressEvent,
   PROVIDER_DEFAULT,
   PROVIDER_GOOGLE,
 } from "../shared/MapComponents";
@@ -110,7 +110,7 @@ export default function LocationPicker({
     }
   };
 
-  const handleMapPress = (e: MapPressEvent) => {
+  const handleMapPress = (e: LongPressEvent) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
     setMarker({ latitude, longitude });
     onLocationSelected({ latitude, longitude });
@@ -197,7 +197,7 @@ export default function LocationPicker({
         {!marker && Platform.OS !== "web" && (
           <View style={styles.overlay} pointerEvents="none">
             <Text style={styles.overlayText}>
-              Mantén presionado (0.7s) para colocar el pin
+              Mantén presionado para colocar el pin
             </Text>
           </View>
         )}

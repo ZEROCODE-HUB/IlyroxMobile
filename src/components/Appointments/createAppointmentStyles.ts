@@ -39,7 +39,7 @@ export const createAppointmentStyles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: "#F0F0F0",
+        borderBottomColor: COLORS.dividerGray,
     },
     headerTitle: {
         flexDirection: "row",
@@ -75,10 +75,10 @@ export const createAppointmentStyles = StyleSheet.create({
         color: COLORS.textTertiary,
     },
     textArea: {
-        backgroundColor: "#F9FAFB",
+        backgroundColor: COLORS.lightGray,
         borderRadius: 12,
         borderWidth: 1.5,
-        borderColor: "#E5E5E5",
+        borderColor: COLORS.mediumGray,
         padding: 14,
         fontSize: 14,
         color: COLORS.textPrimary,
@@ -90,7 +90,7 @@ export const createAppointmentStyles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingTop: 16,
         borderTopWidth: 1,
-        borderTopColor: "#F0F0F0",
+        borderTopColor: COLORS.dividerGray,
         backgroundColor: COLORS.white,
     },
     button: {

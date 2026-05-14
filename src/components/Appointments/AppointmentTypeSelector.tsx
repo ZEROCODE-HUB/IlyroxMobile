@@ -1,9 +1,11 @@
-import React from "react";
+﻿import React, { ComponentProps } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants";
 
-export const APPOINTMENT_TYPES = [
+type IoniconName = ComponentProps<typeof Ionicons>["name"];
+
+export const APPOINTMENT_TYPES: { value: string; label: string; icon: IoniconName }[] = [
     { value: "visita", label: "Visita a propiedad", icon: "home-outline" },
     { value: "llamada", label: "Llamada telefónica", icon: "call-outline" },
     { value: "videollamada", label: "Videollamada", icon: "videocam-outline" },
@@ -44,7 +46,7 @@ const AppointmentTypeSelector: React.FC<AppointmentTypeSelectorProps> = ({
                         activeOpacity={0.7}
                     >
                         <Ionicons
-                            name={type.icon as any}
+                            name={type.icon}
                             size={18}
                             color={
                                 selectedType === type.value
@@ -85,10 +87,10 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingVertical: 14,
         paddingHorizontal: 16,
-        backgroundColor: "#F9FAFB",
+        backgroundColor: COLORS.lightGray,
         borderRadius: 12,
         borderWidth: 1.5,
-        borderColor: "#E5E5E5",
+        borderColor: COLORS.mediumGray,
         gap: 12,
     },
     typeButtonActive: {

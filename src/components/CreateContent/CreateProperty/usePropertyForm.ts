@@ -1,10 +1,12 @@
 // ============================================
 // usePropertyForm - Custom hook para el estado del formulario
-// Maneja TODOS los estados y la carga de datos para edición
+// Mantiene TODA la API pública del hook anterior. Internamente usa
+// un único useReducer en lugar de 50+ useState para reducir renders
+// y centralizar la lógica de mutación.
 // ============================================
 
-import { useState, useCallback, useMemo, useEffect } from "react";
-import { Alert } from "react-native";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useModal } from "@/context/ModalContext";
 import { supabase } from "../../../lib/supabase";
 import { COORDENADAS_ESTADO } from "../../../constants/MexLocations/estados";
 import {
@@ -13,165 +15,385 @@ import {
   esTerreno,
   getCamposVisibles,
 } from "../../../constants/propertyData";
+import { logger } from "@/utils/logger";
+import { formatThousands } from "../../../utils/numberFormatter";
 
 import type {
-  TipoOperacion,
-  MonedaType,
-  SiNo,
   AmuebladoType,
-  ComisionTipo,
-  ContractData,
-  UbicacionData,
-  LocationCoords,
-  MapCenter,
+  PropertyFormState,
+  SiNo,
 } from "./types";
+
+const log = logger.scoped("usePropertyForm");
+
+// ============================================
+// Tipos auxiliares
+// ============================================
+
+/** Permite asignaciones dinámicas sobre un Partial<PropertyFormState> */
+type MutablePayload = Record<string, string | number | boolean | null | undefined>;
+
+// ============================================
+// Estado inicial
+// ============================================
+
+const INITIAL_STATE: PropertyFormState = {
+  // Imágenes
+  images: [],
+
+  // Información básica
+  descripcion: "",
+  tipoOperacion: "venta",
+  precioVenta: "",
+  precioRenta: "",
+  moneda: "MXN",
+  tipoPrincipal: "habitacional",
+  subtipo: "",
+  status: "Publicada",
+  originalStatus: "Publicada",
+
+  // Ubicación
+  pais: "México",
+  ubicacionData: {
+    estado: "",
+    ciudad: "",
+    municipio: "",
+    colonia: "",
+  },
+  calle: "",
+  numeroExterior: "",
+  numeroInterior: "",
+  codigoPostal: "",
+  location: { latitude: 0, longitude: 0 },
+  mapCenter: null,
+
+  // Características físicas
+  recamaras: "0",
+  banosCompletos: "0",
+  mediosBanos: "0",
+  estacionamientos: "0",
+  m2Construccion: "",
+  m2Terreno: "",
+  niveles: "1",
+  antiguedad: "",
+  amueblado: "No",
+  petFriendly: "No",
+
+  // Amenidades
+  amenidadesSeleccionadas: [],
+
+  // Comisión Venta
+  comparteComision: "No",
+  comisionTipo: "porcentaje",
+  comisionValor: "",
+  comisionCompartidaTipo: "porcentaje",
+  comisionCompartidaValor: "50",  // % de mi comisión que comparto (0-100)
+  condicionesComision: "",
+
+  // Comisión Renta
+  comparteComisionRenta: "No",
+  comisionTipoRenta: "porcentaje",
+  comisionValorRenta: "1",        // default 1 mes
+  comisionCompartidaTipoRenta: "porcentaje",
+  comisionCompartidaValorRenta: "50",  // % de mi comisión que comparto (0-100)
+  condicionesComisionRenta: "",
+
+  // Gravamen
+  tieneGravamen: "No",
+  institucionGravamen: "",
+  montoGravamen: "",
+
+  // Financiamiento
+  aceptaFinanciamiento: "No",
+  tiposFinanciamientoSeleccionados: [],
+
+  // Propietario
+  nombreCompletoPropietario: "",
+  emailPropietario: "",
+  telefonoPropietario: "",
+
+  // Contrato
+  contractData: null,
+
+  // EasyBroker
+  sinComision: false,
+
+  // Campos especializados — Agrícola
+  tiposAgua: [],
+  concesionAgua: false,
+  usoTerreno: '',
+  tipoRiego: '',
+  infraElectricidad: false,
+  infraCaminoAcceso: false,
+  infraCercado: false,
+  accesoCarretera: false,
+  accesoCamiones: false,
+
+  // Campos especializados — Comercial
+  tipoUbicacionComercial: '',
+  frenteMetros: '',
+  nivelPiso: '',
+  sobreAvenidaPrincipal: false,
+  enEsquina: false,
+  altaVisibilidad: false,
+  altoFlujoVehicular: false,
+
+  // Campos especializados — Industrial
+  ubicacionIndustrial: '',
+  alturaLibreM: '',
+  tipoEnergiaKva: [],
+  areaOficinas: '',
+  patioManiobras: '',
+
+  // Errores
+  errors: {},
+};
+
+// ============================================
+// Acciones tipadas
+// ============================================
+
+type SetFieldAction = {
+  [K in keyof PropertyFormState]: {
+    type: "SET_FIELD";
+    field: K;
+    value: PropertyFormState[K];
+  };
+}[keyof PropertyFormState];
+
+type UpdateFieldAction = {
+  [K in keyof PropertyFormState]: {
+    type: "UPDATE_FIELD";
+    field: K;
+    updater: (prev: PropertyFormState[K]) => PropertyFormState[K];
+  };
+}[keyof PropertyFormState];
+
+type PropertyFormAction =
+  | SetFieldAction
+  | UpdateFieldAction
+  | { type: "LOAD"; payload: Partial<PropertyFormState> }
+  | { type: "CLEAR_ERROR"; key: string }
+  | { type: "TOGGLE_AMENIDAD"; amenidad: string }
+  | { type: "TOGGLE_FINANCIAMIENTO"; tipo: string };
+
+function reducer(
+  state: PropertyFormState,
+  action: PropertyFormAction,
+): PropertyFormState {
+  switch (action.type) {
+    case "SET_FIELD":
+      return { ...state, [action.field]: action.value };
+    case "UPDATE_FIELD": {
+      const updater = action.updater as (v: unknown) => unknown;
+      return {
+        ...state,
+        [action.field]: updater(state[action.field]),
+      };
+    }
+    case "LOAD":
+      return { ...state, ...action.payload };
+    case "CLEAR_ERROR": {
+      if (!state.errors[action.key]) return state;
+      const { [action.key]: _removed, ...rest } = state.errors;
+      return { ...state, errors: rest };
+    }
+    case "TOGGLE_AMENIDAD": {
+      const list = state.amenidadesSeleccionadas;
+      return {
+        ...state,
+        amenidadesSeleccionadas: list.includes(action.amenidad)
+          ? list.filter((a) => a !== action.amenidad)
+          : [...list, action.amenidad],
+      };
+    }
+    case "TOGGLE_FINANCIAMIENTO": {
+      const list = state.tiposFinanciamientoSeleccionados;
+      return {
+        ...state,
+        tiposFinanciamientoSeleccionados: list.includes(action.tipo)
+          ? list.filter((t) => t !== action.tipo)
+          : [...list, action.tipo],
+      };
+    }
+    default:
+      return state;
+  }
+}
+
+// ============================================
+// Helpers de tipado para setters
+// ============================================
+
+type Updater<T> = T | ((prev: T) => T);
+
+// ============================================
+// Hook
+// ============================================
 
 export function usePropertyForm(
   propertyId?: string,
   onBack?: (shouldRefresh?: boolean) => void,
 ) {
-  // ============================================
-  // LOADING STATE
-  // ============================================
+  const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
+  const { showModal } = useModal();
+
+  // Loading state — es estado de transacción (no de formulario), se queda como useState
   const [isLoadingProperty, setIsLoadingProperty] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // ============================================
-  // STATUS
+  // Setter factory — una por campo, memoizado con useCallback
   // ============================================
-  const [status, setStatus] = useState<string>("Publicada");
-  const [originalStatus, setOriginalStatus] = useState<string>("Publicada");
 
-  // Contract data modal
-  const [contractData, setContractData] = useState<ContractData | null>(null);
+  const makeSetter = <K extends keyof PropertyFormState>(field: K) =>
+    useCallback(
+      (value: Updater<PropertyFormState[K]>) => {
+        if (typeof value === "function") {
+          dispatch({
+            type: "UPDATE_FIELD",
+            field,
+            updater: value as (p: PropertyFormState[K]) => PropertyFormState[K],
+          } as unknown as PropertyFormAction);
+        } else {
+          dispatch({
+            type: "SET_FIELD",
+            field,
+            value,
+          } as unknown as PropertyFormAction);
+        }
+      },
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [],
+    );
+
+  const setImages = makeSetter("images");
+  const setDescripcion = makeSetter("descripcion");
+  const setTipoOperacion = makeSetter("tipoOperacion");
+  const setPrecioVenta = makeSetter("precioVenta");
+  const setPrecioRenta = makeSetter("precioRenta");
+  const setMoneda = makeSetter("moneda");
+  const setTipoPrincipal = makeSetter("tipoPrincipal");
+  const setSubtipo = makeSetter("subtipo");
+  const setStatus = makeSetter("status");
+  const setUbicacionData = makeSetter("ubicacionData");
+  const setCalle = makeSetter("calle");
+  const setNumeroExterior = makeSetter("numeroExterior");
+  const setNumeroInterior = makeSetter("numeroInterior");
+  const setCodigoPostal = makeSetter("codigoPostal");
+  const setLocation = makeSetter("location");
+  const setMapCenter = makeSetter("mapCenter");
+  const setRecamaras = makeSetter("recamaras");
+  const setBanosCompletos = makeSetter("banosCompletos");
+  const setMediosBanos = makeSetter("mediosBanos");
+  const setEstacionamientos = makeSetter("estacionamientos");
+  const setM2Construccion = makeSetter("m2Construccion");
+  const setM2Terreno = makeSetter("m2Terreno");
+  const setNiveles = makeSetter("niveles");
+  const setAntiguedad = makeSetter("antiguedad");
+  const setAmueblado = makeSetter("amueblado");
+  const setPetFriendly = makeSetter("petFriendly");
+  const setComparteComision = makeSetter("comparteComision");
+  const setComisionTipo = makeSetter("comisionTipo");
+  const setComisionValor = makeSetter("comisionValor");
+  const setComisionCompartidaTipo = makeSetter("comisionCompartidaTipo");
+  const setComisionCompartidaValor = makeSetter("comisionCompartidaValor");
+  const setCondicionesComision = makeSetter("condicionesComision");
+  const setComparteComisionRenta = makeSetter("comparteComisionRenta");
+  const setComisionTipoRenta = makeSetter("comisionTipoRenta");
+  const setComisionValorRenta = makeSetter("comisionValorRenta");
+  const setComisionCompartidaTipoRenta = makeSetter("comisionCompartidaTipoRenta");
+  const setComisionCompartidaValorRenta = makeSetter("comisionCompartidaValorRenta");
+  const setCondicionesComisionRenta = makeSetter("condicionesComisionRenta");
+  const setTieneGravamen = makeSetter("tieneGravamen");
+  const setInstitucionGravamen = makeSetter("institucionGravamen");
+  const setMontoGravamen = makeSetter("montoGravamen");
+  const setAceptaFinanciamiento = makeSetter("aceptaFinanciamiento");
+  const setNombreCompletoPropietario = makeSetter("nombreCompletoPropietario");
+  const setEmailPropietario = makeSetter("emailPropietario");
+  const setTelefonoPropietario = makeSetter("telefonoPropietario");
+  const setContractData = makeSetter("contractData");
+  const setErrors = makeSetter("errors");
+
+  // Setters especializados — Agrícola
+  const setConcesionAgua = makeSetter("concesionAgua");
+  const setUsoTerreno = makeSetter("usoTerreno");
+  const setTipoRiego = makeSetter("tipoRiego");
+  const setInfraElectricidad = makeSetter("infraElectricidad");
+  const setInfraCaminoAcceso = makeSetter("infraCaminoAcceso");
+  const setInfraCercado = makeSetter("infraCercado");
+  const setAccesoCarretera = makeSetter("accesoCarretera");
+  const setAccesoCamiones = makeSetter("accesoCamiones");
+
+  // Setters especializados — Comercial
+  const setTipoUbicacionComercial = makeSetter("tipoUbicacionComercial");
+  const setFrenteMetros = makeSetter("frenteMetros");
+  const setNivelPiso = makeSetter("nivelPiso");
+  const setSobreAvenidaPrincipal = makeSetter("sobreAvenidaPrincipal");
+  const setEnEsquina = makeSetter("enEsquina");
+  const setAltaVisibilidad = makeSetter("altaVisibilidad");
+  const setAltoFlujoVehicular = makeSetter("altoFlujoVehicular");
+
+  // Setters especializados — Industrial
+  const setUbicacionIndustrial = makeSetter("ubicacionIndustrial");
+  const setAlturaLibreM = makeSetter("alturaLibreM");
+  const setAreaOficinas = makeSetter("areaOficinas");
+  const setPatioManiobras = makeSetter("patioManiobras");
+
+  const toggleTipoAgua = useCallback((tipo: string) => {
+    dispatch({
+      type: "UPDATE_FIELD",
+      field: "tiposAgua",
+      updater: (prev: string[]) =>
+        prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo],
+    } as unknown as PropertyFormAction);
+  }, []);
+
+  const toggleTipoEnergiaKva = useCallback((tipo: string) => {
+    dispatch({
+      type: "UPDATE_FIELD",
+      field: "tipoEnergiaKva",
+      updater: (prev: string[]) =>
+        prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo],
+    } as unknown as PropertyFormAction);
+  }, []);
 
   // ============================================
-  // 1. GALERÍA DE IMÁGENES
+  // Helpers derivados
   // ============================================
-  const [images, setImages] = useState<string[]>([]);
 
-  // ============================================
-  // 2. INFORMACIÓN BÁSICA
-  // ============================================
-  const [descripcion, setDescripcion] = useState("");
-  const [tipoOperacion, setTipoOperacion] = useState<TipoOperacion>("venta");
-  const [precioVenta, setPrecioVenta] = useState("");
-  const [precioRenta, setPrecioRenta] = useState("");
-  const [moneda, setMoneda] = useState<MonedaType>("MXN");
-  const [tipoPrincipal, setTipoPrincipal] =
-    useState<TipoPrincipal>("habitacional");
-  const [subtipo, setSubtipo] = useState("");
+  const clearError = useCallback((key: string) => {
+    dispatch({ type: "CLEAR_ERROR", key });
+  }, []);
 
-  // ============================================
-  // 3. UBICACIÓN
-  // ============================================
-  const [pais] = useState("México");
-  const [ubicacionData, setUbicacionData] = useState<UbicacionData>({
-    estado: "",
-    ciudad: "",
-    municipio: "",
-    colonia: "",
-  });
-  const [calle, setCalle] = useState("");
-  const [numeroExterior, setNumeroExterior] = useState("");
-  const [numeroInterior, setNumeroInterior] = useState("");
-  const [codigoPostal, setCodigoPostal] = useState("");
-  const [location, setLocation] = useState<LocationCoords>({
-    latitude: 0,
-    longitude: 0,
-  });
-  const [mapCenter, setMapCenter] = useState<MapCenter | null>(null);
+  const toggleAmenidad = useCallback((amenidad: string) => {
+    dispatch({ type: "TOGGLE_AMENIDAD", amenidad });
+  }, []);
 
-  // ============================================
-  // 4. CARACTERÍSTICAS FÍSICAS
-  // ============================================
-  const [recamaras, setRecamaras] = useState("0");
-  const [banosCompletos, setBanosCompletos] = useState("0");
-  const [mediosBanos, setMediosBanos] = useState("0");
-  const [estacionamientos, setEstacionamientos] = useState("0");
-  const [m2Construccion, setM2Construccion] = useState("");
-  const [m2Terreno, setM2Terreno] = useState("");
-  const [niveles, setNiveles] = useState("1");
-  const [antiguedad, setAntiguedad] = useState("");
-  const [amueblado, setAmueblado] = useState<AmuebladoType>("No");
-  const [petFriendly, setPetFriendly] = useState<SiNo>("No");
+  const toggleFinanciamiento = useCallback((tipo: string) => {
+    dispatch({ type: "TOGGLE_FINANCIAMIENTO", tipo });
+  }, []);
 
-  // ============================================
-  // 5. AMENIDADES
-  // ============================================
-  const [amenidadesSeleccionadas, setAmenidadesSeleccionadas] = useState<
-    string[]
-  >([]);
-
-  // ============================================
-  // 6. COMISIÓN (Venta)
-  // ============================================
-  const [comparteComision, setComparteComision] = useState<SiNo>("No");
-  const [comisionTipo, setComisionTipo] = useState<ComisionTipo>("porcentaje");
-  const [comisionValor, setComisionValor] = useState("");
-  const [comisionCompartidaTipo, setComisionCompartidaTipo] =
-    useState<ComisionTipo>("porcentaje");
-  const [comisionCompartidaValor, setComisionCompartidaValor] = useState("");
-  const [condicionesComision, setCondicionesComision] = useState("");
-
-  // Comisión Renta (solo cuando es "ambas")
-  const [comparteComisionRenta, setComparteComisionRenta] =
-    useState<SiNo>("No");
-  const [comisionTipoRenta, setComisionTipoRenta] =
-    useState<ComisionTipo>("porcentaje");
-  const [comisionValorRenta, setComisionValorRenta] = useState("");
-  const [comisionCompartidaTipoRenta, setComisionCompartidaTipoRenta] =
-    useState<ComisionTipo>("porcentaje");
-  const [comisionCompartidaValorRenta, setComisionCompartidaValorRenta] =
-    useState("");
-  const [condicionesComisionRenta, setCondicionesComisionRenta] = useState("");
-
-  // ============================================
-  // 7. GRAVAMEN
-  // ============================================
-  const [tieneGravamen, setTieneGravamen] = useState<SiNo>("No");
-  const [institucionGravamen, setInstitucionGravamen] = useState("");
-  const [montoGravamen, setMontoGravamen] = useState("");
-
-  // ============================================
-  // 8. FINANCIAMIENTO
-  // ============================================
-  const [aceptaFinanciamiento, setAceptaFinanciamiento] = useState<SiNo>("No");
-  const [
-    tiposFinanciamientoSeleccionados,
-    setTiposFinanciamientoSeleccionados,
-  ] = useState<string[]>([]);
-
-  // ============================================
-  // PROPIETARIO
-  // ============================================
-  const [nombreCompletoPropietario, setNombreCompletoPropietario] =
-    useState("");
-  const [emailPropietario, setEmailPropietario] = useState("");
-  const [telefonoPropietario, setTelefonoPropietario] = useState("");
-
-  // ============================================
-  // ERRORES
-  // ============================================
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const clearError = useCallback(
-    (key: string) => {
-      if (errors[key]) {
-        setErrors((prev) => {
-          const newErrors = { ...prev };
-          delete newErrors[key];
-          return newErrors;
-        });
+  const handleCurrencyChange = useCallback(
+    (text: string, setter: (val: string) => void) => {
+      const rawValue = text.replace(/,/g, "");
+      if (/^\d*\.?\d*$/.test(rawValue)) {
+        const parts = rawValue.split(".");
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        setter(parts.join("."));
       }
     },
-    [errors],
+    [],
   );
 
   // ============================================
   // COMPUTED
   // ============================================
-  const camposVisibles = useMemo(() => getCamposVisibles(subtipo), [subtipo]);
+
+  const camposVisibles = useMemo(
+    () => getCamposVisibles(state.subtipo, state.tipoPrincipal as TipoPrincipal),
+    [state.subtipo, state.tipoPrincipal],
+  );
 
   const PROPERTY_STATUS = [
     "Publicada",
@@ -183,76 +405,96 @@ export function usePropertyForm(
 
   const filteredStatusOptions = useMemo(() => {
     return PROPERTY_STATUS.filter((option) => {
-      if (tipoOperacion === "venta") return option !== "Rentada";
-      if (tipoOperacion === "renta") return option !== "Vendida";
+      if (state.sinComision && option === "Publicada") return false;
+      if (state.tipoOperacion === "venta") return option !== "Rentada";
+      if (state.tipoOperacion === "renta") return option !== "Vendida";
       return true;
     });
-  }, [tipoOperacion]);
+  }, [state.tipoOperacion, state.sinComision]);
 
   const isColoniaMode = useMemo(() => {
-    return !!ubicacionData.colonia && !!ubicacionData.latitud && !!ubicacionData.longitud;
-  }, [ubicacionData.colonia, ubicacionData.latitud, ubicacionData.longitud]);
+    return (
+      !!state.ubicacionData.colonia &&
+      !!state.ubicacionData.latitud &&
+      !!state.ubicacionData.longitud
+    );
+  }, [
+    state.ubicacionData.colonia,
+    state.ubicacionData.latitud,
+    state.ubicacionData.longitud,
+  ]);
 
   // ============================================
-  // ERROR CLEARING EFFECTS
+  // EFFECTS: auto-limpieza de errores cuando el campo se llena
   // ============================================
-  useEffect(() => {
-    if (ubicacionData.estado) clearError("estado");
-    if (ubicacionData.municipio) clearError("municipio");
-  }, [ubicacionData]);
 
   useEffect(() => {
-    if (images.length > 0) clearError("images");
-  }, [images]);
+    if (state.ubicacionData.estado) clearError("estado");
+    if (state.ubicacionData.municipio) clearError("municipio");
+  }, [state.ubicacionData, clearError]);
 
   useEffect(() => {
-    if (descripcion.trim()) clearError("descripcion");
-  }, [descripcion]);
+    if (state.images.length > 0) clearError("images");
+  }, [state.images, clearError]);
 
   useEffect(() => {
-    if (subtipo) clearError("subtipo");
-  }, [subtipo]);
+    if (state.descripcion.trim()) clearError("descripcion");
+  }, [state.descripcion, clearError]);
 
   useEffect(() => {
-    if (precioVenta.trim()) clearError("precioVenta");
-  }, [precioVenta]);
+    if (state.subtipo) clearError("subtipo");
+  }, [state.subtipo, clearError]);
 
   useEffect(() => {
-    if (precioRenta.trim()) clearError("precioRenta");
-  }, [precioRenta]);
+    if (state.precioVenta.trim()) clearError("precioVenta");
+  }, [state.precioVenta, clearError]);
 
   useEffect(() => {
-    if (location.latitude !== 0 && location.longitude !== 0)
+    if (state.precioRenta.trim()) clearError("precioRenta");
+  }, [state.precioRenta, clearError]);
+
+  useEffect(() => {
+    if (state.location.latitude !== 0 && state.location.longitude !== 0) {
       clearError("location");
-  }, [location]);
+    }
+  }, [state.location, clearError]);
 
   // ============================================
   // MAP CENTER BASED ON STATE OR GEO COORDS
   // ============================================
+
   useEffect(() => {
-    if (ubicacionData.latitud && ubicacionData.longitud) {
-      setMapCenter({ lat: ubicacionData.latitud, lng: ubicacionData.longitud });
-    } else if (ubicacionData.estado && COORDENADAS_ESTADO[ubicacionData.estado]) {
-      const coords = COORDENADAS_ESTADO[ubicacionData.estado];
-      setMapCenter(coords);
+    const { latitud, longitud, estado } = state.ubicacionData;
+    if (latitud && longitud) {
+      dispatch({
+        type: "SET_FIELD",
+        field: "mapCenter",
+        value: { lat: latitud, lng: longitud },
+      });
+    } else if (estado && COORDENADAS_ESTADO[estado]) {
+      dispatch({
+        type: "SET_FIELD",
+        field: "mapCenter",
+        value: COORDENADAS_ESTADO[estado],
+      });
     }
-  }, [ubicacionData]);
+  }, [state.ubicacionData]);
 
   // ============================================
   // LOAD DATA FOR EDITING
   // ============================================
-  useEffect(() => {
-    if (propertyId) {
-      fetchPropertyDetails();
-    }
-  }, [propertyId]);
 
-  const fetchPropertyDetails = async () => {
+  const onBackRef = useRef(onBack);
+  useEffect(() => {
+    onBackRef.current = onBack;
+  }, [onBack]);
+
+  const fetchPropertyDetails = useCallback(async () => {
+    if (!propertyId) return;
     try {
       setIsLoadingProperty(true);
       setLoadError(null);
 
-      // Timeout de 30 segundos para la carga
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(
           () =>
@@ -291,77 +533,86 @@ export function usePropertyForm(
 
       if (error) throw error;
       if (data) loadPropertyData(data);
-    } catch (e: any) {
-      console.error("Error fetching property:", e);
+    } catch (e: unknown) {
+      log.error("Error fetching property:", e);
       const errorMsg =
-        e?.message || "No se pudo cargar la información de la propiedad";
+        e instanceof Error ? e.message : "No se pudo cargar la información de la propiedad";
       setLoadError(errorMsg);
-      Alert.alert("Error", errorMsg, [
-        {
-          text: "Reintentar",
-          onPress: () => fetchPropertyDetails(),
-        },
-        {
-          text: "Volver",
-          onPress: () => onBack?.(),
-          style: "cancel",
-        },
-      ]);
+      showModal({
+        title: "Error al cargar",
+        message: errorMsg,
+        confirmText: "Reintentar",
+        cancelText: "Volver",
+        onConfirm: () => fetchPropertyDetails(),
+        onCancel: () => onBackRef.current?.(),
+      });
     } finally {
       setIsLoadingProperty(false);
     }
-  };
+  }, [propertyId]);
+
+  useEffect(() => {
+    if (propertyId) {
+      fetchPropertyDetails();
+    }
+  }, [propertyId, fetchPropertyDetails]);
 
   const loadPropertyData = (data: any) => {
     try {
+      const payload: Partial<PropertyFormState> = {};
+
       // 1. Imágenes
       if (data.fotos && Array.isArray(data.fotos)) {
-        setImages(data.fotos);
+        payload.images = data.fotos;
       }
 
       // 2. Info Básica
-      setDescripcion(data.descripcion || "");
-      setStatus(data.status || "Publicada");
-      setOriginalStatus(data.status || "Publicada");
+      payload.descripcion = data.descripcion || "";
+      payload.status = data.status || "Publicada";
+      payload.sinComision = data.sin_comision ?? false;
+      payload.originalStatus = data.status || "Publicada";
 
       const rawTipo = (data.tipo || "habitacional").toLowerCase();
       const isValidTipo = Object.keys(PROPERTY_TYPES).includes(rawTipo);
-      const safeTipo = isValidTipo
+      payload.tipoPrincipal = isValidTipo
         ? (rawTipo as TipoPrincipal)
         : "habitacional";
-      setTipoPrincipal(safeTipo);
-      setSubtipo(data.subtipo || "");
+      payload.subtipo = data.subtipo || "";
 
       // 3. Ubicación
-      setUbicacionData({
+      payload.ubicacionData = {
         estado: data.estado || "",
         ciudad: data.ciudad || "",
         municipio: data.municipio || data.ciudad || "",
         colonia: data.colonia || "",
-      });
-      setCalle(data.calle || "");
-      setNumeroExterior(data.numero_exterior || "");
-      setNumeroInterior(data.numero_interior || "");
-      setCodigoPostal("");
-      setLocation({
+      };
+      payload.calle = data.calle || "";
+      payload.numeroExterior = data.numero_exterior || "";
+      payload.numeroInterior = data.numero_interior || "";
+      payload.codigoPostal = "";
+      payload.location = {
         latitude: data.latitud || 0,
         longitude: data.longitud || 0,
-      });
+      };
 
       // 4. Características Físicas
-      setRecamaras(data.habitaciones?.toString() || "0");
-      setBanosCompletos(data.banos?.toString() || "0");
-      setMediosBanos("");
-      setEstacionamientos(data.estacionamientos?.toString() || "0");
-      setM2Construccion(data.metros_cuadrados_construccion?.toString() || "");
-      setM2Terreno(data.metros_cuadrados_terreno?.toString() || "");
-      setNiveles(data.pisos?.toString() || "1");
-      setAntiguedad(data.antiguedad || "");
-      setAmueblado(data.amueblado || "No");
-      setPetFriendly(data.pet_friendly || "No");
-      setNombreCompletoPropietario(data.nombre_propietario || "");
-      setEmailPropietario(data.email_propietario || "");
-      setTelefonoPropietario(data.telefono_propietario || "");
+      payload.recamaras = data.habitaciones?.toString() || "0";
+      payload.banosCompletos = data.banos?.toString() || "0";
+      payload.mediosBanos = "";
+      payload.estacionamientos = data.estacionamientos?.toString() || "0";
+      payload.m2Construccion = data.metros_cuadrados_construccion
+        ? formatThousands(data.metros_cuadrados_construccion.toString())
+        : "";
+      payload.m2Terreno = data.metros_cuadrados_terreno
+        ? formatThousands(data.metros_cuadrados_terreno.toString())
+        : "";
+      payload.niveles = data.pisos?.toString() || "1";
+      payload.antiguedad = data.antiguedad || "";
+      payload.amueblado = (data.amueblado || "No") as AmuebladoType;
+      payload.petFriendly = (data.pet_friendly || "No") as SiNo;
+      payload.nombreCompletoPropietario = data.nombre_propietario || "";
+      payload.emailPropietario = data.email_propietario || "";
+      payload.telefonoPropietario = data.telefono_propietario || "";
 
       // 5. Operaciones
       const ops = data.operaciones_propiedad || [];
@@ -369,100 +620,84 @@ export function usePropertyForm(
       const rentaOp = ops.find((o: any) => o.tipo_operacion === "renta");
 
       if (ventaOp && rentaOp) {
-        setTipoOperacion("ambas");
+        payload.tipoOperacion = "ambas";
       } else if (ventaOp) {
-        setTipoOperacion("venta");
+        payload.tipoOperacion = "venta";
       } else if (rentaOp) {
-        setTipoOperacion("renta");
+        payload.tipoOperacion = "renta";
       }
 
       if (data.latitud && data.longitud) {
-        setMapCenter({ lat: data.latitud, lng: data.longitud });
+        payload.mapCenter = { lat: data.latitud, lng: data.longitud };
       }
 
       // Configurar campos de VENTA
       if (ventaOp) {
-        setPrecioVenta(ventaOp.precio?.toString() || "");
-        setMoneda(ventaOp.moneda || "MXN");
-        setComparteComision(ventaOp.comparte_comision ? "Sí" : "No");
+        payload.precioVenta = ventaOp.precio?.toString() || "";
+        payload.moneda = ventaOp.moneda || "MXN";
+        payload.comparteComision = ventaOp.comparte_comision ? "Sí" : "No";
+
+        // Porcentaje propio (siempre, no solo cuando comparte)
+        if (ventaOp.comision_porcentaje) {
+          payload.comisionValor = ventaOp.comision_porcentaje.toString();
+        }
 
         if (ventaOp.comparte_comision) {
-          setComisionTipo(
-            ventaOp.comision_tipo === "monto_fijo" ? "monto" : "porcentaje",
-          );
-          const valor =
-            ventaOp.comision_tipo === "monto_fijo"
-              ? ventaOp.comision_monto_fijo
-              : ventaOp.comision_porcentaje;
-          setComisionValor(valor?.toString() || "");
-
           if (ventaOp.porcentaje_comision_compartida) {
-            setComisionCompartidaTipo("porcentaje");
-            setComisionCompartidaValor(
-              ventaOp.porcentaje_comision_compartida.toString(),
-            );
-          } else if (ventaOp.monto_comision_compartida) {
-            setComisionCompartidaTipo("monto");
-            setComisionCompartidaValor(
-              ventaOp.monto_comision_compartida.toString(),
-            );
+            const myPct = ventaOp.comision_porcentaje || 0;
+            const sharePct = myPct > 0
+              ? Math.round(ventaOp.porcentaje_comision_compartida / myPct * 100)
+              : 50;
+            payload.comisionCompartidaValor = String(Math.min(100, Math.max(0, sharePct)));
           }
-          setCondicionesComision(ventaOp.condiciones_comision_compartida || "");
+          payload.condicionesComision =
+            ventaOp.condiciones_comision_compartida || "";
         }
       }
 
       // Configurar campos de RENTA
       if (rentaOp) {
-        setPrecioRenta(rentaOp.precio?.toString() || "");
-        if (!ventaOp) setMoneda(rentaOp.moneda || "MXN");
+        payload.precioRenta = rentaOp.precio?.toString() || "";
+        if (!ventaOp) payload.moneda = rentaOp.moneda || "MXN";
 
         const isAmbas = !!ventaOp;
-        const setComparte = isAmbas
-          ? setComparteComisionRenta
-          : setComparteComision;
-        const setTipo = isAmbas ? setComisionTipoRenta : setComisionTipo;
-        const setValor = isAmbas ? setComisionValorRenta : setComisionValor;
-        const setCompartidaTipo = isAmbas
-          ? setComisionCompartidaTipoRenta
-          : setComisionCompartidaTipo;
-        const setCompartidaValor = isAmbas
-          ? setComisionCompartidaValorRenta
-          : setComisionCompartidaValor;
-        const setCondiciones = isAmbas
-          ? setCondicionesComisionRenta
-          : setCondicionesComision;
+        const valorPropKey = isAmbas ? "comisionValorRenta" : "comisionValor";
+        const compartePropKey = isAmbas ? "comparteComisionRenta" : "comparteComision";
+        const compartidaValorPropKey = isAmbas
+          ? "comisionCompartidaValorRenta"
+          : "comisionCompartidaValor";
+        const condicionesPropKey = isAmbas
+          ? "condicionesComisionRenta"
+          : "condicionesComision";
 
-        setComparte(rentaOp.comparte_comision ? "Sí" : "No");
+        const mutablePayload = payload as unknown as MutablePayload;
+
+        // Comisión en meses (nuevo sistema)
+        if (rentaOp.comision_meses) {
+          mutablePayload[valorPropKey] = rentaOp.comision_meses.toString();
+        }
+
+        mutablePayload[compartePropKey] = rentaOp.comparte_comision ? "Sí" : "No";
 
         if (rentaOp.comparte_comision) {
-          setTipo(
-            rentaOp.comision_tipo === "monto_fijo" ? "monto" : "porcentaje",
-          );
-          const valor =
-            rentaOp.comision_tipo === "monto_fijo"
-              ? rentaOp.comision_monto_fijo
-              : rentaOp.comision_porcentaje;
-          setValor(valor?.toString() || "");
-
+          // porcentaje_comision_compartida almacena los meses compartidos para renta
           if (rentaOp.porcentaje_comision_compartida) {
-            setCompartidaTipo("porcentaje");
-            setCompartidaValor(
-              rentaOp.porcentaje_comision_compartida.toString(),
-            );
-          } else if (rentaOp.monto_comision_compartida) {
-            setCompartidaTipo("monto");
-            setCompartidaValor(rentaOp.monto_comision_compartida.toString());
+            const myMeses = rentaOp.comision_meses || 0;
+            const sharePct = myMeses > 0
+              ? Math.round(rentaOp.porcentaje_comision_compartida / myMeses * 100)
+              : 50;
+            mutablePayload[compartidaValorPropKey] = String(Math.min(100, Math.max(0, sharePct)));
           }
-          setCondiciones(rentaOp.condiciones_comision_compartida || "");
+          mutablePayload[condicionesPropKey] =
+            rentaOp.condiciones_comision_compartida || "";
         }
       }
 
       // 6. Amenidades
       if (data.propiedad_amenidades) {
-        const names = data.propiedad_amenidades
+        payload.amenidadesSeleccionadas = data.propiedad_amenidades
           .map((pa: any) => pa.catalogo_amenidades?.nombre)
           .filter(Boolean);
-        setAmenidadesSeleccionadas(names);
       }
 
       // 7. Financiamiento
@@ -470,124 +705,114 @@ export function usePropertyForm(
         data.propiedad_financiamientos &&
         data.propiedad_financiamientos.length > 0
       ) {
-        setAceptaFinanciamiento("Sí");
-        const names = data.propiedad_financiamientos
-          .map((pf: any) => pf.catalogo_tipos_financiamiento?.nombre)
-          .filter(Boolean);
-        setTiposFinanciamientoSeleccionados(names);
+        payload.aceptaFinanciamiento = "Sí";
+        payload.tiposFinanciamientoSeleccionados =
+          data.propiedad_financiamientos
+            .map((pf: any) => pf.catalogo_tipos_financiamiento?.nombre)
+            .filter(Boolean);
       } else {
-        setAceptaFinanciamiento("No");
+        payload.aceptaFinanciamiento = "No";
       }
 
       // 8. Gravamen
       if (data.propiedad_gravamenes && data.propiedad_gravamenes.length > 0) {
-        setTieneGravamen("Sí");
+        payload.tieneGravamen = "Sí";
         const grav = data.propiedad_gravamenes[0];
-        setInstitucionGravamen(
-          grav.catalogo_instituciones_financieras?.nombre || "",
-        );
-        setMontoGravamen(grav.monto?.toString() || "");
+        payload.institucionGravamen =
+          grav.catalogo_instituciones_financieras?.nombre || "";
+        payload.montoGravamen = grav.monto?.toString() || "";
       } else {
-        setTieneGravamen("No");
+        payload.tieneGravamen = "No";
       }
-    } catch (e: any) {
-      console.error("Error loading property data:", e);
+
+      // 9. Campos especializados
+      payload.tiposAgua = data.tipo_agua ?? [];
+      payload.concesionAgua = data.concesion_agua ?? false;
+      payload.usoTerreno = data.uso_terreno ?? '';
+      payload.tipoRiego = data.tipo_riego ?? '';
+      payload.infraElectricidad = data.infra_electricidad ?? false;
+      payload.infraCaminoAcceso = data.infra_camino_acceso ?? false;
+      payload.infraCercado = data.infra_cercado ?? false;
+      payload.accesoCarretera = data.acceso_carretera ?? false;
+      payload.accesoCamiones = data.acceso_camiones ?? false;
+      payload.tipoUbicacionComercial = data.tipo_ubicacion_comercial ?? '';
+      payload.frenteMetros = data.frente_metros?.toString() ?? '';
+      payload.nivelPiso = data.nivel_piso?.toString() ?? '';
+      payload.sobreAvenidaPrincipal = data.sobre_avenida_principal ?? false;
+      payload.enEsquina = data.en_esquina ?? false;
+      payload.altaVisibilidad = data.alta_visibilidad ?? false;
+      payload.altoFlujoVehicular = data.alto_flujo_vehicular ?? false;
+      payload.ubicacionIndustrial = data.ubicacion_industrial ?? '';
+      payload.alturaLibreM = data.altura_libre_m ?? '';
+      payload.tipoEnergiaKva = data.tipo_energia_kva ?? [];
+      payload.areaOficinas = data.area_oficinas_m2?.toString() ?? '';
+      payload.patioManiobras = data.patio_maniobras_m2?.toString() ?? '';
+
+      dispatch({ type: "LOAD", payload });
+    } catch (e: unknown) {
+      log.error("Error loading property data:", e);
       setLoadError("Error al procesar los datos de la propiedad");
     }
   };
 
   // ============================================
-  // HELPERS
-  // ============================================
-  const toggleAmenidad = useCallback((amenidad: string) => {
-    setAmenidadesSeleccionadas((prev) =>
-      prev.includes(amenidad)
-        ? prev.filter((a) => a !== amenidad)
-        : [...prev, amenidad],
-    );
-  }, []);
-
-  const toggleFinanciamiento = useCallback((tipo: string) => {
-    setTiposFinanciamientoSeleccionados((prev) =>
-      prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo],
-    );
-  }, []);
-
-  const handleCurrencyChange = useCallback(
-    (text: string, setter: (val: string) => void) => {
-      const rawValue = text.replace(/,/g, "");
-      if (/^\d*\.?\d*$/.test(rawValue)) {
-        const parts = rawValue.split(".");
-        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-        setter(parts.join("."));
-      }
-    },
-    [],
-  );
-
-  // ============================================
   // VALIDACIÓN
   // ============================================
+
   const validate = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (images.length === 0) {
+    if (state.images.length === 0) {
       newErrors.images = "Debes agregar al menos 1 imagen";
     }
-    if (!descripcion.trim()) {
+    if (!state.descripcion.trim()) {
       newErrors.descripcion = "La descripción es requerida";
     }
-    if (!subtipo) {
+    if (!state.subtipo) {
       newErrors.subtipo = "Debes seleccionar un subtipo de propiedad";
     }
 
-    if (tipoOperacion === "venta" && !precioVenta.trim()) {
+    if (state.tipoOperacion === "venta" && !state.precioVenta.trim()) {
       newErrors.precioVenta = "El precio de venta es requerido";
     }
-    if (tipoOperacion === "renta" && !precioRenta.trim()) {
+    if (state.tipoOperacion === "renta" && !state.precioRenta.trim()) {
       newErrors.precioRenta = "El precio de renta es requerido";
     }
-    if (tipoOperacion === "ambas") {
-      if (!precioVenta.trim())
+    if (state.tipoOperacion === "ambas") {
+      if (!state.precioVenta.trim())
         newErrors.precioVenta = "El precio de venta es requerido";
-      if (!precioRenta.trim())
+      if (!state.precioRenta.trim())
         newErrors.precioRenta = "El precio de renta es requerido";
     }
 
-    if (!ubicacionData.estado) newErrors.estado = "El estado es requerido";
-    if (!ubicacionData.municipio)
+    if (!state.ubicacionData.estado)
+      newErrors.estado = "El estado es requerido";
+    if (!state.ubicacionData.municipio)
       newErrors.municipio = "El municipio es requerido";
 
-    if (esTerreno(subtipo)) {
-      if (!m2Terreno.trim()) {
+    if (esTerreno(state.subtipo)) {
+      if (!state.m2Terreno.trim()) {
         newErrors.m2Terreno =
           "Los m² de terreno son obligatorios para terrenos";
       }
     } else {
-      if (!m2Construccion.trim() && !m2Terreno.trim()) {
+      if (!state.m2Construccion.trim() && !state.m2Terreno.trim()) {
         newErrors.m2 =
           "Debes especificar al menos m² de construcción o terreno";
       }
     }
 
-    if (location.latitude === 0 && location.longitude === 0) {
+    if (state.location.latitude === 0 && state.location.longitude === 0) {
       newErrors.location = "Debes seleccionar la ubicación en el mapa";
     }
 
-    setErrors(newErrors);
+    dispatch({ type: "SET_FIELD", field: "errors", value: newErrors });
     return Object.keys(newErrors).length === 0;
-  }, [
-    images,
-    descripcion,
-    subtipo,
-    tipoOperacion,
-    precioVenta,
-    precioRenta,
-    ubicacionData,
-    m2Terreno,
-    m2Construccion,
-    location,
-  ]);
+  }, [state]);
+
+  // ============================================
+  // Return — API pública idéntica al hook anterior
+  // ============================================
 
   return {
     // Loading
@@ -596,132 +821,183 @@ export function usePropertyForm(
     retryLoad: fetchPropertyDetails,
 
     // Status
-    status,
+    status: state.status,
     setStatus,
-    originalStatus,
+    originalStatus: state.originalStatus,
     filteredStatusOptions,
 
     // Contract
-    contractData,
+    contractData: state.contractData,
     setContractData,
 
     // Images
-    images,
+    images: state.images,
     setImages,
 
     // Información Básica
-    descripcion,
+    descripcion: state.descripcion,
     setDescripcion,
-    tipoOperacion,
+    tipoOperacion: state.tipoOperacion,
     setTipoOperacion,
-    precioVenta,
+    precioVenta: state.precioVenta,
     setPrecioVenta,
-    precioRenta,
+    precioRenta: state.precioRenta,
     setPrecioRenta,
-    moneda,
+    moneda: state.moneda,
     setMoneda,
-    tipoPrincipal,
+    tipoPrincipal: state.tipoPrincipal as TipoPrincipal,
     setTipoPrincipal,
-    subtipo,
+    subtipo: state.subtipo,
     setSubtipo,
 
     // Ubicación
-    pais,
-    ubicacionData,
+    pais: state.pais,
+    ubicacionData: state.ubicacionData,
     setUbicacionData,
-    calle,
+    calle: state.calle,
     setCalle,
-    numeroExterior,
+    numeroExterior: state.numeroExterior,
     setNumeroExterior,
-    numeroInterior,
+    numeroInterior: state.numeroInterior,
     setNumeroInterior,
-    codigoPostal,
+    codigoPostal: state.codigoPostal,
     setCodigoPostal,
-    location,
+    location: state.location,
     setLocation,
-    mapCenter,
+    mapCenter: state.mapCenter,
     setMapCenter,
     isColoniaMode,
 
     // Características Físicas
-    recamaras,
+    recamaras: state.recamaras,
     setRecamaras,
-    banosCompletos,
+    banosCompletos: state.banosCompletos,
     setBanosCompletos,
-    mediosBanos,
+    mediosBanos: state.mediosBanos,
     setMediosBanos,
-    estacionamientos,
+    estacionamientos: state.estacionamientos,
     setEstacionamientos,
-    m2Construccion,
+    m2Construccion: state.m2Construccion,
     setM2Construccion,
-    m2Terreno,
+    m2Terreno: state.m2Terreno,
     setM2Terreno,
-    niveles,
+    niveles: state.niveles,
     setNiveles,
-    antiguedad,
+    antiguedad: state.antiguedad,
     setAntiguedad,
-    amueblado,
+    amueblado: state.amueblado,
     setAmueblado,
-    petFriendly,
+    petFriendly: state.petFriendly,
     setPetFriendly,
     camposVisibles,
 
     // Amenidades
-    amenidadesSeleccionadas,
+    amenidadesSeleccionadas: state.amenidadesSeleccionadas,
     toggleAmenidad,
 
     // Comisión Venta
-    comparteComision,
+    comparteComision: state.comparteComision,
     setComparteComision,
-    comisionTipo,
+    comisionTipo: state.comisionTipo,
     setComisionTipo,
-    comisionValor,
+    comisionValor: state.comisionValor,
     setComisionValor,
-    comisionCompartidaTipo,
+    comisionCompartidaTipo: state.comisionCompartidaTipo,
     setComisionCompartidaTipo,
-    comisionCompartidaValor,
+    comisionCompartidaValor: state.comisionCompartidaValor,
     setComisionCompartidaValor,
-    condicionesComision,
+    condicionesComision: state.condicionesComision,
     setCondicionesComision,
 
     // Comisión Renta
-    comparteComisionRenta,
+    comparteComisionRenta: state.comparteComisionRenta,
     setComparteComisionRenta,
-    comisionTipoRenta,
+    comisionTipoRenta: state.comisionTipoRenta,
     setComisionTipoRenta,
-    comisionValorRenta,
+    comisionValorRenta: state.comisionValorRenta,
     setComisionValorRenta,
-    comisionCompartidaTipoRenta,
+    comisionCompartidaTipoRenta: state.comisionCompartidaTipoRenta,
     setComisionCompartidaTipoRenta,
-    comisionCompartidaValorRenta,
+    comisionCompartidaValorRenta: state.comisionCompartidaValorRenta,
     setComisionCompartidaValorRenta,
-    condicionesComisionRenta,
+    condicionesComisionRenta: state.condicionesComisionRenta,
     setCondicionesComisionRenta,
 
     // Gravamen
-    tieneGravamen,
+    tieneGravamen: state.tieneGravamen,
     setTieneGravamen,
-    institucionGravamen,
+    institucionGravamen: state.institucionGravamen,
     setInstitucionGravamen,
-    montoGravamen,
+    montoGravamen: state.montoGravamen,
     setMontoGravamen,
 
     // Financiamiento
-    aceptaFinanciamiento,
+    aceptaFinanciamiento: state.aceptaFinanciamiento,
     setAceptaFinanciamiento,
-    tiposFinanciamientoSeleccionados,
+    tiposFinanciamientoSeleccionados: state.tiposFinanciamientoSeleccionados,
     toggleFinanciamiento,
 
     // Propietario
-    nombreCompletoPropietario,
+    nombreCompletoPropietario: state.nombreCompletoPropietario,
     setNombreCompletoPropietario,
-    emailPropietario,
+    emailPropietario: state.emailPropietario,
     setEmailPropietario,
-    telefonoPropietario,
+    telefonoPropietario: state.telefonoPropietario,
     setTelefonoPropietario,
 
+    // EasyBroker
+    sinComision: state.sinComision,
+
+    // Campos especializados — Agrícola
+    tiposAgua: state.tiposAgua,
+    toggleTipoAgua,
+    concesionAgua: state.concesionAgua,
+    setConcesionAgua,
+    usoTerreno: state.usoTerreno,
+    setUsoTerreno,
+    tipoRiego: state.tipoRiego,
+    setTipoRiego,
+    infraElectricidad: state.infraElectricidad,
+    setInfraElectricidad,
+    infraCaminoAcceso: state.infraCaminoAcceso,
+    setInfraCaminoAcceso,
+    infraCercado: state.infraCercado,
+    setInfraCercado,
+    accesoCarretera: state.accesoCarretera,
+    setAccesoCarretera,
+    accesoCamiones: state.accesoCamiones,
+    setAccesoCamiones,
+
+    // Campos especializados — Comercial
+    tipoUbicacionComercial: state.tipoUbicacionComercial,
+    setTipoUbicacionComercial,
+    frenteMetros: state.frenteMetros,
+    setFrenteMetros,
+    nivelPiso: state.nivelPiso,
+    setNivelPiso,
+    sobreAvenidaPrincipal: state.sobreAvenidaPrincipal,
+    setSobreAvenidaPrincipal,
+    enEsquina: state.enEsquina,
+    setEnEsquina,
+    altaVisibilidad: state.altaVisibilidad,
+    setAltaVisibilidad,
+    altoFlujoVehicular: state.altoFlujoVehicular,
+    setAltoFlujoVehicular,
+
+    // Campos especializados — Industrial
+    ubicacionIndustrial: state.ubicacionIndustrial,
+    setUbicacionIndustrial,
+    alturaLibreM: state.alturaLibreM,
+    setAlturaLibreM,
+    tipoEnergiaKva: state.tipoEnergiaKva,
+    toggleTipoEnergiaKva,
+    areaOficinas: state.areaOficinas,
+    setAreaOficinas,
+    patioManiobras: state.patioManiobras,
+    setPatioManiobras,
+
     // Errors
-    errors,
+    errors: state.errors,
     setErrors,
     clearError,
 

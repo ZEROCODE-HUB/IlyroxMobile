@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TextInputProps,
   Platform,
-  Animated,
 } from "react-native";
 import { useAppTheme } from "../theme";
 import { COLORS } from "../../constants/colors";

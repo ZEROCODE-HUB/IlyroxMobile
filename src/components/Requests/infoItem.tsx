@@ -5,8 +5,6 @@ import {
   Text,
   Pressable,
   View,
-  Linking,
-  Alert,
 } from "react-native";
 import { COLORS } from "@/constants/colors";
 import firstUpperCase from "@/utils/firstUpperCase";

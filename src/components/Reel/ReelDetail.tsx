@@ -4,7 +4,6 @@ import {
   Text,
   Image,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   StyleSheet,
   useWindowDimensions,
   Modal,
@@ -17,7 +16,7 @@ import {
 import { VideoView, useVideoPlayer as useExpoVideoPlayer } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { FeedItem, User } from "../../types";
-import { COLORS } from "../../constants";
+import { COLORS, FALLBACKS } from "../../constants";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import ActionButtons from "../ActionButtons";
 import { Avatar } from "../shared";
@@ -39,7 +38,7 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
   const [showComments, setShowComments] = useState(false);
 
   const videoSource =
-    item.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
+    item.videoUrl || FALLBACKS.VIDEO_URL;
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);

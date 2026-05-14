@@ -6,7 +6,6 @@ import {
   Modal,
   StyleSheet,
   TextInput,
-  Switch,
   ScrollView,
   ActivityIndicator,
 } from "react-native";

@@ -1,5 +1,8 @@
 import { ScreenWrapper } from "@/screens/ScreenWrapper";
 import React, { useEffect, useState, useRef } from "react";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("RequestScreen");
 import {
   View,
   Text,
@@ -45,7 +48,7 @@ const RequestScreen = () => {
       setInfoRequests(info);
       setPropertyRequests(props);
     } catch (error) {
-      console.error("Error fetching requests:", error);
+      log.error("Error fetching requests:", error);
       showToast(
         "No se pudieron cargar las solicitudes. Intente de nuevo.",
         "error",
@@ -128,7 +131,7 @@ const RequestScreen = () => {
         );
       }
     } catch (error) {
-      console.error("Error opening WhatsApp:", error);
+      log.error("Error opening WhatsApp:", error);
       showToast(
         "Ocurrió un error al intentar contactar por WhatsApp.",
         "error",

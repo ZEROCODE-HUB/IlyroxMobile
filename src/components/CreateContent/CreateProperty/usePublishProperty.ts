@@ -5,23 +5,26 @@
 // ============================================
 
 import { useState, useRef, useCallback } from "react";
-import { Alert } from "react-native";
 import { useRouter } from "expo-router";
+import { useModal } from "@/context/ModalContext";
+import { useToast } from "@/context/ToastContext";
 import { uploadImage as uploadImageService } from "../../../services/uploadService";
-import { usePropertyMutation } from "@/hooks/hooks/usePropertyMutation";
+import { usePropertyMutation } from "@/hooks/usePropertyMutation";
 import { useAuth } from "../../../context/AuthContext";
 import {
   PROPERTY_TYPES,
-  esTerreno,
   getCamposVisibles,
 } from "../../../constants/propertyData";
 
 import type {
   ContractData,
   PublishState,
-  INITIAL_PUBLISH_STATE,
 } from "./types";
 import type { usePropertyForm } from "./usePropertyForm";
+import { logger } from "@/utils/logger";
+import { notifyMatchingUsers } from "@/hooks/useMatchNotifier";
+
+const log = logger.scoped("usePublishProperty");
 
 // Timeout para la operación completa de publicación (2 minutos)
 const PUBLISH_TIMEOUT_MS = 120_000;
@@ -61,6 +64,8 @@ export function usePublishProperty(
   const { user } = useAuth();
   const router = useRouter();
   const { saveProperty } = usePropertyMutation();
+  const { showModal } = useModal();
+  const { showToast } = useToast();
 
   const [publishState, setPublishState] = useState<PublishState>({
     uploading: false,
@@ -96,8 +101,8 @@ export function usePublishProperty(
       error: null,
       canCancel: true,
     });
-    Alert.alert("Cancelado", "La publicación fue cancelada.");
-  }, []);
+    showToast("La publicación fue cancelada.", "info");
+  }, [showToast]);
 
   const clearPublishError = useCallback(() => {
     setPublishState((prev) => ({
@@ -112,20 +117,18 @@ export function usePublishProperty(
 
       // Validar
       if (!form.validate()) {
-        // Obtener errores actualizados después de validate()
-        // validate() ya setea los errores, usamos un timeout corto para leer el estado actualizado
         setTimeout(() => {
-          Alert.alert(
-            "Faltan datos requeridos",
-            "Por favor revisa los campos marcados en rojo",
-            [{ text: "OK" }],
-          );
+          showModal({
+            title: "Faltan datos requeridos",
+            message: "Por favor revisa los campos marcados en rojo",
+            confirmText: "Entendido",
+          });
         }, 50);
         return;
       }
 
       if (!user) {
-        Alert.alert("Error", "Debes iniciar sesión");
+        showModal({ title: "Sesión requerida", message: "Debes iniciar sesión para continuar.", confirmText: "OK" });
         return;
       }
 
@@ -159,17 +162,13 @@ export function usePublishProperty(
             uploading: false,
             error: "La operación tardó demasiado. Intenta de nuevo.",
           }));
-          Alert.alert(
-            "Tiempo agotado",
-            "La publicación tardó demasiado. ¿Deseas intentar de nuevo?",
-            [
-              { text: "No", style: "cancel" },
-              {
-                text: "Reintentar",
-                onPress: () => handlePublish(resolvedContractData),
-              },
-            ],
-          );
+          showModal({
+            title: "Tiempo agotado",
+            message: "La publicación tardó demasiado. ¿Deseas intentar de nuevo?",
+            confirmText: "Reintentar",
+            cancelText: "No",
+            onConfirm: () => void handlePublish(resolvedContractData),
+          });
         }
       }, PUBLISH_TIMEOUT_MS);
 
@@ -207,7 +206,7 @@ export function usePublishProperty(
               failedImages++;
             }
           } catch (imgError: any) {
-            console.warn(`Error subiendo imagen ${i + 1}:`, imgError.message);
+            log.warn(`Error subiendo imagen ${i + 1}:`, imgError.message);
             failedImages++;
             // Continuar con las demás imágenes en lugar de fallar todo
           }
@@ -226,7 +225,7 @@ export function usePublishProperty(
 
         if (failedImages > 0 && uploadedUrls.length > 0) {
           // Algunas imágenes fallaron pero hay al menos una exitosa
-          console.warn(
+          log.warn(
             `${failedImages} imágenes no se pudieron subir. Continuando con ${uploadedUrls.length} imágenes.`,
           );
         }
@@ -239,6 +238,9 @@ export function usePublishProperty(
         updateProgress(45, "Preparando datos...");
 
         const camposVisibles = getCamposVisibles(form.subtipo);
+
+        const tieneComision = checkComisionPresente(form);
+        const sinComision = !tieneComision;
 
         const propertyData = {
           tipo: form.tipoPrincipal,
@@ -255,6 +257,7 @@ export function usePublishProperty(
           calle: form.calle || null,
           numero_exterior: form.numeroExterior || null,
           numero_interior: form.numeroInterior || null,
+          codigo_postal: form.codigoPostal || null,
           latitud: form.location.latitude,
           longitud: form.location.longitude,
           fotos: uploadedUrls,
@@ -266,17 +269,18 @@ export function usePublishProperty(
             ? parseInt(form.estacionamientos) || 0
             : 0,
           metros_cuadrados_construccion: camposVisibles.m2Construccion
-            ? parseFloat(form.m2Construccion) || null
+            ? parseFloat(form.m2Construccion?.replace(/,/g, "") || "") || null
             : null,
           metros_cuadrados_terreno: camposVisibles.m2Terreno
-            ? parseFloat(form.m2Terreno) || null
+            ? parseFloat(form.m2Terreno?.replace(/,/g, "") || "") || null
             : null,
           pisos: camposVisibles.niveles ? parseInt(form.niveles) || 1 : null,
           amueblado: camposVisibles.amueblado ? form.amueblado : null,
           pet_friendly: camposVisibles.petFriendly ? form.petFriendly : "No",
           antiguedad: camposVisibles.antiguedad ? form.antiguedad : null,
-          status: form.status,
-          activo: form.status === "Publicada",
+          status: sinComision ? "Suspendida" : form.status,
+          activo: form.status === "Publicada" && tieneComision,
+          sin_comision: sinComision,
           created_by: user.id,
           nombre_propietario: form.nombreCompletoPropietario || null,
           email_propietario: form.emailPropietario || null,
@@ -288,7 +292,43 @@ export function usePublishProperty(
                 precio_contrato: resolvedContractData.precio,
               }
             : {}),
+          // Campos especializados por tipo
+          ...(form.tipoPrincipal === 'agricola' ? {
+            tipo_agua: form.tiposAgua.length ? form.tiposAgua : null,
+            concesion_agua: form.concesionAgua || null,
+            uso_terreno: form.usoTerreno || null,
+            tipo_riego: form.tipoRiego || null,
+            infra_electricidad: form.infraElectricidad || null,
+            infra_camino_acceso: form.infraCaminoAcceso || null,
+            infra_cercado: form.infraCercado || null,
+            acceso_carretera: form.accesoCarretera || null,
+            acceso_camiones: form.accesoCamiones || null,
+          } : {}),
+          ...(form.tipoPrincipal === 'comercial' ? {
+            tipo_ubicacion_comercial: form.tipoUbicacionComercial || null,
+            frente_metros: parseFloat(form.frenteMetros) || null,
+            nivel_piso: parseInt(form.nivelPiso) || null,
+            sobre_avenida_principal: form.sobreAvenidaPrincipal || null,
+            en_esquina: form.enEsquina || null,
+            alta_visibilidad: form.altaVisibilidad || null,
+            alto_flujo_vehicular: form.altoFlujoVehicular || null,
+          } : {}),
+          ...(form.tipoPrincipal === 'industrial' ? {
+            ubicacion_industrial: form.ubicacionIndustrial || null,
+            altura_libre_m: form.alturaLibreM || null,
+            tipo_energia_kva: form.tipoEnergiaKva.length ? form.tipoEnergiaKva : null,
+            area_oficinas_m2: parseFloat(form.areaOficinas) || null,
+            patio_maniobras_m2: parseFloat(form.patioManiobras) || null,
+          } : {}),
         };
+
+        if (sinComision && form.status === "Publicada") {
+          showModal({
+            title: "Propiedad oculta",
+            message: "Tu propiedad se guardará, pero no será visible en el feed ni en el mapa hasta que agregues la comisión.",
+            confirmText: "Entendido",
+          });
+        }
 
         if (cancelledRef.current) throw new Error("CANCELLED");
 
@@ -351,9 +391,14 @@ export function usePublishProperty(
 
         const savePromise = saveProperty(propertyId, propertyData, relatedData);
 
-        await Promise.race([savePromise, saveTimeoutPromise]);
+        const saveResult = await Promise.race([savePromise, saveTimeoutPromise]);
 
         updateProgress(100, "¡Completado!");
+
+        // Notificar usuarios con búsquedas guardadas que coincidan (solo en publicación nueva)
+        if (!propertyId && saveResult?.id) {
+          notifyMatchingUsers(saveResult.id);
+        }
 
         // Limpiar timeout global
         if (globalTimeoutRef.current) {
@@ -371,27 +416,23 @@ export function usePublishProperty(
             canCancel: true,
           });
 
-          Alert.alert(
-            "¡Éxito!",
-            propertyId
+          showModal({
+            title: propertyId ? "¡Propiedad actualizada!" : "¡Propiedad publicada!",
+            message: propertyId
               ? "Propiedad actualizada correctamente"
               : "Propiedad publicada correctamente",
-            [
-              {
-                text: "OK",
-                onPress: () => {
-                  if (!propertyId) {
-                    router.replace({
-                      pathname: "/(tabs)",
-                      params: { refresh: String(Date.now()) },
-                    });
-                  } else {
-                    if (onBack) onBack(true);
-                  }
-                },
-              },
-            ],
-          );
+            confirmText: "Listo",
+            onConfirm: () => {
+              if (!propertyId) {
+                router.replace({
+                  pathname: "/(tabs)",
+                  params: { refresh: String(Date.now()) },
+                });
+              } else {
+                if (onBack) onBack(true);
+              }
+            },
+          });
         }, 500); // Pequeño delay para que el usuario vea el 100%
       } catch (error: any) {
         // Limpiar timeout global
@@ -405,7 +446,7 @@ export function usePublishProperty(
           return;
         }
 
-        console.error("Error publishing property:", error);
+        log.error("Error publishing property:", error);
 
         const errorMessage =
           error.message || "No se pudo publicar la propiedad";
@@ -418,16 +459,16 @@ export function usePublishProperty(
           canCancel: true,
         });
 
-        Alert.alert("Error al publicar", errorMessage, [
-          { text: "OK" },
-          {
-            text: "Reintentar",
-            onPress: () => handlePublish(resolvedContractData),
-          },
-        ]);
+        showModal({
+          title: "Error al publicar",
+          message: errorMessage,
+          confirmText: "Reintentar",
+          cancelText: "Cerrar",
+          onConfirm: () => void handlePublish(resolvedContractData),
+        });
       }
     },
-    [form, propertyId, user, onBack, router, saveProperty, updateProgress],
+    [form, propertyId, user, onBack, router, saveProperty, updateProgress, showModal],
   );
 
   return {
@@ -439,41 +480,43 @@ export function usePublishProperty(
 }
 
 // ============================================
+// HELPER: Verificar si hay comisión definida
+// ============================================
+function checkComisionPresente(form: ReturnType<typeof usePropertyForm>): boolean {
+  if (form.tipoOperacion === "venta" || form.tipoOperacion === "ambas") {
+    if (!form.comisionValor) return false;
+  }
+  if (form.tipoOperacion === "renta" || form.tipoOperacion === "ambas") {
+    const rentaVal =
+      form.tipoOperacion === "ambas" ? form.comisionValorRenta : form.comisionValor;
+    if (!rentaVal) return false;
+  }
+  return true;
+}
+
+// ============================================
 // HELPER: Construir operaciones
 // ============================================
 function buildOperaciones(form: ReturnType<typeof usePropertyForm>) {
   const operaciones: any[] = [];
 
   if (form.tipoOperacion === "venta" || form.tipoOperacion === "ambas") {
+    const pct = form.comisionValor ? parseFloat(form.comisionValor) : null;
+    const compartidaPct =
+      form.comparteComision === "Sí" && form.comisionCompartidaValor && pct
+        ? Math.round((parseFloat(form.comisionCompartidaValor) / 100) * pct * 100) / 100
+        : null;
+
     operaciones.push({
       tipo_operacion: "venta",
       precio: parseFloat(form.precioVenta.replace(/,/g, "")),
       moneda: form.moneda,
+      comision_tipo: pct ? "porcentaje" : null,
+      comision_porcentaje: pct,
+      comision_monto_fijo: null,
       comparte_comision: form.comparteComision === "Sí",
-      comision_tipo:
-        form.comparteComision === "Sí"
-          ? form.comisionTipo === "monto"
-            ? "monto_fijo"
-            : form.comisionTipo
-          : null,
-      comision_porcentaje:
-        form.comparteComision === "Sí" && form.comisionTipo === "porcentaje"
-          ? parseFloat(form.comisionValor.replace(/,/g, ""))
-          : null,
-      comision_monto_fijo:
-        form.comparteComision === "Sí" && form.comisionTipo === "monto"
-          ? parseFloat(form.comisionValor.replace(/,/g, ""))
-          : null,
-      porcentaje_comision_compartida:
-        form.comparteComision === "Sí" &&
-        form.comisionCompartidaTipo === "porcentaje"
-          ? parseFloat(form.comisionCompartidaValor.replace(/,/g, ""))
-          : null,
-      monto_comision_compartida:
-        form.comparteComision === "Sí" &&
-        form.comisionCompartidaTipo === "monto"
-          ? parseFloat(form.comisionCompartidaValor.replace(/,/g, ""))
-          : null,
+      porcentaje_comision_compartida: compartidaPct,
+      monto_comision_compartida: null,
       condiciones_comision_compartida:
         form.comparteComision === "Sí" && form.condicionesComision
           ? form.condicionesComision
@@ -483,44 +526,34 @@ function buildOperaciones(form: ReturnType<typeof usePropertyForm>) {
 
   if (form.tipoOperacion === "renta" || form.tipoOperacion === "ambas") {
     const isAmbas = form.tipoOperacion === "ambas";
-    const comparte = isAmbas
-      ? form.comparteComisionRenta
-      : form.comparteComision;
-    const tipo = isAmbas ? form.comisionTipoRenta : form.comisionTipo;
-    const valor = isAmbas ? form.comisionValorRenta : form.comisionValor;
-    const compartidaTipo = isAmbas
-      ? form.comisionCompartidaTipoRenta
-      : form.comisionCompartidaTipo;
-    const compartidaValor = isAmbas
-      ? form.comisionCompartidaValorRenta
-      : form.comisionCompartidaValor;
-    const condiciones = isAmbas
-      ? form.condicionesComisionRenta
-      : form.condicionesComision;
+    const mesesValor = isAmbas ? form.comisionValorRenta : form.comisionValor;
+    const comparte = isAmbas ? form.comparteComisionRenta : form.comparteComision;
+    const mesesCompartidos =
+      comparte === "Sí"
+        ? isAmbas
+          ? form.comisionCompartidaValorRenta
+          : form.comisionCompartidaValor
+        : "";
+    const condiciones = isAmbas ? form.condicionesComisionRenta : form.condicionesComision;
+
+    const meses = mesesValor ? parseFloat(mesesValor) : null;
+    const mesesComp =
+      comparte === "Sí" && mesesCompartidos && meses
+        ? Math.round((parseFloat(mesesCompartidos) / 100) * meses * 100) / 100
+        : null;
 
     operaciones.push({
       tipo_operacion: "renta",
       precio: parseFloat(form.precioRenta.replace(/,/g, "")),
       moneda: form.moneda,
+      comision_tipo: null,
+      comision_porcentaje: null,
+      comision_monto_fijo: null,
+      comision_meses: meses,
       comparte_comision: comparte === "Sí",
-      comision_tipo:
-        comparte === "Sí" ? (tipo === "monto" ? "monto_fijo" : tipo) : null,
-      comision_porcentaje:
-        comparte === "Sí" && tipo === "porcentaje"
-          ? parseFloat(valor.replace(/,/g, ""))
-          : null,
-      comision_monto_fijo:
-        comparte === "Sí" && tipo === "monto"
-          ? parseFloat(valor.replace(/,/g, ""))
-          : null,
-      porcentaje_comision_compartida:
-        comparte === "Sí" && compartidaTipo === "porcentaje"
-          ? parseFloat(compartidaValor.replace(/,/g, ""))
-          : null,
-      monto_comision_compartida:
-        comparte === "Sí" && compartidaTipo === "monto"
-          ? parseFloat(compartidaValor.replace(/,/g, ""))
-          : null,
+      // reutilizamos porcentaje_comision_compartida para almacenar los meses compartidos
+      porcentaje_comision_compartida: mesesComp,
+      monto_comision_compartida: null,
       condiciones_comision_compartida:
         comparte === "Sí" && condiciones ? condiciones : null,
     });

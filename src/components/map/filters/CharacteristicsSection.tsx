@@ -5,7 +5,7 @@ import { AppInput } from "@/design-system/components/AppInput";
 import { SelectionMoreModal } from "@/components/modals/SelectionMoreModal";
 import { COLORS } from "@/constants/colors";
 import { TipoPrincipal, getLabelRecamaras } from "@/constants/propertyData";
-import { SelectionModal, MultiSelectionModal } from "@/components/modals";
+import { SelectionModal } from "@/components/modals";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 
 interface CharacteristicsSectionProps {
@@ -20,8 +20,6 @@ interface CharacteristicsSectionProps {
   setShowNivelesModal: (show: boolean) => void;
   showAntiguedadModal: boolean;
   setShowAntiguedadModal: (show: boolean) => void;
-  showComisionModal: boolean;
-  setShowComisionModal: (show: boolean) => void;
   openNumberInput: (title: string, onSave: (val: string) => void) => void;
   setShowNumberInput: (show: boolean) => void;
 }
@@ -38,27 +36,12 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
   setShowNivelesModal,
   showAntiguedadModal,
   setShowAntiguedadModal,
-  showComisionModal,
-  setShowComisionModal,
   openNumberInput,
   setShowNumberInput,
 }) => {
   const { filters, updateFilter: onUpdateFilter } = usePropertyFiltersStore();
 
   if (!filters.tipoPropiedad) return null;
-
-  const optionsComission = [
-    { label: "Mostrar solo 1% o más", value: "1" },
-    { label: "Mostrar solo 2% o más", value: "2" },
-    { label: "Mostrar solo 3% o más", value: "3" },
-    { label: "Mostrar solo 4% o más", value: "4" },
-    { label: "Mostrar solo 5% o más", value: "5" },
-    { label: "Mostrar solo 6% o más", value: "6" },
-    { label: "Mostrar solo 7% o más", value: "7" },
-    { label: "Mostrar solo 8% o más", value: "8" },
-    { label: "Mostrar solo 9% o más", value: "9" },
-    { label: "Mostrar solo 10% o más", value: "10" },
-  ];
 
   return (
     <View style={styles.formSection}>
@@ -255,34 +238,6 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
           </View>
         )}
       </View>
-      <Text style={[styles.label, { marginTop: 12 }]}>Comisión</Text>
-      <TouchableOpacity
-        style={styles.selector}
-        onPress={() => setShowComisionModal(true)}
-      >
-        <Text
-          style={
-            filters.comision && filters.comision.length > 0
-              ? styles.selectorText
-              : [styles.selectorText, { color: COLORS.textTertiary }]
-          }
-        >
-          {filters.comision && filters.comision.length > 0
-            ? `${filters.comision.length} seleccionada${filters.comision.length > 1 ? "s" : ""}`
-            : "Cualquiera"}
-        </Text>
-        <Ionicons name="chevron-down" size={20} color={COLORS.textTertiary} />
-      </TouchableOpacity>
-      <MultiSelectionModal
-        visible={showComisionModal}
-        onClose={() => setShowComisionModal(false)}
-        onSelect={(vals) => {
-          onUpdateFilter("comision", vals);
-        }}
-        title="Filtrar por comisión"
-        options={optionsComission}
-        currentValues={filters.comision}
-      />
     </View>
   );
 };

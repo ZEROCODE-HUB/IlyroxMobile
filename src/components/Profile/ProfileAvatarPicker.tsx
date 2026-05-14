@@ -8,11 +8,11 @@ import {
   View,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   Platform,
   ActivityIndicator,
-  Modal,
 } from "react-native";
+import { useModal } from "@/context/ModalContext";
+import { useToast } from "@/context/ToastContext";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { decode } from "base64-arraybuffer";
@@ -20,6 +20,9 @@ import { supabase } from "../../lib/supabase";
 import { COLORS } from "../../constants/colors";
 import { Avatar } from "../shared";
 import { ViewImage } from "../modals/ViewImage";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("ProfileAvatarPicker");
 
 interface ProfileAvatarPickerProps {
   uri?: string;
@@ -32,6 +35,8 @@ interface ProfileAvatarPickerProps {
 
 const ProfileAvatarPicker: React.FC<ProfileAvatarPickerProps> = React.memo(
   ({ uri, name, size = 100, userId, isOwnProfile, onPhotoUpdated }) => {
+    const { showModal } = useModal();
+    const { showToast } = useToast();
     const [uploading, setUploading] = useState(false);
     const [openModal, setOpenModal] = useState(false);
 
@@ -43,10 +48,7 @@ const ProfileAvatarPicker: React.FC<ProfileAvatarPickerProps> = React.memo(
           await ImagePicker.requestMediaLibraryPermissionsAsync();
 
         if (status !== "granted") {
-          Alert.alert(
-            "Permiso denegado",
-            "Se requiere acceso a la galería para cambiar la foto.",
-          );
+          showModal({ title: "Permiso denegado", message: "Se requiere acceso a la galería para cambiar la foto.", confirmText: "OK" });
           return;
         }
 
@@ -62,8 +64,8 @@ const ProfileAvatarPicker: React.FC<ProfileAvatarPickerProps> = React.memo(
           await uploadImage(imageUri);
         }
       } catch (error) {
-        console.error("Error picking image:", error);
-        Alert.alert("Error", "No se pudo seleccionar la imagen");
+        log.error("Error picking image:", error);
+        showToast("No se pudo seleccionar la imagen", "error");
       }
     };
 
@@ -117,10 +119,10 @@ const ProfileAvatarPicker: React.FC<ProfileAvatarPickerProps> = React.memo(
           onPhotoUpdated(publicUrl);
         }
 
-        Alert.alert("Éxito", "Foto de perfil actualizada correctamente");
+        showToast("Foto de perfil actualizada correctamente", "success");
       } catch (error: any) {
-        console.error("Error uploading image:", error);
-        Alert.alert("Error", error.message || "No se pudo subir la imagen");
+        log.error("Error uploading image:", error);
+        showToast(error.message || "No se pudo subir la imagen", "error");
       } finally {
         setUploading(false);
       }

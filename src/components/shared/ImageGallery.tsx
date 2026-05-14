@@ -26,7 +26,7 @@ import {
 } from "react-native";
 import { FlatList } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
-import { DIMENSIONS, COLORS } from "../../constants";
+import { COLORS } from "../../constants";
 
 import LazyImage from "../LazyImage";
 import { commonStyles } from "../../../styles";

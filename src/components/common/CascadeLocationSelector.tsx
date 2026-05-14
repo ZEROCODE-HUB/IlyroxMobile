@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 import SelectionModal from "../modals/SelectionModal";
-import MultiSelectionModal from "../modals/MultiSelectionModal";
-import { useGeoLocation, GeoOption } from "../../hooks/useGeoLocation";
+import { useGeoLocation } from "../../hooks/useGeoLocation";
 
 interface LocationData {
   estado: string;

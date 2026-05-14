@@ -4,17 +4,11 @@
  */
 
 import React, { memo } from "react";
-import {
-  View,
-  TouchableOpacity,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  ScrollView,
-} from "react-native";
+import { StyleSheet, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../../constants/colors";
 import { AuthProvider } from "../hooks/useExternalAuth";
+import { Button } from "@/design-system/components";
 
 interface AuthProviderButtonsProps {
   onProviderPress: (provider: AuthProvider) => void;
@@ -88,22 +82,24 @@ export const AuthProviderButtons = memo(
         bounces={false}
       >
         {providerConfigs.map((config) => (
-          <TouchableOpacity
+          <Button
             key={config.provider}
-            style={[styles.button, { backgroundColor: config.backgroundColor }]}
+            label={config.label}
             onPress={() => handlePress(config)}
             disabled={loading}
-            activeOpacity={0.8}
-          >
-            {loading && config.provider !== "email" ? (
-              <ActivityIndicator color={config.iconColor} size="small" />
-            ) : (
+            loading={loading && config.provider !== "email"}
+            iconLeft={
               <Ionicons name={config.icon} size={24} color={config.iconColor} />
-            )}
-            <Text style={[styles.buttonText, { color: config.textColor }]}>
-              {config.label}
-            </Text>
-          </TouchableOpacity>
+            }
+            variant="primary"
+            size="lg"
+            fullWidth
+            style={[
+              styles.button,
+              { backgroundColor: config.backgroundColor },
+            ]}
+            labelStyle={{ color: config.textColor, fontWeight: "500" }}
+          />
         ))}
       </ScrollView>
     );
@@ -119,15 +115,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   button: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 18,
+    height: 60,
     paddingHorizontal: 20,
     borderRadius: 16,
-    gap: 16,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: "500",
   },
 });

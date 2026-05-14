@@ -1,22 +1,24 @@
 import React from "react";
-import { View, Text, StyleSheet, Image, Dimensions } from "react-native";
-import { FeedItem, Post } from "../../types";
+import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
+import { FeedItem } from "../../types";
 import { Ionicons } from "@expo/vector-icons";
 import { Avatar, CircularImageWithRays } from "../shared/Avatar";
 import { COLORS } from "../../constants";
-import { Clock } from "lucide-react-native";
+import { normalizePostType } from "../../utils/stringNormalizer";
+import { useChatInitiator } from "@/hooks/messaging/useChatInitiator";
+import firstUpperCase from "@/utils/firstUpperCase";
+import { formatPrice } from "@/utils/priceFormatter";
 
 interface SpecialPostCardProps {
   item: FeedItem;
-  mode?: "preview" | "detail" | "grid"; // Para ajustar tamaños de fuentes si es necesario
+  mode?: "preview" | "detail" | "grid" | "compact";
 }
 
-// Colores extraídos de tus imágenes de referencia
 const SPECIAL_COLORS = {
-  aniversario: "#74b5c3ff", // Azul claro tipo 'Celebración'
-  openhouse: "#6A1B9A", // Morado oscuro
-  sold: "#D32F2F", // Rojo para vendido
-  textWhite: "#FFFFFF",
+  aniversario: COLORS.eventAnniversary,
+  openhouse: COLORS.tagPurpleDark,
+  sold: COLORS.sold,
+  textWhite: COLORS.white,
 };
 
 export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
@@ -26,15 +28,21 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
   const {
     postType: rawPostType,
     user,
-    content,
     images,
     propertyDetails,
   } = item;
-  const postType = rawPostType
-    ?.toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "");
+  const postType = normalizePostType(rawPostType);
+  const { handleContact } = useChatInitiator();
+
+  const handleOfferProperty = () => {
+    if (!item.user?.id) return;
+    handleContact(item.user.id, null, {
+      id: item.user.id,
+      nombre: item.user.name?.split(" ")[0] || item.user.name || "",
+      apellido_paterno: item.user.name?.split(" ")[1] || "",
+      foto: item.user.avatar || null,
+    });
+  };
 
   // Datos variables
   const userName = item.nombre_asesor || user.nombre || user.name || "Usuario";
@@ -45,7 +53,94 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
   const eventDate = item.fecha_hora || "Próximamente";
   // Asumimos antiguedad viene en el item aunque no esté en el tipo estricto aún, o usamos 1 por defecto
   const years = item.antiguedad || 1;
-  const userAvatar = item.postDetails.foto_perfil_usuario;
+  const userAvatar = item.postDetails?.foto_perfil_usuario;
+  const headerImage = item.foto_propiedad || images?.[0] || propertyDetails?.images?.[0];
+
+  // --- RENDER: COMPACT MODE (para grids de 2 columnas) ---
+  if (mode === "compact") {
+    // COMPACT: OPEN HOUSE / SOLD
+    if (postType === "openhouse" || postType === "sold") {
+      const isSold =
+        postType === "sold" ||
+        item.status?.toLowerCase() === "vendida" ||
+        item.status?.toLowerCase() === "sold";
+      const mainColor = isSold ? SPECIAL_COLORS.sold : SPECIAL_COLORS.openhouse;
+      const bannerText = isSold ? "VENDIDO" : "OPEN\nHOUSE";
+      const formattedDate =
+        eventDate !== "Próximamente"
+          ? new Date(eventDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+          : null;
+
+      return (
+        <View style={styles.compactContainer}>
+          {headerImage ? (
+            <Image source={{ uri: headerImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : null}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: mainColor, opacity: headerImage ? 0.72 : 1 }]} />
+          {userAvatar && (
+            <View style={styles.compactAvatar}>
+              <Avatar uri={userAvatar} name={userName} size={34} />
+            </View>
+          )}
+          <Text style={styles.compactBannerText}>{bannerText}</Text>
+          {!isSold && formattedDate && (
+            <Text style={styles.compactSubText} numberOfLines={1}>{formattedDate}</Text>
+          )}
+          <View style={styles.compactLocationRow}>
+            <Ionicons name="location-sharp" size={10} color="rgba(255,255,255,0.9)" />
+            <Text style={styles.compactLocationText} numberOfLines={2}>{userLocation}</Text>
+          </View>
+        </View>
+      );
+    }
+
+    // COMPACT: BUSQUEDA
+    if (postType === "busqueda" && item.postDetails?.busquedas_json) {
+      const { busquedas_json } = item.postDetails;
+      return (
+        <View style={[styles.compactContainer, { backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.cardBorder }]}>
+          <View style={styles.compactSearchHeader}>
+            <Ionicons name={busquedas_json.icon || "search-outline"} size={18} color={COLORS.primary} />
+            <Text style={styles.compactSearchTitle}>SE BUSCA</Text>
+          </View>
+          <Text style={styles.compactSearchType} numberOfLines={1}>
+            {busquedas_json.filtros?.tipo_propiedad
+              ? busquedas_json.filtros.tipo_propiedad.charAt(0).toUpperCase() + busquedas_json.filtros.tipo_propiedad.slice(1)
+              : "Propiedad"}
+          </Text>
+          <View style={styles.compactBadge}>
+            <Text style={styles.compactBadgeText}>{busquedas_json.filtros?.operacion || "Compra"}</Text>
+          </View>
+          {(busquedas_json.filtros?.ubicacion?.ciudad || busquedas_json.filtros?.ubicacion?.colonia) && (
+            <View style={styles.compactLocationRow}>
+              <Ionicons name="location-outline" size={10} color={COLORS.textTertiary} />
+              <Text style={[styles.compactLocationText, { color: COLORS.textSecondary }]} numberOfLines={2}>
+                {[busquedas_json.filtros.ubicacion.ciudad, busquedas_json.filtros.ubicacion.colonia]
+                  .filter(Boolean).join(", ")}
+              </Text>
+            </View>
+          )}
+        </View>
+      );
+    }
+
+    // COMPACT: ANIVERSARIO
+    if (postType === "aniversario") {
+      return (
+        <View style={[styles.compactContainer, { backgroundColor: SPECIAL_COLORS.aniversario, justifyContent: "center" }]}>
+          <View style={styles.compactBurstCircle}>
+            <Avatar uri={userAvatar} name={userName} size={44} />
+          </View>
+          <Text style={styles.compactAniYears}>{years > 1 ? `${years} Años` : `${years} Año`}</Text>
+          <Text style={styles.compactAniLabel}>Aniversario</Text>
+          <Text style={styles.compactAniName} numberOfLines={1}>{userName}</Text>
+        </View>
+      );
+    }
+
+    return null;
+  }
+
   // --- RENDER: GRID MODE (Prioridad Alta) ---
   if (mode === "grid") {
     // --- GRID: ANIVERSARIO ---
@@ -249,7 +344,7 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
                     minute: "2-digit",
                   })}
                 </Text>
-                {item.postDetails.fecha_finalizacion && (
+                {item.postDetails?.fecha_finalizacion && (
                   <Text style={[styles.dateTimeText]}>
                     Finaliza:{" "}
                     {new Date(
@@ -281,6 +376,41 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
   if (postType === "busqueda" && item.postDetails?.busquedas_json) {
     const { busquedas_json } = item.postDetails;
     const isDetail = mode === "detail";
+    const f = busquedas_json.filtros ?? {};
+
+    // Título grande: subtipo principal o tipo_propiedad
+    const subtipoArr: string[] = Array.isArray(f.subtipo) ? f.subtipo : [];
+    const rawTipo = subtipoArr[0] || f.tipo_propiedad || "Propiedad";
+    const titulo = firstUpperCase(rawTipo);
+
+    // Rango de presupuesto
+    const moneda = f.moneda || "MXN";
+    const precioMin = typeof f.precio_min === "number" && f.precio_min > 0 ? f.precio_min : null;
+    const precioMax = typeof f.precio_max === "number" && f.precio_max > 0 ? f.precio_max : null;
+    let presupuestoText = "Sin especificar";
+    if (precioMin && precioMax) {
+      presupuestoText = `${formatPrice(precioMin)} – ${formatPrice(precioMax)} ${moneda}`;
+    } else if (precioMin) {
+      presupuestoText = `Desde ${formatPrice(precioMin)} ${moneda}`;
+    } else if (precioMax) {
+      presupuestoText = `Hasta ${formatPrice(precioMax)} ${moneda}`;
+    }
+
+    // Zonas (chips de locationChips)
+    const zonas: Array<{ id?: string; label: string }> = Array.isArray(f.zonas_interes)
+      ? f.zonas_interes
+      : [];
+
+    // Fallback de ubicación: si no hay zonas pero sí hay ubicacion explícita, mostrarla como un chip
+    const ubicacionFallback = !zonas.length
+      ? [f.ubicacion?.ciudad, f.ubicacion?.colonia, f.ubicacion?.municipio, f.ubicacion?.estado]
+          .filter((s) => typeof s === "string" && s.trim().length > 0)
+          .slice(0, 1)
+      : [];
+
+    const habitaciones = f.caracteristicas?.habitaciones;
+    const banos = f.caracteristicas?.banos;
+    const nota: string = typeof f.nota === "string" ? f.nota : "";
 
     return (
       <View style={[styles.cardContainer, isDetail && styles.detailContainer]}>
@@ -290,173 +420,82 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
             isDetail && styles.searchPostDetail,
           ]}
         >
-          <View style={styles.searchHeader}>
-            <Ionicons
-              name={busquedas_json.icon || "search-outline"}
-              size={isDetail ? 24 : 20}
-              color={COLORS.primary}
-            />
-            <Text
-              style={[styles.searchTitle, isDetail && styles.searchTitleDetail]}
-            >
-              {busquedas_json.titulo || "SE BUSCA"}
-            </Text>
+          {/* Chip SE BUSCA */}
+          <View style={styles.busquedaTagRow}>
+            <Ionicons name="search-outline" size={14} color={COLORS.primary} />
+            <Text style={styles.busquedaTagText}>SE BUSCA</Text>
           </View>
 
-          <View style={styles.searchInfoContent}>
-            <View style={styles.searchMainRow}>
-              <View
-                style={[
-                  styles.searchBadge,
-                  { backgroundColor: COLORS.primary + "15" },
-                ]}
-              >
-                <Ionicons
-                  name={
-                    busquedas_json.filtros?.icon_operacion || "cash-outline"
-                  }
-                  size={14}
-                  color={COLORS.primary}
-                />
-                <Text
-                  style={[styles.searchBadgeText, { color: COLORS.primary }]}
-                >
-                  {busquedas_json.filtros?.operacion?.toUpperCase()}
-                </Text>
+          {/* Título grande */}
+          <Text style={styles.busquedaTitulo} numberOfLines={2}>
+            {titulo}
+          </Text>
+
+          {/* Presupuesto */}
+          <Text style={styles.busquedaLabel}>PRESUPUESTO</Text>
+          <Text style={styles.busquedaPresupuesto}>{presupuestoText}</Text>
+
+          {/* Zonas de interés */}
+          {(zonas.length > 0 || ubicacionFallback.length > 0) && (
+            <>
+              <Text style={styles.busquedaLabel}>ZONAS DE INTERÉS</Text>
+              <View style={styles.busquedaZonasRow}>
+                {zonas.map((z, idx) => (
+                  <View key={z.id ?? `${z.label}-${idx}`} style={styles.busquedaZonaChip}>
+                    <Text style={styles.busquedaZonaPin}>📍</Text>
+                    <Text style={styles.busquedaZonaText} numberOfLines={1}>
+                      {z.label}
+                    </Text>
+                  </View>
+                ))}
+                {ubicacionFallback.map((label, idx) => (
+                  <View key={`fallback-${idx}`} style={styles.busquedaZonaChip}>
+                    <Text style={styles.busquedaZonaPin}>📍</Text>
+                    <Text style={styles.busquedaZonaText} numberOfLines={1}>
+                      {label}
+                    </Text>
+                  </View>
+                ))}
               </View>
-              <View
-                style={[
-                  styles.searchBadge,
-                  { backgroundColor: COLORS.info + "15" },
-                ]}
-              >
-                <Ionicons
-                  name={busquedas_json.filtros?.icon_tipo || "business-outline"}
-                  size={14}
-                  color={COLORS.info}
-                />
-                <Text style={[styles.searchBadgeText, { color: COLORS.info }]}>
-                  {busquedas_json.filtros?.tipo_propiedad
-                    ?.charAt(0)
-                    .toUpperCase() +
-                    busquedas_json.filtros?.tipo_propiedad?.slice(1) ||
-                    "Propiedad"}
+            </>
+          )}
+
+          {/* Características */}
+          {(habitaciones || banos) && (
+            <View style={styles.busquedaStatsRow}>
+              {habitaciones ? (
+                <Text style={styles.busquedaStat}>
+                  🛏️ <Text style={styles.busquedaStatValue}>{habitaciones}</Text> rec.
                 </Text>
-              </View>
+              ) : null}
+              {banos ? (
+                <Text style={styles.busquedaStat}>
+                  🚽 <Text style={styles.busquedaStatValue}>{banos}</Text> baños
+                </Text>
+              ) : null}
             </View>
+          )}
 
-            <View style={styles.searchLocationRow}>
-              <Ionicons
-                name="location-outline"
-                size={isDetail ? 20 : 16}
-                color={COLORS.textTertiary}
-              />
-              <Text
-                style={[
-                  styles.searchLocationText,
-                  isDetail && styles.searchLocationTextDetail,
-                ]}
-                numberOfLines={2}
-              >
-                {[
-                  busquedas_json.filtros?.ubicacion?.ciudad,
-                  busquedas_json.filtros?.ubicacion?.colonia,
-                ]
-                  .filter(Boolean)
-                  .join(", ")}
+          {/* Nota */}
+          {nota.trim().length > 0 && (
+            <>
+              <View style={styles.busquedaSeparator} />
+              <Text style={styles.busquedaNota}>
+                <Text style={styles.busquedaNotaLabel}>Nota: </Text>
+                {nota}
               </Text>
-            </View>
-
-            <View
-              style={[
-                styles.searchPriceRow,
-                isDetail && styles.searchPriceRowDetail,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.searchPriceText,
-                  isDetail && styles.searchPriceTextDetail,
-                ]}
-              >
-                {busquedas_json.filtros?.precio_min &&
-                busquedas_json.filtros?.precio_max
-                  ? busquedas_json.filtros?.moneda +
-                    " - " +
-                    "Min. " +
-                    busquedas_json.filtros?.precio_min +
-                    " - " +
-                    "Max. " +
-                    busquedas_json.filtros?.precio_max
-                  : busquedas_json.filtros?.precio_min
-                    ? busquedas_json.filtros?.moneda +
-                      " - " +
-                      "Min. " +
-                      busquedas_json.filtros?.precio_min
-                    : busquedas_json.filtros?.precio_max
-                      ? busquedas_json.filtros?.moneda +
-                        " - " +
-                        "Max. " +
-                        busquedas_json.filtros?.precio_max
-                      : "Sin especificar"}
-              </Text>
-            </View>
-
-            <View style={styles.searchCharacteristicsGrid}>
-              {busquedas_json.filtros?.caracteristicas?.habitaciones && (
-                <View style={styles.searchCharItem}>
-                  <Ionicons
-                    name="bed-outline"
-                    size={isDetail ? 18 : 14}
-                    color={COLORS.textTertiary}
-                  />
-                  <Text
-                    style={[
-                      styles.searchCharText,
-                      isDetail && styles.searchCharTextDetail,
-                    ]}
-                  >
-                    {busquedas_json.filtros.caracteristicas.habitaciones}
-                  </Text>
-                </View>
-              )}
-              {busquedas_json.filtros?.caracteristicas?.banos && (
-                <View style={styles.searchCharItem}>
-                  <Ionicons
-                    name="water-outline"
-                    size={isDetail ? 18 : 14}
-                    color={COLORS.textTertiary}
-                  />
-                  <Text
-                    style={[
-                      styles.searchCharText,
-                      isDetail && styles.searchCharTextDetail,
-                    ]}
-                  >
-                    {busquedas_json.filtros.caracteristicas.banos}
-                  </Text>
-                </View>
-              )}
-              {busquedas_json.filtros?.caracteristicas?.estacionamientos && (
-                <View style={styles.searchCharItem}>
-                  <Ionicons
-                    name="car-outline"
-                    size={isDetail ? 18 : 14}
-                    color={COLORS.textTertiary}
-                  />
-                  <Text
-                    style={[
-                      styles.searchCharText,
-                      isDetail && styles.searchCharTextDetail,
-                    ]}
-                  >
-                    {busquedas_json.filtros.caracteristicas.estacionamientos}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
+            </>
+          )}
         </View>
+
+        {/* Botón Ofrecer propiedad */}
+        <TouchableOpacity
+          style={[styles.busquedaCta, isDetail && styles.busquedaCtaDetail]}
+          onPress={handleOfferProperty}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.busquedaCtaText}>Ofrecer propiedad 👋</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -506,7 +545,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
     borderRadius: 100,
     borderWidth: 2,
-    borderColor: "#fff",
+    borderColor: COLORS.white,
     borderStyle: "dashed", // Simula los rayos del diseño
   },
   largeAvatar: {
@@ -514,7 +553,7 @@ const styles = StyleSheet.create({
     height: 140,
     borderRadius: 70,
     borderWidth: 3,
-    borderColor: "#fff",
+    borderColor: COLORS.white,
   },
   aniversaryFooter: {
     padding: 20,
@@ -579,7 +618,7 @@ const styles = StyleSheet.create({
     height: 110,
     borderRadius: 55,
     borderWidth: 4,
-    borderColor: "#fff", // Borde blanco como en la imagen
+    borderColor: COLORS.white, // Borde blanco como en la imagen
   },
   openHouseInfo: {
     flex: 1,
@@ -587,7 +626,7 @@ const styles = StyleSheet.create({
     paddingTop: 5,
   },
   joinUsText: {
-    color: "#fff",
+    color: COLORS.white,
     fontWeight: "bold",
     fontSize: 16,
     marginBottom: 5,
@@ -612,7 +651,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   soldText: {
-    color: "#fff",
+    color: COLORS.white,
     fontWeight: "bold",
     fontSize: 28,
     textTransform: "uppercase",
@@ -620,11 +659,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 10,
     backgroundColor: "#D32F2F",
-    borderColor: "#fff",
+    borderColor: COLORS.white,
     borderWidth: 2,
   },
   openHouseText: {
-    color: "#fff",
+    color: COLORS.white,
     fontWeight: "bold",
     fontSize: 30,
     textTransform: "uppercase",
@@ -647,7 +686,7 @@ const styles = StyleSheet.create({
     padding: 3,
     borderRadius: 50,
     borderWidth: 1.5,
-    borderColor: "#fff",
+    borderColor: COLORS.white,
     borderStyle: "dashed",
     marginBottom: 4,
     marginTop: 8,
@@ -657,7 +696,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: "#fff",
+    borderColor: COLORS.white,
   },
   gridTinyText: {
     color: "rgba(255,255,255,0.9)",
@@ -666,13 +705,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   gridLargeText: {
-    color: "#fff",
+    color: COLORS.white,
     fontSize: 16,
     fontWeight: "900",
   },
   // Grid OpenHouse/Sold
   gridBannerText: {
-    color: "#fff",
+    color: COLORS.white,
     fontWeight: "900",
     fontSize: 18, // Tamaño suficiente para leer en pequeño
     textTransform: "uppercase",
@@ -720,13 +759,13 @@ const styles = StyleSheet.create({
 
   // --- ESTILOS BUSQUEDA ---
   searchPostContainer: {
-    padding: 16,
+    padding: 20,
     backgroundColor: COLORS.white,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
     marginHorizontal: 16,
-    marginVertical: 8,
+    marginTop: 8,
     shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -735,95 +774,230 @@ const styles = StyleSheet.create({
   },
   searchPostDetail: {
     marginHorizontal: 0,
-    marginVertical: 0,
+    marginTop: 0,
     borderRadius: 0,
     borderWidth: 1,
     elevation: 0,
     shadowOpacity: 0,
     padding: 24,
   },
-  searchHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.background,
-    paddingBottom: 8,
-  },
-  searchTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: COLORS.primaryDark,
-    letterSpacing: 1,
-  },
-  searchTitleDetail: {
-    fontSize: 16,
-  },
-  searchInfoContent: {
-    gap: 10,
-  },
-  searchMainRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  searchBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  searchBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  searchLocationRow: {
+  busquedaTagRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    marginBottom: 8,
   },
-  searchLocationText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    fontWeight: "500",
+  busquedaTagText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: COLORS.primary,
+    letterSpacing: 1.2,
   },
-  searchLocationTextDetail: {
-    fontSize: 16,
-  },
-  searchPriceRow: {
-    backgroundColor: COLORS.background,
-    padding: 12,
-    borderRadius: 10,
-  },
-  searchPriceRowDetail: {
-    padding: 20,
-  },
-  searchPriceText: {
-    fontSize: 17,
-    fontWeight: "700",
+  busquedaTitulo: {
+    fontSize: 24,
+    fontWeight: "800",
     color: COLORS.textPrimary,
+    marginBottom: 16,
+    lineHeight: 28,
   },
-  searchPriceTextDetail: {
-    fontSize: 22,
+  busquedaLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: COLORS.textTertiary,
+    letterSpacing: 0.8,
+    marginBottom: 6,
   },
-  searchCharacteristicsGrid: {
+  busquedaPresupuesto: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.textPrimary,
+    marginBottom: 16,
+  },
+  busquedaZonasRow: {
     flexDirection: "row",
-    gap: 16,
-    paddingTop: 4,
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 16,
   },
-  searchCharItem: {
+  busquedaZonaChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: COLORS.background,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    maxWidth: "100%",
   },
-  searchCharText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
+  busquedaZonaPin: {
+    fontSize: 13,
+  },
+  busquedaZonaText: {
+    fontSize: 13,
     fontWeight: "600",
+    color: COLORS.textPrimary,
+    maxWidth: 180,
   },
-  searchCharTextDetail: {
+  busquedaStatsRow: {
+    flexDirection: "row",
+    gap: 20,
+    marginTop: 4,
+  },
+  busquedaStat: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  busquedaStatValue: {
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+  },
+  busquedaSeparator: {
+    height: 1,
+    backgroundColor: COLORS.cardBorder,
+    marginVertical: 14,
+  },
+  busquedaNota: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+  },
+  busquedaNotaLabel: {
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+  },
+  busquedaCta: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    paddingVertical: 16,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  busquedaCtaDetail: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  busquedaCtaText: {
+    color: COLORS.white,
     fontSize: 16,
+    fontWeight: "700",
+  },
+
+  // ================= ESTILOS COMPACT (2 columnas) =================
+  compactContainer: {
+    width: "100%",
+    aspectRatio: 3 / 4,
+    overflow: "hidden",
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    padding: 10,
+    gap: 3,
+  },
+  compactAvatar: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: COLORS.white,
+    overflow: "hidden",
+  },
+  compactBannerText: {
+    color: COLORS.white,
+    fontWeight: "900",
+    fontSize: 16,
+    textTransform: "uppercase",
+    textAlign: "center",
+    lineHeight: 18,
+    letterSpacing: 1,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  compactSubText: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 10,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  compactLocationRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 3,
+    width: "100%",
+  },
+  compactLocationText: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 10,
+    flex: 1,
+    lineHeight: 13,
+  },
+  // Compact busqueda
+  compactSearchHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    position: "absolute",
+    top: 10,
+    left: 10,
+    right: 10,
+  },
+  compactSearchTitle: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: COLORS.primaryDark,
+    letterSpacing: 0.5,
+  },
+  compactSearchType: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: COLORS.textPrimary,
+    textAlign: "center",
+    marginTop: "auto" as any,
+  },
+  compactBadge: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  compactBadgeText: {
+    fontSize: 9,
+    color: COLORS.white,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  // Compact aniversario
+  compactBurstCircle: {
+    borderRadius: 28,
+    borderWidth: 1.5,
+    borderColor: COLORS.white,
+    borderStyle: "dashed",
+    padding: 3,
+    marginBottom: 6,
+  },
+  compactAniYears: {
+    color: COLORS.white,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  compactAniLabel: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 10,
+    textTransform: "uppercase",
+    fontWeight: "600",
+    letterSpacing: 1,
+  },
+  compactAniName: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2,
+    textAlign: "center",
   },
 });

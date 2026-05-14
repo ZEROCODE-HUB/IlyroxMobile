@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { ConfirmationModal } from "../components/modals/ConfirmationModal";
+import { logger } from "../utils/logger";
+
+const log = logger.scoped("ModalContext");
 
 export type ModalType = "confirm" | "alert";
 
@@ -49,7 +52,7 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
                 setIsLoading(true);
                 await modalConfig.onConfirm();
             } catch (error) {
-                console.error("Modal confirmation error:", error);
+                log.error("Modal confirmation error:", error);
             } finally {
                 setIsLoading(false);
                 hideModal();
@@ -82,7 +85,7 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
                     }
                     cancelText={modalConfig.cancelText || "Cancelar"}
                     onConfirm={handleConfirm}
-                    onCancel={handleCancel}
+                    onCancel={modalConfig.onCancel ? handleCancel : undefined}
                     loading={isLoading}
                 // If it's an alert, we can hide the cancel button (check ConfirmationModal implementation)
                 // For now, assuming ConfirmationModal always shows cancel unless type is handled there.

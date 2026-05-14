@@ -3,13 +3,16 @@ import { View, Text, StyleSheet, Platform, Pressable } from "react-native";
 
 import MapView, {
   Marker,
+  Polygon,
+  Polyline,
   PROVIDER_DEFAULT,
   PROVIDER_GOOGLE,
 } from "../shared/MapComponents";
 import { Property } from "@/types";
 import { COLORS } from "@/constants/colors";
-import { useStableSafeInsets } from "@/context/SafeInsetsContext";
 import { Globe, MapIcon } from "lucide-react-native";
+import { PolygonCoord } from "@/store/propertyFiltersStore";
+import Supercluster from "supercluster";
 
 interface PropertyMapProps {
   properties: Property[];
@@ -22,6 +25,11 @@ interface PropertyMapProps {
     latitudeDelta: number;
     longitudeDelta: number;
   } | null;
+  drawingMode?: boolean;
+  draftPolygonPoints?: PolygonCoord[];
+  confirmedPolygons?: PolygonCoord[][];
+  onMapPress?: (coord: PolygonCoord) => void;
+  onLongPressMap?: (coord: PolygonCoord) => void;
 }
 
 export const PropertyMap: React.FC<PropertyMapProps> = ({
@@ -30,8 +38,12 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   googleApiKey,
   highlightedPropertyId,
   focusRegion,
+  drawingMode = false,
+  draftPolygonPoints = [],
+  confirmedPolygons = [],
+  onMapPress,
+  onLongPressMap,
 }) => {
-  const { bottom } = useStableSafeInsets();
   const mapRef = useRef<any>(null);
   const nativeMapRef = useRef<MapView>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -40,10 +52,20 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   const [overlayPositions, setOverlayPositions] = useState<{
     [key: string]: { x: number; y: number };
   }>({});
+  const [clusterOverlayPositions, setClusterOverlayPositions] = useState<{
+    [key: string]: { x: number; y: number };
+  }>({});
 
   const [mapTypeId, setMapTypeId] = useState<"standard" | "satellite">(
     "standard",
   );
+
+  const [currentRegion, setCurrentRegion] = useState({
+    latitude: 25.6866,
+    longitude: -100.3161,
+    latitudeDelta: 0.5,
+    longitudeDelta: 0.5,
+  });
 
   // Fast lookup map for properties
   const propertyMap = useMemo(() => {
@@ -52,16 +74,83 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     return map;
   }, [properties]);
 
+  const superclusterRef = useRef<Supercluster | null>(null);
+
+  const superclusterIndex = useMemo(() => {
+    const sc = new Supercluster({ radius: 50, maxZoom: 14 });
+    const points = properties
+      .map((p) => {
+        const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
+        const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
+        if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return null;
+        return {
+          type: "Feature" as const,
+          geometry: { type: "Point" as const, coordinates: [lng, lat] },
+          properties: { propertyId: p.id },
+        };
+      })
+      .filter(Boolean) as any[];
+    console.log(`[MapDebug] supercluster: ${points.length} puntos con coords (de ${properties.length} props totales)`);
+    sc.load(points);
+    superclusterRef.current = sc;
+    return sc;
+  }, [properties]);
+
+  const latDeltaToZoom = (delta: number) =>
+    Math.round(Math.log(360 / delta) / Math.LN2);
+
+  const clusters = useMemo(() => {
+    if (Platform.OS === "web") return [];
+    const zoom = latDeltaToZoom(currentRegion.latitudeDelta);
+    const { latitude, longitude, latitudeDelta, longitudeDelta } = currentRegion;
+    const bbox: [number, number, number, number] = [
+      longitude - longitudeDelta,
+      latitude - latitudeDelta,
+      longitude + longitudeDelta,
+      latitude + latitudeDelta,
+    ];
+    const result = superclusterIndex.getClusters(bbox, zoom);
+    const isCluster = result.filter((c: any) => c.properties.cluster).length;
+    const isPoint = result.filter((c: any) => !c.properties.cluster).length;
+    console.log(`[MapDebug] clusters: ${result.length} (${isCluster} agrupados, ${isPoint} individuales) | zoom: ${zoom} | latDelta: ${latitudeDelta.toFixed(3)} | center: ${latitude.toFixed(3)},${longitude.toFixed(3)}`);
+    return result;
+  }, [superclusterIndex, currentRegion]);
+
+  const individualPropertyIds = useMemo(
+    () =>
+      new Set(
+        clusters
+          .filter((c: any) => !c.properties.cluster)
+          .map((c: any) => c.properties.propertyId as string),
+      ),
+    [clusters],
+  );
+
+  const handleClusterPress = (clusterId: number) => {
+    const leaves = superclusterIndex.getLeaves(clusterId, Infinity);
+    const coords = leaves.map((l: any) => ({
+      latitude: l.geometry.coordinates[1],
+      longitude: l.geometry.coordinates[0],
+    }));
+    nativeMapRef.current?.fitToCoordinates(coords, {
+      edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+      animated: true,
+    });
+  };
+
   const lastUpdateRef = useRef<number>(0);
   const regionRef = useRef<any>(null);
   const isCalculatingRef = useRef(false);
+  const drawingModeRef = useRef(drawingMode);
+  useEffect(() => { drawingModeRef.current = drawingMode; }, [drawingMode]);
+  const focusRegionRef = useRef(focusRegion);
+  useEffect(() => { focusRegionRef.current = focusRegion; }, [focusRegion]);
 
   // Optimized function to calculate positions only for visible elements
   const updateOverlayPositions = async (region?: any) => {
     if (
       Platform.OS === "web" ||
       !nativeMapRef.current ||
-      properties.length === 0 ||
       !mapReady
     )
       return;
@@ -72,61 +161,75 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
     // Throttle: avoid overlapping calculations
     if (isCalculatingRef.current) return;
-    
+
     const now = Date.now();
     // Only update every ~32ms during motion to keep bridge clear (30fps)
     if (region && now - lastUpdateRef.current < 32) return;
-    
+
     isCalculatingRef.current = true;
     lastUpdateRef.current = now;
 
     try {
+      // ── Posiciones de precio (propiedades individuales) ──
       const { latitude, longitude, latitudeDelta, longitudeDelta } = activeRegion;
-      
-      // Buffer of 0.5 deltas to avoid markers popping in abruptly
       const latBuffer = latitudeDelta * 0.5;
       const lngBuffer = longitudeDelta * 0.5;
-      
       const minLat = latitude - latitudeDelta - latBuffer;
       const maxLat = latitude + latitudeDelta + latBuffer;
       const minLng = longitude - longitudeDelta - lngBuffer;
       const maxLng = longitude + longitudeDelta + lngBuffer;
 
-      // Filter properties to only those within the extended viewport
       const visibleProps = properties.filter((p) => {
-        const lat = p.coordinates?.lat || (p as any).latitud;
-        const lng = p.coordinates?.lng || (p as any).longitud;
-        if (!lat || !lng || isNaN(lat) || isNaN(lng)) return false;
-        
+        const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
+        const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
+        if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return false;
         return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
       });
 
-      // Limit max simultaneous calculations to avoid lag (even if visible, 200 markers is plenty)
       const limitedProps = visibleProps.slice(0, 200);
       const newPositions: any = {};
-
-      // Process in small batches if the list is very large, 
-      // but for 200, Promise.all is usually fine with the filtered list
-      const promises = limitedProps.map(async (p) => {
-        const lat = p.coordinates?.lat || (p as any).latitud;
-        const lng = p.coordinates?.lng || (p as any).longitud;
-
+      const propPromises = limitedProps.map(async (p) => {
+        const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
+        const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
         try {
+          if (!nativeMapRef.current) return;
           const point = await nativeMapRef.current.pointForCoordinate({
             latitude: Number(lat),
             longitude: Number(lng),
           });
           newPositions[p.id] = point;
-        } catch (e) {
-          // ignore
-        }
+        } catch (e) { /* ignore */ }
       });
+      await Promise.all(propPromises);
 
-      await Promise.all(promises);
-      
-      // Batch update the UI
+      // ── Posiciones de clusters ──
+      const currentClusters = superclusterRef.current?.getClusters(
+        [minLng, minLat, maxLng, maxLat],
+        latDeltaToZoom(latitudeDelta),
+      ) ?? [];
+      const clusterFeatures = currentClusters.filter((c: any) => c.properties.cluster);
+      const newClusterPositions: any = {};
+      const clusterPromises = clusterFeatures.map(async (c: any) => {
+        const [lng, lat] = c.geometry.coordinates;
+        try {
+          if (!nativeMapRef.current) return;
+          const point = await nativeMapRef.current.pointForCoordinate({
+            latitude: lat,
+            longitude: lng,
+          });
+          newClusterPositions[`cluster-${c.id}`] = {
+            x: point.x,
+            y: point.y,
+            count: c.properties.point_count as number,
+            clusterId: c.id,
+          };
+        } catch (e) { /* ignore */ }
+      });
+      await Promise.all(clusterPromises);
+
       requestAnimationFrame(() => {
         setOverlayPositions(newPositions);
+        setClusterOverlayPositions(newClusterPositions);
       });
     } finally {
       isCalculatingRef.current = false;
@@ -137,7 +240,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     if (mapReady) {
       updateOverlayPositions();
     }
-  }, [properties.length, mapReady]); // Fixed: only re-calculate fully if length changes or map ready
+  }, [properties.length, mapReady, currentRegion]);
 
   const formatPrice = (
     price: number,
@@ -162,10 +265,10 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     let maxLng = -Infinity;
 
     properties.forEach((p) => {
-      const lat = p.coordinates?.lat || (p as any).latitud;
-      const lng = p.coordinates?.lng || (p as any).longitud;
+      const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
+      const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
 
-      if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+      if (lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng)) {
         minLat = Math.min(minLat, lat);
         maxLat = Math.max(maxLat, lat);
         minLng = Math.min(minLng, lng);
@@ -198,23 +301,39 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     };
   };
 
+  // Sincronizar currentRegion con focusRegion inmediatamente (para el bbox de Supercluster)
+  useEffect(() => {
+    if (focusRegion) {
+      setCurrentRegion(focusRegion);
+      regionRef.current = focusRegion;
+    }
+  }, [focusRegion]);
+
+  // Animar la cámara solo cuando cambia focusRegion (navegación explícita)
   useEffect(() => {
     if (Platform.OS === "web" || !nativeMapRef.current || !mapReady) return;
-    // Priorizar enfoque explícito si está definido
-    if (focusRegion) {
-      nativeMapRef.current?.animateToRegion(focusRegion, 700);
-      return;
-    }
+    if (!focusRegion) return;
+    nativeMapRef.current?.animateToRegion(focusRegion, 700);
+  }, [focusRegion, mapReady]);
+
+  // Auto-fit inicial solo cuando no hay focusRegion (carga sin ubicación seleccionada)
+  const hasAutoFitRef = useRef(false);
+  useEffect(() => {
+    if (Platform.OS === "web" || !nativeMapRef.current || !mapReady) return;
+    if (focusRegion) { hasAutoFitRef.current = true; return; }
+    if (hasAutoFitRef.current) return;
     if (properties.length === 0) return;
-
     const region = calculateRegionWithPadding();
-
     if (region) {
+      hasAutoFitRef.current = true;
+      setCurrentRegion(region);
       setTimeout(() => {
+        if (focusRegionRef.current) return;
         nativeMapRef.current?.animateToRegion(region, 1000);
       }, 700);
     }
-  }, [properties, mapReady, focusRegion]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [properties, mapReady]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || !mapInstanceRef.current) return;
@@ -236,10 +355,10 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     const bounds = new (window as any).google.maps.LatLngBounds();
 
     properties.forEach((p) => {
-      const lat = p.coordinates?.lat || (p as any).latitud;
-      const lng = p.coordinates?.lng || (p as any).longitud;
+      const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
+      const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
 
-      if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+      if (lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng)) {
         bounds.extend({ lat, lng });
       }
     });
@@ -296,10 +415,10 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     markersRef.current = [];
 
     properties.forEach((p) => {
-      const lat = p.coordinates?.lat || (p as any).latitud;
-      const lng = p.coordinates?.lng || (p as any).longitud;
+      const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
+      const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
 
-      if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
+      if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return;
 
       const priceText = formatPrice(p.price || 0, p.currency);
       const isHighlighted = p.id === highlightedPropertyId;
@@ -360,9 +479,9 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     if (!highlightedPropertyId) return;
     const target = properties.find((p) => p.id === highlightedPropertyId);
     if (!target) return;
-    const lat = target.coordinates?.lat || (target as any).latitud;
-    const lng = target.coordinates?.lng || (target as any).longitud;
-    if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
+    const lat = target.coordinates?.lat ?? (target.latitud ? parseFloat(target.latitud) : undefined);
+    const lng = target.coordinates?.lng ?? (target.longitud ? parseFloat(target.longitud) : undefined);
+    if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return;
     const region = makeFocusRegion(Number(lat), Number(lng));
     nativeMapRef.current?.animateToRegion(region, 600);
   }, [highlightedPropertyId]);
@@ -417,45 +536,109 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         }}
         onRegionChangeComplete={(region) => {
           regionRef.current = region;
-          // Forced update on completion to ensure final position is exact
+          setCurrentRegion(region);
           updateOverlayPositions(region);
+          console.log(`[MapDebug] onRegionChangeComplete: latDelta=${region.latitudeDelta.toFixed(3)} center=${region.latitude.toFixed(3)},${region.longitude.toFixed(3)}`);
         }}
+        onPress={undefined}
+        onLongPress={(e) => {
+          const coord = e.nativeEvent.coordinate;
+          if (drawingMode && onMapPress) {
+            onMapPress(coord);
+          } else if (!drawingMode && onLongPressMap) {
+            onLongPressMap(coord);
+          }
+        }}
+        scrollEnabled={true}
+        zoomEnabled={true}
         mapPadding={{ top: 20, right: 20, bottom: 20, left: 20 }}
         moveOnMarkerPress={false}
       >
-        {properties.map((p) => {
-          const lat = p.coordinates?.lat || (p as any).latitud;
-          const lng = p.coordinates?.lng || (p as any).longitud;
-
-          if (!lat || !lng || isNaN(lat) || isNaN(lng)) return null;
-
-          // Optional: Only render invisible markers if they are some-what visible 
-          // to reduce native marker count
-          const region = regionRef.current || initialRegion;
-          const buffer = region.latitudeDelta * 2;
-          if (
-            lat < region.latitude - buffer ||
-            lat > region.latitude + buffer ||
-            lng < region.longitude - buffer ||
-            lng > region.longitude + buffer
-          ) {
-            return null;
-          }
-
-          return (
-            <Marker
-              key={p.id}
-              coordinate={{ latitude: Number(lat), longitude: Number(lng) }}
-              onPress={() => {
-                const region = makeFocusRegion(Number(lat), Number(lng));
-                nativeMapRef.current?.animateToRegion(region, 600);
-                onMarkerPress(p.id, p);
-              }}
-              opacity={0}
-              tracksViewChanges={false} // Optimization: invisible markers don't change
+        {/* Polígonos confirmados (múltiples) */}
+        {confirmedPolygons.map((polygon, i) =>
+          polygon.length >= 3 ? (
+            <Polygon
+              key={`confirmed-polygon-${i}`}
+              coordinates={polygon}
+              fillColor="rgba(69,160,165,0.18)"
+              strokeColor={COLORS.primary}
+              strokeWidth={2}
             />
-          );
-        })}
+          ) : null,
+        )}
+
+        {/* Polígono en borrador */}
+        {draftPolygonPoints.length >= 2 && (
+          <Polyline
+            coordinates={draftPolygonPoints}
+            strokeColor={COLORS.primary}
+            strokeWidth={2.5}
+            lineDashPattern={[8, 4]}
+          />
+        )}
+        {draftPolygonPoints.length >= 3 && (
+          <Polygon
+            coordinates={draftPolygonPoints}
+            fillColor="rgba(69,160,165,0.12)"
+            strokeColor="transparent"
+            strokeWidth={0}
+          />
+        )}
+
+        {/* Vértices del borrador */}
+        {draftPolygonPoints.map((pt, idx) => (
+          <Marker
+            key={`vertex-${idx}`}
+            coordinate={pt}
+            anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={false}
+          >
+            <View style={vertexStyles.dot}>
+              <View style={vertexStyles.dotInner} />
+            </View>
+          </Marker>
+        ))}
+        {/* Invisible cluster touch targets */}
+        {clusters
+          .filter((c: any) => c.properties.cluster)
+          .map((cluster: any) => {
+            const [lng, lat] = cluster.geometry.coordinates;
+            return (
+              <Marker
+                key={`cluster-touch-${cluster.id}`}
+                coordinate={{ latitude: lat, longitude: lng }}
+                onPress={() => handleClusterPress(cluster.id)}
+                tracksViewChanges={false}
+                anchor={{ x: 0.5, y: 0.5 }}
+                opacity={0}
+              />
+            );
+          })}
+
+        {/* Markers individuales — invisibles (detectan toque), solo para props no agrupadas */}
+        {clusters
+          .filter((c: any) => !c.properties.cluster)
+          .map((point: any) => {
+            const propertyId = point.properties.propertyId as string;
+            const p = propertyMap.get(propertyId);
+            if (!p) return null;
+            const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
+            const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
+            if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return null;
+            return (
+              <Marker
+                key={p.id}
+                coordinate={{ latitude: Number(lat), longitude: Number(lng) }}
+                onPress={() => {
+                  const r = makeFocusRegion(Number(lat), Number(lng));
+                  nativeMapRef.current?.animateToRegion(r, 600);
+                  onMarkerPress(p.id, p);
+                }}
+                opacity={0}
+                tracksViewChanges={false}
+              />
+            );
+          })}
       </MapView>
 
       {/* Overlay absoluto para los precios (Inmune a los recortes de Android) */}
@@ -464,6 +647,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           {Object.entries(overlayPositions).map(([id, pos]) => {
             const p = propertyMap.get(id);
             if (!p) return null;
+            if (!individualPropertyIds.has(id)) return null;
 
             const isHighlighted = p.id === highlightedPropertyId;
             const priceText = formatPrice(p.price || 0, p.currency);
@@ -518,6 +702,51 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
                     marginTop: -1,
                   }}
                 />
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Cluster bubbles overlay — rendered outside MapView para garantizar visibilidad en Android */}
+      {Platform.OS !== "web" && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          {Object.entries(clusterOverlayPositions).map(([key, data]: [string, any]) => {
+            const count = data.count as number;
+            const size = count < 10 ? 44 : count < 50 ? 56 : 68;
+            const bg =
+              count < 10 ? COLORS.primary : count < 50 ? "#E07B00" : COLORS.error;
+            return (
+              <View
+                key={key}
+                style={{
+                  position: "absolute",
+                  left: data.x - size / 2,
+                  top: data.y - size / 2,
+                  width: size,
+                  height: size,
+                  borderRadius: size / 2,
+                  backgroundColor: bg + "30",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <View
+                  style={{
+                    width: size * 0.7,
+                    height: size * 0.7,
+                    borderRadius: (size * 0.7) / 2,
+                    backgroundColor: bg,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderWidth: 2,
+                    borderColor: "white",
+                  }}
+                >
+                  <Text style={styles.clusterCount}>
+                    {count > 999 ? "999+" : count}
+                  </Text>
+                </View>
               </View>
             );
           })}
@@ -599,5 +828,44 @@ const styles = StyleSheet.create({
   mapTypeButtonText: {
     fontSize: 10,
     fontWeight: "bold",
+  },
+  clusterOuter: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clusterInner: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "white",
+  },
+  clusterCount: {
+    color: "white",
+    fontSize: 13,
+    fontWeight: "bold",
+  },
+});
+
+const vertexStyles = StyleSheet.create({
+  dot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: COLORS.white,
+    borderWidth: 2.5,
+    borderColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+  },
+  dotInner: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.primary,
   },
 });

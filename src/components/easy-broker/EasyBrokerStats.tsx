@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { COLORS } from "@/constants/colors";
-import { Stats } from "@/hooks/hooks/useEasyBroker";
+import { Stats } from "@/hooks/useEasyBroker";
 
 interface Props {
     stats: Stats;

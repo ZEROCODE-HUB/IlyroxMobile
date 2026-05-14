@@ -1,58 +1,54 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
   ActivityIndicator,
   FlatList,
-  RefreshControl,
   ListRenderItem,
-  Alert,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 
 import { useAuth } from "../../context/AuthContext";
+import { useToast } from "../../context/ToastContext";
 import { COLORS } from "../../constants/colors";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
-// Types
 import {
-  perfiles,
-  Property,
-  ProfileContentType,
   FeedItem,
-  User,
   Post,
+  ProfileContentType,
+  Property,
   Reel,
 } from "../../types";
 
-// Components
-import { Avatar, ExpandableText } from "../shared";
-import { ProfileHeader } from "./ProfileHeader";
-import ProfileAvatarPicker from "./ProfileAvatarPicker";
-import ProfileTabs from "./ProfileTabs";
-import PropertyDetail from "../Details/PropertyDetail";
 import SelectionModal from "../modals/SelectionModal";
-import { useProfile } from "../../hooks/hooks/profile/useProfile";
-import { useGridProfile } from "../../hooks/hooks/profile/useGridProfile";
+import { useProfile } from "../../hooks/profile/useProfile";
+import { useGridProfile } from "../../hooks/profile/useGridProfile";
 import ReelDetail from "../Reel/ReelDetail";
 import FeedDetail from "../Feed/FeedDetail";
-import CreateProperty from "../CreateContent/CreateProperty";
-import CreatePost from "../CreateContent/CreatePost/CreatePost";
-import CreateReel from "../CreateContent/CreateReel";
-import AnimatedLike from "../../design-system/components/AnimatedLike";
-import { useChatInitiator } from "@/hooks/hooks/messaging/useChatInitiator";
+import { useChatInitiator } from "@/hooks/messaging/useChatInitiator";
 import { router } from "expo-router";
 import ProfileReelItem from "./ProfileReelItem";
 import ProfilePostItem from "./ProfilePostItem";
 import ProfilePropertyItem from "./ProfilePropertyItem";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import { supabase } from "../../lib/supabase";
-import { RecommendedSection } from "./RecommendedSection";
+import { logger } from "@/utils/logger";
+
+import {
+  formatFullName,
+  formatLocation,
+  formatPhoneNumber,
+  formatRole,
+} from "./profileFormatters";
+import { mapPostToFeedItem, mapProfileToUser, mapReelToFeedItem } from "./profileMappers";
+import { ProfileInfoHeader } from "./ProfileInfoHeader";
+import { ProfileEditModals } from "./ProfileEditModals";
+
+const log = logger.scoped("Profile");
 
 interface ProfileProps {
   userId?: string | null;
@@ -68,170 +64,68 @@ const FILTER_OPTIONS = [
   "Vendida",
 ];
 
-/**
- * Helper: Map entities to FeedItem
- */
-const mapProfileToUser = (p: perfiles): User => {
-  const name = [p.nombre, p.apellido_paterno, p.apellido_materno]
-    .filter(Boolean)
-    .join(" ");
-
-  return {
-    id: p.id,
-    nombre: p.nombre,
-    name: p.nombre_completo || name || "Usuario",
-    avatar: p.foto,
-    role: (p.rol.charAt(0).toUpperCase() + p.rol.slice(1)) as any,
-    rating: parseFloat(p.calificacion_promedio || "0"),
-    totalRatings: parseInt(p.total_calificaciones || "0"),
-    positiveRecommendations: parseInt(p.total_recomendaciones_positivas || "0"),
-    negativeRecommendations: parseInt(p.total_recomendaciones_negativas || "0"),
-    isFollowing: false,
-  };
-};
-
-const mapPostToFeedItem = (
-  post: any,
-  profile: perfiles | null,
-  targetUserId?: string,
-): FeedItem => {
-  const defaultUser: User = {
-    id: targetUserId || "",
-    name: "Usuario",
-    avatar: "",
-    role: "Cliente",
-    isFollowing: false,
-  };
-
-  return {
-    id: post.feed_item_id || post.id,
-    type: "post",
-    user: profile ? mapProfileToUser(profile) : defaultUser,
-    content: post.contenido || "",
-    postType:
-      post.tipo
-        ?.toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/\s+/g, "") || "post",
-    images: post.imagenes || [],
-    likes: post.likes_count || 0,
-    comments: post.comentarios_count || 0,
-    timestamp: post.created_at,
-    status: post.status,
-    foto_perfil_usuario: post.foto_perfil,
-    fecha_hora: post.fecha_hora,
-    nombre_asesor: post.nombre_asesor,
-    ubicacion: post.ubicacion,
-    foto_propiedad: post.foto_propiedad,
-    antiguedad: post.antiguedad,
-    postDetails: post,
-    busquedas_json: post.busquedas_json,
-  };
-};
-
-const mapReelToFeedItem = (
-  reel: any,
-  profile: perfiles | null,
-  targetUserId?: string,
-): FeedItem => {
-  const defaultUser: User = {
-    id: targetUserId || "",
-    name: "Usuario",
-    avatar: "",
-    role: "Cliente",
-    isFollowing: false,
-  };
-
-  return {
-    id: reel.feed_item_id || reel.id,
-    type: "reel",
-    user: profile ? mapProfileToUser(profile) : defaultUser,
-    content: reel.descripcion || "",
-    videoUrl: reel.video_url,
-    images: reel.thumbnail_url ? [reel.thumbnail_url] : [],
-    likes: reel.likes_count || 0,
-    comments: reel.comentarios_count || 0,
-    timestamp: reel.created_at,
-    reelDetails: reel,
-  };
-};
-
 const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   const { user: authUser } = useAuth();
-  const navigation = useNavigation<any>();
-
-  // Use Custom Hook
+  const { showToast } = useToast();
   const {
     profile,
     reviewStats,
     properties,
     posts,
     reels,
-    userRecommendation,
-    recommendedByUsers,
-    recommendedByHasMore,
-    loadingRecommendedBy,
-    recommendedByError,
     loading,
-    submittingRecommendation,
     fetchProfileData,
-    handleRecommendation,
     loadRecommendedByUsers,
     updateProfilePhoto,
     isMe,
   } = useProfile(userId);
 
   const { deletePost, deleteReel } = useGridProfile();
-
   const { handleContact } = useChatInitiator();
 
-  // Refresh Control
+  // Refresh control
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    setRefreshTrigger((prev) => prev + 1);
     await fetchProfileData();
     setRefreshing(false);
   }, [fetchProfileData]);
 
   const handleSilentRefresh = useCallback(async () => {
-    setRefreshTrigger((prev) => prev + 1);
     await fetchProfileData();
   }, [fetchProfileData]);
 
-  // State - Content
+  // Content tabs & filters
   const [activeTab, setActiveTab] = useState<ProfileContentType>("properties");
-
-  // State - Filters & Modals
   const [activeFilter, setActiveFilter] = useState<string>("Todas");
   const [showFilterModal, setShowFilterModal] = useState(false);
+
+  // Modal state
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(
     null,
   );
   const [editProperty, setEditProperty] = useState<Property | null>(null);
   const [editPost, setEditPost] = useState<Post | null>(null);
   const [editReel, setEditReel] = useState<Reel | null>(null);
+  const [showEditPropertyModal, setShowEditPropertyModal] = useState(false);
+  const [showEditPostModal, setShowEditPostModal] = useState(false);
+  const [showEditReelModal, setShowEditReelModal] = useState(false);
+  const [showOpenHouseModal, setShowOpenHouseModal] = useState(false);
+  const [openHousePost, setOpenHousePost] = useState<Post | null>(null);
 
   const [showRatingDetails, setShowRatingDetails] = useState(false);
   const [showRecommendedByModal, setShowRecommendedByModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<FeedItem | null>(null);
   const [selectedReel, setSelectedReel] = useState<FeedItem | null>(null);
 
-  const [showModal, setShowModal] = useState(false); // Property Modal
-  const [showPostModal, setShowPostModal] = useState(false); // Post Modal
-  const [showReelModal, setShowReelModal] = useState(false); // Reel Modal
-
-  // Deletion State
+  // Deletion state
   const [itemToDelete, setItemToDelete] = useState<{
     type: "property" | "post" | "reel";
     item: any;
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Computed
   const targetUserId = userId || authUser?.id;
 
   useFocusEffect(
@@ -239,53 +133,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       setSelectedProperty(null);
     }, []),
   );
-
-  /**
-   * Helpers
-   */
-  const formatFullName = useCallback((p: perfiles | null): string => {
-    if (!p) return "Usuario";
-    const parts = [p.nombre, p.apellido_paterno, p.apellido_materno].filter(
-      Boolean,
-    );
-    return parts.length > 0 ? parts.join(" ") : p.nombre_completo || "Usuario";
-  }, []);
-
-  const formatPhoneNumber = useCallback(
-    (prefix: string | null, number: string | null): string => {
-      if (!number) return "No especificado";
-      if (prefix) return `${prefix} ${number}`;
-      return number;
-    },
-    [],
-  );
-
-  const formatLocation = useCallback(
-    (estado: string | null, pais: string): string => {
-      if (!estado) return pais || "No especificada";
-      return `${estado}, ${pais}`;
-    },
-    [],
-  );
-
-  const formatRole = useCallback((rol: string): string => {
-    const roleMap: Record<string, string> = {
-      agente: "Agente",
-      cliente: "Cliente",
-      admin: "Admin",
-    };
-    return roleMap[rol] || rol;
-  }, []);
-
-  /**
-   * Wrapper for recommendation to also reload list if needed
-   */
-  const onToggleRecommendation = async (recomienda: boolean) => {
-    await handleRecommendation(recomienda);
-    if (showRatingDetails || showRecommendedByModal) {
-      loadRecommendedByUsers({ reset: true });
-    }
-  };
 
   const handleDeleteItem = useCallback(async () => {
     if (!itemToDelete) return;
@@ -307,18 +154,18 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       await handleRefresh();
       setItemToDelete(null);
     } catch (error: any) {
-      console.error("Error deleting item:", error);
-      Alert.alert("Error", error.message || "No se pudo eliminar el elemento");
+      log.error("Error deleting item:", error);
+      showToast(error.message || "No se pudo eliminar el elemento", "error");
     } finally {
       setDeleting(false);
     }
-  }, [itemToDelete, supabase, deletePost, deleteReel, handleRefresh]);
+  }, [itemToDelete, deletePost, deleteReel, handleRefresh]);
 
   const profileData = useMemo(
     () => ({
       name: formatFullName(profile),
       avatar: profile?.foto || undefined,
-      role: formatRole(profile?.rol || "cliente"),
+      role: profile?.ocupacion || formatRole(profile?.rol || "cliente"),
       location: formatLocation(
         profile?.estado || null,
         profile?.pais || "México",
@@ -369,19 +216,24 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     reels: reels.length,
   };
 
+  const userProfileMapped = useMemo(
+    () => (profile ? mapProfileToUser(profile) : undefined),
+    [profile],
+  );
+
   const handlePostPress = useCallback(
     (post: Post) => {
-      const targetId = (post as any).feed_item_id || post.id;
+      const targetId = post.feed_item_id || post.id;
 
-      navigation.push("(stack)", {
-        screen: "post/[id]",
+      router.push({
+        pathname: "/post/[id]",
         params: {
           id: targetId,
           item: JSON.stringify(mapPostToFeedItem(post, profile, targetUserId)),
         },
       });
     },
-    [navigation, profile, targetUserId],
+    [profile, targetUserId],
   );
 
   const handlePropertyPress = useCallback((property: Property) => {
@@ -390,7 +242,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
   const handleEditProperty = useCallback((property: Property) => {
     setEditProperty(property);
-    setShowModal(true);
+    setShowEditPropertyModal(true);
   }, []);
 
   const handleDeleteProperty = useCallback((property: Property) => {
@@ -399,8 +251,45 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
   const handleEditPost = useCallback((post: Post) => {
     setEditPost(post);
-    setShowPostModal(true);
+    setShowEditPostModal(true);
   }, []);
+
+  const handlePublishOpenHouse = useCallback(async (property: Property) => {
+    try {
+      const { data: existingPost } = await supabase
+        .from("posts")
+        .select("*")
+        .eq("propiedad_id", property.id)
+        .eq("tipo", "openhouse")
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      if (existingPost) {
+        setOpenHousePost(existingPost as Post);
+      } else {
+        const { data: newPost, error } = await supabase
+          .from("posts")
+          .insert({
+            publicado_por: authUser?.id,
+            tipo: "openhouse",
+            propiedad_id: property.id,
+            ubicacion: [property.location?.address, property.location?.city, property.location?.state]
+              .filter(Boolean).join(" - "),
+            foto_propiedad: property.images?.[0] ?? null,
+            contenido: `Open House: ${property.codigo_propiedad ?? ""}`.trim(),
+            fecha_hora: new Date().toISOString(),
+            status: "oculto",
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        setOpenHousePost(newPost as Post);
+      }
+      setShowOpenHouseModal(true);
+    } catch (err: any) {
+      showToast(err.message || "No se pudo abrir el Open House", "error");
+    }
+  }, [authUser?.id]);
 
   const handleDeletePost = useCallback((post: Post) => {
     setItemToDelete({ type: "post", item: post });
@@ -408,7 +297,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
   const handleEditReel = useCallback((reel: Reel) => {
     setEditReel(reel);
-    setShowReelModal(true);
+    setShowEditReelModal(true);
   }, []);
 
   const handleDeleteReel = useCallback((reel: Reel) => {
@@ -425,180 +314,61 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         },
       });
     },
-    [router, profile, targetUserId],
+    [profile, targetUserId],
   );
 
-  const renderHeader = () => (
-    <>
-      <ProfileHeader
-        isOwnProfile={isMe}
+  const handleMessage = useCallback(() => {
+    if (!targetUserId) return;
+    handleContact(targetUserId, null, {
+      id: targetUserId,
+      nombre: profile?.nombre || "",
+      apellido_paterno: profile?.apellido_paterno || "",
+      foto: profile?.foto || null,
+    });
+  }, [handleContact, targetUserId, profile]);
+
+  const renderHeader = useCallback(
+    () => (
+      <ProfileInfoHeader
+        profile={profile}
+        profileData={profileData}
+        targetUserId={targetUserId!}
+        isMe={isMe}
         onBack={onBack}
         onSupport={() => router.push("/support")}
         onSettings={() => router.push("/settings")}
-      />
-      {/* Profile Info */}
-      <View style={styles.infoContainer}>
-        <View style={styles.infoRow}>
-          <View style={styles.infoLeft}>
-            <ProfileAvatarPicker
-              uri={profileData.avatar}
-              name={profileData.name}
-              size={85}
-              userId={targetUserId!}
-              isOwnProfile={isMe}
-              onPhotoUpdated={updateProfilePhoto}
-            />
-          </View>
-
-          <View style={styles.infoRight}>
-            <Text style={styles.name}>{profileData.name}</Text>
-            {profileData.biography && (
-              <ExpandableText
-                text={profileData.biography}
-                maxLines={2}
-                style={styles.biography}
-              />
-            )}
-            {profileData.role && (
-              <View style={styles.roleBadge}>
-                <Text style={styles.roleText}>{profileData.role}</Text>
-              </View>
-            )}
-            <View style={styles.metaList}>
-              {profileData.phone && (
-                <View style={styles.metaItem}>
-                  <Ionicons name="call" size={12} color={COLORS.textTertiary} />
-                  <Text style={styles.metaText}>{profileData.phone}</Text>
-                </View>
-              )}
-              <View style={styles.metaItem}>
-                <Ionicons
-                  name="location"
-                  size={12}
-                  color={COLORS.textTertiary}
-                />
-                <Text style={styles.metaText}>{profileData.location}</Text>
-              </View>
-              <View style={styles.metaItem}>
-                <Ionicons name="school" size={12} color={COLORS.textTertiary} />
-                <Text style={styles.metaText}>
-                  {`+${profileData.anos_experiencia} años de experiencia`}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {!isMe && (
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={styles.messageBtn}
-              onPress={() => {
-                handleContact(targetUserId!, null, {
-                  id: targetUserId!,
-                  nombre: profile?.nombre || "",
-                  apellido_paterno: profile?.apellido_paterno || "",
-                  foto: profile?.foto || null,
-                });
-              }}
-            >
-              <Ionicons
-                name="chatbubble-outline"
-                size={16}
-                color={COLORS.textPrimary}
-              />
-              <Text style={styles.messageBtnText}>Mensaje</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-
-      {/* ========== RATING SECTION - COMPLETA ========== */}
-      <View style={styles.ratingSection}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => setShowRatingDetails(!showRatingDetails)}
-          style={styles.ratingCard}
-        >
-          {/* Rating Info Group (Left) */}
-          <View style={styles.ratingInfoGroup}>
-            <View style={styles.ratingHeader}>
-              <Text style={styles.ratingValue}>
-                {profileData.rating.toFixed(1)}
-              </Text>
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <Ionicons
-                    key={s}
-                    name="star"
-                    size={14}
-                    color={COLORS.warning}
-                  />
-                ))}
-              </View>
-            </View>
-            <Text style={styles.reviewCount}>
-              {profileData.reviewCount} reseñas
-            </Text>
-          </View>
-
-          {/* Details Group (Right) */}
-          <View style={styles.ratingRight}>
-            <Text style={styles.viewDetailsText}>Ver Detalles</Text>
-            <Ionicons
-              name={showRatingDetails ? "chevron-up" : "chevron-down"}
-              size={14}
-              color={COLORS.primary}
-              style={styles.chevronIcon}
-            />
-          </View>
-        </TouchableOpacity>
-
-        {showRatingDetails && (
-          <RecommendedSection
-            setShowRecommendedByModal={setShowRecommendedByModal}
-            showRecommendedByModal={showRecommendedByModal}
-            formatRole={formatRole}
-            navigation={navigation}
-            isMe={isMe}
-            loadRecommendedByUsers={loadRecommendedByUsers}
-          />
-        )}
-      </View>
-
-      <ProfileTabs
+        onUpdatePhoto={updateProfilePhoto}
+        onMessage={handleMessage}
+        showRatingDetails={showRatingDetails}
+        onToggleRatingDetails={() => setShowRatingDetails((v) => !v)}
+        showRecommendedByModal={showRecommendedByModal}
+        setShowRecommendedByModal={setShowRecommendedByModal}
+        formatRole={formatRole}
+        loadRecommendedByUsers={loadRecommendedByUsers}
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        counts={contentCounts}
+        contentCounts={contentCounts}
+        activeFilter={activeFilter}
+        onOpenFilter={() => setShowFilterModal(true)}
+        filteredPropertiesCount={filteredProperties.length}
       />
-
-      {/* Filter Toolbar */}
-      {activeTab === "properties" && (
-        <View style={styles.toolbar}>
-          <TouchableOpacity
-            onPress={() => setShowFilterModal(true)}
-            style={styles.filterBtn}
-          >
-            <Ionicons name="funnel" size={16} color={COLORS.textPrimary} />
-            <Text style={styles.filterBtnText}>{activeFilter}</Text>
-            <Ionicons
-              name="chevron-down"
-              size={16}
-              color={COLORS.textPrimary}
-            />
-          </TouchableOpacity>
-          <Text style={styles.countText}>
-            {filteredProperties.length}{" "}
-            {filteredProperties.length === 1 ? "Propiedad" : "Propiedades"}
-          </Text>
-        </View>
-      )}
-    </>
-  );
-
-  const userProfileMapped = useMemo(
-    () => (profile ? mapProfileToUser(profile) : undefined),
-    [profile],
+    ),
+    [
+      profile,
+      profileData,
+      targetUserId,
+      isMe,
+      onBack,
+      updateProfilePhoto,
+      handleMessage,
+      showRatingDetails,
+      showRecommendedByModal,
+      loadRecommendedByUsers,
+      activeTab,
+      contentCounts,
+      activeFilter,
+      filteredProperties.length,
+    ],
   );
 
   const renderItem: ListRenderItem<any> = useCallback(
@@ -612,6 +382,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
               isOwnProfile={isMe}
               onEdit={handleEditProperty}
               onDelete={handleDeleteProperty}
+              onPublishOpenHouse={handlePublishOpenHouse}
               isLastInRow={(index + 1) % 3 === 0}
             />
           );
@@ -698,7 +469,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         numColumns={3}
-        key={activeTab} // Forces refresh of FlatList config when tab changes
+        key={activeTab}
         ListHeaderComponent={renderHeader}
         columnWrapperStyle={
           activeTab === "properties" ? styles.columnWrapper : undefined
@@ -723,9 +494,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         }
       />
 
-      {/* Modal de "Recomendado por" Completo */}
-
-      {/* Modal Rating Details */}
       {selectedPost && (
         <FeedDetail
           item={selectedPost}
@@ -752,74 +520,39 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         searchable={false}
       />
 
-      {selectedProperty && (
-        <Modal
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => setSelectedProperty(null)}
-        >
-          <PropertyDetail
-            propertyId={selectedProperty.id}
-            navigation={{
-              ...navigation,
-              goBack: (shouldRefresh?: boolean) => {
-                setSelectedProperty(null);
-                // Si hubo cambios, actualizamos
-                if (shouldRefresh) handleSilentRefresh();
-              },
-              navigate: (screen: string, params: any) => {
-                setSelectedProperty(null);
-                navigation.navigate(screen, params);
-              },
-            }}
-            onRefresh={handleSilentRefresh}
-          />
-        </Modal>
-      )}
-
-      {/* Edit Modals */}
-      {showModal && (
-        <Modal
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => setShowModal(false)}
-        >
-          <CreateProperty
-            onBack={(shouldRefresh) => {
-              setShowModal(false);
-              setEditProperty(null);
-              if (shouldRefresh) handleRefresh();
-            }}
-            propertyId={editProperty?.id}
-          />
-        </Modal>
-      )}
-
-      {showPostModal && (
-        <Modal visible={showPostModal}>
-          <CreatePost
-            post={editPost || undefined}
-            onBack={() => {
-              setShowPostModal(false);
-              setEditPost(null);
-              handleRefresh();
-            }}
-          />
-        </Modal>
-      )}
-
-      {showReelModal && (
-        <Modal visible={showReelModal}>
-          <CreateReel
-            reelId={editReel?.id}
-            onBack={() => {
-              setShowReelModal(false);
-              setEditReel(null);
-              handleRefresh();
-            }}
-          />
-        </Modal>
-      )}
+      <ProfileEditModals
+        selectedProperty={selectedProperty}
+        onCloseProperty={() => setSelectedProperty(null)}
+        handleSilentRefresh={handleSilentRefresh}
+        showEditPropertyModal={showEditPropertyModal}
+        editProperty={editProperty}
+        onCloseEditProperty={(shouldRefresh) => {
+          setShowEditPropertyModal(false);
+          setEditProperty(null);
+          if (shouldRefresh) handleRefresh();
+        }}
+        showEditPostModal={showEditPostModal}
+        editPost={editPost}
+        onCloseEditPost={() => {
+          setShowEditPostModal(false);
+          setEditPost(null);
+          handleRefresh();
+        }}
+        showOpenHouseModal={showOpenHouseModal}
+        openHousePost={openHousePost}
+        onCloseOpenHouseModal={() => {
+          setShowOpenHouseModal(false);
+          setOpenHousePost(null);
+          handleRefresh();
+        }}
+        showEditReelModal={showEditReelModal}
+        editReel={editReel}
+        onCloseEditReel={() => {
+          setShowEditReelModal(false);
+          setEditReel(null);
+          handleRefresh();
+        }}
+      />
 
       <ConfirmDialog
         visible={!!itemToDelete}
@@ -852,203 +585,10 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 100,
-    // Note: ProfileReelItem and ProfilePostItem use internal padding calculation.
-    // The FlatList is the main container now.
   },
   columnWrapper: {
     justifyContent: "flex-start",
-    paddingHorizontal: 12, // Apply padding here for Property rows
-  },
-  infoContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 4,
-    paddingBottom: 16,
-    backgroundColor: COLORS.white,
-  },
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-  },
-  infoLeft: {
-    marginRight: 16,
-    alignItems: "center",
-  },
-  infoRight: {
-    flex: 1,
-    paddingTop: 4,
-  },
-  name: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-    marginBottom: 4,
-  },
-  roleBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    marginBottom: 8,
-  },
-  roleText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  metaList: {
-    gap: 6,
-  },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  metaText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  actionButtons: {
-    marginTop: 16,
-  },
-  messageBtn: {
-    backgroundColor: COLORS.background,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 8,
-  },
-  messageBtnText: {
-    color: COLORS.textPrimary,
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  ratingSection: {
-    marginBottom: 16,
-    alignItems: "stretch", // Changed to stretch to control width via margins
-  },
-  ratingCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.background,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    marginHorizontal: 32,
-    justifyContent: "space-between",
-  },
-  ratingInfoGroup: {
-    flexDirection: "column",
-    gap: 2,
-  },
-  ratingHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  ratingValue: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: COLORS.textPrimary,
-  },
-  starsRow: {
-    flexDirection: "row",
-    gap: 2,
-  },
-  reviewCount: {
-    fontSize: 12,
-    color: COLORS.textTertiary,
-    fontWeight: "500",
-  },
-  ratingRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  viewDetailsText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.primary,
-  },
-  chevronIcon: {
-    margin: 4,
-    backgroundColor: COLORS.background,
-    borderRadius: 12,
-    marginHorizontal: 16,
-  },
-  statsPanel: {
-    marginTop: 16,
-    padding: 20,
-    backgroundColor: COLORS.background,
-    borderRadius: 12,
-    marginHorizontal: 16,
-  },
-  recommendsRow: {
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "center",
-    marginBottom: 20,
-  },
-  recItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 3,
-    paddingHorizontal: 10,
-    borderColor: COLORS.cardBorder,
-  },
-  recItemDisabled: {
-    opacity: 0.5,
-  },
-  recItemActive: {
-    backgroundColor: COLORS.white,
-  },
-  recVal: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-  },
-  recLabel: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
-  },
-
-  toolbar: {
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: COLORS.cardBorder,
-    padding: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  filterBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.background,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 8,
-  },
-  filterBtnText: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: COLORS.textPrimary,
-  },
-  countText: {
-    fontSize: 11,
-    color: COLORS.textTertiary,
-    fontWeight: "500",
   },
   emptyState: {
     padding: 40,
@@ -1059,12 +599,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: COLORS.textTertiary,
-  },
-  biography: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-    lineHeight: 18,
   },
 });
 

@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Text, TouchableOpacity, StyleSheet } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -56,6 +56,15 @@ export function RegisterStepTwo({
   const [showOcupacionModal, setShowOcupacionModal] = useState(false);
   const [showModalidadModal, setShowModalidadModal] = useState(false);
   const [showExperienciaModal, setShowExperienciaModal] = useState(false);
+  const [photoTouched, setPhotoTouched] = useState(false);
+
+  const handleSubmit = () => {
+    if (!formState.avatarUri) {
+      setPhotoTouched(true);
+      return;
+    }
+    onSubmit();
+  };
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -95,9 +104,12 @@ export function RegisterStepTwo({
           {formState.avatarUri ? "Cambiar foto" : "Agregar foto de perfil *"}
         </Text>
         <Text style={styles.avatarHint}>
-          Se recomienda encarecidamente una foto real del usuario.
+          Por favor, utiliza una foto real de tu rostro. Las cuentas sin foto auténtica podrán ser suspendidas o eliminadas.
         </Text>
       </TouchableOpacity>
+      {photoTouched && !formState.avatarUri && (
+        <Text style={styles.photoError}>La foto de perfil es obligatoria *</Text>
+      )}
 
       {/* Ocupación */}
       <TouchableOpacity
@@ -209,9 +221,8 @@ export function RegisterStepTwo({
 
       <SubmitButton
         loading={loading}
-        onPress={onSubmit}
+        onPress={handleSubmit}
         text="Finalizar Registro"
-        disabled={!formState.avatarUri}
       />
 
       <BackButton onPress={onBack} text="Volver al paso 1" />
@@ -264,5 +275,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 4,
     paddingHorizontal: 20,
+  },
+  photoError: {
+    fontSize: 12,
+    color: COLORS.error,
+    textAlign: "center",
+    marginTop: -12,
+    marginBottom: 12,
   },
 });

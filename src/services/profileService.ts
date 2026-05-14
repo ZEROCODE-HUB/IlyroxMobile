@@ -1,5 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import { perfiles, EstadisticasResenas } from "@/types";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("profileService");
 
 export const profileService = {
   async getProfile(userId: string) {
@@ -155,7 +158,7 @@ export const profileService = {
 
       return result;
     } catch (error) {
-      console.error("Error en getRecommendationPreviewsForUsers:", error);
+      log.error("Error en getRecommendationPreviewsForUsers:", error);
       return {};
     }
   },

@@ -5,7 +5,7 @@ import { RatingModal } from "./RatingModal";
 import { COLORS } from "../constants/colors";
 import { ScreenWrapper } from "@/screens/ScreenWrapper";
 import { router } from "expo-router";
-import { useAppointments } from "../hooks/hooks/useAppointments";
+import { useAppointments } from "../hooks/useAppointments";
 import AppointmentTabs from "./Appointments/AppointmentTabs";
 import AppointmentList from "./Appointments/AppointmentList";
 

@@ -1,4 +1,4 @@
-// components/Charts/Chart10_SearchesByNeighborhood.tsx
+﻿// components/Charts/Chart10_SearchesByNeighborhood.tsx
 
 import React, { useEffect, useState } from "react";
 import {
@@ -144,7 +144,7 @@ const Chart10_SearchesByNeighborhood: React.FC<Chart10Props> = ({
             // Determinar color según ranking
             let barColor: string = COLORS.tagPurpleLight;
             if (index === 0)
-              barColor = "#8B5CF6"; // Más buscada - púrpura oscuro
+              barColor = COLORS.tagPurple; // Más buscada - púrpura oscuro
             else if (index <= 2)
               barColor = "#A78BFA"; // Top 3 - púrpura medio
             else if (isActive) barColor = COLORS.tagPurple;
@@ -221,7 +221,7 @@ const Chart10_SearchesByNeighborhood: React.FC<Chart10Props> = ({
       {/* Leyenda */}
       <View style={styles.legend}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: "#8B5CF6" }]} />
+          <View style={[styles.legendDot, { backgroundColor: COLORS.tagPurple }]} />
           <Text style={styles.legendText}>Alta demanda</Text>
         </View>
         <View style={styles.legendItem}>
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 20,
     elevation: 2,
-    shadowColor: "#000",
+    shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   barWrapperActive: {
-    backgroundColor: "#F3E8FF",
+    backgroundColor: COLORS.tagPurpleLight,
     borderRadius: 8,
     padding: 8,
     marginHorizontal: -8,
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
   barTrack: {
     width: 32,
     height: "65%",
-    backgroundColor: "#F0F0F0",
+    backgroundColor: COLORS.dividerGray,
     borderRadius: 16,
     justifyContent: "flex-end",
     overflow: "hidden",
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
+    borderTopColor: COLORS.dividerGray,
     marginBottom: 12,
   },
   legendItem: {
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   tooltipHeader: {
-    backgroundColor: "#F3E8FF",
+    backgroundColor: COLORS.tagPurpleLight,
     padding: 12,
     flexDirection: "row",
     justifyContent: "space-between",

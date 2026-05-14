@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, TouchableOpacity, View, Alert } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Avatar } from "../shared";
+import { useToast } from "../../context/ToastContext";
 import { COLORS } from "../../constants";
-import { useTags } from "../../hooks/hooks/messaging";
+import { useTags } from "../../hooks/messaging";
 import { useState, useEffect } from "react";
 import TagsModal from "./TagsModal";
 import CreateAppointmentModal from "../Appointments/CreateAppointmentModal";
@@ -22,6 +23,7 @@ export default function HeaderChat({
   propertyId?: string | null;
   conversationId: string;
 }) {
+  const { showToast } = useToast();
   const [conversationTags, setConversationTags] = useState<any[]>([]);
   const [showTagsModal, setShowTagsModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
@@ -52,10 +54,7 @@ export default function HeaderChat({
 
   const handleAssignTag = async (tagId: string) => {
     if (!conversationId || conversationId === "new") {
-      Alert.alert(
-        "Error",
-        "Envía un mensaje primero para poder asignar etiquetas",
-      );
+      showToast("Envía un mensaje primero para poder asignar etiquetas", "info");
       return false;
     }
     const success = await assignTag(conversationId, tagId);

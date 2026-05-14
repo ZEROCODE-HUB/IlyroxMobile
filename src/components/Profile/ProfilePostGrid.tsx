@@ -12,10 +12,10 @@ import {
   FlatList,
   StyleSheet,
   Dimensions,
-  Alert,
   ActivityIndicator,
   Modal,
 } from "react-native";
+import { useToast } from "@/context/ToastContext";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 import { Post } from "../../types";
@@ -23,7 +23,10 @@ import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
 
 import CreatePost from "../CreateContent/CreatePost/CreatePost";
-import { useGridProfile } from "@/hooks/hooks/profile/useGridProfile";
+import { useGridProfile } from "@/hooks/profile/useGridProfile";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("ProfilePostGrid");
 
 const { width } = Dimensions.get("window");
 const ITEM_SIZE = (width - 24) / 3; // 3 items per row with padding
@@ -43,6 +46,7 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
   onDelete,
   refreshTrigger = 0,
 }) => {
+  const { showToast } = useToast();
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
@@ -74,8 +78,8 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
         getPosts(userId);
       }
     } catch (error: any) {
-      console.error("Error deleting post:", error);
-      Alert.alert("Error", error.message || "No se pudo eliminar el post");
+      log.error("Error deleting post:", error);
+      showToast(error.message || "No se pudo eliminar el post", "error");
     } finally {
       setDeleting(false);
     }
@@ -194,7 +198,7 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
         message="¿Estás seguro de que deseas eliminar este post? Esta acción no se puede deshacer."
         confirmText="Eliminar"
         cancelText="Cancelar"
-        onConfirm={() => postToDelete && handleDelete(postToDelete)}
+        onConfirm={() => { if (postToDelete) handleDelete(postToDelete); }}
         onCancel={() => setPostToDelete(null)}
         danger
         loading={deleting}

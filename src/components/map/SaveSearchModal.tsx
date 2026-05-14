@@ -18,14 +18,14 @@ import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 interface SaveSearchModalProps {
   visible: boolean;
   onClose: () => void;
-  onSaveSuccess: () => void; // Callback para cerrar también el modal de filtros
+  onSaveSuccessWithData: (metadata?: any) => void;
   userId?: string;
 }
 
 export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
   visible,
   onClose,
-  onSaveSuccess,
+  onSaveSuccessWithData,
   userId,
 }) => {
   const { filters } = usePropertyFiltersStore();
@@ -49,36 +49,54 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
   }, [visible, setCreateLead]);
 
   const getFilterSummary = () => {
-    const parts = [];
-    if (filters.operacion) parts.push(filters.operacion);
-    if (filters.tipoPropiedad) parts.push(filters.tipoPropiedad);
-    if (filters.subtipo && filters.subtipo.length > 0)
-      parts.push(filters.subtipo.join(", "));
+    const parts: string[] = [];
+    if (filters.operacion) parts.push(filters.operacion.charAt(0).toUpperCase() + filters.operacion.slice(1));
+    if (filters.tipoPropiedad) parts.push(filters.tipoPropiedad.charAt(0).toUpperCase() + filters.tipoPropiedad.slice(1));
+    if (filters.subtipo?.length > 0) parts.push(filters.subtipo.join(", "));
 
     const loc = filters.locationFilter;
     if (loc?.ciudad) parts.push(loc.ciudad);
-
+    if (loc?.municipio && loc.municipio !== loc.ciudad) parts.push(loc.municipio);
     if (loc?.colonia) {
       if (Array.isArray(loc.colonia) && loc.colonia.length > 0) {
-        parts.push(`Colonia: ${loc.colonia.join(", ")}`);
+        parts.push(loc.colonia.join(", "));
       } else if (typeof loc.colonia === "string" && loc.colonia.trim()) {
-        parts.push(`Colonia: ${loc.colonia}`);
+        parts.push(loc.colonia);
       }
     }
 
-    if (filters.precioMin || filters.precioMax) {
-      parts.push(
-        `${filters.moneda} ${filters.precioMin || 0}-${filters.precioMax || "Max"}`,
-      );
+    // Location chips (zonas nombradas)
+    if (filters.locationChips?.length > 0) {
+      parts.push(filters.locationChips.map((c: any) => c.label).join(", "));
     }
+
+    if (filters.precioMin || filters.precioMax) {
+      parts.push(`${filters.moneda} ${filters.precioMin || "0"} – ${filters.precioMax || "Max"}`);
+    }
+
+    if (filters.polygons?.length > 0) {
+      parts.push(filters.polygons.length === 1 ? "1 zona dibujada" : `${filters.polygons.length} zonas dibujadas`);
+    }
+
+    if (filters.comisionVentaMin) parts.push(`Comisión venta ≥ ${filters.comisionVentaMin}%`);
+    if (filters.comisionRentaMin) parts.push(`Comisión renta ≥ ${filters.comisionRentaMin} meses`);
+
+    // Filtros especializados — resumen breve
+    const cf = filters.comercialFilters;
+    const inf = filters.industrialFilters;
+    const ag = filters.agricolaFilters;
+    if (cf?.tipoUbicacion) parts.push(cf.tipoUbicacion);
+    if (inf?.ubicacion) parts.push(inf.ubicacion);
+    if (inf?.alturaLibre) parts.push(`Altura: ${inf.alturaLibre}`);
+    if (ag?.usoTerreno) parts.push(`Uso: ${ag.usoTerreno}`);
 
     return parts.length > 0 ? parts.join(" • ") : "Búsqueda general";
   };
 
   const handleSave = async () => {
-    const success = await handleSaveSearch(filters, onClose);
-    if (success) {
-      onSaveSuccess(); // Cierra también el modal de filtros
+    const result = await handleSaveSearch(filters, onClose);
+    if (result.success) {
+      onSaveSuccessWithData(result.metadata);
     }
   };
 
@@ -97,7 +115,7 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={styles.title}>Guardar Búsqueda</Text>
+              <Text style={styles.title}>Avísame si encuentras algo</Text>
               <Text style={styles.subtitle}>
                 Convierte estos filtros en una oportunidad de negocio
               </Text>
@@ -234,7 +252,7 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
                 color={COLORS.white}
                 style={{ marginRight: 8 }}
               />
-              <Text style={styles.saveButtonText}>Guardar Búsqueda</Text>
+              <Text style={styles.saveButtonText}>Avísame si encuentras algo</Text>
             </TouchableOpacity>
           </View>
         </Pressable>

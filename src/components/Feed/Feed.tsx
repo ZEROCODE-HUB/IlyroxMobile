@@ -27,8 +27,8 @@ import {
 import { COLORS } from "../../constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
-import { useFeed, useUserApprovals } from "@/hooks/hooks";
-import { usePropertyFilters } from "@/hooks/hooks/usePropertyFilters";
+import { useFeed, useUserApprovals } from "@/hooks";
+import { usePropertyFilters } from "@/hooks/usePropertyFilters";
 
 interface FeedProps {
   currentUserId?: string;
@@ -50,7 +50,6 @@ const Feed: React.FC<FeedProps> = ({
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
-  const [scrollOffset, setScrollOffset] = useState(0);
   const [activeCommentItem, setActiveCommentItem] = useState<FeedItem | null>(
     null,
   );
@@ -102,7 +101,6 @@ const Feed: React.FC<FeedProps> = ({
 
   const {
     pendingUsers,
-    loading: loadingApprovals,
     approveUser,
     rejectUser,
   } = useUserApprovals(currentUserId, currentUserState);
@@ -219,7 +217,6 @@ const Feed: React.FC<FeedProps> = ({
   const handleScroll = useCallback(
     (event: any) => {
       const currentOffset = event.nativeEvent.contentOffset.y;
-      setScrollOffset(currentOffset);
       onScroll?.(currentOffset);
     },
     [onScroll],
@@ -358,7 +355,6 @@ const Feed: React.FC<FeedProps> = ({
         data={finalItems}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        estimatedItemSize={400} // Altura aproximada promedio de un post/reel
         extraData={focusedItemId}
         ListHeaderComponent={ListHeader}
         ListFooterComponent={ListFooter}

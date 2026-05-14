@@ -12,19 +12,22 @@ import {
   FlatList,
   StyleSheet,
   Dimensions,
-  Alert,
   ActivityIndicator,
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
+import { useToast } from "../../context/ToastContext";
 import { FeedItem, Reel } from "../../types";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
 
 import CreateReel from "../CreateContent/CreateReel";
-import { useGridProfile } from "@/hooks/hooks/profile/useGridProfile";
+import { useGridProfile } from "@/hooks/profile/useGridProfile";
 import * as VideoThumbnails from "expo-video-thumbnails";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("ProfileReelGrid");
 
 const { width } = Dimensions.get("window");
 const ITEM_SIZE = (width - 24) / 3; // 3 items per row with padding
@@ -46,6 +49,7 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
   onDelete,
   refreshTrigger = 0,
 }) => {
+  const { showToast } = useToast();
   const [reelToDelete, setReelToDelete] = useState<Reel | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [showModalEdit, setShowModalEdit] = useState(false);
@@ -76,8 +80,8 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
         getReels(userId);
       }
     } catch (error: any) {
-      console.error("Error deleting reel:", error);
-      Alert.alert("Error", error.message || "No se pudo eliminar el reel");
+      log.error("Error deleting reel:", error);
+      showToast(error.message || "No se pudo eliminar el reel", "error");
     } finally {
       setDeleting(false);
     }
@@ -109,7 +113,7 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
             if (isMounted) setThumbUri(uri);
             setLoading(false);
           } catch (e) {
-            console.warn(
+            log.warn(
               "No se pudo generar miniatura para:",
               item.video_url,
               e,
@@ -243,7 +247,7 @@ const ProfileReelGrid: React.FC<ProfileReelGridProps> = ({
         message="¿Estás seguro de que deseas eliminar este reel? Esta acción no se puede deshacer."
         confirmText="Eliminar"
         cancelText="Cancelar"
-        onConfirm={() => reelToDelete && handleDelete(reelToDelete)}
+        onConfirm={() => { if (reelToDelete) handleDelete(reelToDelete); }}
         onCancel={() => setReelToDelete(null)}
         danger
         loading={deleting}

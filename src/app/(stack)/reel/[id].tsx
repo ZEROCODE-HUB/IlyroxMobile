@@ -3,7 +3,10 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { View, ActivityIndicator, Text, TouchableOpacity } from "react-native";
 import ReelFeedList from "@/components/Reel/ReelFeedList";
 import { useAuth } from "@/context/AuthContext";
-import { useFeedItem } from "@/hooks/hooks";
+import { useFeedItem } from "@/hooks";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("[id]");
 
 export default function ReelDetailScreen() {
   const params = useLocalSearchParams();
@@ -17,7 +20,7 @@ export default function ReelDetailScreen() {
       reelItem =
         typeof params.item === "string" ? JSON.parse(params.item) : params.item;
     } catch (e) {
-      console.error("Error parsing reel item:", e);
+      log.error("Error parsing reel item:", e);
     }
   }
 

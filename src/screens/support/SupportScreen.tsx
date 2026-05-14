@@ -8,18 +8,18 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
 import { ScreenWrapper } from "@/screens/ScreenWrapper";
 import { supabase } from "@/lib/supabase";
 import { router } from "expo-router";
 import { useModal } from "@/context/ModalContext";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("SupportScreen");
 
 const SupportScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
   const { showModal } = useModal();
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -68,10 +68,6 @@ const SupportScreen: React.FC = () => {
     return isValid;
   };
 
-  const handleResetPassword = async () => {
-    router.push("/reset-password");
-  };
-
   const handleSubmit = async () => {
     if (!validateForm()) {
       return;
@@ -86,7 +82,7 @@ const SupportScreen: React.FC = () => {
       } = await supabase.auth.getUser();
 
       // Insertar el mensaje de soporte en la base de datos
-      const { data, error } = await supabase.from("soporte").insert([
+      const { error } = await supabase.from("soporte").insert([
         {
           asunto: subject,
           mensaje: message,
@@ -97,11 +93,9 @@ const SupportScreen: React.FC = () => {
       ]);
 
       if (error) {
-        console.error("Error al insertar en Supabase:", error);
+        log.error("Error al insertar en Supabase:", error);
         throw error;
       }
-
-      console.log("Mensaje de soporte guardado exitosamente:", data);
 
       if (Platform.OS === "web") {
         if (typeof window !== "undefined") {
@@ -115,7 +109,7 @@ const SupportScreen: React.FC = () => {
           message:
             "Mensaje enviado exitosamente. Nos pondremos en contacto pronto.",
           confirmText: "OK",
-          onConfirm: () => navigation.goBack(),
+          onConfirm: () => router.back(),
         });
       }
 
@@ -127,10 +121,10 @@ const SupportScreen: React.FC = () => {
 
       // Volver atrás en web
       if (Platform.OS === "web") {
-        setTimeout(() => navigation.goBack(), 1500);
+        setTimeout(() => router.back(), 1500);
       }
     } catch (error) {
-      console.error("Error al enviar mensaje de soporte:", error);
+      log.error("Error al enviar mensaje de soporte:", error);
       if (Platform.OS === "web") {
         if (typeof window !== "undefined") {
           window.alert(
@@ -154,7 +148,7 @@ const SupportScreen: React.FC = () => {
       <AppHeader
         title="Soporte"
         showBackButton={true}
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
 
       <KeyboardAvoidingView

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useModal } from '../context/ModalContext';
-import { COLORS, DIMENSIONS } from '../constants';
+import { COLORS } from '../constants';
 import { theme } from '../design-system/theme';
 
 export default function PendingApprovalScreen() {

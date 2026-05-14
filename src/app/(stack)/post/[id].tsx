@@ -4,8 +4,11 @@ import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 
 import { useAuth } from "@/context/AuthContext";
 import { FeedDetail } from "@/components";
-import { useFeedItem } from "@/hooks/hooks";
+import { useFeedItem } from "@/hooks";
 import { COLORS } from "@/constants/colors";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("[id]");
 
 export default function PostDetailScreen() {
   const { id, item } = useLocalSearchParams();
@@ -18,7 +21,7 @@ export default function PostDetailScreen() {
     try {
       initialItem = typeof item === "string" ? JSON.parse(item) : item;
     } catch (e) {
-      console.error("Error parsing initial item:", e);
+      log.error("Error parsing initial item:", e);
     }
   }
 

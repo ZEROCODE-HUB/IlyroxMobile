@@ -2,12 +2,11 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   StyleSheet,
-  TouchableWithoutFeedback,
   Pressable,
 } from "react-native";
 import { VideoView } from "expo-video";
-import { useVideoPlayer } from "@/hooks/hooks/useVideoPlayer";
-import { DIMENSIONS, COLORS } from "@/constants";
+import { useVideoPlayer } from "@/hooks/useVideoPlayer";
+import { COLORS, FALLBACKS } from "@/constants";
 import ProgressTimeline from "./ProgressTimeline";
 
 export interface VideoPlayerProps {
@@ -37,11 +36,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onPress,
   onLongPress,
 }) => {
-  const [dynamicContentFit, setDynamicContentFit] = useState<
-    "contain" | "cover"
-  >("cover");
   // Video de fallback si no hay URL
-  const videoSource = videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
+  const videoSource = videoUrl || FALLBACKS.VIDEO_URL;
 
   const [dynamicAspectRatio, setDynamicAspectRatio] =
     useState<number>(aspectRatio);
@@ -63,11 +59,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           const { width, height } = event.videoSize;
           if (width > height) {
             // Video horizontal: ajusta el contenedor a su ratio real
-            setDynamicContentFit("contain");
             setDynamicAspectRatio(width / height); // 👈 ej: 16/9
           } else {
             // Video vertical o cuadrado: mantiene el ratio del prop
-            setDynamicContentFit("cover");
             setDynamicAspectRatio(aspectRatio); // 👈 restaura el original
           }
         }
@@ -85,12 +79,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
     onPress?.();
   };
-
-  // useEffect(() => {
-  //   return () => {
-  //     player.release();
-  //   };
-  // }, []);
 
   return (
     <Pressable onPress={handlePress} onLongPress={onLongPress}>

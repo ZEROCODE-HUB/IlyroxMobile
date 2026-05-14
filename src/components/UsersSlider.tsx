@@ -1,11 +1,9 @@
 import React, { useCallback } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Dimensions } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, FlatList } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { User } from "../types";
 import { useWindowDimensions } from "react-native";
 import Avatar from "./shared/Avatar";
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 import { COLORS } from "../constants";
 

@@ -12,6 +12,16 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_ONESIGNAL_APP_ID": "a727fcbb-320c-4028-bd6b-a2ec90ed2141",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://kpgmcebtzbeatmznwbfb.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwZ21jZWJ0emJlYXRtem53YmZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU4NzEzNDYsImV4cCI6MjA2MTQ0NzM0Nn0.Gh04DTgvIwDh1aHldOfza8oj9r9tCyar7Ke2wXh5Dnc",
+        "EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY": "AIzaSyCMns7F3TjXiJ4oswwws0USAgum-GcwM9A",
+        "EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY": "AIzaSyB2SD7BpH4ms3h3N4FiXcTv1CZdlElhRGg",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyCMns7F3TjXiJ4oswwws0USAgum-GcwM9A",
+        "EXPO_PUBLIC_SUPABASE_GEO_URL": "https://jofsnpcrklgxutjxmcwj.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_GEO_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvZnNucGNya2xneHV0anhtY3dqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNDMzOTEsImV4cCI6MjA4ODkxOTM5MX0.wjxtXb9vk4sv620Yv4Rx31D5kXp95tSW83ZC4D0FJiI"
       }
     },
     "production": {
@@ -21,6 +31,7 @@
         "buildType": "apk"
       },
       "env": {
+        "EXPO_PUBLIC_ONESIGNAL_APP_ID": "a727fcbb-320c-4028-bd6b-a2ec90ed2141",
         "EXPO_PUBLIC_SUPABASE_URL": "https://kpgmcebtzbeatmznwbfb.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwZ21jZWJ0emJlYXRtem53YmZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU4NzEzNDYsImV4cCI6MjA2MTQ0NzM0Nn0.Gh04DTgvIwDh1aHldOfza8oj9r9tCyar7Ke2wXh5Dnc",
         "EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY": "AIzaSyCMns7F3TjXiJ4oswwws0USAgum-GcwM9A",
@@ -36,7 +47,7 @@
       "ios": {
         "ascAppId": "6756507569",
         "appleTeamId": "9BWTN3CAXU",
-        "ascApiKeyPath": "./AuthKey_7TB389LN84.p8",
+        "ascApiKeyPath": "./secrets/AuthKey_7TB389LN84.p8",
         "ascApiKeyIssuerId": "05ec12f7-b988-4093-8849-a3ed039d8705",
         "ascApiKeyId": "7TB389LN84"
       }

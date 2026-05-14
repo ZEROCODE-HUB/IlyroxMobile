@@ -12,6 +12,9 @@ import { COLORS } from "../../constants/colors";
 import { Reel } from "../../types";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import * as VideoThumbnails from "expo-video-thumbnails";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("ProfileReelItem");
 
 const { width } = Dimensions.get("window");
 // Assuming 12px padding total (horizontal) and 3 cols?
@@ -54,7 +57,7 @@ const ProfileReelItem: React.FC<ProfileReelItemProps> = React.memo(
             .then(({ uri }) => {
               if (isMounted) setThumbSource(uri);
             })
-            .catch((e) => console.warn("Thumbnail generation failed", e));
+            .catch((e) => log.warn("Thumbnail generation failed", e));
         }, 500);
 
         return () => {

@@ -11,12 +11,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants";
 import { Avatar } from "../shared";
+import { EmptyState, LoadingState } from "@/design-system/components";
 import { useProfileStore, useAuthProfileStore } from "@/store/profileStore";
+import { router } from "expo-router";
 
 interface RecommendedModalProps {
   showRecommendedByModal: boolean;
   setShowRecommendedByModal: (show: boolean) => void;
-  navigation: any;
   formatRole: (rol: string) => string;
   isMe: boolean;
   loadRecommendedByUsers: (options?: { reset?: boolean }) => Promise<void>;
@@ -25,7 +26,6 @@ interface RecommendedModalProps {
 export const RecommendedModal = ({
   showRecommendedByModal,
   setShowRecommendedByModal,
-  navigation,
   formatRole,
   isMe,
   loadRecommendedByUsers,
@@ -99,15 +99,9 @@ export const RecommendedModal = ({
             onEndReachedThreshold={0.6}
             ListEmptyComponent={
               loadingRecommendedBy ? (
-                <View style={stylesRecommendedSection.recommendedByLoading}>
-                  <ActivityIndicator size="small" color={COLORS.primary} />
-                </View>
+                <LoadingState size="small" />
               ) : (
-                <View style={stylesRecommendedSection.recommendedByModalEmpty}>
-                  <Text style={stylesRecommendedSection.recommendedByEmptyText}>
-                    Aún no hay recomendaciones
-                  </Text>
-                </View>
+                <EmptyState title="Aún no hay recomendaciones" />
               )
             }
             renderItem={({ item: u }) => {
@@ -125,7 +119,7 @@ export const RecommendedModal = ({
                   style={stylesRecommendedSection.recommendedByModalItem}
                   onPress={() => {
                     setShowRecommendedByModal(false);
-                    navigation.navigate("user/[id]", { id: u.id });
+                    router.push({ pathname: "/user/[id]", params: { id: u.id } });
                   }}
                   activeOpacity={0.85}
                 >

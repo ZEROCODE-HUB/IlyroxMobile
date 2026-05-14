@@ -5,11 +5,10 @@ import React, {
   ReactNode,
   useEffect,
 } from "react";
-import { User, Property, SavedSearch, Lead } from "@/types";
-import { MOCK_PROPERTIES } from "../../data/mocks";
+import { User, SavedSearch, Lead } from "@/types";
 import { useAuth } from "./AuthContext";
 
-import { supabase } from "@/lib/supabase";
+import { FALLBACKS } from "@/constants/config";
 
 interface AppContextType {
   currentUser: User | null;
@@ -18,8 +17,6 @@ interface AppContextType {
   setIsLoading: (loading: boolean) => void;
   error: string | null;
   setError: (error: string | null) => void;
-  properties: Property[];
-  addProperty: (p: Property) => void;
   savedSearches: SavedSearch[];
   leads: Lead[];
   saveSearch: (
@@ -55,7 +52,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [properties, setProperties] = useState<Property[]>(MOCK_PROPERTIES);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<{
@@ -76,7 +72,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       const mappedUser: User = {
         id: profile.id,
         nombre: profile.nombre + " " + profile.apellido_paterno,
-        avatar: profile.foto || "https://picsum.photos/150",
+        avatar: profile.foto || FALLBACKS.AVATAR_URL,
         role:
           profile.rol === "agente"
             ? "Agent"
@@ -97,78 +93,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       setCurrentUser(null);
     }
   }, [user, profile]);
-
-  // Cargar propiedades reales de Supabase
-  useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("propiedades")
-          .select(
-            `
-            *,
-            operaciones_propiedad (*)
-          `,
-          )
-          .eq("activo", true)
-          .is("deleted_at", null);
-
-        if (error) throw error;
-
-        if (data) {
-          const mappedProperties: Property[] = data.map((p) => {
-            const operacion =
-              p.operaciones_propiedad && p.operaciones_propiedad[0];
-            return {
-              ...p, // Preservar todas las propiedades originales incluyendo operaciones_propiedad
-              id: p.id,
-              title: `${p.subtipo} en ${p.municipio}`,
-              description: p.descripcion,
-              price: operacion?.precio || 0,
-              currency: operacion?.moneda || "MXN",
-              location: {
-                address: `${p.calle} ${p.numero_exterior || ""}`,
-                country: "México",
-                state: p.estado || "",
-                city: p.ciudad || "",
-                colony: p.colonia || "",
-                municipio: p.municipio || "", // Add municipio here
-              },
-              coordinates:
-                p.latitud && p.longitud
-                  ? {
-                      lat: parseFloat(p.latitud),
-                      lng: parseFloat(p.longitud),
-                    }
-                  : undefined,
-              images: p.fotos || [],
-              features: {
-                beds: p.habitaciones || 0,
-                baths: p.banos || 0,
-                constructionSqft: p.metros_cuadrados_construccion || 0,
-                landSqft: p.metros_cuadrados_terreno || 0,
-              },
-              amenities: p.amenidades || [],
-              type: (p.tipo || "habitacional").toLowerCase() as any,
-              subtype: (p.subtipo || "").toLowerCase(),
-              operation:
-                operacion?.tipo_operacion === "venta" ? "Sale" : "Rent",
-              status: "Publicada",
-            };
-          });
-          setProperties(mappedProperties);
-        }
-      } catch (err) {
-        console.error("Error fetching properties:", err);
-      }
-    };
-
-    fetchProperties();
-  }, []);
-
-  const addProperty = (p: Property) => {
-    setProperties((prev) => [p, ...prev]);
-  };
 
   const saveSearch = (
     name: string,
@@ -203,8 +127,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     setIsLoading: () => {}, // Deprecated - controlled by AuthContext
     error,
     setError,
-    properties,
-    addProperty,
     savedSearches,
     leads,
     saveSearch,

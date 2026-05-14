@@ -17,9 +17,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/colors";
 import { useStableSafeInsets } from "@/context/SafeInsetsContext";
+import { Button } from "@/design-system/components";
 
 // Hooks
-import { useAuthForm, AuthFormState } from "./hooks/useAuthForm";
+import { useAuthForm } from "./hooks/useAuthForm";
 import { useExternalAuth, AuthProvider, ExternalAuthFormData } from "./hooks";
 
 // Componentes
@@ -120,7 +121,7 @@ export default function AuthScreen() {
 
   // Finalizar registro externo
   const handleFinalizeExternal = useCallback(async () => {
-    const success = await externalAuth.finalizeExternalRegistration(
+    await externalAuth.finalizeExternalRegistration(
       externalFormData,
       handleCloseModal,
     );
@@ -201,7 +202,9 @@ export default function AuthScreen() {
         return (
           <RegisterStepOne
             formState={authForm.formState}
+            fieldErrors={authForm.fieldErrors}
             onUpdateField={authForm.updateField}
+            onValidateField={authForm.validateField}
             onNext={handleNextStep}
             onBack={() => setAuthMethod("none")}
           />
@@ -257,21 +260,25 @@ export default function AuthScreen() {
 
         {/* Botones principales */}
         <View style={styles.buttonsContainer}>
-          <TouchableOpacity
-            style={[styles.mainButton, styles.loginButton]}
+          <Button
+            label="Iniciar Sesión"
             onPress={() => handleOpenModal("login")}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
-          </TouchableOpacity>
+            variant="primary"
+            size="lg"
+            fullWidth
+            style={styles.loginButton}
+            labelStyle={styles.loginButtonText}
+          />
 
-          <TouchableOpacity
-            style={[styles.mainButton, styles.registerButton]}
+          <Button
+            label="Registrarse"
             onPress={() => handleOpenModal("register")}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.registerButtonText}>Registrarse</Text>
-          </TouchableOpacity>
+            variant="outline"
+            size="lg"
+            fullWidth
+            style={styles.registerButton}
+            labelStyle={styles.registerButtonText}
+          />
         </View>
       </View>
 
@@ -339,7 +346,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   logoWrapper: {
-    shadowColor: "#000",
+    shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -358,14 +365,9 @@ const styles = StyleSheet.create({
     gap: 16,
     width: "100%",
   },
-  mainButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    width: "100%",
-  },
   loginButton: {
-    backgroundColor: COLORS.primary,
+    height: 56,
+    borderRadius: 12,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -373,17 +375,15 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   loginButtonText: {
-    color: COLORS.white,
     fontSize: 18,
     fontWeight: "bold",
   },
   registerButton: {
-    backgroundColor: "transparent",
+    height: 56,
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: COLORS.primary,
   },
   registerButtonText: {
-    color: COLORS.primary,
     fontSize: 18,
     fontWeight: "bold",
   },

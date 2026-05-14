@@ -6,11 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Alert,
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
 } from "react-native";
+import { useModal } from "@/context/ModalContext";
+import { useToast } from "@/context/ToastContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
@@ -22,6 +23,9 @@ import { decode } from "base64-arraybuffer";
 import { SelectionModal } from "../modals";
 import { ESTADOS_MEXICO } from "../../constants/locations";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("EditProfile");
 
 interface EditProfileProps {
   onBack: () => void;
@@ -33,8 +37,10 @@ const EditProfile: React.FC<EditProfileProps> = ({
   onProfileUpdate,
 }) => {
   const { user, profile: authProfile, refreshProfile } = useAuth();
+  const { showModal } = useModal();
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [, setUploading] = useState(false);
 
   const [formData, setFormData] = useState<Partial<perfiles>>({});
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -55,10 +61,7 @@ const EditProfile: React.FC<EditProfileProps> = ({
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          "Permiso denegado",
-          "Se requiere acceso a la galería para cambiar la foto.",
-        );
+        showModal({ title: "Permiso denegado", message: "Se requiere acceso a la galería para cambiar la foto.", confirmText: "OK" });
         return;
       }
 
@@ -73,8 +76,8 @@ const EditProfile: React.FC<EditProfileProps> = ({
         setImageUri(result.assets[0].uri);
       }
     } catch (error) {
-      console.error("Error picking image:", error);
-      Alert.alert("Error", "No se pudo seleccionar la imagen");
+      log.error("Error picking image:", error);
+      showToast("No se pudo seleccionar la imagen", "error");
     }
   };
 
@@ -110,7 +113,7 @@ const EditProfile: React.FC<EditProfileProps> = ({
         .getPublicUrl(filePath);
       return data.publicUrl;
     } catch (error) {
-      console.error("Error uploading image:", error);
+      log.error("Error uploading image:", error);
       return null;
     }
   };
@@ -120,10 +123,7 @@ const EditProfile: React.FC<EditProfileProps> = ({
 
     // Validation
     if (!formData.nombre?.trim() || !formData.apellido_paterno?.trim()) {
-      Alert.alert(
-        "Campos requeridos",
-        "Nombre y Apellido Paterno son obligatorios.",
-      );
+      showModal({ title: "Campos requeridos", message: "Nombre y Apellido Paterno son obligatorios.", confirmText: "OK" });
       return;
     }
 
@@ -170,12 +170,12 @@ const EditProfile: React.FC<EditProfileProps> = ({
 
       await refreshProfile(updatedData); // Optimización: pasar datos directamente
 
-      Alert.alert("Éxito", "Perfil actualizado correctamente");
+      showToast("Perfil actualizado correctamente", "success");
       if (onProfileUpdate) onProfileUpdate();
       onBack();
     } catch (error: any) {
-      console.error("Error updating profile:", error);
-      Alert.alert("Error", error.message || "No se pudo actualizar el perfil");
+      log.error("Error updating profile:", error);
+      showToast(error.message || "No se pudo actualizar el perfil", "error");
     } finally {
       setLoading(false);
       setUploading(false);

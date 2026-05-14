@@ -12,8 +12,8 @@ import {
   FlatList,
   StyleSheet,
   Dimensions,
-  Alert,
 } from "react-native";
+import { useToast } from "@/context/ToastContext";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 import { Property } from "../../types";
@@ -21,6 +21,9 @@ import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import { supabase } from "../../lib/supabase";
 import { Bath } from "lucide-react-native";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("ProfilePropertyGrid");
 
 const { width } = Dimensions.get("window");
 const GAP = 8;
@@ -41,6 +44,7 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
   onEditPress,
   onDelete,
 }) => {
+  const { showToast } = useToast();
   const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(
     null,
   );
@@ -58,7 +62,7 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
 
       if (error) throw error;
 
-      Alert.alert("Éxito", "Propiedad eliminada correctamente");
+      showToast("Propiedad eliminada correctamente", "success");
       setPropertyToDelete(null);
 
       // Trigger refresh
@@ -66,8 +70,8 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
         onDelete();
       }
     } catch (error: any) {
-      console.error("Error deleting property:", error);
-      Alert.alert("Error", error.message || "No se pudo eliminar la propiedad");
+      log.error("Error deleting property:", error);
+      showToast(error.message || "No se pudo eliminar la propiedad", "error");
     } finally {
       setDeleting(false);
     }
@@ -105,16 +109,21 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
       >
         <Image source={{ uri: item.images[0] }} style={styles.gridImage} />
 
-        {/* Status Badge  getStatusStyle(item.status) */}
-        <View style={[styles.statusBadge, { backgroundColor: "#aab9d761" }]}>
-          {commissionText ? (
-            <Text style={styles.statusText}>{commissionText} comisión</Text>
-          ) : (
-            <Text style={styles.statusText}>{item.status}</Text>
-          )}
-        </View>
-
-        {/* Commission Badge */}
+        {/* Status Badge */}
+        {item.sin_comision ? (
+          <View style={[styles.statusBadge, styles.sinComisionBadge]}>
+            <Ionicons name="alert-circle" size={10} color="#fff" />
+            <Text style={[styles.statusText, { color: "#fff" }]}> Sin comisión</Text>
+          </View>
+        ) : (
+          <View style={[styles.statusBadge, { backgroundColor: "#aab9d761" }]}>
+            {commissionText ? (
+              <Text style={styles.statusText}>{commissionText} comisión</Text>
+            ) : (
+              <Text style={styles.statusText}>{item.status}</Text>
+            )}
+          </View>
+        )}
 
         {/* 3-Dot Menu (solo si es perfil propio) */}
         {isOwnProfile && (
@@ -234,7 +243,7 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
         message={`¿Estás seguro de que deseas eliminar "${propertyToDelete?.title}"? Esta acción no se puede deshacer.`}
         confirmText="Eliminar"
         cancelText="Cancelar"
-        onConfirm={() => propertyToDelete && handleDelete(propertyToDelete)}
+        onConfirm={() => { if (propertyToDelete) handleDelete(propertyToDelete); }}
         onCancel={() => setPropertyToDelete(null)}
         danger
         loading={deleting}
@@ -243,41 +252,20 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
   );
 };
 
-/**
- * Formatear información de comisión
- */
 const formatCommission = (commission?: {
   shared: boolean;
   percentage?: number;
+  months?: number;
   condition?: string;
 }): string | null => {
   if (!commission) return null;
-
+  if (commission.months) {
+    return `${commission.months} mes${commission.months !== 1 ? "es" : ""}`;
+  }
   if (commission.percentage) {
     return `${commission.percentage}%`;
   }
-
   return null;
-};
-
-/**
- * Obtener estilos según estado
- */
-const getStatusStyle = (status: Property["status"]) => {
-  switch (status) {
-    case "Publicada":
-      return { backgroundColor: COLORS.success };
-    case "Suspendida":
-      return { backgroundColor: COLORS.warning };
-    case "Rentada":
-      return { backgroundColor: COLORS.info };
-    case "Reservada":
-      return { backgroundColor: COLORS.tagPurple };
-    case "Vendida":
-      return { backgroundColor: COLORS.error };
-    default:
-      return { backgroundColor: COLORS.textSecondary };
-  }
 };
 
 const styles = StyleSheet.create({
@@ -320,24 +308,10 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     letterSpacing: 0.3,
   },
-  commissionBadge: {
-    position: "absolute",
-    top: 6,
-    left: 6,
-    backgroundColor: COLORS.primaryDark,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
-    elevation: 2,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  commissionText: {
-    color: COLORS.white,
-    fontSize: 9,
-    fontWeight: "700",
+  sinComisionBadge: {
+    backgroundColor: "#C53030cc",
+    flexDirection: "row",
+    alignItems: "center",
   },
   menuContainer: {
     position: "absolute",

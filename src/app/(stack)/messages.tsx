@@ -2,6 +2,9 @@ import React from "react";
 import { useRouter } from "expo-router";
 import { useRoute } from "@react-navigation/native";
 import MessagingScreen from "../../components/MessagingScreen";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("messages");
 
 export default function MessagesRoute() {
   const router = useRouter();
@@ -16,7 +19,7 @@ export default function MessagesRoute() {
     try {
       initialUser = JSON.parse(initialUser);
     } catch (e) {
-      console.error("Error parsing initialUser:", e);
+      log.error("Error parsing initialUser:", e);
     }
   }
 

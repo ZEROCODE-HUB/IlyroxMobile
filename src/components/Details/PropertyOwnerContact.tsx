@@ -1,0 +1,126 @@
+import React from "react";
+import {
+  ActivityIndicator,
+  Linking,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { COLORS } from "@/constants";
+import { useModal } from "@/context/ModalContext";
+import { Avatar } from "../shared";
+import { propertyDetailStyles as styles } from "./propertyDetailStyles";
+
+export interface PropertyOwnerContactProps {
+  profile: any;
+  propertyId: string;
+  currentUserId?: string;
+  sinDatos?: boolean;
+  loadingEdit: boolean;
+  onContactExternal?: (ownerId: string, propertyId: string) => void;
+  onContactInternal: (profile: any) => void;
+  onEditProperty: () => void;
+}
+
+export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
+  profile,
+  propertyId,
+  currentUserId,
+  sinDatos,
+  loadingEdit,
+  onContactExternal,
+  onContactInternal,
+  onEditProperty,
+}) => {
+  const { showModal } = useModal();
+
+  if (sinDatos || !profile) return null;
+
+  const isOwnProperty = currentUserId === profile.id;
+
+  const handleContactOwner = () => {
+    if (onContactExternal) {
+      onContactExternal(profile.id, propertyId);
+      return;
+    }
+    onContactInternal(profile);
+  };
+
+  const handleCall = () => {
+    const phone = `${profile.prefijo_celular || ""}${profile.celular || ""}`;
+    if (phone && phone.trim().length > 0) {
+      Linking.openURL(`tel:${phone.replace(/\s/g, "")}`);
+      return;
+    }
+    showModal({
+      title: "Sin número de contacto",
+      message:
+        "Este usuario no cuenta con un número registrado para llamadas directas.",
+      confirmText: "OK",
+    });
+  };
+
+  return (
+    <>
+      <View style={styles.profileSection}>
+        <Avatar
+          uri={profile.foto}
+          name={profile.nombre}
+          size={50}
+          style={styles.profileFoto}
+        />
+        <View style={styles.profileInfo}>
+          <Text style={styles.profileName}>{profile.nombre}</Text>
+          <Text style={styles.profileRole}>Agente Inmobiliario</Text>
+        </View>
+
+        {!isOwnProperty && (
+          <TouchableOpacity
+            style={styles.contactIconBtn}
+            onPress={handleContactOwner}
+          >
+            <Ionicons
+              name="chatbubble-ellipses"
+              size={24}
+              color={COLORS.primary}
+            />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {isOwnProperty ? (
+        <TouchableOpacity
+          style={[styles.mainContactBtn, { backgroundColor: COLORS.info }]}
+          onPress={onEditProperty}
+        >
+          <Text style={styles.mainContactBtnText}>
+            {loadingEdit ? (
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            ) : (
+              <>
+                <Ionicons
+                  name="pencil"
+                  size={20}
+                  color={COLORS.white}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={{ marginLeft: 8 }}>Editar Propiedad</Text>
+              </>
+            )}
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity style={styles.mainContactBtn} onPress={handleCall}>
+          <Ionicons
+            name="call"
+            size={20}
+            color={COLORS.white}
+            style={{ marginRight: 8 }}
+          />
+          <Text style={styles.mainContactBtnText}>Contactar ahora</Text>
+        </TouchableOpacity>
+      )}
+    </>
+  );
+};

@@ -7,6 +7,7 @@ import {
 } from "react-native";
 import { Avatar } from "../shared";
 import { COLORS } from "@/constants";
+import { EmptyState } from "@/design-system/components";
 import { Ionicons } from "@expo/vector-icons";
 import { RecommendedModal } from "./RecommendedModal";
 import { useProfileStore, useAuthProfileStore } from "@/store/profileStore";
@@ -16,7 +17,6 @@ interface RecommendedSectionProps {
   setShowRecommendedByModal: (show: boolean) => void;
   showRecommendedByModal: boolean;
   formatRole: (rol: string) => string;
-  navigation: any;
   isMe: boolean;
   loadRecommendedByUsers: (options?: { reset?: boolean }) => Promise<void>;
 }
@@ -25,7 +25,6 @@ export const RecommendedSection = ({
   setShowRecommendedByModal,
   showRecommendedByModal,
   formatRole,
-  navigation,
   isMe,
   loadRecommendedByUsers,
 }: RecommendedSectionProps) => {
@@ -81,9 +80,7 @@ export const RecommendedSection = ({
             {recommendedByError}
           </Text>
         ) : recommendedByUsers.length === 0 ? (
-          <Text style={stylesRecommendedSection.recommendedByEmptyText}>
-            Aún no hay recomendaciones
-          </Text>
+          <EmptyState title="Aún no hay recomendaciones" />
         ) : (
           <TouchableOpacity
             style={stylesRecommendedSection.recommendedByPreviewRow}
@@ -209,7 +206,6 @@ export const RecommendedSection = ({
       <RecommendedModal
         showRecommendedByModal={showRecommendedByModal}
         setShowRecommendedByModal={setShowRecommendedByModal}
-        navigation={navigation}
         formatRole={formatRole}
         isMe={isMe}
         loadRecommendedByUsers={loadRecommendedByUsers}

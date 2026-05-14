@@ -1,18 +1,13 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
-  TouchableOpacity,
-  ScrollView,
 } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { FilteredChartProps } from "./types";
 import { COLORS } from "../../constants/colors";
 import currencyConverter from "../../utils/currencyConverter";
-
-const SCREEN_WIDTH = Dimensions.get("window").width;
 
 const Chart03_SearchVsProperties: React.FC<FilteredChartProps> = ({
   onPress,
@@ -64,14 +59,6 @@ const Chart03_SearchVsProperties: React.FC<FilteredChartProps> = ({
 
   const handleBarPress = React.useCallback((index: number) => {
     setLocalActiveIndex(index);
-  }, []);
-
-  const renderTooltip = React.useCallback((item: any) => {
-    return (
-      <View style={styles.tooltipContainer}>
-        <Text style={styles.tooltipText}>{item.value}</Text>
-      </View>
-    );
   }, []);
 
   useEffect(() => {
@@ -323,20 +310,20 @@ const Chart03_SearchVsProperties: React.FC<FilteredChartProps> = ({
           lineData={lineData1} // Blue: Construction
           lineData2={lineData2} // Yellow: Land
           lineConfig={{
-            color: "#2196F3", // Blue
+            color: COLORS.chartBlue, // Blue
             thickness: 3,
             curved: false,
             hideDataPoints: false,
-            dataPointsColor: "#2196F3",
+            dataPointsColor: COLORS.chartBlue,
             dataPointsRadius: 5,
             isSecondary: true,
           }}
           lineConfig2={{
-            color: "#FFEB3B", // Yellow
+            color: COLORS.chartYellow, // Yellow
             thickness: 3,
             curved: false,
             hideDataPoints: false,
-            dataPointsColor: "#FFEB3B",
+            dataPointsColor: COLORS.chartYellow,
             dataPointsRadius: 5,
             isSecondary: true,
           }}
@@ -362,11 +349,11 @@ const Chart03_SearchVsProperties: React.FC<FilteredChartProps> = ({
           <Text style={styles.lText}>Propiedades</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.line, { backgroundColor: "#2196F3" }]} />
+          <View style={[styles.line, { backgroundColor: COLORS.chartBlue }]} />
           <Text style={styles.lText}>m² Const.</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.line, { backgroundColor: "#FFEB3B" }]} />
+          <View style={[styles.line, { backgroundColor: COLORS.chartYellow }]} />
           <Text style={styles.lText}>m² Terreno</Text>
         </View>
       </View>

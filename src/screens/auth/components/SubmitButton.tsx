@@ -4,14 +4,9 @@
  */
 
 import React, { memo } from "react";
-import {
-  TouchableOpacity,
-  Text,
-  ActivityIndicator,
-  StyleSheet,
-  ViewStyle,
-} from "react-native";
+import { StyleSheet, ViewStyle } from "react-native";
 import { COLORS } from "../../../constants/colors";
+import { Button } from "@/design-system/components";
 
 interface SubmitButtonProps {
   loading: boolean;
@@ -23,40 +18,27 @@ interface SubmitButtonProps {
 
 export const SubmitButton = memo(
   ({ loading, onPress, text, disabled = false, style }: SubmitButtonProps) => (
-    <TouchableOpacity
-      style={[styles.button, disabled && styles.buttonDisabled, style]}
+    <Button
+      label={text}
       onPress={onPress}
-      disabled={loading || disabled}
-      activeOpacity={0.8}
-    >
-      {loading ? (
-        <ActivityIndicator color={COLORS.white} />
-      ) : (
-        <Text style={styles.buttonText}>{text}</Text>
-      )}
-    </TouchableOpacity>
+      loading={loading}
+      disabled={disabled}
+      variant="primary"
+      size="lg"
+      fullWidth
+      style={[styles.button, style as ViewStyle]}
+    />
   )
 );
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
     marginTop: 12,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: "bold",
+    borderRadius: 12,
   },
 });

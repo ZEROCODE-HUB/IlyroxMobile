@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { COLORS } from "../constants";
 
@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder || "#E5E5E5",
+    borderBottomColor: COLORS.cardBorder || COLORS.mediumGray,
   },
   pillContainer: {
     flexDirection: "row",
@@ -106,12 +106,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   pillTextWhite: {
-    color: "#FFFFFF",
+    color: COLORS.white,
     fontSize: 12,
     fontWeight: "700",
   },
   pillTextDark: {
-    color: "#000000",
+    color: COLORS.black,
     fontSize: 12,
     fontWeight: "700",
   },

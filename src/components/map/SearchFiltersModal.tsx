@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -16,39 +16,36 @@ import { usePropertyFiltersStore } from "../../store/propertyFiltersStore";
 
 import NumberInputModal from "../modals/NumberInputModal";
 import { PropertyTypeSelector } from "./PropertyTypeSelector";
-import { SaveSearchModal } from "./SaveSearchModal";
 import { PriceSection } from "./filters/PriceSection";
 import { CharacteristicsSection } from "./filters/CharacteristicsSection";
+import { CommissionFilterSection } from "./filters/CommissionFilterSection";
+import { AgricolaFiltersSection } from "./filters/AgricolaFiltersSection";
+import { ComercialFiltersSection } from "./filters/ComercialFiltersSection";
+import { IndustrialFiltersSection } from "./filters/IndustrialFiltersSection";
 
 import { COLORS } from "../../constants/colors";
 import { getCamposVisibles } from "../../constants/propertyData";
 import { KeyboardAvoidingView } from "react-native";
-import { useGeoLocation } from "../../hooks/useGeoLocation";
-import SelectionModal from "../modals/SelectionModal";
-import MultiSelectionModal from "../modals/MultiSelectionModal";
 
 const { height } = Dimensions.get("window");
 
 interface SearchFiltersModalProps {
   visible: boolean;
   onClose: () => void;
+  onViewResults?: () => void;
   filteredPropertiesCount: number;
   userId?: string;
-  selectedLocation?: {
-    type: "estado" | "municipio" | "colonia";
-    name: string;
-    estado_id: number;
-  } | null;
 }
 
 export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   visible,
   onClose,
+  onViewResults,
   filteredPropertiesCount,
   userId,
-  selectedLocation,
 }) => {
-  const { filters, updateFilter: onUpdateFilter, updateLocationFilter: onUpdateLocationFilter } = usePropertyFiltersStore();
+  const { filters, updateFilter: onUpdateFilter } = usePropertyFiltersStore();
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   // Estados para modals
   const [showRecamarasModal, setShowRecamarasModal] = useState(false);
@@ -57,66 +54,6 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
     useState(false);
   const [showNivelesModal, setShowNivelesModal] = useState(false);
   const [showAntiguedadModal, setShowAntiguedadModal] = useState(false);
-  const [showSaveSearchModal, setShowSaveSearchModal] = useState(false);
-  const [showColoniaModal, setShowColoniaModal] = useState(false);
-  const [showComisionModal, setShowComisionModal] = useState(false);
-
-  // Geo Location Hook para las colonias
-  const [geoEstadoId, setGeoEstadoId] = useState<string | null>(null);
-  const { colonias, fetchColonias, fetchEstados, estados, isLoading } =
-    useGeoLocation();
-
-  // 1. Intentar obtener el ID del estado por nombre si no viene en el objeto
-  useEffect(() => {
-    if (
-      selectedLocation &&
-      !selectedLocation.estado_id &&
-      selectedLocation.name
-    ) {
-      if (selectedLocation.type === "estado") {
-        const findEstado = async () => {
-          try {
-            const { supabaseGeo } = await import("../../lib/supabase-geo");
-            // Limpiar el nombre (ej: "Nuevo León, México" -> "Nuevo León")
-            const parts = selectedLocation.name.split(",").map((p) => p.trim());
-            const searchName =
-              parts
-                .filter(
-                  (p) =>
-                    p.toLowerCase() !== "méxico" &&
-                    p.toLowerCase() !== "mexico",
-                )
-                .pop() || parts[0];
-
-            const { data } = await supabaseGeo.rpc("obtener_estados", {
-              p_nombre_busqueda: searchName,
-            });
-            if (data && data.length > 0) {
-              setGeoEstadoId(String(data[0].id));
-            } else {
-              setGeoEstadoId(null);
-            }
-          } catch (error) {
-            console.error("Error mapping state name to ID:", error);
-          }
-        };
-        findEstado();
-      } else {
-        // Es un municipio o colonia que debería traer ya el estado_id o estar en un formato que no podemos resolver así.
-        setGeoEstadoId(null);
-      }
-    } else if (selectedLocation && selectedLocation.estado_id) {
-      setGeoEstadoId(String(selectedLocation.estado_id));
-    } else {
-      setGeoEstadoId(null);
-    }
-  }, [selectedLocation?.name, selectedLocation?.estado_id]);
-  // 2. Cargar colonias cuando tenemos el ID del estado (de la DB Geo)
-  React.useEffect(() => {
-    if (geoEstadoId) {
-      fetchColonias("", geoEstadoId);
-    }
-  }, [geoEstadoId]);
 
   // Number Input Modal
   const [showNumberInput, setShowNumberInput] = useState(false);
@@ -191,6 +128,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+            scrollEnabled={scrollEnabled}
           >
             {/* 1. TIPO DE OPERACIÓN */}
             <View style={styles.formSection}>
@@ -221,68 +159,13 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
               handleCurrencyChange={handleCurrencyChange}
             />
 
-            {/* UBICACION - COLONIA */}
-            {geoEstadoId && (
-              <View style={styles.formSection}>
-                <Text style={styles.sectionLabel}>Colonia</Text>
-
-                <TouchableOpacity
-                  style={[styles.selector, { marginTop: 12 }]}
-                  onPress={() => setShowColoniaModal(true)}
-                  disabled={colonias.length === 0}
-                >
-                  <Text
-                    style={
-                      Array.isArray(filters.locationFilter.colonia) &&
-                      filters.locationFilter.colonia.length > 0
-                        ? styles.selectorText
-                        : [styles.selectorText, { color: COLORS.textTertiary }]
-                    }
-                  >
-                    {isLoading
-                      ? "Cargando colonias..."
-                      : Array.isArray(filters.locationFilter.colonia) &&
-                          filters.locationFilter.colonia.length > 0
-                        ? `${filters.locationFilter.colonia.length} seleccionadas`
-                        : "Seleccionar Colonias"}
-                  </Text>
-                  <Ionicons
-                    name="chevron-down"
-                    size={20}
-                    color={COLORS.textSecondary}
-                  />
-                </TouchableOpacity>
-
-                <MultiSelectionModal
-                  visible={showColoniaModal}
-                  onClose={() => setShowColoniaModal(false)}
-                  onSelect={(vals) => {
-                    const names = vals.map((v) => {
-                      const c = colonias.find((col) => col.value === v);
-                      // Extraer solo el nombre de la colonia (eliminar " - Municipio")
-                      return c ? c.label.split(" - ")[0] : v;
-                    });
-                    onUpdateLocationFilter({
-                      ...filters.locationFilter,
-                      colonia: names,
-                    });
-                  }}
-                  title="Selecciona Colonias"
-                  options={colonias}
-                  currentValues={
-                    Array.isArray(filters.locationFilter.colonia)
-                      ? filters.locationFilter.colonia.map((name) => {
-                          const f = colonias.find(
-                            (c) => c.label.split(" - ")[0] === name,
-                          );
-                          return f ? f.value : name;
-                        })
-                      : []
-                  }
-                  searchable
-                />
+            {/* 3. COMISIÓN MÍNIMA */}
+            <View style={styles.formSection}>
+              <Text style={styles.sectionLabel}>Comisión mínima</Text>
+              <View style={{ marginTop: 12 }}>
+                <CommissionFilterSection onScrollLock={setScrollEnabled} />
               </View>
-            )}
+            </View>
 
             {/* 4. TIPO DE PROPIEDAD */}
             <View style={styles.formSection}>
@@ -309,33 +192,39 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
               setShowNivelesModal={setShowNivelesModal}
               showAntiguedadModal={showAntiguedadModal}
               setShowAntiguedadModal={setShowAntiguedadModal}
-              showComisionModal={showComisionModal}
-              setShowComisionModal={setShowComisionModal}
               openNumberInput={openNumberInput}
               setShowNumberInput={setShowNumberInput}
             />
+
+            {/* 6. FILTROS ESPECIALIZADOS POR TIPO */}
+            {filters.tipoPropiedad === 'agricola' && (
+              <View style={styles.formSection}>
+                <AgricolaFiltersSection />
+              </View>
+            )}
+            {filters.tipoPropiedad === 'comercial' && (
+              <View style={styles.formSection}>
+                <ComercialFiltersSection />
+              </View>
+            )}
+            {filters.tipoPropiedad === 'industrial' && (
+              <View style={styles.formSection}>
+                <IndustrialFiltersSection />
+              </View>
+            )}
 
             <View style={styles.divider} />
           </ScrollView>
 
           {/* Footer */}
           <View style={styles.modalFooter}>
-            <TouchableOpacity style={styles.applyBtn} onPress={onClose}>
+            <TouchableOpacity
+              style={styles.applyBtn}
+              onPress={onViewResults ?? onClose}
+            >
               <Text style={styles.applyBtnText}>
                 Ver {filteredPropertiesCount} propiedades
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.saveSearchBtn}
-              onPress={() => setShowSaveSearchModal(true)}
-            >
-              <Ionicons
-                name="bookmark-outline"
-                size={18}
-                color={COLORS.primary}
-                style={{ marginRight: 6 }}
-              />
-              <Text style={styles.saveSearchBtnText}>Guardar búsqueda</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -347,17 +236,6 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
         onClose={() => setShowNumberInput(false)}
         onSave={numberInputConfig.onSave}
         title={numberInputConfig.title}
-      />
-
-      {/* Save Search Modal */}
-      <SaveSearchModal
-        visible={showSaveSearchModal}
-        onClose={() => setShowSaveSearchModal(false)}
-        onSaveSuccess={() => {
-          setShowSaveSearchModal(false);
-          onClose();
-        }}
-        userId={userId}
       />
     </Modal>
   );
@@ -523,23 +401,6 @@ const styles = StyleSheet.create({
   secondaryBtnText: {
     color: COLORS.textSecondary,
     fontSize: 15,
-    fontWeight: "600",
-  },
-  saveSearchBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.white,
-    marginTop: 12,
-  },
-  saveSearchBtnText: {
-    color: COLORS.primary,
-    fontSize: 14,
     fontWeight: "600",
   },
   divider: {

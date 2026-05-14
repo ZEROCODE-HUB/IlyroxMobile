@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Platform } from "react-native";
 import { supabase } from "@/lib/supabase";
 import Constants from "expo-constants";
+import { logger } from "@/utils/logger";const log = logger.scoped("useVersionCheck");
 
 export interface VersionInfo {
   platform: string;
@@ -46,7 +47,7 @@ export const useVersionCheck = () => {
         }
       }
     } catch (error) {
-      console.error("Error al verificar versión:", error);
+      log.error("Error al verificar versión:", error);
     } finally {
       setLoading(false);
     }

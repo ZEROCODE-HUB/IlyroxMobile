@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
+import { formatPriceShort } from "../../utils/priceFormatter";
 import { Property } from "../../types";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import { Bath } from "lucide-react-native";
@@ -23,11 +24,12 @@ interface ProfilePropertyItemProps {
   isOwnProfile?: boolean;
   onEdit?: (item: Property) => void;
   onDelete?: (item: Property) => void;
+  onPublishOpenHouse?: (item: Property) => void;
   isLastInRow?: boolean;
 }
 
 const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
-  ({ item, onPress, isOwnProfile, onEdit, onDelete, isLastInRow }) => {
+  ({ item, onPress, isOwnProfile, onEdit, onDelete, onPublishOpenHouse, isLastInRow }) => {
     const commissionText = formatCommission(item.commission);
 
     const menuOptions: MenuOption[] = [
@@ -36,6 +38,13 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
         label: "Editar",
         onPress: () => onEdit && onEdit(item),
       },
+      ...(item.es_easybroker
+        ? [{
+            icon: "home-outline" as const,
+            label: "Publicar OpenHouse",
+            onPress: () => onPublishOpenHouse && onPublishOpenHouse(item),
+          }]
+        : []),
       {
         icon: "trash-outline",
         label: "Eliminar",
@@ -58,13 +67,20 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
           cachePolicy="memory-disk"
         />
 
-        <View style={[styles.statusBadge, { backgroundColor: "#03a58fd7" }]}>
-          {commissionText ? (
-            <Text style={styles.statusText}>{commissionText} comisión</Text>
-          ) : (
-            <Text style={styles.statusText}>{item.status}</Text>
-          )}
-        </View>
+        {item.sin_comision ? (
+          <View style={[styles.statusBadge, styles.sinComisionBadge]}>
+            <Ionicons name="alert-circle" size={10} color="#fff" />
+            <Text style={styles.statusText}> Sin comisión</Text>
+          </View>
+        ) : (
+          <View style={[styles.statusBadge, { backgroundColor: "#03a58fd7" }]}>
+            {commissionText ? (
+              <Text style={styles.statusText}>{commissionText} comisión</Text>
+            ) : (
+              <Text style={styles.statusText}>{item.status}</Text>
+            )}
+          </View>
+        )}
 
         {isOwnProfile && (
           <View style={styles.menuContainer}>
@@ -75,10 +91,7 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
         <View style={styles.infoContainer}>
           <View style={styles.priceRow}>
             <Text style={styles.propertyPrice}>
-              $
-              {item.price >= 1000000
-                ? `${(item.price / 1000000).toFixed(1)}M`
-                : `${(item.price / 1000).toFixed(0)}k`}
+              {formatPriceShort(item.price)}
             </Text>
             <Text style={styles.propertyCurrency}>{item.currency}</Text>
           </View>
@@ -156,9 +169,13 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
 const formatCommission = (commission?: {
   shared: boolean;
   percentage?: number;
+  months?: number;
   condition?: string;
 }): string | null => {
   if (!commission) return null;
+  if (commission.months) {
+    return `${commission.months} mes${commission.months !== 1 ? "es" : ""}`;
+  }
   if (commission.percentage) {
     return `${commission.percentage}%`;
   }
@@ -193,10 +210,15 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   statusText: {
-    color: "#ffffffff",
+    color: COLORS.white,
     fontSize: 11,
     fontWeight: "500",
     letterSpacing: 0.3,
+  },
+  sinComisionBadge: {
+    backgroundColor: "#C53030cc",
+    flexDirection: "row",
+    alignItems: "center",
   },
   menuContainer: {
     position: "absolute",

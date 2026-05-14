@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ReportPropertyModal.tsx
  * Modal para reportar una propiedad con motivo y descripción.
  */
@@ -21,7 +21,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useReportProperty } from "@/hooks/hooks/useReportProperty";
+import { useReportProperty } from "@/hooks/useReportProperty";
 
 interface ReportPropertyModalProps {
   visible: boolean;
@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: COLORS.dividerGray,
   },
   headerTitleContainer: {
     flexDirection: "row",
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#F0F0F0",
+    borderColor: COLORS.dividerGray,
   },
   reportCardHeader: {
     flexDirection: "row",
@@ -594,7 +594,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
+    borderTopColor: COLORS.dividerGray,
     backgroundColor: COLORS.white,
   },
   primaryButton: {
@@ -652,14 +652,14 @@ const styles = StyleSheet.create({
     color: COLORS.error,
   },
   textArea: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: COLORS.lightGray,
     borderRadius: 12,
     padding: 14,
     minHeight: 100,
     fontSize: 14,
     color: COLORS.textPrimary,
     borderWidth: 1.5,
-    borderColor: "#E5E5E5",
+    borderColor: COLORS.mediumGray,
     textAlignVertical: "top",
     marginBottom: 10,
   },
@@ -690,7 +690,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E5E5E5",
+    borderColor: COLORS.mediumGray,
     overflow: "hidden",
   },
   categoryHeader: {
@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#E5E5E5",
+    borderBottomColor: COLORS.mediumGray,
   },
   categoryHeaderText: {
     fontSize: 13,

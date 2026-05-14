@@ -1,6 +1,9 @@
 import { supabase } from "@/lib/supabase";
 import { Post } from "@/types";
 import * as Burnt from "burnt";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("postsService");
 
 export const postsService = {
   async postsByUser(targetUserId: string) {
@@ -12,7 +15,7 @@ export const postsService = {
       .order("created_at", { ascending: false });
 
     if (postsError) {
-      console.error("Error fetching posts:", postsError);
+      log.error("Error fetching posts:", postsError);
       return [];
     }
 
@@ -26,7 +29,7 @@ export const postsService = {
       .in("contenido_id", postsIds);
 
     if (feedError) {
-      console.error("Error fetching feed_items for posts:", feedError);
+      log.error("Error fetching feed_items for posts:", feedError);
       return postsData;
     }
 
@@ -66,7 +69,7 @@ export const postsService = {
       .maybeSingle();
 
     if (postError) {
-      console.error("Error fetching post:", postError);
+      log.error("Error fetching post:", postError);
       return null;
     }
 
@@ -81,7 +84,7 @@ export const postsService = {
       .maybeSingle();
 
     if (feedError) {
-      console.error("Error fetching feed_item for post detail:", feedError);
+      log.error("Error fetching feed_item for post detail:", feedError);
       return postData;
     }
 

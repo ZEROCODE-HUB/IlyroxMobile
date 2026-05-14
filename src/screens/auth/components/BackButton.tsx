@@ -4,8 +4,9 @@
  */
 
 import React, { memo } from "react";
-import { TouchableOpacity, Text, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 import { COLORS } from "../../../constants/colors";
+import { Button } from "@/design-system/components";
 
 interface BackButtonProps {
   onPress: () => void;
@@ -13,19 +14,24 @@ interface BackButtonProps {
 }
 
 export const BackButton = memo(({ onPress, text }: BackButtonProps) => (
-  <TouchableOpacity style={styles.button} onPress={onPress} activeOpacity={0.7}>
-    <Text style={styles.text}>{text}</Text>
-  </TouchableOpacity>
+  <Button
+    label={text}
+    onPress={onPress}
+    variant="ghost"
+    size="md"
+    fullWidth
+    style={styles.button}
+    labelStyle={styles.text}
+  />
 ));
 
 const styles = StyleSheet.create({
   button: {
-    padding: 16,
-    alignItems: "center",
     marginTop: 8,
   },
   text: {
     color: COLORS.textSecondary,
     fontSize: 14,
+    fontWeight: "400",
   },
 });

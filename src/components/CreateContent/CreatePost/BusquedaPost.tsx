@@ -1,8 +1,8 @@
 import { COLORS } from "@/constants/colors";
+import { PROPERTY_TYPES } from "@/constants/propertyData";
 import { AppInput } from "@/design-system/components/AppInput";
 import { Post } from "@/types";
-import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface BusquedaPostProps {
   post: Post;
@@ -14,7 +14,12 @@ interface BusquedaPostProps {
   setHabitaciones: (val: string) => void;
   operacion: string;
   setOperacion: (val: string) => void;
+  subtipo: string[];
+  setSubtipo: (val: string[]) => void;
+  tipoPropiedad?: string;
 }
+
+const OPERACION_OPTIONS = ["venta", "renta"] as const;
 
 export const BusquedaPost = ({
   post,
@@ -26,52 +31,110 @@ export const BusquedaPost = ({
   setHabitaciones,
   operacion,
   setOperacion,
+  subtipo,
+  setSubtipo,
+  tipoPropiedad,
 }: BusquedaPostProps) => {
+  const subtipoOptions =
+    (PROPERTY_TYPES as Record<string, readonly string[]>)[tipoPropiedad ?? ""] ?? [];
+
+  const toggleSubtipo = (val: string) => {
+    setSubtipo(
+      subtipo.includes(val) ? subtipo.filter((s) => s !== val) : [...subtipo, val]
+    );
+  };
+
+  const handleCurrencyChange = (text: string, setter: (val: string) => void) => {
+    const rawValue = text.replace(/,/g, "");
+    if (/^\d*\.?\d*$/.test(rawValue)) {
+      const parts = rawValue.split(".");
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      setter(parts.join("."));
+    }
+  };
 
   return (
     <View style={styles.card}>
       <Text style={styles.label}>Parámetros de Búsqueda</Text>
 
       <View style={{ marginTop: 12, gap: 16 }}>
+        {/* Operación */}
+        <View>
+          <Text style={styles.fieldLabel}>Operación</Text>
+          <View style={styles.chipsRow}>
+            {OPERACION_OPTIONS.map((op) => {
+              const active = operacion.toLowerCase() === op;
+              return (
+                <TouchableOpacity
+                  key={op}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => setOperacion(active ? "" : op)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {op.charAt(0).toUpperCase() + op.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Subtipo */}
+        {subtipoOptions.length > 0 && (
+          <View>
+            <Text style={styles.fieldLabel}>Tipo de inmueble</Text>
+            <View style={styles.chipsRow}>
+              {subtipoOptions.map((opt) => {
+                const active = subtipo.includes(opt);
+                return (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.chip, active && styles.chipActive]}
+                    onPress={() => toggleSubtipo(opt)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* Precios */}
         <View style={{ flexDirection: "row", gap: 12 }}>
           <View style={{ flex: 1 }}>
             <AppInput
               label="Precio Mínimo"
-              placeholder="Ej. 1000000"
+              placeholder="Ej. 1,000,000"
               keyboardType="numeric"
               value={precioMin}
-              onChangeText={setPrecioMin}
+              onChangeText={(t) => handleCurrencyChange(t, setPrecioMin)}
             />
           </View>
           <View style={{ flex: 1 }}>
             <AppInput
               label="Precio Máximo"
-              placeholder="Ej. 5000000"
+              placeholder="Ej. 5,000,000"
               keyboardType="numeric"
               value={precioMax}
-              onChangeText={setPrecioMax}
+              onChangeText={(t) => handleCurrencyChange(t, setPrecioMax)}
             />
           </View>
         </View>
 
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          <View style={{ flex: 1 }}>
-            <AppInput
-              label="Habitaciones"
-              placeholder="Ej. 3"
-              keyboardType="numeric"
-              value={habitaciones}
-              onChangeText={setHabitaciones}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <AppInput
-              label="Operación"
-              placeholder="Venta / Renta"
-              value={operacion}
-              onChangeText={setOperacion}
-            />
-          </View>
+        {/* Habitaciones */}
+        <View style={{ width: "50%" }}>
+          <AppInput
+            label="Recámaras"
+            placeholder="Ej. 3"
+            keyboardType="numeric"
+            value={habitaciones}
+            onChangeText={setHabitaciones}
+          />
         </View>
       </View>
     </View>
@@ -94,46 +157,37 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textTransform: "uppercase",
   },
-  dateButton: {
-    flex: 1,
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.textTertiary,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 8,
+  },
+  chipsRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.background,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    flexWrap: "wrap",
     gap: 8,
   },
-  dateButtonText: {
-    fontSize: 14,
-    color: COLORS.primary,
-  },
-  uploadBtn: {
-    width: 120,
-    height: 125,
-    borderRadius: 12,
-    borderWidth: 2,
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 18,
+    borderWidth: 1.5,
     borderColor: COLORS.cardBorder,
-    borderStyle: "dashed",
-    alignItems: "center",
-    justifyContent: "center",
     backgroundColor: COLORS.background,
   },
-  uploadText: {
-    fontSize: 11,
-    color: COLORS.textTertiary,
-    marginTop: 6,
-    textAlign: "center",
+  chipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
-  uploadBtnError: {
-    borderColor: COLORS.error,
+  chipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
   },
-  image: {
-    width: "100%",
-    height: 200,
-    borderRadius: 12,
-    marginTop: 12,
+  chipTextActive: {
+    color: COLORS.white,
   },
 });

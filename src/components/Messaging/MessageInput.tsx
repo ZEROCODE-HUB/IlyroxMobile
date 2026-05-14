@@ -4,16 +4,19 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
-  Platform,
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import { useModal } from "@/context/ModalContext";
+import { useToast } from "@/context/ToastContext";
 import { COLORS } from "../../constants";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("MessageInput");
 
 export interface MessageInputProps {
   onSendText?: (text: string) => Promise<void>;
@@ -39,6 +42,8 @@ export default React.forwardRef<TextInput, MessageInputProps>(
     },
     ref,
   ) {
+    const { showModal } = useModal();
+    const { showToast } = useToast();
     const [text, setText] = useState("");
     const [uploading, setUploading] = useState(false);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -63,10 +68,10 @@ export default React.forwardRef<TextInput, MessageInputProps>(
           if (imageToSend && onSendImage) await onSendImage(imageToSend);
         }
       } catch (error) {
-        console.error("Error sending message:", error);
+        log.error("Error sending message:", error);
         setText(messageText);
         setSelectedImage(imageToSend);
-        Alert.alert("Error", "No se pudo enviar el mensaje");
+        showToast("No se pudo enviar el mensaje", "error");
       } finally {
         setUploading(false);
       }
@@ -80,10 +85,7 @@ export default React.forwardRef<TextInput, MessageInputProps>(
           await ImagePicker.requestMediaLibraryPermissionsAsync();
 
         if (status !== "granted") {
-          Alert.alert(
-            "Permiso denegado",
-            "Necesitamos permiso para acceder a tus fotos",
-          );
+          showModal({ title: "Permiso denegado", message: "Necesitamos permiso para acceder a tus fotos", confirmText: "OK" });
           return;
         }
 
@@ -107,10 +109,11 @@ export default React.forwardRef<TextInput, MessageInputProps>(
           const limit = isVideo ? 40 * 1024 * 1024 : 5 * 1024 * 1024; // 40MB video, 5MB image
 
           if (fileSize > limit) {
-            Alert.alert(
-              "Archivo muy grande",
-              `El ${isVideo ? "video" : "imagen"} excede el límite de ${isVideo ? "40MB" : "5MB"}.`,
-            );
+            showModal({
+              title: "Archivo muy grande",
+              message: `El ${isVideo ? "video" : "imagen"} excede el límite de ${isVideo ? "40MB" : "5MB"}.`,
+              confirmText: "OK",
+            });
             return;
           }
 
@@ -121,17 +124,17 @@ export default React.forwardRef<TextInput, MessageInputProps>(
             try {
               await onSendImage(asset.uri);
             } catch (error) {
-              console.error("Error sending image directly:", error);
-              Alert.alert("Error", "No se pudo enviar la imagen");
+              log.error("Error sending image directly:", error);
+              showToast("No se pudo enviar la imagen", "error");
             } finally {
               setUploading(false);
             }
           }
         }
       } catch (error) {
-        console.error("Error picking image:", error);
+        log.error("Error picking image:", error);
         setUploading(false);
-        Alert.alert("Error", "No se pudo cargar el archivo");
+        showToast("No se pudo cargar el archivo", "error");
       }
     };
 
@@ -152,10 +155,7 @@ export default React.forwardRef<TextInput, MessageInputProps>(
           const limit = 20 * 1024 * 1024; // 20MB for files
 
           if (fileSize > limit) {
-            Alert.alert(
-              "Archivo muy grande",
-              "El documento excede el límite de 20MB.",
-            );
+            showModal({ title: "Archivo muy grande", message: "El documento excede el límite de 20MB.", confirmText: "OK" });
             return;
           }
 
@@ -164,9 +164,9 @@ export default React.forwardRef<TextInput, MessageInputProps>(
           setUploading(false);
         }
       } catch (error) {
-        console.error("Error picking file:", error);
+        log.error("Error picking file:", error);
         setUploading(false);
-        Alert.alert("Error", "No se pudo cargar el archivo");
+        showToast("No se pudo cargar el archivo", "error");
       }
     };
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabaseGeo } from "../lib/supabase-geo";
+import { logger } from "@/utils/logger";const log = logger.scoped("useGeoLocation");
 
 export interface GeoOption {
   label: string;
@@ -34,7 +35,7 @@ export const useGeoLocation = () => {
         })));
       }
     } catch (error) {
-      console.error("Error fetching estados:", error);
+      log.error("Error fetching estados:", error);
     } finally {
       setIsLoading(false);
     }
@@ -56,7 +57,7 @@ export const useGeoLocation = () => {
         setMunicipios(data.map((item: any) => ({ label: item.nombre, value: String(item.id) })));
       }
     } catch (error) {
-      console.error("Error fetching municipios:", error);
+      log.error("Error fetching municipios:", error);
     } finally {
       setIsLoading(false);
     }
@@ -84,7 +85,7 @@ export const useGeoLocation = () => {
         })));
       }
     } catch (error) {
-      console.error("Error fetching colonias:", error);
+      log.error("Error fetching colonias:", error);
     } finally {
       setIsLoading(false);
     }

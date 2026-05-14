@@ -1,18 +1,17 @@
-import { Tabs, useRouter } from "expo-router";
+import { Tabs } from "expo-router";
 import { COLORS } from "../../constants";
 import { Ionicons } from "@expo/vector-icons";
 import {
   StyleSheet,
   View,
   TouchableOpacity,
-  Text,
-  Platform,
 } from "react-native";
+import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../context/AuthContext";
-import { useConversations } from "../../hooks/hooks/messaging/useConversations";
+import { useConversations } from "../../hooks/messaging/useConversations";
 
-const CustomTabBar = ({ state, descriptors, navigation }: any) => {
+const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
   const insets = useSafeAreaInsets();
 
   return (
@@ -23,7 +22,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
       ]}
     >
       <View style={styles.bottomNav}>
-        {state.routes.map((route: any, index: number) => {
+        {state.routes.map((route, index: number) => {
           const { options } = descriptors[route.key];
           const isFocused = state.index === index;
 
@@ -39,7 +38,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
             }
           };
 
-          let iconName: any = "home-outline";
+          let iconName: keyof typeof Ionicons.glyphMap = "home-outline";
           if (route.name === "index")
             iconName = "home-outline";
           else if (route.name === "Statistics")
@@ -55,7 +54,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
               accessibilityRole="button"
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={options.tabBarAccessibilityLabel}
-              testID={options.tabBarTestID}
+              testID={(options as Record<string, unknown>).tabBarTestID as string | undefined}
               onPress={onPress}
               style={styles.tabItem}
             >
@@ -118,7 +117,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
     elevation: 8,
-    shadowColor: "#000",
+    shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,

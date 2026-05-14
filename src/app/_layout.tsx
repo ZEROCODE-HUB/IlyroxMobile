@@ -1,4 +1,4 @@
-import { Stack, Redirect, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
@@ -8,14 +8,10 @@ import { useEffect } from "react";
 import {
   Platform,
   StatusBar,
-  StyleSheet,
-  View,
-  Text,
   LogBox,
 } from "react-native";
-import { COLORS } from "../constants";
 
-import { AppProvider, useApp } from "@/context/AppContext";
+import { AppProvider } from "@/context/AppContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ToastProvider } from "@/context/ToastContext";
 
@@ -37,7 +33,7 @@ LogBox.ignoreLogs([
 
 // OneSignal init
 if (Platform.OS !== "web") {
-  OneSignal.initialize("a727fcbb-320c-4028-bd6b-a2ec90ed2141");
+  OneSignal.initialize(process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID!);
   OneSignal.Notifications.requestPermission(true);
 }
 
@@ -80,6 +76,24 @@ function RootLayoutNav() {
   const router = useRouter();
 
   const loading = authLoading || versionLoading;
+
+  // Handler de tap en notificaciones push
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const handleNotificationClick = (event: any) => {
+      const data = event?.notification?.additionalData;
+      if (!data?.type) return;
+      if (data.type === "new_match") {
+        router.push("/(stack)/matches");
+      } else if (data.type === "recordar_filtros") {
+        router.push("/(stack)/map");
+      }
+    };
+    OneSignal.Notifications.addEventListener("click", handleNotificationClick);
+    return () => {
+      OneSignal.Notifications.removeEventListener("click", handleNotificationClick);
+    };
+  }, [router]);
 
   // Global StatusBar setup
   useEffect(() => {
@@ -146,4 +160,3 @@ function RootLayoutNav() {
   );
 }
 
-const styles = StyleSheet.create({});

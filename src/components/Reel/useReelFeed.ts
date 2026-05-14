@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { PAGINATION } from "@/constants";
+import { reelService, ContextualReelRow } from "@/services/reelService";
 import { FeedItem } from "../../types";
 
 const mapContextualReelToFeedItem = (
-  r: any,
+  r: ContextualReelRow,
 ): FeedItem & { tipo_match: string } => ({
   id: r.feed_item_id,
   type: "reel",
@@ -30,26 +31,21 @@ export const useReelFeed = (initialReelId: string, initialItem?: any) => {
   );
   const [loading, setLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-  // ✅ Track the index of the "actual" reel so ReelFeedList can scroll to it immediately
   const [initialScrollIndex, setInitialScrollIndex] = useState(0);
-  const limit = 5;
+  const limit = PAGINATION.REEL_CONTEXT_LIMIT;
 
   const fetchInitialReels = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc("get_reels_feed_contextual", {
-      p_target_reel_id: initialReelId,
-      p_limit_around: limit,
-    });
+    const data = await reelService.getContextualFeed(initialReelId, limit);
 
-    if (!error && data) {
+    if (data.length > 0) {
       const mapped = data.map(mapContextualReelToFeedItem);
-      // ✅ Calculate the index here, right when data arrives, before setting state
-      const idx = mapped.findIndex((r: any) => r.tipo_match === "actual");
+      const idx = mapped.findIndex((r) => r.tipo_match === "actual");
       setInitialScrollIndex(idx !== -1 ? idx : 0);
       setReels(mapped);
     }
     setLoading(false);
-  }, [initialReelId]);
+  }, [initialReelId, limit]);
 
   const fetchMoreReels = async () => {
     if (isFetchingMore || reels.length === 0) return;
@@ -62,18 +58,18 @@ export const useReelFeed = (initialReelId: string, initialItem?: any) => {
       return;
     }
 
-    const { data, error } = await supabase.rpc("get_reels_feed_contextual", {
-      p_target_reel_id: lastReel.reelDetails?.id || lastReel.id,
-      p_limit_around: limit,
-    });
+    const data = await reelService.getContextualFeed(
+      lastReel.reelDetails?.id || lastReel.id,
+      limit,
+    );
 
-    if (data && !error) {
+    if (data.length > 0) {
       const posteriors = data
-        .filter((r: any) => r.tipo_match === "posterior")
+        .filter((r) => r.tipo_match === "posterior")
         .map(mapContextualReelToFeedItem);
       if (posteriors.length > 0) {
         setReels((prev) => {
-          const newIds = new Set(posteriors.map((p: any) => p.id));
+          const newIds = new Set(posteriors.map((p) => p.id));
           const prevWithoutNewIds = prev.filter((p) => !newIds.has(p.id));
           return [...prevWithoutNewIds, ...posteriors];
         });

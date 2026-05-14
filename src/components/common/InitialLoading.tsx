@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+﻿import React, { useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -93,7 +93,7 @@ export const InitialLoading = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.white,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   loadingBarBackground: {
     width: 100,
     height: 4,
-    backgroundColor: "#F0F0F0",
+    backgroundColor: COLORS.dividerGray,
     borderRadius: 2,
     overflow: "hidden",
   },

@@ -19,7 +19,6 @@ import {
 } from "../../constants/locations";
 import { PROPERTY_TYPES, TipoPrincipal } from "../../constants/propertyData";
 import SelectionModal from "../modals/SelectionModal";
-import { ScreenWrapper } from "../../screens/ScreenWrapper";
 
 const { height } = Dimensions.get("window");
 

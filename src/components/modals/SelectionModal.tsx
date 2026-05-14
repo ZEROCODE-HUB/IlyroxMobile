@@ -2,17 +2,19 @@ import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
-  Modal,
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  Platform,
+  Dimensions,
   KeyboardAvoidingView,
-  SafeAreaView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
+import { Modal } from "@/design-system/components";
 import { COLORS } from "../../constants";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 type Option = string | { label: string; value: string };
 
@@ -79,110 +81,77 @@ export default function SelectionModal({
   return (
     <Modal
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      variant="bottom"
+      title={title}
+      contentStyle={styles.modalContent}
     >
-      <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.container}
-        >
-          <View style={styles.modalContent}>
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.title}>{title}</Text>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
-              </TouchableOpacity>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        style={styles.kavWrapper}
+      >
+        {/* Search Bar */}
+        {searchable && (
+          <AppInput
+            containerStyle={styles.searchContainer}
+            placeholder={placeholder}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCorrect={false}
+            leftIcon={<Ionicons name="search" size={20} color={COLORS.textTertiary} />}
+            rightIcon={
+              searchQuery.length > 0 ? (
+                <TouchableOpacity onPress={() => setSearchQuery("")}>
+                  <Ionicons name="close-circle" size={18} color={COLORS.textTertiary} />
+                </TouchableOpacity>
+              ) : undefined
+            }
+          />
+        )}
+
+        {/* List */}
+        <FlatList
+          data={filteredOptions}
+          keyExtractor={(item, index) => {
+            const val = typeof item === "string" ? item : item.value;
+            return `${val}-${index}`;
+          }}
+          renderItem={renderItem}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          initialNumToRender={15}
+          maxToRenderPerBatch={20}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                No se encontraron resultados
+              </Text>
             </View>
-
-            {/* Search Bar */}
-            {searchable && (
-              <AppInput
-                containerStyle={styles.searchContainer}
-                placeholder={placeholder}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoCorrect={false}
-                leftIcon={<Ionicons name="search" size={20} color={COLORS.textTertiary} />}
-                rightIcon={
-                  searchQuery.length > 0 ? (
-                    <TouchableOpacity onPress={() => setSearchQuery("")}>
-                      <Ionicons name="close-circle" size={18} color={COLORS.textTertiary} />
-                    </TouchableOpacity>
-                  ) : undefined
-                }
-              />
-            )}
-
-            {/* List */}
-            <FlatList
-              data={filteredOptions}
-              keyExtractor={(item, index) => {
-                const val = typeof item === "string" ? item : item.value;
-                return `${val}-${index}`;
-              }}
-              renderItem={renderItem}
-              style={styles.list}
-              contentContainerStyle={styles.listContent}
-              keyboardShouldPersistTaps="handled"
-              initialNumToRender={15}
-              maxToRenderPerBatch={20}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>
-                    No se encontraron resultados
-                  </Text>
-                </View>
-              }
-            />
-          </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+          }
+        />
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.blackTransparent50,
-  },
-  container: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
   modalContent: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    height: "70%", // Take up 70% of screen
+    maxHeight: SCREEN_HEIGHT * 0.7,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-  },
-  closeButton: {
-    padding: 4,
+  kavWrapper: {
+    flexShrink: 1,
   },
   searchContainer: {
     margin: 16,
     width: "auto", // Override AppInput's 100% to respect margins
   },
   list: {
-    flex: 1,
+    maxHeight: SCREEN_HEIGHT * 0.55,
   },
   listContent: {
     paddingBottom: 40,

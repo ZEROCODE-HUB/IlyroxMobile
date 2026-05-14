@@ -4,6 +4,9 @@ import {
   PublishedVsSoldData,
   SearchesByNeighborhoodData,
 } from "@/components/charts/types";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("statsService");
 
 export interface FilterOptions {
   estado: string;
@@ -105,7 +108,7 @@ export const statsService = {
         .sort((a, b) => b.avgPrice - a.avgPrice)
         .slice(0, 7);
     } catch (error) {
-      console.error("Error fetching AvgPriceByNeighborhood stats:", error);
+      log.error("Error fetching AvgPriceByNeighborhood stats:", error);
       return [];
     }
   },
@@ -260,7 +263,7 @@ export const statsService = {
         }))
         .sort((a, b) => a.rooms - b.rooms);
     } catch (error) {
-      console.error("Error fetching PriceByRooms stats:", error);
+      log.error("Error fetching PriceByRooms stats:", error);
       return [];
     }
   },
@@ -297,7 +300,7 @@ export const statsService = {
       if (filters.subtipo !== "Todos")
         query = query.eq("subtipo", filters.subtipo);
 
-      const { data, error } = await query;
+      const { error } = await query;
       if (error) throw error;
 
       return [
@@ -305,7 +308,7 @@ export const statsService = {
         { category: "Usadas", avgDays: 210, count: 28 },
       ];
     } catch (error) {
-      console.error("Error fetching SaleTimeNewVsUsed stats:", error);
+      log.error("Error fetching SaleTimeNewVsUsed stats:", error);
       return [];
     }
   },
@@ -420,7 +423,7 @@ export const statsService = {
         .sort((a, b) => b.fast + b.slow - (a.fast + a.slow)) // Sort by total magnitude
         .slice(0, 10);
     } catch (error) {
-      console.error("Error fetching SurfaceVsSaleTime stats:", error);
+      log.error("Error fetching SurfaceVsSaleTime stats:", error);
       return [];
     }
   },
@@ -463,7 +466,7 @@ export const statsService = {
         .sort((a, b) => b.count - a.count)
         .slice(0, 6);
     } catch (error) {
-      console.error("Error fetching PropertiesByZone stats:", error);
+      log.error("Error fetching PropertiesByZone stats:", error);
       return [];
     }
   },
@@ -503,7 +506,7 @@ export const statsService = {
         .sort((a, b) => b.count - a.count)
         .slice(0, 6);
     } catch (error) {
-      console.error("Error fetching TopAmenities stats:", error);
+      log.error("Error fetching TopAmenities stats:", error);
       return [];
     }
   },
@@ -625,7 +628,7 @@ export const statsService = {
       const { data, error } = await query;
 
       if (error) {
-        console.error(
+        log.error(
           "Error al obtener datos de búsquedas por colonia:",
           error,
         );
@@ -677,7 +680,7 @@ export const statsService = {
 
       return result;
     } catch (error) {
-      console.error("Error en getSearchesByNeighborhood:", error);
+      log.error("Error en getSearchesByNeighborhood:", error);
       return [];
     }
   },
@@ -1051,7 +1054,7 @@ export const statsService = {
 
       return result.sort((a, b) => b.published - a.published).slice(0, 15);
     } catch (error) {
-      console.error("Error en getPublishedVsSold:", error);
+      log.error("Error en getPublishedVsSold:", error);
       return [];
     }
   },

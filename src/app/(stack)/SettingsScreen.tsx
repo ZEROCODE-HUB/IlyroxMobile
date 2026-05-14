@@ -1,16 +1,13 @@
-import React from "react";
+import React, { ComponentProps } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Alert,
-  Platform,
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
@@ -18,11 +15,15 @@ import EditProfile from "@/components/Profile/EditProfile";
 import { useModal } from "@/context/ModalContext";
 
 import { router } from "expo-router";
+
+type IoniconName = ComponentProps<typeof Ionicons>["name"];
 import Constants from "expo-constants";
 import { ScreenWrapper } from "@/screens/ScreenWrapper";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("SettingsScreen");
 
 const SettingsScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
   const { signOut } = useAuth();
   const { showModal } = useModal();
 
@@ -34,11 +35,9 @@ const SettingsScreen: React.FC = () => {
       cancelText: "Cancelar",
       onConfirm: async () => {
         try {
-          console.log("🚀 Iniciando cierre de sesión desde Settings...");
           await signOut();
-          console.log("✨ Proceso de cierre de sesión completado.");
         } catch (error) {
-          console.error("❌ Error en performLogout:", error);
+          log.error("performLogout error:", error);
           showModal({
             title: "Error",
             message: "No se pudo cerrar sesión. Inténtalo de nuevo.",
@@ -51,7 +50,7 @@ const SettingsScreen: React.FC = () => {
 
   const [showEditProfile, setShowEditProfile] = React.useState(false);
 
-  const settingsOptions = [
+  const settingsOptions: { id: string; title: string; icon: IoniconName; onPress: () => void; color?: string; showChevron?: boolean }[] = [
     {
       id: "edit_profile",
       title: "Editar perfil",
@@ -93,7 +92,7 @@ const SettingsScreen: React.FC = () => {
       <AppHeader
         title="Configuración"
         showBackButton={true}
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
 
       <ScrollView style={styles.content}>
@@ -120,7 +119,7 @@ const SettingsScreen: React.FC = () => {
                   ]}
                 >
                   <Ionicons
-                    name={option.icon as any}
+                    name={option.icon}
                     size={22}
                     color={option.color || COLORS.primary}
                   />

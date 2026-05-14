@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
     View,
     Text,
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        backgroundColor: "#F9FAFB",
+        backgroundColor: COLORS.lightGray,
         borderRadius: 12,
         borderWidth: 1.5,
         borderColor: "#E5E7EB",

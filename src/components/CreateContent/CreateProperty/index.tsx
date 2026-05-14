@@ -25,6 +25,9 @@ import { BasicInfoSection } from "./BasicInfoSection";
 import { LocationSection } from "./LocationSection";
 import { PhysicalFeaturesSection } from "./PhysicalFeaturesSection";
 import { AmenitiesSection } from "./AmenitiesSection";
+import { AgricolaSection } from "./AgricolaSection";
+import { ComercialSection } from "./ComercialSection";
+import { IndustrialSection } from "./IndustrialSection";
 import { OwnerSection } from "./OwnerSection";
 import { CommissionSection } from "./CommissionSection";
 import { GravamenFinancingSection } from "./GravamenFinancingSection";
@@ -34,6 +37,7 @@ import { ProgressModal } from "./ProgressModal";
 // Hooks
 import { usePropertyForm } from "./usePropertyForm";
 import { usePublishProperty } from "./usePublishProperty";
+import { PropertyFormProvider } from "./PropertyFormContext";
 
 // Types
 import type { CreatePropertyProps } from "./types";
@@ -50,6 +54,7 @@ export default function CreateProperty({
     onBack,
   );
 
+  const [scrollEnabled, setScrollEnabled] = useState(true);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showSaleContractModal, setShowSaleContractModal] = useState(false);
 
@@ -116,6 +121,7 @@ export default function CreateProperty({
   }
 
   return (
+    <PropertyFormProvider value={form}>
     <ScreenWrapper withHeader={false} style={styles.container}>
       <AppHeader
         title={propertyId ? "Editar Propiedad" : "Crear Propiedad"}
@@ -128,20 +134,17 @@ export default function CreateProperty({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="always"
+        scrollEnabled={scrollEnabled}
       >
         {/* 1. GALERÍA DE IMÁGENES */}
-        <ImageGallerySection
-          images={form.images}
-          setImages={form.setImages}
-          error={form.errors.images}
-        />
+        <ImageGallerySection />
 
         {/* ESTADO (solo en edición) */}
         {propertyId && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="stats-chart" size={24} color={COLORS.primary} />
-              <Text style={styles.sectionTitle}>Estado de la Propiedad</Text>
+            <View style={styles.sectionHeaderBand}>
+              <Ionicons name="stats-chart-outline" size={18} color={COLORS.primary} />
+              <Text style={styles.sectionTitleBand}>Estado de la Propiedad</Text>
             </View>
             <TouchableOpacity
               style={styles.selector}
@@ -157,153 +160,44 @@ export default function CreateProperty({
           </View>
         )}
 
+        {/* BANNER: sin comisión (solo en edición de propiedades EasyBroker) */}
+        {propertyId && form.sinComision && (
+          <View style={styles.commissionBanner}>
+            <Ionicons name="warning-outline" size={20} color="#FF6B00" />
+            <Text style={styles.commissionBannerText}>
+              Esta propiedad está Suspendida porque no tiene comisión configurada en EasyBroker. Completa la sección de Comisión para publicarla.
+            </Text>
+          </View>
+        )}
+
         {/* 2. INFORMACIÓN BÁSICA */}
-        <BasicInfoSection
-          descripcion={form.descripcion}
-          setDescripcion={form.setDescripcion}
-          tipoOperacion={form.tipoOperacion}
-          setTipoOperacion={form.setTipoOperacion}
-          precioVenta={form.precioVenta}
-          precioRenta={form.precioRenta}
-          moneda={form.moneda}
-          setMoneda={form.setMoneda}
-          tipoPrincipal={form.tipoPrincipal}
-          setTipoPrincipal={form.setTipoPrincipal}
-          subtipo={form.subtipo}
-          setSubtipo={form.setSubtipo}
-          handleCurrencyChange={form.handleCurrencyChange}
-          setPrecioVenta={form.setPrecioVenta}
-          setPrecioRenta={form.setPrecioRenta}
-          errors={form.errors}
-        />
+        <BasicInfoSection />
 
         {/* 3. UBICACIÓN */}
-        <LocationSection
-          pais={form.pais}
-          ubicacionData={form.ubicacionData}
-          setUbicacionData={form.setUbicacionData}
-          calle={form.calle}
-          setCalle={form.setCalle}
-          numeroExterior={form.numeroExterior}
-          setNumeroExterior={form.setNumeroExterior}
-          numeroInterior={form.numeroInterior}
-          setNumeroInterior={form.setNumeroInterior}
-          codigoPostal={form.codigoPostal}
-          setCodigoPostal={form.setCodigoPostal}
-          errors={form.errors}
-        />
+        <LocationSection />
 
         {/* 4. CARACTERÍSTICAS FÍSICAS */}
-        <PhysicalFeaturesSection
-          tipoPrincipal={form.tipoPrincipal}
-          subtipo={form.subtipo}
-          tipoOperacion={form.tipoOperacion}
-          camposVisibles={form.camposVisibles}
-          recamaras={form.recamaras}
-          setRecamaras={form.setRecamaras}
-          banosCompletos={form.banosCompletos}
-          setBanosCompletos={form.setBanosCompletos}
-          mediosBanos={form.mediosBanos}
-          setMediosBanos={form.setMediosBanos}
-          estacionamientos={form.estacionamientos}
-          setEstacionamientos={form.setEstacionamientos}
-          m2Construccion={form.m2Construccion}
-          setM2Construccion={form.setM2Construccion}
-          m2Terreno={form.m2Terreno}
-          setM2Terreno={form.setM2Terreno}
-          niveles={form.niveles}
-          setNiveles={form.setNiveles}
-          antiguedad={form.antiguedad}
-          setAntiguedad={form.setAntiguedad}
-          amueblado={form.amueblado}
-          setAmueblado={form.setAmueblado}
-          petFriendly={form.petFriendly}
-          setPetFriendly={form.setPetFriendly}
-          errors={form.errors}
-          clearError={form.clearError}
-        />
+        <PhysicalFeaturesSection />
 
-        {/* 5. AMENIDADES */}
-        <AmenitiesSection
-          amenidadesSeleccionadas={form.amenidadesSeleccionadas}
-          toggleAmenidad={form.toggleAmenidad}
-        />
+        {/* 5. AMENIDADES (solo habitacional) */}
+        {form.tipoPrincipal === "habitacional" && <AmenitiesSection />}
+
+        {/* CAMPOS ESPECIALIZADOS — solo si aplica el tipo */}
+        {form.tipoPrincipal === 'agricola' && <AgricolaSection />}
+        {form.tipoPrincipal === 'comercial' && <ComercialSection />}
+        {form.tipoPrincipal === 'industrial' && <IndustrialSection />}
 
         {/* 6. PROPIETARIO */}
-        <OwnerSection
-          nombreCompletoPropietario={form.nombreCompletoPropietario}
-          setNombreCompletoPropietario={form.setNombreCompletoPropietario}
-          emailPropietario={form.emailPropietario}
-          setEmailPropietario={form.setEmailPropietario}
-          telefonoPropietario={form.telefonoPropietario}
-          setTelefonoPropietario={form.setTelefonoPropietario}
-        />
+        <OwnerSection />
 
         {/* 7. COMISIÓN */}
-        <CommissionSection
-          tipoOperacion={form.tipoOperacion}
-          moneda={form.moneda}
-          setMoneda={form.setMoneda}
-          handleCurrencyChange={form.handleCurrencyChange}
-          ventaValues={{
-            comparte: form.comparteComision,
-            tipo: form.comisionTipo,
-            valor: form.comisionValor,
-            compartidaTipo: form.comisionCompartidaTipo,
-            compartidaValor: form.comisionCompartidaValor,
-            condiciones: form.condicionesComision,
-          }}
-          ventaSetters={{
-            setComparte: form.setComparteComision,
-            setTipo: form.setComisionTipo,
-            setValor: form.setComisionValor,
-            setCompartidaTipo: form.setComisionCompartidaTipo,
-            setCompartidaValor: form.setComisionCompartidaValor,
-            setCondiciones: form.setCondicionesComision,
-          }}
-          rentaValues={{
-            comparte: form.comparteComisionRenta,
-            tipo: form.comisionTipoRenta,
-            valor: form.comisionValorRenta,
-            compartidaTipo: form.comisionCompartidaTipoRenta,
-            compartidaValor: form.comisionCompartidaValorRenta,
-            condiciones: form.condicionesComisionRenta,
-          }}
-          rentaSetters={{
-            setComparte: form.setComparteComisionRenta,
-            setTipo: form.setComisionTipoRenta,
-            setValor: form.setComisionValorRenta,
-            setCompartidaTipo: form.setComisionCompartidaTipoRenta,
-            setCompartidaValor: form.setComisionCompartidaValorRenta,
-            setCondiciones: form.setCondicionesComisionRenta,
-          }}
-        />
+        <CommissionSection onScrollLock={setScrollEnabled} />
 
         {/* 8. GRAVAMEN Y FINANCIAMIENTO */}
-        <GravamenFinancingSection
-          tieneGravamen={form.tieneGravamen}
-          setTieneGravamen={form.setTieneGravamen}
-          institucionGravamen={form.institucionGravamen}
-          setInstitucionGravamen={form.setInstitucionGravamen}
-          montoGravamen={form.montoGravamen}
-          setMontoGravamen={form.setMontoGravamen}
-          handleCurrencyChange={form.handleCurrencyChange}
-          aceptaFinanciamiento={form.aceptaFinanciamiento}
-          setAceptaFinanciamiento={form.setAceptaFinanciamiento}
-          tiposFinanciamientoSeleccionados={
-            form.tiposFinanciamientoSeleccionados
-          }
-          toggleFinanciamiento={form.toggleFinanciamiento}
-        />
+        <GravamenFinancingSection />
 
         {/* 9. MAPA */}
-        <MapSection
-          location={form.location}
-          setLocation={form.setLocation}
-          mapCenter={form.mapCenter}
-          isColonia={form.isColoniaMode}
-          error={form.errors.location}
-        />
+        <MapSection />
       </ScrollView>
 
       {/* FOOTER - BOTÓN PUBLICAR */}
@@ -368,6 +262,7 @@ export default function CreateProperty({
         loading={publishState.uploading}
       />
     </ScreenWrapper>
+    </PropertyFormProvider>
   );
 }
 
@@ -397,16 +292,20 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  sectionHeader: {
+  sectionHeaderBand: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
     gap: 8,
+    backgroundColor: COLORS.primary + "12",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
+  sectionTitleBand: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.primary,
   },
   selector: {
     backgroundColor: COLORS.background,
@@ -449,6 +348,23 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: "bold",
+  },
+  commissionBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFF3E0",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FF6B00",
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  commissionBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#B84500",
+    lineHeight: 18,
   },
   // Loading states
   loadingContainer: {

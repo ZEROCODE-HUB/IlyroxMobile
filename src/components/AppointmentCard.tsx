@@ -83,7 +83,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
         <View style={styles.cardContent}>
           <View style={styles.cardHeader}>
             <Pressable
-              onPress={() => onUserPress(appointment.user.id)}
+              onPress={() => onUserPress?.(appointment.user.id)}
               style={styles.userInfo}
             >
               {appointment.user.avatar ? (
@@ -150,7 +150,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
           <View style={styles.details}>
             {appointment.propertyImage && (
               <Pressable
-                onPress={() => onPropertyPress(appointment.propertyId)}
+                onPress={() => onPropertyPress?.(appointment.propertyId ?? "")}
                 style={styles.propertyImage}
               >
                 <Image

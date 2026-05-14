@@ -4,10 +4,6 @@ import {
   StyleSheet,
   Animated,
   Pressable,
-  ActivityIndicator,
-  Text,
-  TouchableOpacity,
-  Modal,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import Feed from "../../components/Feed/Feed";
@@ -15,11 +11,7 @@ import { useAuth } from "../../context/AuthContext";
 import { HomeHeader } from "../../components/HomeHeader";
 import { User } from "../../types";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
-import { Dimensions } from "react-native";
-import MapSearch from "../../components/map/MapSearch";
-import { useApp } from "../../context/AppContext";
-import { Ionicons } from "@expo/vector-icons";
+import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 import { COLORS } from "../../constants/colors";
 
 export default function FeedScreen() {
@@ -27,13 +19,10 @@ export default function FeedScreen() {
   const { refresh } = useLocalSearchParams();
   const { user, profile } = useAuth();
   const insets = useSafeAreaInsets();
-  const { properties, saveSearch } = useApp();
-  const bottomSheetRef = useRef<BottomSheet>(null);
-
+  const pendingOpenMap = usePropertyFiltersStore((s) => s.pendingOpenMap);
+  const setPendingOpenMap = usePropertyFiltersStore((s) => s.setPendingOpenMap);
   const [isSearching, setIsSearching] = useState(false);
   const [headerShown, setHeaderShown] = useState(true);
-  const [isMapOpening, setIsMapOpening] = useState(false);
-  const [isMapReady, setIsMapReady] = useState(false);
 
   // Animation Refs
   const headerTranslateY = useRef(new Animated.Value(0)).current;
@@ -88,18 +77,12 @@ export default function FeedScreen() {
     lastScrollY.current = currentScrollY;
   };
 
-  const handleOpenMap = () => {
-    setIsMapOpening(true);
-  };
-
   useEffect(() => {
-    if (isMapOpening && !isMapReady) {
-      const timer = setTimeout(() => {
-        setIsMapReady(true);
-      }, 300);
-      return () => clearTimeout(timer);
+    if (pendingOpenMap) {
+      setPendingOpenMap(false);
+      router.push("/(stack)/map");
     }
-  }, [isMapOpening]);
+  }, [pendingOpenMap]);
 
   return (
     <View style={styles.container}>
@@ -141,66 +124,18 @@ export default function FeedScreen() {
           style={{ height: TOTAL_HEADER_HEIGHT }}
           onSearchingChange={setIsSearching}
           isHeaderVisible={headerShown}
-          onOpenMap={() => setIsMapOpening(true)}
+          onOpenMap={() => router.push("/(stack)/map")}
         />
       </Animated.View>
 
-      <Modal
-        visible={isMapOpening}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setIsMapOpening(false)}
-      >
-        <View style={[styles.modalOverlay, { marginTop: TOTAL_HEADER_HEIGHT }]}>
-          <View style={styles.modalContent}>
-            {/* Header del Modal con botón cerrar */}
-            <View style={styles.modalHeader}>
-              <View style={styles.modalIndicator} />
-              <TouchableOpacity 
-                onPress={() => setIsMapOpening(false)}
-                style={styles.closeModalButton}
-              >
-                <Ionicons name="close" size={24} color={COLORS.textPrimary} />
-              </TouchableOpacity>
-            </View>
-
-            {isMapReady ? (
-              <MapSearch
-                properties={properties}
-                onSaveSearch={(name, leadName, leadPhone) =>
-                  saveSearch(name, "", leadName, leadPhone)
-                }
-              />
-            ) : (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#005B52" />
-                <Text style={styles.loadingText}>
-                  Cargando mapa interactivo...
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: "#666",
-    fontWeight: "500",
-  },
   container: {
     flex: 1,
-    backgroundColor: "#F4F8F8",
+    backgroundColor: COLORS.background,
   },
   headerWrapper: {
     position: "absolute",
@@ -209,39 +144,5 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 100,
     elevation: 5,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "transparent",
-  },
-  modalContent: {
-    flex: 1,
-    backgroundColor: "white",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 20,
-    overflow: "hidden",
-  },
-  modalHeader: {
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  modalIndicator: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#ccc",
-    borderRadius: 2,
-  },
-  closeModalButton: {
-    position: "absolute",
-    right: 16,
-    top: 8,
   },
 });

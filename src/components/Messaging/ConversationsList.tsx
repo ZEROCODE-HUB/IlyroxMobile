@@ -17,7 +17,7 @@ import { AppInput } from "../../design-system/components/AppInput";
 import ConversationsSelectionModal from "./ConversationsSelectionModal";
 import TagFilterBar from "./TagFilterBar";
 import TagsModal from "./TagsModal";
-import { useTags } from "../../hooks/hooks/messaging/useTags";
+import { useTags } from "../../hooks/messaging/useTags";
 import { COLORS } from "../../constants";
 import { Avatar } from "../shared";
 

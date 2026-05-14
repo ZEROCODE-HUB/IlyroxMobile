@@ -1,7 +1,41 @@
 import { supabase } from "@/lib/supabase";
 import { Reel } from "@/types";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("reelService");
+
+export interface ContextualReelRow {
+  feed_item_id: string;
+  reel_id: string;
+  autor_id: string;
+  autor_nombre?: string;
+  autor_foto?: string;
+  descripcion?: string;
+  thumbnail_url?: string;
+  video_url?: string;
+  likes_count?: number;
+  comentarios_count?: number;
+  tipo_match: "actual" | "anterior" | "posterior";
+}
 
 export const reelService = {
+  async getContextualFeed(
+    targetReelId: string,
+    limitAround: number,
+  ): Promise<ContextualReelRow[]> {
+    const { data, error } = await supabase.rpc("get_reels_feed_contextual", {
+      p_target_reel_id: targetReelId,
+      p_limit_around: limitAround,
+    });
+
+    if (error) {
+      log.error("getContextualFeed failed", error);
+      return [];
+    }
+
+    return (data ?? []) as ContextualReelRow[];
+  },
+
   async reelsByUser(targetUserId: string) {
     // 1. Fetch reels first
     const { data: reelsData, error: reelsError } = await supabase
@@ -12,7 +46,7 @@ export const reelService = {
       .order("created_at", { ascending: false });
 
     if (reelsError) {
-      console.error("Error fetching reels:", reelsError);
+      log.error("Error fetching reels:", reelsError);
       return [];
     }
 
@@ -27,7 +61,7 @@ export const reelService = {
       .in("contenido_id", reelIds);
 
     if (feedError) {
-      console.error("Error fetching feed_items for reels:", feedError);
+      log.error("Error fetching feed_items for reels:", feedError);
       // Return reels even if feed stats fail
       return reelsData;
     }

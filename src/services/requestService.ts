@@ -1,4 +1,7 @@
 import { supabase } from "@/lib/supabase";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("requestService");
 
 export const requestService = {
   /**
@@ -25,7 +28,7 @@ export const requestService = {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error fetching info requests:", error);
+      log.error("Error fetching info requests:", error);
       throw error;
     }
     return data;
@@ -37,7 +40,7 @@ export const requestService = {
   async getRequestProperty() {
     const { data, error } = await supabase.rpc("get_solicitudes_match_agente");
     if (error) {
-      console.error("Error fetching property requests:", error);
+      log.error("Error fetching property requests:", error);
       throw error;
     }
     return data;

@@ -1,13 +1,6 @@
 import React from "react";
-import {
-    View,
-    Text,
-    Modal,
-    StyleSheet,
-    TouchableOpacity,
-    ActivityIndicator,
-} from "react-native";
-import { COLORS } from "../../constants/colors";
+import { View, StyleSheet } from "react-native";
+import { Modal, Button, Typography } from "@/design-system/components";
 
 interface ConfirmationModalProps {
     visible: boolean;
@@ -30,79 +23,57 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     onCancel,
     loading = false,
 }) => {
+    const handleClose = () => {
+        if (loading) return;
+        if (onCancel) onCancel();
+    };
+
     return (
-        <Modal visible={visible} transparent animationType="fade">
-            <View style={styles.overlay}>
-                <View style={styles.modalCard}>
-                    <Text style={styles.title}>{title}</Text>
-                    <Text style={styles.message}>{message}</Text>
+        <Modal
+            visible={visible}
+            onClose={handleClose}
+            variant="center"
+            showCloseButton={false}
+            dismissOnBackdropPress={!loading}
+            contentStyle={styles.content}
+        >
+            <Typography variant="subheading" style={styles.title}>{title}</Typography>
+            <Typography variant="body" tone="secondary" style={styles.message}>{message}</Typography>
 
-                    <View style={styles.actions}>
-                        {onCancel && (
-                            <TouchableOpacity
-                                style={[styles.button, styles.cancelButton]}
-                                onPress={onCancel}
-                                disabled={loading}
-                            >
-                                <Text style={styles.cancelText}>{cancelText}</Text>
-                            </TouchableOpacity>
-                        )}
-
-                        <TouchableOpacity
-                            style={[
-                                styles.button,
-                                styles.confirmButton,
-                                !onCancel && { backgroundColor: COLORS.primary },
-                            ]}
-                            onPress={onConfirm}
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <ActivityIndicator size="small" color={COLORS.white} />
-                            ) : (
-                                <Text style={styles.confirmText}>{confirmText}</Text>
-                            )}
-                        </TouchableOpacity>
-                    </View>
-                </View>
+            <View style={styles.actions}>
+                {onCancel && (
+                    <Button
+                        variant="ghost"
+                        label={cancelText}
+                        onPress={onCancel}
+                        disabled={loading}
+                        style={styles.button}
+                    />
+                )}
+                <Button
+                    variant={!onCancel ? "primary" : "danger"}
+                    label={confirmText}
+                    loading={loading}
+                    onPress={onConfirm}
+                    style={styles.button}
+                />
             </View>
         </Modal>
     );
 };
 
 const styles = StyleSheet.create({
-    overlay: {
-        flex: 1,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        justifyContent: "center",
-        alignItems: "center",
+    content: {
         padding: 24,
-    },
-    modalCard: {
-        backgroundColor: COLORS.white,
-        borderRadius: 16,
-        padding: 24,
-        width: "100%",
         maxWidth: 340,
-        elevation: 5,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
     },
     title: {
-        fontSize: 18,
-        fontWeight: "700",
-        color: COLORS.textPrimary,
-        marginBottom: 8,
         textAlign: "center",
+        marginBottom: 8,
     },
     message: {
-        fontSize: 14,
-        color: COLORS.textSecondary,
         textAlign: "center",
         marginBottom: 24,
-        lineHeight: 20,
     },
     actions: {
         flexDirection: "row",
@@ -110,25 +81,5 @@ const styles = StyleSheet.create({
     },
     button: {
         flex: 1,
-        paddingVertical: 12,
-        borderRadius: 10,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    cancelButton: {
-        backgroundColor: COLORS.background,
-    },
-    confirmButton: {
-        backgroundColor: COLORS.error, // Default to error color for destructive actions usually
-    },
-    cancelText: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: COLORS.textSecondary,
-    },
-    confirmText: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: COLORS.white,
     },
 });

@@ -9,7 +9,6 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
 import { useLocalSearchParams } from "expo-router";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
@@ -18,9 +17,12 @@ import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useModal } from "@/context/ModalContext";
+import { Button } from "@/design-system/components";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("VerifyPasswordResetScreen");
 
 const VerifyPasswordResetScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
   const params = useLocalSearchParams();
   const { showModal } = useModal();
   const email = (params.email as string) || "";
@@ -77,10 +79,6 @@ const VerifyPasswordResetScreen: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      console.log("🔑 Verificando código y actualizando contraseña...");
-      console.log("📧 Email:", email);
-      console.log("🔢 Código length:", otp.length);
-
       // Verificar el código OTP
       const { error: verifyError } = await supabase.auth.verifyOtp({
         email,
@@ -89,11 +87,9 @@ const VerifyPasswordResetScreen: React.FC = () => {
       });
 
       if (verifyError) {
-        console.error("❌ Error al verificar OTP:", verifyError);
+        log.error("Error al verificar OTP:", verifyError);
         throw verifyError;
       }
-
-      console.log("✅ Código verificado correctamente");
 
       // Actualizar la contraseña
       const { error: updateError } = await supabase.auth.updateUser({
@@ -101,11 +97,9 @@ const VerifyPasswordResetScreen: React.FC = () => {
       });
 
       if (updateError) {
-        console.error("❌ Error al actualizar contraseña:", updateError);
+        log.error("Error al actualizar contraseña:", updateError);
         throw updateError;
       }
-
-      console.log("✅ Contraseña actualizada correctamente");
 
       // Cerrar sesión
       await supabase.auth.signOut();
@@ -119,7 +113,7 @@ const VerifyPasswordResetScreen: React.FC = () => {
         onConfirm: () => router.replace("/login"),
       });
     } catch (error: any) {
-      console.error("❌ Error en el proceso:", error);
+      log.error("Error en el proceso:", error);
 
       let errorMessage = "Ocurrió un error inesperado. Intenta de nuevo.";
 
@@ -186,7 +180,7 @@ const VerifyPasswordResetScreen: React.FC = () => {
       <AppHeader
         title="Verificar código"
         showBackButton={true}
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
 
       <KeyboardAvoidingView
@@ -325,30 +319,28 @@ const VerifyPasswordResetScreen: React.FC = () => {
               </View>
 
               {/* Botón de Envío */}
-              <TouchableOpacity
-                style={[
-                  styles.submitButton,
-                  isSubmitting && styles.submitButtonDisabled,
-                ]}
+              <Button
+                label={isSubmitting ? "Actualizando..." : "Actualizar contraseña"}
                 onPress={handleVerifyAndReset}
                 disabled={isSubmitting}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.submitButtonText}>
-                  {isSubmitting ? "Actualizando..." : "Actualizar contraseña"}
-                </Text>
-              </TouchableOpacity>
+                variant="primary"
+                size="lg"
+                fullWidth
+                style={styles.submitButton}
+                labelStyle={styles.submitButtonText}
+              />
 
               {/* Botón de Reenviar Código */}
-              <TouchableOpacity
-                style={styles.resendButton}
+              <Button
+                label="¿No recibiste el código? Reenviar"
                 onPress={handleResendCode}
                 disabled={isSubmitting}
-              >
-                <Text style={styles.resendButtonText}>
-                  ¿No recibiste el código? Reenviar
-                </Text>
-              </TouchableOpacity>
+                variant="ghost"
+                size="md"
+                fullWidth
+                style={styles.resendButton}
+                labelStyle={styles.resendButtonText}
+              />
             </View>
           </View>
         </ScrollView>
@@ -447,11 +439,7 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
   submitButton: {
-    backgroundColor: COLORS.primary,
     borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: "center",
-    justifyContent: "center",
     marginTop: 12,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
@@ -459,25 +447,18 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  submitButtonDisabled: {
-    backgroundColor: COLORS.textTertiary,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
   submitButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: COLORS.white,
   },
   resendButton: {
     marginTop: 16,
-    alignItems: "center",
-    paddingVertical: 12,
   },
   resendButtonText: {
     fontSize: 14,
     color: COLORS.primary,
     textDecorationLine: "underline",
+    fontWeight: "400",
   },
 });
 

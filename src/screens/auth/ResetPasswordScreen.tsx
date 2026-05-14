@@ -9,7 +9,6 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
 import { ScreenWrapper } from "@/screens/ScreenWrapper";
@@ -19,6 +18,10 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useModal } from "@/context/ModalContext";
 import * as Linking from "expo-linking";
 import { Session } from "@supabase/supabase-js";
+import { Button } from "@/design-system/components";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("ResetPasswordScreen");
 
 // Función helper para parsear parámetros de URL (tanto query ? como fragment #)
 const parseUrlParams = (url: string): Record<string, string> => {
@@ -48,7 +51,6 @@ const parseUrlParams = (url: string): Record<string, string> => {
 };
 
 const ResetPasswordScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
   const { showModal } = useModal();
   const localParams = useLocalSearchParams();
   const [newPassword, setNewPassword] = useState("");
@@ -94,13 +96,10 @@ const ResetPasswordScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    console.log("=== ResetPasswordScreen INIT ===");
-    
     // 1. Sincronizar sesión inicial
     const syncSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        console.log("✅ Sesión activa encontrada al inicio");
         setCurrentSession(session);
         setIsProcessingLink(false);
         hasProcessedLink.current = true;
@@ -110,8 +109,6 @@ const ResetPasswordScreen: React.FC = () => {
 
     // 2. Listener de cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log(`🔄 Auth Event: ${event}, Session: ${session ? "YES" : "NO"}`);
-      
       if (session) {
         setCurrentSession(session);
         setIsProcessingLink(false);
@@ -119,7 +116,6 @@ const ResetPasswordScreen: React.FC = () => {
       
       // Evento específico de recuperación de contraseña
       if (event === 'PASSWORD_RECOVERY' && session) {
-        console.log("✅ PASSWORD_RECOVERY event con sesión válida");
         setIsProcessingLink(false);
         hasProcessedLink.current = true;
       }
@@ -129,11 +125,8 @@ const ResetPasswordScreen: React.FC = () => {
     const handleRecoveryParams = async (params: Record<string, string>) => {
       if (!params || Object.keys(params).length === 0) return;
       if (hasProcessedLink.current) {
-        console.log("⏭️  Link ya procesado, ignorando...");
         return;
       }
-
-      console.log("🔍 Procesando parámetros:", params);
 
       // PRIMERO: Detectar errores
       if (params.error || params.error_description || params.error_code) {
@@ -144,7 +137,7 @@ const ResetPasswordScreen: React.FC = () => {
           msg = "El enlace de recuperación ha expirado o ya ha sido utilizado. Por favor, solicita uno nuevo.";
         }
         
-        console.error("❌ Error en parámetros:", msg);
+        log.error("Error en parámetros:", msg);
         setSessionError(msg);
         setIsProcessingLink(false);
         return;
@@ -153,33 +146,27 @@ const ResetPasswordScreen: React.FC = () => {
       // SEGUNDO: Procesar tokens válidos
       try {
         if (params.access_token && params.refresh_token) {
-          console.log("🔑 Estableciendo sesión con tokens...");
           const { data, error } = await supabase.auth.setSession({
             access_token: params.access_token,
             refresh_token: params.refresh_token,
           });
-          
+
           if (error) throw error;
-          
+
           hasProcessedLink.current = true;
-          console.log("✅ Sesión establecida correctamente");
           setCurrentSession(data.session);
           setIsProcessingLink(false);
         } else if (params.code) {
-          console.log("🔄 Intercambiando código por sesión...");
           const { data, error } = await supabase.auth.exchangeCodeForSession(params.code);
-          
+
           if (error) throw error;
-          
+
           hasProcessedLink.current = true;
-          console.log("✅ Código intercambiado correctamente");
           setCurrentSession(data.session);
           setIsProcessingLink(false);
-        } else {
-          console.log("⚠️  No se encontraron tokens ni código en parámetros");
         }
       } catch (err: any) {
-        console.error("💥 Error al procesar tokens:", err);
+        log.error("Error al procesar tokens:", err);
         hasProcessedLink.current = true;
         setSessionError(err.message || "No se pudo validar el enlace de recuperación.");
         setIsProcessingLink(false);
@@ -190,7 +177,6 @@ const ResetPasswordScreen: React.FC = () => {
     const checkLink = async () => {
       // Prioridad 1: Expo Router Params
       if (Object.keys(localParams).length > 0) {
-        console.log("📱 Parámetros vía Expo Router");
         const params: Record<string, string> = {};
         Object.keys(localParams).forEach(key => {
           const value = localParams[key];
@@ -202,7 +188,6 @@ const ResetPasswordScreen: React.FC = () => {
       // Prioridad 2: Initial URL
       const initialUrl = await Linking.getInitialURL();
       if (initialUrl) {
-        console.log("🔗 URL inicial:", initialUrl);
         const params = parseUrlParams(initialUrl);
         await handleRecoveryParams(params);
       }
@@ -210,11 +195,6 @@ const ResetPasswordScreen: React.FC = () => {
       // Timeout de seguridad
       setTimeout(async () => {
         if (isProcessingLink && !hasProcessedLink.current) {
-          console.log("⏰ Timeout alcanzado");
-          const { data: { session } } = await supabase.auth.getSession();
-          if (!session && !sessionError) {
-            console.log("⚠️  No se detectó sesión válida");
-          }
           setIsProcessingLink(false);
         }
       }, 4000);
@@ -224,7 +204,6 @@ const ResetPasswordScreen: React.FC = () => {
 
     // 5. Listener para URLs entrantes
     const linkSubscription = Linking.addEventListener("url", async ({ url }) => {
-      console.log("📨 URL entrante:", url);
       const params = parseUrlParams(url);
       await handleRecoveryParams(params);
     });
@@ -247,14 +226,11 @@ const ResetPasswordScreen: React.FC = () => {
         throw new Error("Sesión de recuperación no encontrada. El enlace es inválido o ha expirado.");
       }
 
-      console.log("🔐 Actualizando contraseña...");
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
 
       if (error) throw error;
-
-      console.log("✅ Contraseña actualizada exitosamente");
 
       showModal({
         title: "Contraseña actualizada",
@@ -268,7 +244,7 @@ const ResetPasswordScreen: React.FC = () => {
       });
 
     } catch (error: any) {
-      console.error("❌ Error al actualizar contraseña:", error);
+      log.error("Error al actualizar contraseña:", error);
       showModal({
         title: "Error",
         message: error.message || "Ocurrió un error inesperado.",
@@ -296,18 +272,22 @@ const ResetPasswordScreen: React.FC = () => {
         <Ionicons name="alert-circle-outline" size={60} color={COLORS.error} />
         <Text style={styles.errorTitle}>Enlace inválido</Text>
         <Text style={styles.errorSubtitle}>{sessionError}</Text>
-        <TouchableOpacity 
-          style={styles.submitButton}
+        <Button
+          label="Solicitar nuevo enlace"
           onPress={() => router.replace("/forgot-password")}
-        >
-          <Text style={styles.submitButtonText}>Solicitar nuevo enlace</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.backButton}
+          variant="primary"
+          size="lg"
+          style={styles.submitButton}
+          labelStyle={styles.submitButtonText}
+        />
+        <Button
+          label="Volver al login"
           onPress={() => router.replace("/login")}
-        >
-          <Text style={styles.backButtonText}>Volver al login</Text>
-        </TouchableOpacity>
+          variant="outline"
+          size="md"
+          style={styles.backButton}
+          labelStyle={styles.backButtonText}
+        />
       </ScreenWrapper>
     );
   }
@@ -321,18 +301,22 @@ const ResetPasswordScreen: React.FC = () => {
         <Text style={styles.errorSubtitle}>
           No pudimos validar tu sesión de recuperación. Esto ocurre si el enlace ya expiró o si abriste la pantalla directamente.
         </Text>
-        <TouchableOpacity 
-          style={styles.submitButton}
+        <Button
+          label="Solicitar nuevo enlace"
           onPress={() => router.replace("/forgot-password")}
-        >
-          <Text style={styles.submitButtonText}>Solicitar nuevo enlace</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.backButton}
+          variant="primary"
+          size="lg"
+          style={styles.submitButton}
+          labelStyle={styles.submitButtonText}
+        />
+        <Button
+          label="Volver al login"
           onPress={() => router.replace("/login")}
-        >
-          <Text style={styles.backButtonText}>Volver al login</Text>
-        </TouchableOpacity>
+          variant="outline"
+          size="md"
+          style={styles.backButton}
+          labelStyle={styles.backButtonText}
+        />
       </ScreenWrapper>
     );
   }
@@ -343,7 +327,7 @@ const ResetPasswordScreen: React.FC = () => {
       <AppHeader
         title="Restablecer Contraseña"
         showBackButton={true}
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
 
       <KeyboardAvoidingView
@@ -441,19 +425,16 @@ const ResetPasswordScreen: React.FC = () => {
             </View>
 
             {/* Botón de Envío */}
-            <TouchableOpacity
-              style={[
-                styles.submitButton,
-                isSubmitting && styles.submitButtonDisabled,
-              ]}
+            <Button
+              label={isSubmitting ? "Actualizando..." : "Actualizar contraseña"}
               onPress={handleResetPassword}
               disabled={isSubmitting}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.submitButtonText}>
-                {isSubmitting ? "Actualizando..." : "Actualizar contraseña"}
-              </Text>
-            </TouchableOpacity>
+              variant="primary"
+              size="lg"
+              fullWidth
+              style={styles.submitButton}
+              labelStyle={styles.submitButtonText}
+            />
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -532,11 +513,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   submitButton: {
-    backgroundColor: COLORS.primary,
     borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: "center",
-    justifyContent: "center",
     marginTop: 12,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
@@ -544,15 +521,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  submitButtonDisabled: {
-    backgroundColor: COLORS.textTertiary,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
   submitButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: COLORS.white,
   },
   centerContent: {
     justifyContent: "center",
@@ -582,16 +553,12 @@ const styles = StyleSheet.create({
   },
   backButton: {
     marginTop: 16,
-    paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
   },
   backButtonText: {
     fontSize: 14,
     fontWeight: "600",
-    color: COLORS.primary,
   },
 });
 

@@ -1,3 +1,4 @@
+
 export type Post = {
   id: string;
   publicado_por: string;
@@ -21,6 +22,8 @@ export type Post = {
   operacion?: string;
   fecha_finalizacion?: string;
   feed_item_id?: string;
+  likes_count?: number;
+  comentarios_count?: number;
 };
 
 export type FeedItem = {
@@ -99,6 +102,7 @@ export type PropertyType =
 export type CommissionDetails = {
   shared: boolean;
   percentage?: number;
+  months?: number;
   condition?: string;
 };
 
@@ -144,6 +148,8 @@ export type Property = {
   operation: "Sale" | "Rent";
   status: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
   commission?: CommissionDetails;
+  sin_comision?: boolean;
+  es_easybroker?: boolean;
   legal?: LegalDetails;
   longitud?: string;
   latitud?: string;
@@ -151,7 +157,12 @@ export type Property = {
   colonia?: string;
   subtipo?: string;
   codigo_propiedad?: string;
-  operations?: any[];
+  operations?: operaciones_propiedad[];
+  habitaciones?: number;
+  banos?: number;
+  estacionamientos?: number;
+  metros_construccion?: number;
+  metros_terreno?: number;
 };
 
 export type Comment = {
@@ -272,6 +283,7 @@ export type operaciones_propiedad = {
   comision_tipo?: "porcentaje" | "monto_fijo" | "mixto";
   comision_porcentaje?: number;
   comision_monto_fijo?: number;
+  comision_meses?: number;
   comparte_comision?: boolean;
   porcentaje_comision_compartida?: number;
   monto_comision_compartida?: number;
@@ -311,7 +323,7 @@ export type busquedas_guardadas = {
   tipo_operacion?: "venta" | "renta";
   precio_min: number;
   precio_max: number;
-  monera: string;
+  moneda: string;
   estado?: string;
   colonia?: string;
   subtipo?: string;
@@ -321,6 +333,7 @@ export type busquedas_guardadas = {
   metros_construccion?: number;
   metros_terreno?: number;
   genero?: "Masculino" | "Femenino";
+  polygon_coords?: { latitude: number; longitude: number }[];
 };
 
 export type agrupaciones_conversaciones = {

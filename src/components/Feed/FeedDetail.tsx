@@ -2,13 +2,9 @@ import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Modal,
   Dimensions,
-  Animated,
-  PanResponder,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
@@ -22,7 +18,7 @@ import { AppHeader } from "../AppHeader";
 import { commonStyles } from "styles";
 import { SpecialPostCard } from "./SpecialPostCard";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface FeedDetailProps {
   item: FeedItem;
@@ -40,10 +36,10 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
   const images = item.images || item.propertyDetails?.images || [];
   const [showComments, setShowComments] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false);
+  const [, setShowReportModal] = useState(false);
 
   const isSpecialPost =
-    ["openhouse", "aniversario", "sold"].includes(item.postType) ||
+    ["openhouse", "aniversario", "sold"].includes(item.postType ?? "") ||
     (item.postType === "busqueda" && !!item.postDetails?.busquedas_json);
 
   const hasImages = images.length > 0;
@@ -55,46 +51,6 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
   useEffect(() => {
     showCommentsRef.current = showComments;
   }, [showComments]);
-
-  // Animación para el gesto de swipe down
-  const panY = useRef(new Animated.Value(0)).current;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only capture if vertical movement is dominant and significant
-        return (
-          !showCommentsRef.current &&
-          Math.abs(gestureState.dy) > 15 &&
-          Math.abs(gestureState.dy) > Math.abs(gestureState.dx)
-        );
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          panY.setValue(gestureState.dy);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 150 || gestureState.vy > 0.5) {
-          Animated.timing(panY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 250,
-            useNativeDriver: true,
-          }).start(() => {
-            panY.setValue(0);
-            onClose();
-          });
-        } else {
-          Animated.spring(panY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 100,
-            friction: 10,
-          }).start();
-        }
-      },
-    }),
-  ).current;
 
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>

@@ -1,13 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
+import { logger } from "@/utils/logger";const log = logger.scoped("supabase");
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("Supabase config missing! Check your .env file.");
+  log.error("Supabase config missing! Check your .env file.");
 } else {
-  console.log("Supabase config loaded:", {
+  log.debug("Supabase config loaded:", {
     urlLength: supabaseUrl.length,
     keyLength: supabaseAnonKey.length,
     urlStart: supabaseUrl.substring(0, 8) + "...",

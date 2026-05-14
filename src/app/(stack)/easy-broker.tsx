@@ -12,38 +12,37 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { router } from "expo-router";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
 import { ScreenWrapper } from "@/screens/ScreenWrapper";
-import { useEasyBroker } from "@/hooks/hooks/useEasyBroker";
+import { useEasyBroker } from "@/hooks/useEasyBroker";
 import { EasyBrokerOnboarding } from "@/components/easy-broker/EasyBrokerOnboarding";
 import { EasyBrokerStats } from "@/components/easy-broker/EasyBrokerStats";
 import { EasyBrokerSyncStatus } from "@/components/easy-broker/EasyBrokerSyncStatus";
 import { EasyBrokerHistory } from "@/components/easy-broker/EasyBrokerHistory";
 
 const EasyBrokerSettingsScreen: React.FC = () => {
-  const navigation = useNavigation();
   const {
     apiKey,
     setApiKey,
     hasApiKey,
     loading,
     syncing,
+    syncProgress,
     stats,
     history,
     handleSaveAndSync,
     handleSync,
-    setHasApiKey,
+    changeApiKey,
   } = useEasyBroker();
 
   const handleBack = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
+    if (router.canGoBack()) {
+      router.back();
     } else {
       // Fallback a Home si no hay historial
-      // Ajusta 'Home' o 'Dashboard' según tus rutas
-      navigation.navigate("Home" as never);
+      router.replace("/(tabs)");
     }
   };
 
@@ -96,7 +95,7 @@ const EasyBrokerSettingsScreen: React.FC = () => {
       >
         <EasyBrokerStats stats={stats} />
 
-        <EasyBrokerSyncStatus syncing={syncing} onSync={handleSync} />
+        <EasyBrokerSyncStatus syncing={syncing} syncProgress={syncProgress} onSync={handleSync} />
 
         <EasyBrokerHistory history={history} />
 
@@ -104,7 +103,7 @@ const EasyBrokerSettingsScreen: React.FC = () => {
         <View style={styles.settingsSection}>
           <TouchableOpacity
             style={styles.settingsItem}
-            onPress={() => setHasApiKey(false)}
+            onPress={changeApiKey}
           >
             <Ionicons
               name="key-outline"

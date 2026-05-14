@@ -7,15 +7,19 @@ import {
   Text,
   View,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { COLORS } from "../../../constants/colors";
+import { useModal } from "@/context/ModalContext";
+import { useToast } from "@/context/ToastContext";
 import { Post } from "@/types";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { uploadImage } from "../../../services/uploadService";
 import { AppInput } from "@/design-system/components/AppInput";
 import { SelectionModal } from "@/components/modals";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("OpenHousePost");
 
 interface OpenHousePostProps {
   post: Post;
@@ -46,6 +50,8 @@ export const OpenHousePost = ({
   statusPost,
   setStatusPost,
 }: OpenHousePostProps) => {
+  const { showModal } = useModal();
+  const { showToast } = useToast();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
@@ -58,7 +64,7 @@ export const OpenHousePost = ({
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permiso denegado", "Necesitamos acceso a tu galería");
+        showModal({ title: "Permiso denegado", message: "Necesitamos acceso a tu galería", confirmText: "OK" });
         return;
       }
 
@@ -74,8 +80,8 @@ export const OpenHousePost = ({
         setFotoPropiedad(url);
       }
     } catch (error) {
-      console.error("Error picking/uploading image:", error);
-      Alert.alert("Error", "No se pudo subir la imagen");
+      log.error("Error picking/uploading image:", error);
+      showToast("No se pudo subir la imagen", "error");
     } finally {
       setUploading(false);
     }

@@ -1,14 +1,11 @@
 import { useState } from "react";
-import { Alert } from "react-native";
 import { supabase } from "../../../lib/supabase";
 import { useToast } from "../../../context/ToastContext";
-import { useCreateContent } from "../../../hooks/hooks/useCreateContent";
-import { useAuth } from "../../../context/AuthContext";
+import { useModal } from "../../../context/ModalContext";
 
 export const useSaveSearch = (userId?: string) => {
   const { showToast } = useToast();
-  const { user } = useAuth();
-  const { createPost } = useCreateContent(user?.id);
+  const { showModal } = useModal();
 
   const [createLead, setCreateLead] = useState(false);
   const [leadName, setLeadName] = useState("");
@@ -91,10 +88,32 @@ export const useSaveSearch = (userId?: string) => {
     return leadData?.id || null;
   };
 
-  const createSearchPost = async (filters: any) => {
-    if (!createLead) return true;
+  const buildSearchPostMetadata = (filters: any) => {
+    // Zonas de interés: tomamos los chips de ubicación nombrada (excluye polígonos a propósito)
+    const zonas_interes = Array.isArray(filters.locationChips)
+      ? filters.locationChips.map((c: any) => ({
+          id: c.id,
+          label: c.label,
+          type: c.type,
+          locationFilter: c.locationFilter,
+        }))
+      : [];
 
-    const busquedaMetadata = {
+    // Filtros especializados según tipo de propiedad (NO comisión, NO polígonos)
+    let comercial: any = undefined;
+    let industrial: any = undefined;
+    let agricola: any = undefined;
+    if (filters.tipoPropiedad === "comercial" && filters.comercialFilters) {
+      comercial = filters.comercialFilters;
+    }
+    if (filters.tipoPropiedad === "industrial" && filters.industrialFilters) {
+      industrial = filters.industrialFilters;
+    }
+    if (filters.tipoPropiedad === "agricola" && filters.agricolaFilters) {
+      agricola = filters.agricolaFilters;
+    }
+
+    return {
       titulo: "SE BUSCA",
       icon: "search-outline",
       filtros: {
@@ -102,25 +121,26 @@ export const useSaveSearch = (userId?: string) => {
         icon_operacion: "cash-outline",
         tipo_propiedad: filters.tipoPropiedad,
         icon_tipo: "business-outline",
-        subtipo: filters.subtipo,
+        subtipo: Array.isArray(filters.subtipo) ? filters.subtipo : filters.subtipo ? [filters.subtipo] : [],
         moneda: filters.moneda,
         precio_min:
           filters.precioMin && filters.precioMin !== "0"
-            ? parseFloat(filters.precioMin.replace(/,/g, ""))
+            ? parseFloat(filters.precioMin.toString().replace(/,/g, ""))
             : 0,
         precio_max:
           filters.precioMax && filters.precioMax !== "Sin límite"
-            ? parseFloat(filters.precioMax.replace(/,/g, ""))
+            ? parseFloat(filters.precioMax.toString().replace(/,/g, ""))
             : null,
         ubicacion: {
           estado: filters.locationFilter.estado,
           ciudad: filters.locationFilter.ciudad,
           municipio: filters.locationFilter.municipio,
-          colonia: Array.isArray(filters.locationFilter.colonia) 
-            ? filters.locationFilter.colonia.join(", ") 
+          colonia: Array.isArray(filters.locationFilter.colonia)
+            ? filters.locationFilter.colonia.join(", ")
             : filters.locationFilter.colonia,
           icon: "location-outline",
         },
+        zonas_interes,
         caracteristicas: {
           habitaciones: filters.habitaciones,
           icon_bed: "bed-outline",
@@ -135,13 +155,16 @@ export const useSaveSearch = (userId?: string) => {
         },
         superficies: {
           m2_terreno_min: filters.m2TerrenoMin
-            ? parseFloat(filters.m2TerrenoMin.replace(/,/g, ""))
+            ? parseFloat(filters.m2TerrenoMin.toString().replace(/,/g, ""))
             : 0,
           m2_construccion_min: filters.m2ConstruccionMin
-            ? parseFloat(filters.m2ConstruccionMin.replace(/,/g, ""))
+            ? parseFloat(filters.m2ConstruccionMin.toString().replace(/,/g, ""))
             : 0,
           icon: "resize-outline",
         },
+        ...(comercial ? { comercial } : {}),
+        ...(industrial ? { industrial } : {}),
+        ...(agricola ? { agricola } : {}),
       },
       prospecto: {
         nombre: leadName.trim(),
@@ -149,20 +172,6 @@ export const useSaveSearch = (userId?: string) => {
         ...(leadEmail.trim() && { email: leadEmail.trim() }),
       },
     };
-
-    const postSuccess = await createPost(
-      "🔍  BUSCO PROPIEDAD:",
-      [],
-      "busqueda",
-      busquedaMetadata,
-    );
-
-    if (!postSuccess) {
-      showToast("Error al crear el post de la búsqueda", "error");
-      return false;
-    }
-
-    return true;
   };
 
   const saveSearchToDatabase = async (filters: any, leadId: string | null) => {
@@ -209,10 +218,37 @@ export const useSaveSearch = (userId?: string) => {
     if (filters.locationFilter.municipio)
       criterios_busqueda.municipio = filters.locationFilter.municipio;
     if (filters.locationFilter.colonia) {
-      // Si es un array (nuevo formato) o un string (viejo), aseguramos que se guarde como array
-      criterios_busqueda.colonias = Array.isArray(filters.locationFilter.colonia) 
-        ? filters.locationFilter.colonia 
+      criterios_busqueda.colonias = Array.isArray(filters.locationFilter.colonia)
+        ? filters.locationFilter.colonia
         : [filters.locationFilter.colonia];
+    }
+
+    // Location chips (zonas nombradas)
+    if (filters.locationChips?.length > 0) {
+      criterios_busqueda.location_chips = filters.locationChips.map((c: any) => ({
+        label: c.label,
+        type: c.type,
+        locationFilter: c.locationFilter,
+      }));
+    }
+
+    // Comisiones
+    if (filters.comisionVentaMin) {
+      criterios_busqueda.comision_venta_min = parseFloat(filters.comisionVentaMin);
+    }
+    if (filters.comisionRentaMin) {
+      criterios_busqueda.comision_renta_min = parseFloat(filters.comisionRentaMin);
+    }
+
+    // Filtros especializados por tipo
+    if (filters.tipoPropiedad === "comercial" && filters.comercialFilters) {
+      criterios_busqueda.comercial = filters.comercialFilters;
+    }
+    if (filters.tipoPropiedad === "industrial" && filters.industrialFilters) {
+      criterios_busqueda.industrial = filters.industrialFilters;
+    }
+    if (filters.tipoPropiedad === "agricola" && filters.agricolaFilters) {
+      criterios_busqueda.agricola = filters.agricolaFilters;
     }
 
     const insertData: any = {
@@ -243,15 +279,30 @@ export const useSaveSearch = (userId?: string) => {
     }
 
     if (filters.locationFilter.estado)
-      insertData.estado = filters.locationFilter.estado;
+      insertData.estado = [filters.locationFilter.estado];
     if (filters.locationFilter.ciudad)
       insertData.ciudad = filters.locationFilter.ciudad;
     if (filters.locationFilter.municipio)
-      insertData.municipio = filters.locationFilter.municipio;
+      insertData.municipio = [filters.locationFilter.municipio];
     if (filters.locationFilter.colonia) {
       insertData.colonias = Array.isArray(filters.locationFilter.colonia)
         ? filters.locationFilter.colonia
         : [filters.locationFilter.colonia];
+    }
+
+    // Si se usaron chips sin locationFilter base, extraer estados de los chips
+    // para que el trigger de match pueda filtrar por ubicación correctamente
+    if (filters.locationChips?.length > 0 && !filters.locationFilter?.estado) {
+      const estadosDeChips = [
+        ...new Set(
+          filters.locationChips
+            .map((c: any) => c.locationFilter?.estado)
+            .filter((e: string) => e && e.trim())
+        ),
+      ] as string[];
+      if (estadosDeChips.length > 0) {
+        insertData.estado = estadosDeChips;
+      }
     }
 
     if (filters.habitaciones && filters.habitaciones !== "No indicado") {
@@ -280,6 +331,10 @@ export const useSaveSearch = (userId?: string) => {
         filters.m2TerrenoMin.toString().replace(/,/g, ""),
       );
       if (!isNaN(m2Terr)) insertData.metros_terreno = m2Terr;
+    }
+
+    if (filters.polygons && filters.polygons.length > 0) {
+      insertData.polygon_coords = filters.polygons;
     }
 
     if (filters.moneda) {
@@ -311,14 +366,56 @@ export const useSaveSearch = (userId?: string) => {
     return searchData;
   };
 
-  const handleSaveSearch = async (filters: any, onClose: () => void) => {
+  const hasAnyCriteria = (filters: any): boolean => {
+    if (!filters) return false;
+    const trim = (v: any) => (typeof v === "string" ? v.trim() : v);
+    const hasArray = (a: any) => Array.isArray(a) && a.length > 0;
+
+    return Boolean(
+      trim(filters.tipoPropiedad) ||
+        hasArray(filters.subtipo) ||
+        trim(filters.locationFilter?.estado) ||
+        trim(filters.locationFilter?.ciudad) ||
+        trim(filters.locationFilter?.municipio) ||
+        (Array.isArray(filters.locationFilter?.colonia)
+          ? filters.locationFilter.colonia.length > 0
+          : trim(filters.locationFilter?.colonia)) ||
+        hasArray(filters.locationChips) ||
+        hasArray(filters.polygons) ||
+        trim(filters.precioMin) ||
+        trim(filters.precioMax) ||
+        trim(filters.habitaciones) ||
+        trim(filters.banos) ||
+        trim(filters.estacionamientos) ||
+        trim(filters.niveles) ||
+        trim(filters.antiguedad) ||
+        trim(filters.m2TerrenoMin) ||
+        trim(filters.m2ConstruccionMin) ||
+        parseFloat(filters.comisionVentaMin || "0") > 0 ||
+        parseFloat(filters.comisionRentaMin || "0") > 0,
+    );
+  };
+
+  const handleSaveSearch = async (filters: any, onClose: () => void): Promise<{ success: boolean; metadata?: any }> => {
     if (!userId) {
-      Alert.alert("Error", "Debes iniciar sesión para guardar búsquedas");
-      return false;
+      showModal({
+        title: "Error",
+        message: "Debes iniciar sesión para guardar búsquedas",
+        confirmText: "OK",
+      });
+      return { success: false };
+    }
+
+    if (!hasAnyCriteria(filters)) {
+      showToast(
+        "Agrega al menos un filtro o dibuja una zona en el mapa para guardar la búsqueda",
+        "error",
+      );
+      return { success: false };
     }
 
     if (!validateLeadFields()) {
-      return false;
+      return { success: false };
     }
 
     try {
@@ -330,9 +427,8 @@ export const useSaveSearch = (userId?: string) => {
 
       await saveSearchToDatabase(filters, leadId);
 
-      if (createLead) {
-        await createSearchPost(filters);
-      }
+      // Construir metadata antes de limpiar el estado
+      const metadata = buildSearchPostMetadata(filters);
 
       showToast("Búsqueda guardada correctamente", "success");
 
@@ -342,10 +438,10 @@ export const useSaveSearch = (userId?: string) => {
       setLeadPhone("");
       setLeadEmail("");
       onClose();
-      return true;
+      return { success: true, metadata };
     } catch (error: any) {
       showToast(error.message || "Error al procesar el guardado", "error");
-      return false;
+      return { success: false };
     }
   };
 

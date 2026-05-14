@@ -2,30 +2,53 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/colors";
+import { SyncProgress } from "@/hooks/useEasyBroker";
 
 interface Props {
     syncing: boolean;
+    syncProgress: SyncProgress | null;
     onSync: () => void;
 }
 
-export const EasyBrokerSyncStatus: React.FC<Props> = ({ syncing, onSync }) => {
+export const EasyBrokerSyncStatus: React.FC<Props> = ({ syncing, syncProgress, onSync }) => {
     if (syncing) {
+        const hasProgress = syncProgress != null && syncProgress.total > 0;
+        const pct = hasProgress
+            ? Math.min(syncProgress.procesadas / syncProgress.total, 1)
+            : 0;
+
         return (
             <View style={styles.syncingCard}>
                 <View style={styles.syncingHeader}>
                     <View style={styles.syncingDot} />
                     <Text style={styles.syncingTitle}>Sincronizando...</Text>
+                    {hasProgress && (
+                        <Text style={styles.syncingCounter}>
+                            {syncProgress.procesadas}/{syncProgress.total}
+                        </Text>
+                    )}
                 </View>
 
                 <Text style={styles.syncingDescription}>
-                    Estamos importando tus propiedades desde EasyBroker. Puedes salir de
-                    esta pantalla, te avisaremos cuando termine.
+                    {hasProgress
+                        ? `Procesando propiedad ${syncProgress.procesadas} de ${syncProgress.total}. Puedes salir, te avisaremos cuando termine.`
+                        : "Estamos importando tus propiedades desde EasyBroker. Puedes salir de esta pantalla, te avisaremos cuando termine."}
                 </Text>
 
                 <View style={styles.syncingProgress}>
                     <View style={styles.progressBarBg}>
-                        <View style={styles.progressBarAnimated} />
+                        <View
+                            style={[
+                                styles.progressBarFill,
+                                hasProgress
+                                    ? { width: `${Math.round(pct * 100)}%` }
+                                    : styles.progressBarAnimated,
+                            ]}
+                        />
                     </View>
+                    {hasProgress && (
+                        <Text style={styles.progressPct}>{Math.round(pct * 100)}%</Text>
+                    )}
                 </View>
             </View>
         );
@@ -78,19 +101,35 @@ const styles = StyleSheet.create({
         lineHeight: 20,
         marginBottom: 16,
     },
+    syncingCounter: {
+        marginLeft: "auto",
+        fontSize: 13,
+        fontWeight: "600",
+        color: COLORS.warningDark,
+    },
     syncingProgress: {
         marginTop: 8,
+        gap: 4,
     },
     progressBarBg: {
-        height: 4,
+        height: 6,
         backgroundColor: COLORS.white,
-        borderRadius: 2,
+        borderRadius: 3,
         overflow: "hidden",
     },
-    progressBarAnimated: {
+    progressBarFill: {
         height: "100%",
-        width: "100%",
         backgroundColor: COLORS.warning,
+        borderRadius: 3,
+    },
+    progressBarAnimated: {
+        width: "60%",
+    },
+    progressPct: {
+        fontSize: 11,
+        color: COLORS.warningDark,
+        textAlign: "right",
+        fontWeight: "600",
     },
     syncButton: {
         flexDirection: "row",

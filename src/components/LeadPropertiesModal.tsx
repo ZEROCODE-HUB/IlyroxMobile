@@ -6,9 +6,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useModal } from "../context/ModalContext";
 import PropertyCard from "./cards/PropertyCard";
 import { AppHeader } from "./AppHeader";
 import { COLORS } from "../constants";
@@ -65,6 +65,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
   onDeleteSearch,
   currentUserId,
 }) => {
+  const { showModal } = useModal();
   const [activeTab, setActiveTab] = useState<"coincidencia" | "similar">(
     "coincidencia",
   );
@@ -74,21 +75,17 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
   const [showCommentsModal, setShowCommentsModal] = useState(false);
 
   const handleDeleteSearchInternal = () => {
-    Alert.alert(
-      "Eliminar búsqueda",
-      "¿Estás seguro de que deseas eliminar esta búsqueda guardada? Se eliminarán todos los matches asociados.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: () => {
-            onDeleteSearch(busquedaId);
-            onClose();
-          },
-        },
-      ],
-    );
+    showModal({
+      title: "Eliminar búsqueda",
+      message:
+        "¿Estás seguro de que deseas eliminar esta búsqueda guardada? Se eliminarán todos los matches asociados.",
+      confirmText: "Eliminar",
+      cancelText: "Cancelar",
+      onConfirm: () => {
+        onDeleteSearch(busquedaId);
+        onClose();
+      },
+    });
   };
 
   const handleCommentClick = (feedItemId: string) => {
@@ -422,7 +419,7 @@ const styles = StyleSheet.create({
     paddingTop: 45,
     // Add shadow for better separation
     elevation: 2,
-    shadowColor: "#000",
+    shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 5,
@@ -436,7 +433,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     zIndex: 10,
     elevation: 4,
-    shadowColor: "#000",
+    shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 3,

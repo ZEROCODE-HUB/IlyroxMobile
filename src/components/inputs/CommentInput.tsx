@@ -1,4 +1,4 @@
-import React, { forwardRef, useState, useEffect } from "react";
+import React, { forwardRef, useEffect } from "react";
 import {
   Platform,
   TextInput,
@@ -13,7 +13,6 @@ import {
 import { AppInput } from "../../design-system/components/AppInput";
 import { COLORS } from "../../constants/colors";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface CommentInputProps extends React.ComponentProps<typeof AppInput> {
   onSend: () => void;
@@ -40,7 +39,6 @@ export const CommentInput = forwardRef<TextInput, CommentInputProps>(
     },
     ref
   ) => {
-    const insets = useSafeAreaInsets();
     const bottomPosition = React.useRef(new Animated.Value(0)).current;
 
     useEffect(() => {

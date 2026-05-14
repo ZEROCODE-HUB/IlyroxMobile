@@ -2,7 +2,6 @@ import React from "react";
 import { Text, View, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Bath } from "lucide-react-native";
-import { COLORS } from "../../constants/colors";
 
 interface RichTextProps {
   content: string;

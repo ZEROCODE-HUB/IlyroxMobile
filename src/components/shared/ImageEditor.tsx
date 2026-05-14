@@ -14,6 +14,9 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImageManipulator from "expo-image-manipulator";
 import { COLORS } from "../../constants";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("ImageEditor");
 
 interface ImageEditorProps {
   visible: boolean;
@@ -145,7 +148,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
       });
       onSave(result.uri);
     } catch (err) {
-      console.error(err);
+      log.error(err);
       alert("Error al procesar imagen");
     } finally {
       setIsProcessing(false);
@@ -158,7 +161,6 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
     cropRef.current = crop;
   }, [crop]);
 
-  const lastPoint = useRef({ x: 0, y: 0 });
   const lastState = useRef({ x: 0, y: 0, w: 0, h: 0 });
 
   const moveResponder = useRef(
@@ -357,7 +359,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
+  container: { flex: 1, backgroundColor: COLORS.black },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -366,7 +368,7 @@ const styles = StyleSheet.create({
     height: 60,
   },
   headerButton: { padding: 8, minWidth: 60, alignItems: "center" },
-  headerTitle: { fontSize: 18, fontWeight: "bold", color: "#fff" },
+  headerTitle: { fontSize: 18, fontWeight: "bold", color: COLORS.white },
   saveText: { color: COLORS.primary, fontSize: 16, fontWeight: "bold" },
   previewContainer: {
     flex: 1,
@@ -384,7 +386,7 @@ const styles = StyleSheet.create({
   cropBox: {
     position: "absolute",
     borderWidth: 2,
-    borderColor: "#fff",
+    borderColor: COLORS.white,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
   },
   cropGrid: {
@@ -397,12 +399,12 @@ const styles = StyleSheet.create({
   gridLineV: {
     width: 1,
     height: "100%",
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    backgroundColor: COLORS.whiteTransparent30,
   },
   gridLineH: {
     width: "100%",
     height: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    backgroundColor: COLORS.whiteTransparent30,
     position: "absolute",
   },
   handle: {
@@ -445,8 +447,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     paddingVertical: 20,
-    backgroundColor: "#000",
+    backgroundColor: COLORS.black,
   },
   toolButton: { alignItems: "center", gap: 4 },
-  toolText: { color: "#fff", fontSize: 12 },
+  toolText: { color: COLORS.white, fontSize: 12 },
 });

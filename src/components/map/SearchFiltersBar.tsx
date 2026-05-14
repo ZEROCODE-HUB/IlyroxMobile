@@ -1,123 +1,195 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../../constants/colors';
+import React from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { COLORS } from "../../constants/colors";
+import { LocationChip } from "@/store/propertyFiltersStore";
 
 interface SearchFiltersBarProps {
   hasActiveFilters: boolean;
-  onOpenFilters: () => void;
   onClearFilters: () => void;
+  locationChips?: LocationChip[];
+  polygonChips?: Array<{ index: number; label: string }>;
+  onAddZone?: () => void;
+  onRemoveChip?: (id: string) => void;
+  onRemovePolygon?: (index: number) => void;
+  onBack?: () => void;
 }
 
 export const SearchFiltersBar: React.FC<SearchFiltersBarProps> = ({
   hasActiveFilters,
-  onOpenFilters,
   onClearFilters,
+  locationChips = [],
+  polygonChips = [],
+  onAddZone,
+  onRemoveChip,
+  onRemovePolygon,
+  onBack,
 }) => {
+  const hasChips = locationChips.length > 0 || polygonChips.length > 0;
+
   return (
     <View style={styles.container}>
       <View style={styles.buttonsRow}>
-        <TouchableOpacity
-          style={styles.filterBtn}
-          onPress={onOpenFilters}
-        >
-          <Ionicons name="options-outline" size={20} color={COLORS.white} />
-          <Text style={styles.filterBtnText}>Filtrar</Text>
-          {hasActiveFilters && <View style={styles.activeFilterDot} />}
-        </TouchableOpacity>
+        {onBack && (
+          <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={8}>
+            <Ionicons name="arrow-back" size={20} color={COLORS.textPrimary} />
+          </TouchableOpacity>
+        )}
+        {onAddZone && (
+          <TouchableOpacity
+            style={styles.zoneBtn}
+            onPress={onAddZone}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="map-outline" size={17} color={COLORS.primary} />
+            <Text style={styles.zoneBtnText}>Agregar Zona</Text>
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity
-          style={[
-            styles.clearBtn,
-            !hasActiveFilters && styles.clearBtnDisabled
-          ]}
-          onPress={onClearFilters}
-          disabled={!hasActiveFilters}
-        >
-          <Ionicons 
-            name="refresh-outline" 
-            size={20} 
-            color={hasActiveFilters ? COLORS.error : COLORS.textDisabled} 
-          />
-          <Text style={[
-            styles.clearBtnText,
-            !hasActiveFilters && styles.clearBtnTextDisabled
-          ]}>
-            Limpiar filtros
-          </Text>
-        </TouchableOpacity>
+        {hasActiveFilters && (
+          <TouchableOpacity style={styles.clearBtn} onPress={onClearFilters}>
+            <Ionicons name="close-outline" size={20} color={COLORS.error} />
+          </TouchableOpacity>
+        )}
       </View>
+
+      {/* Chips de zonas y ubicaciones */}
+      {hasChips && (
+        <View style={styles.chipsRow}>
+          {polygonChips.map((chip) => (
+            <TouchableOpacity
+              key={`polygon-${chip.index}`}
+              style={[styles.chip, styles.polygonChip]}
+              onPress={() => onRemovePolygon?.(chip.index)}
+              activeOpacity={0.6}
+            >
+              <Ionicons name="shapes-outline" size={13} color="#7c3aed" />
+              <Text style={[styles.chipLabel, styles.polygonChipLabel]} numberOfLines={1}>
+                {chip.label}
+              </Text>
+              <Ionicons name="close-circle" size={16} color="#7c3aed" />
+            </TouchableOpacity>
+          ))}
+          {locationChips.map((chip) => (
+            <TouchableOpacity
+              key={chip.id}
+              style={styles.chip}
+              onPress={() => onRemoveChip?.(chip.id)}
+              activeOpacity={0.6}
+            >
+              <Ionicons
+                name={
+                  chip.type === "estado"
+                    ? "map-outline"
+                    : chip.type === "municipio"
+                      ? "business-outline"
+                      : "location-outline"
+                }
+                size={13}
+                color={COLORS.primary}
+              />
+              <Text style={styles.chipLabel} numberOfLines={1}>
+                {chip.label}
+              </Text>
+              <Ionicons name="close-circle" size={16} color={COLORS.primary} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.background,
+    paddingTop: 12,
+    paddingBottom: 8,
+    paddingHorizontal: 16,
+    gap: 8,
+    zIndex: 10,
+    elevation: 10,
   },
   buttonsRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  filterBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
-    elevation: 2,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    position: 'relative',
   },
-  filterBtnText: {
-    color: COLORS.white,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  activeFilterDot: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.warning,
-    borderWidth: 2,
-    borderColor: COLORS.white,
-  },
-  clearBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.errorLight,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  backBtn: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: COLORS.errorLight,
-  },
-  clearBtnDisabled: {
     backgroundColor: COLORS.background,
+    borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
-  clearBtnText: {
-    color: COLORS.error,
-    fontSize: 15,
-    fontWeight: '600',
+  zoneBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    backgroundColor: COLORS.background,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: COLORS.primaryLight,
   },
-  clearBtnTextDisabled: {
-    color: COLORS.textDisabled,
+  zoneBtnText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  clearBtn: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: COLORS.errorLight,
+  },
+
+  // Chips
+  chipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    gap: 5,
+    borderWidth: 1.5,
+    borderColor: COLORS.primaryLight,
+  },
+  chipLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.primary,
+    maxWidth: 120,
+  },
+
+  polygonChip: {
+    backgroundColor: "#f5f3ff",
+    borderColor: "#c4b5fd",
+  },
+  polygonChipLabel: {
+    color: "#7c3aed",
   },
 });

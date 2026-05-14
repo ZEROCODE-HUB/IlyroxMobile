@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Alert,
   TextInput,
   KeyboardAvoidingView,
   Platform,
@@ -19,16 +18,18 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants";
-import { supabase } from "../../lib/supabase";
+import { appointmentService } from "@/services/appointmentService";
+import { logger } from "@/utils/logger";
+import { useModal } from "../../context/ModalContext";
 import { useToast } from "../../context/ToastContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const log = logger.scoped("CreateAppointmentModal");
 
 // Sub-components
 import DatePickerField from "./DatePickerField";
 import TimePickerField from "./TimePickerField";
-import AppointmentTypeSelector, {
-  APPOINTMENT_TYPES,
-} from "./AppointmentTypeSelector";
+import AppointmentTypeSelector from "./AppointmentTypeSelector";
 import { createAppointmentStyles as styles } from "./createAppointmentStyles";
 
 interface CreateAppointmentModalProps {
@@ -49,6 +50,7 @@ export default function CreateAppointmentModal({
   currentUserId,
 }: CreateAppointmentModalProps) {
   const insets = useSafeAreaInsets();
+  const { showModal } = useModal();
   const { showToast } = useToast();
   const scrollRef = useRef<ScrollView>(null);
 
@@ -88,47 +90,21 @@ export default function CreateAppointmentModal({
     return regex.test(timeStr);
   };
 
-  const determineRoles = async () => {
-    const { data: currentUserProfile } = await supabase
-      .from("perfiles")
-      .select("rol")
-      .eq("id", currentUserId)
-      .single();
-
-    const { data: otherUserProfile } = await supabase
-      .from("perfiles")
-      .select("rol")
-      .eq("id", otherUserId)
-      .single();
-
-    let agenteId = "";
-    let clienteId = "";
-
-    if (currentUserProfile?.rol === "agente") {
-      agenteId = currentUserId;
-      clienteId = otherUserId;
-    } else if (otherUserProfile?.rol === "agente") {
-      agenteId = otherUserId;
-      clienteId = currentUserId;
-    } else {
-      agenteId = currentUserId;
-      clienteId = otherUserId;
-    }
-
-    return { agenteId, clienteId };
-  };
+  const determineRoles = () =>
+    appointmentService.resolveRoles(currentUserId, otherUserId);
 
   const handleCreateAppointment = async () => {
     if (!validateDate(fechaText)) {
-      Alert.alert(
-        "Error",
-        "Fecha inválida. Usa formato YYYY-MM-DD y asegúrate que no sea anterior a hoy",
-      );
+      showModal({
+        title: "Error",
+        message: "Fecha inválida. Usa formato YYYY-MM-DD y asegúrate que no sea anterior a hoy",
+        confirmText: "OK",
+      });
       return;
     }
 
     if (!validateTime(horaText)) {
-      Alert.alert("Error", "Hora inválida. Usa formato HH:MM (24 horas)");
+      showModal({ title: "Error", message: "Hora inválida. Usa formato HH:MM (24 horas)", confirmText: "OK" });
       return;
     }
 
@@ -138,29 +114,22 @@ export default function CreateAppointmentModal({
       const { agenteId, clienteId } = await determineRoles();
 
       if (agenteId === clienteId) {
-        Alert.alert("Error", "No se puede crear una cita con el mismo usuario");
+        showModal({ title: "Error", message: "No se puede crear una cita con el mismo usuario", confirmText: "OK" });
         return;
       }
 
       const horaStr = `${horaText}:00`;
 
-      const { data, error } = await supabase
-        .from("citas")
-        .insert({
-          propiedad_id: propertyId,
-          agente_id: agenteId,
-          cliente_id: clienteId,
-          created_by: currentUserId,
-          fecha: fechaText,
-          hora: horaStr,
-          tipo,
-          descripcion: descripcion.trim() || null,
-          estado: "pendiente",
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
+      await appointmentService.createAppointment({
+        propertyId,
+        agenteId,
+        clienteId,
+        createdBy: currentUserId,
+        fecha: fechaText,
+        hora: horaStr,
+        tipo,
+        descripcion: descripcion.trim() || null,
+      });
 
       showToast("Cita creada exitosamente", "success");
 
@@ -170,39 +139,19 @@ export default function CreateAppointmentModal({
       let otherUserName = "";
 
       try {
-        // Obtener datos de la propiedad
-        if (propertyId) {
-          const { data: propData } = await supabase
-            .from("propiedades")
-            .select("titulo, calle, numero, ciudad, codigo_postal")
-            .eq("id", propertyId)
-            .single();
-
-          if (propData) {
-            propertyTitle = propData.titulo || "Propiedad";
-            const parts = [
-              propData.calle,
-              propData.numero,
-              propData.ciudad,
-              propData.codigo_postal,
-            ].filter(Boolean);
-            location = parts.join(", ");
-          }
+        const propInfo =
+          await appointmentService.getPropertyCalendarInfo(propertyId);
+        if (propInfo) {
+          propertyTitle = propInfo.titulo;
+          location = propInfo.location;
         }
 
-        // Obtener nombre del otro usuario
-        const { data: userData } = await supabase
-          .from("perfiles")
-          .select("nombre, apellido_paterno")
-          .eq("id", otherUserId)
-          .single();
-
+        const userData = await appointmentService.getUserBasicInfo(otherUserId);
         if (userData) {
-          otherUserName = `${userData.nombre || ""} ${userData.apellido_paterno || ""
-            }`.trim();
+          otherUserName = `${userData.nombre} ${userData.apellido_paterno}`.trim();
         }
       } catch (err) {
-        console.warn("Could not fetch details for calendar", err);
+        log.warn("Could not fetch details for calendar", err);
       }
 
       // Abrir Google Calendar automáticamente
@@ -219,7 +168,7 @@ export default function CreateAppointmentModal({
       try {
         await Linking.openURL(calendarUrl);
       } catch (linkError) {
-        console.warn("No se pudo abrir Google Calendar:", linkError);
+        log.warn("No se pudo abrir Google Calendar:", linkError);
       }
 
       onClose();
@@ -235,7 +184,7 @@ export default function CreateAppointmentModal({
       setTipo("visita");
       setDescripcion("");
     } catch (error: any) {
-      console.error("Error creating appointment:", error);
+      log.error("Error creating appointment:", error);
       showToast(error.message || "Error al crear la cita", "error");
     } finally {
       setIsCreating(false);

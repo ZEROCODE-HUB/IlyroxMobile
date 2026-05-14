@@ -15,37 +15,23 @@ import {
   TIPOS_FINANCIAMIENTO,
 } from "../../../constants/propertyData";
 import type { SiNo } from "./types";
-
-interface GravamenFinancingSectionProps {
-  // Gravamen
-  tieneGravamen: SiNo;
-  setTieneGravamen: (val: SiNo) => void;
-  institucionGravamen: string;
-  setInstitucionGravamen: (val: string) => void;
-  montoGravamen: string;
-  setMontoGravamen: (val: string) => void;
-  handleCurrencyChange: (text: string, setter: (val: string) => void) => void;
-  // Financiamiento
-  aceptaFinanciamiento: SiNo;
-  setAceptaFinanciamiento: (val: SiNo) => void;
-  tiposFinanciamientoSeleccionados: string[];
-  toggleFinanciamiento: (tipo: string) => void;
-}
+import { usePropertyFormContext } from "./PropertyFormContext";
 
 export const GravamenFinancingSection = React.memo(
-  function GravamenFinancingSection({
-    tieneGravamen,
-    setTieneGravamen,
-    institucionGravamen,
-    setInstitucionGravamen,
-    montoGravamen,
-    setMontoGravamen,
-    handleCurrencyChange,
-    aceptaFinanciamiento,
-    setAceptaFinanciamiento,
-    tiposFinanciamientoSeleccionados,
-    toggleFinanciamiento,
-  }: GravamenFinancingSectionProps) {
+  function GravamenFinancingSection() {
+    const {
+      tieneGravamen,
+      setTieneGravamen,
+      institucionGravamen,
+      setInstitucionGravamen,
+      montoGravamen,
+      setMontoGravamen,
+      handleCurrencyChange,
+      aceptaFinanciamiento,
+      setAceptaFinanciamiento,
+      tiposFinanciamientoSeleccionados,
+      toggleFinanciamiento,
+    } = usePropertyFormContext();
     const [showInstitucionGravamenModal, setShowInstitucionGravamenModal] =
       useState(false);
 
@@ -53,9 +39,9 @@ export const GravamenFinancingSection = React.memo(
       <>
         {/* GRAVAMEN */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="alert-circle" size={24} color={COLORS.primary} />
-            <Text style={styles.sectionTitle}>Gravamen</Text>
+          <View style={styles.sectionHeaderBand}>
+            <Ionicons name="alert-circle-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.sectionTitleBand}>Gravamen</Text>
           </View>
 
           <RadioGroupSelector
@@ -113,9 +99,9 @@ export const GravamenFinancingSection = React.memo(
 
         {/* FINANCIAMIENTO */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="card" size={24} color={COLORS.primary} />
-            <Text style={styles.sectionTitle}>Financiamiento</Text>
+          <View style={styles.sectionHeaderBand}>
+            <Ionicons name="card-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.sectionTitleBand}>Financiamiento</Text>
           </View>
 
           <RadioGroupSelector
@@ -173,16 +159,20 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  sectionHeader: {
+  sectionHeaderBand: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
     gap: 8,
+    backgroundColor: COLORS.primary + "12",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
+  sectionTitleBand: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.primary,
   },
   label: {
     fontSize: 13,

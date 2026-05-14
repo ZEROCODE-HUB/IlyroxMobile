@@ -1,15 +1,17 @@
 import React from "react";
 import {
-  Modal,
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Linking,
-  Platform,
 } from "react-native";
 import { COLORS } from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
+import { Modal } from "@/design-system/components";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("VersionUpdateModal");
 
 interface VersionUpdateModalProps {
   visible: boolean;
@@ -22,52 +24,42 @@ export const VersionUpdateModal: React.FC<VersionUpdateModalProps> = ({
 }) => {
   const handleUpdate = () => {
     Linking.openURL(storeUrl).catch((err) =>
-      console.error("Error al abrir la tienda:", err)
+      log.error("Error al abrir la tienda:", err)
     );
   };
 
-  return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.overlay}>
-        <View style={styles.container}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="refresh-circle" size={80} color={COLORS.primary} />
-          </View>
-          
-          <Text style={styles.title}>Actualización disponible</Text>
-          <Text style={styles.message}>
-            Hay una nueva versión de Ilyrox disponible. Por favor, actualiza la aplicación para continuar disfrutando de todas las funciones.
-          </Text>
+  // Update forzada: el usuario no puede cerrar el modal sin actualizar.
+  const noop = () => {};
 
-          <TouchableOpacity style={styles.button} onPress={handleUpdate}>
-            <Text style={styles.buttonText}>Actualizar ahora</Text>
-          </TouchableOpacity>
-        </View>
+  return (
+    <Modal
+      visible={visible}
+      onClose={noop}
+      variant="center"
+      showCloseButton={false}
+      dismissOnBackdropPress={false}
+      contentStyle={styles.content}
+    >
+      <View style={styles.iconContainer}>
+        <Ionicons name="refresh-circle" size={80} color={COLORS.primary} />
       </View>
+
+      <Text style={styles.title}>Actualización disponible</Text>
+      <Text style={styles.message}>
+        Hay una nueva versión de Ilyrox disponible. Por favor, actualiza la aplicación para continuar disfrutando de todas las funciones.
+      </Text>
+
+      <TouchableOpacity style={styles.button} onPress={handleUpdate}>
+        <Text style={styles.buttonText}>Actualizar ahora</Text>
+      </TouchableOpacity>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  container: {
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
+  content: {
     padding: 30,
-    width: "100%",
-    maxWidth: 400,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 15,
-    elevation: 10,
   },
   iconContainer: {
     marginBottom: 20,

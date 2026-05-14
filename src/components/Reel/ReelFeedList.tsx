@@ -34,7 +34,7 @@ const ReelFeedList: React.FC<ReelFeedListProps> = ({
   currentUserId,
 }) => {
   const { height, width } = useWindowDimensions();
-  const { reels, loading, fetchMoreReels, initialScrollIndex } = useReelFeed(
+  const { reels, fetchMoreReels, initialScrollIndex } = useReelFeed(
     initialReelId,
     initialReelItem,
   );

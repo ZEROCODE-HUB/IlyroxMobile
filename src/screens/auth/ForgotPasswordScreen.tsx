@@ -4,19 +4,20 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
 import { ScreenWrapper } from "@/screens/ScreenWrapper";
 import { supabase } from "@/lib/supabase";
 import { router } from "expo-router";
+import { Button } from "@/design-system/components";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("ForgotPasswordScreen");
 
 const ForgotPasswordScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,19 +44,15 @@ const ForgotPasswordScreen: React.FC = () => {
     setError("");
 
     try {
-      console.log("📧 Enviando código de recuperación a:", email);
-
       // Enviar código OTP al correo (sin redirectTo)
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         email
       );
 
       if (resetError) {
-        console.error("❌ Error al enviar correo:", resetError);
+        log.error("Error al enviar correo:", resetError);
         throw resetError;
       }
-
-      console.log("✅ Código enviado exitosamente");
 
       // Navegar directamente a la pantalla de verificación
       router.push({
@@ -64,7 +61,7 @@ const ForgotPasswordScreen: React.FC = () => {
       });
 
     } catch (error: any) {
-      console.error("❌ Error al recuperar contraseña:", error);
+      log.error("Error al recuperar contraseña:", error);
       setError(error?.message || "No se pudo enviar el correo. Intenta de nuevo.");
     } finally {
       setIsSubmitting(false);
@@ -76,7 +73,7 @@ const ForgotPasswordScreen: React.FC = () => {
       <AppHeader
         title="Recuperar Contraseña"
         showBackButton={true}
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
 
       <KeyboardAvoidingView
@@ -113,19 +110,16 @@ const ForgotPasswordScreen: React.FC = () => {
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
             </View>
 
-            <TouchableOpacity
-              style={[
-                styles.submitButton,
-                isSubmitting && styles.submitButtonDisabled,
-              ]}
+            <Button
+              label={isSubmitting ? "Enviando..." : "Enviar código"}
               onPress={handleResetPassword}
               disabled={isSubmitting}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.submitButtonText}>
-                {isSubmitting ? "Enviando..." : "Enviar código"}
-              </Text>
-            </TouchableOpacity>
+              variant="primary"
+              size="lg"
+              fullWidth
+              style={styles.submitButton}
+              labelStyle={styles.submitButtonText}
+            />
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -195,11 +189,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   submitButton: {
-    backgroundColor: COLORS.primary,
     borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: "center",
-    justifyContent: "center",
     marginTop: 12,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
@@ -207,15 +197,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  submitButtonDisabled: {
-    backgroundColor: COLORS.textTertiary,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
   submitButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: COLORS.white,
   },
 });
 

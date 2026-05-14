@@ -4,6 +4,9 @@
  */
 
 import { supabase } from "./supabase";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("catalogHelpers");
 
 /**
  * Buscar ID de institución financiera por nombre
@@ -19,13 +22,13 @@ export const findInstitucionFinancieraId = async (
       .single();
 
     if (error) {
-      console.error("Error buscando institución financiera:", error);
+      log.error("Error buscando institución financiera:", error);
       return null;
     }
 
     return data?.id || null;
   } catch (err) {
-    console.error("Error en findInstitucionFinancieraId:", err);
+    log.error("Error en findInstitucionFinancieraId:", err);
     return null;
   }
 };
@@ -44,13 +47,13 @@ export const findTipoFinanciamientoId = async (
       .single();
 
     if (error) {
-      console.error("Error buscando tipo de financiamiento:", error);
+      log.error("Error buscando tipo de financiamiento:", error);
       return null;
     }
 
     return data?.id || null;
   } catch (err) {
-    console.error("Error en findTipoFinanciamientoId:", err);
+    log.error("Error en findTipoFinanciamientoId:", err);
     return null;
   }
 };
@@ -67,13 +70,13 @@ export const findAmenidadId = async (nombre: string): Promise<string | null> => 
       .single();
 
     if (error) {
-      console.error("Error buscando amenidad:", error);
+      log.error("Error buscando amenidad:", error);
       return null;
     }
 
     return data?.id || null;
   } catch (err) {
-    console.error("Error en findAmenidadId:", err);
+    log.error("Error en findAmenidadId:", err);
     return null;
   }
 };
@@ -91,13 +94,13 @@ export const findAmenidadesIds = async (
       .in("nombre", nombres);
 
     if (error) {
-      console.error("Error buscando amenidades:", error);
+      log.error("Error buscando amenidades:", error);
       return [];
     }
 
     return data?.map((item) => item.id) || [];
   } catch (err) {
-    console.error("Error en findAmenidadesIds:", err);
+    log.error("Error en findAmenidadesIds:", err);
     return [];
   }
 };
@@ -115,13 +118,13 @@ export const findTiposFinanciamientoIds = async (
       .in("nombre", nombres);
 
     if (error) {
-      console.error("Error buscando tipos de financiamiento:", error);
+      log.error("Error buscando tipos de financiamiento:", error);
       return [];
     }
 
     return data?.map((item) => item.id) || [];
   } catch (err) {
-    console.error("Error en findTiposFinanciamientoIds:", err);
+    log.error("Error en findTiposFinanciamientoIds:", err);
     return [];
   }
 };
@@ -201,8 +204,8 @@ export const poblarCatalogos = async () => {
         .upsert({ nombre }, { onConflict: "nombre" });
     }
 
-    console.log("Catálogos poblados exitosamente");
+    log.debug("Catálogos poblados exitosamente");
   } catch (error) {
-    console.error("Error poblando catálogos:", error);
+    log.error("Error poblando catálogos:", error);
   }
 };

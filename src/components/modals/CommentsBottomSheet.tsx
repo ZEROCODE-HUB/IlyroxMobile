@@ -29,13 +29,12 @@ import {
   Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   KeyboardProvider,
   KeyboardAvoidingView,
 } from "react-native-keyboard-controller";
 
-import { useComments } from "../../hooks/hooks";
+import { useComments } from "../../hooks";
 import { COLORS } from "../../constants";
 import { Avatar } from "../shared";
 import { ViewImage } from "./ViewImage";
@@ -163,8 +162,6 @@ export default function CommentsBottomSheet({
   feedItemId,
   currentUserId,
 }: CommentsBottomSheetProps) {
-  const insets = useSafeAreaInsets();
-
   // State
   const [replyTo, setReplyTo] = useState<string | null>(null);
 

@@ -38,10 +38,12 @@ const OCUPACIONES = [
 
 const MODALIDADES = ["Inmobiliaria", "Independiente"];
 
-const EXPERIENCIA_OPTIONS = [...Array(11).keys()].map((n) => ({
+const EXPERIENCIA_OPTIONS = [...Array(51).keys()].map((n) => ({
   label: `${n} años`,
   value: n.toString(),
 }));
+
+EXPERIENCIA_OPTIONS.push({ label: "+ 50 años", value: "50+" });
 
 export function ExternalAuthForm({
   pendingUser,

@@ -20,8 +20,8 @@ import {
 import ActionButtons from "../ActionButtons";
 
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
-import { useFeedInteractions, useViewTracking } from "@/hooks/hooks";
-import { useUserRecommendations } from "@/hooks/hooks/useUserRecommendations";
+import { useFeedInteractions, useViewTracking } from "@/hooks";
+import { useUserRecommendations } from "@/hooks/useUserRecommendations";
 import { SpecialPostCard } from "../Feed/SpecialPostCard";
 
 interface PostCardProps {
@@ -55,7 +55,7 @@ const PostCard: React.FC<PostCardProps> = ({
     isVisible: true,
   });
   const isSpecialPost =
-    ["openhouse", "aniversario", "sold"].includes(item.postType) ||
+    ["openhouse", "aniversario", "sold"].includes(item.postType ?? "") ||
     (item.postType === "busqueda" && !!item.postDetails?.busquedas_json);
 
   const images = item.images || [];

@@ -3,25 +3,24 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   RefreshControl,
   Modal,
   TextInput,
   FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { router } from "expo-router";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { FeedItem, User } from "../types";
 import PropertyDetail from "./Details/PropertyDetail";
 
 import { LeadPropertiesModal } from "./LeadPropertiesModal";
 import { AppHeader } from "./AppHeader";
-import { COLORS } from "../constants";
+import { COLORS, FALLBACKS } from "../constants";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
 
 export type MatchType = "coincidencia" | "similar";
@@ -73,13 +72,16 @@ interface LeadGroup {
   };
 }
 
-import { usePropertyFeedItems } from "../hooks/hooks/usePropertyFeedItems";
+import { usePropertyFeedItems } from "../hooks/usePropertyFeedItems";
 import { LeadMatchCard } from "./LeadMatchCard";
 // ... (keep existing imports)
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("Matches");
 
 const Matches: React.FC = () => {
   const { user } = useAuth();
-  const navigation = useNavigation<any>();
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [matches, setMatches] = useState<MatchData[]>([]);
@@ -181,8 +183,8 @@ const Matches: React.FC = () => {
 
       setMatches(data || []);
     } catch (error) {
-      console.error("Error fetching matches:", error);
-      Alert.alert("Error", "No se pudieron cargar los matches");
+      log.error("Error fetching matches:", error);
+      showToast("No se pudieron cargar los matches", "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -209,11 +211,11 @@ const Matches: React.FC = () => {
         .update({ activo: false })
         .eq("busqueda_id", busquedaId);
 
-      Alert.alert("Éxito", "Búsqueda eliminada correctamente");
+      showToast("Búsqueda eliminada correctamente", "success");
       fetchMatches(); // Recargar datos
     } catch (error) {
-      console.error("Error deleting search:", error);
-      Alert.alert("Error", "No se pudo eliminar la búsqueda");
+      log.error("Error deleting search:", error);
+      showToast("No se pudo eliminar la búsqueda", "error");
     }
   };
 
@@ -365,9 +367,7 @@ const Matches: React.FC = () => {
       }
 
       if (propertyImages.length === 0) {
-        propertyImages = [
-          "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1080&q=80",
-        ];
+        propertyImages = [FALLBACKS.PROPERTY_IMAGE_URL];
       }
 
       // Look up feed item data
@@ -493,7 +493,7 @@ const Matches: React.FC = () => {
       <AppHeader
         title="Matches"
         showBackButton
-        onBack={() => navigation.goBack()}
+        onBack={() => router.back()}
       />
 
       {/* Tabs Removed */}
@@ -567,7 +567,7 @@ const Matches: React.FC = () => {
           onClose={() => setSelectedLeadId(null)}
           leadName={selectedLead.leadName}
           leadPhone={selectedLead.leadPhone}
-          leadEmail={selectedLead.leadEmail}
+          leadEmail={selectedLead.leadEmail ?? ""}
           busquedaId={selectedLead.busquedaId}
           coincidences={selectedLead.coincidences}
           similars={selectedLead.similars}
@@ -576,7 +576,7 @@ const Matches: React.FC = () => {
             setSelectedPropertyId(propertyId);
           }}
           onUserClick={(user) => {
-            navigation.navigate("user/[id]", { id: user.id });
+            router.push({ pathname: "/user/[id]", params: { id: user.id } });
           }}
           onDeleteSearch={handleDeleteSearch}
           currentUserId={user?.id}
@@ -588,9 +588,6 @@ const Matches: React.FC = () => {
         <Modal visible={!!selectedPropertyId} animationType="slide">
           <PropertyDetail
             propertyId={selectedPropertyId}
-            navigation={{
-              goBack: () => setSelectedPropertyId(null),
-            }}
           />
         </Modal>
       )}

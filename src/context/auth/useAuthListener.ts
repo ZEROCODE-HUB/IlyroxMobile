@@ -12,6 +12,9 @@ import { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { perfiles } from "../../types";
 import { OneSignal } from "react-native-onesignal";
 import { Platform } from "react-native";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("auth-listener");
 
 interface UseAuthListenerProps {
   onSessionChange: (session: Session | null) => void;
@@ -28,8 +31,6 @@ export const useAuthListener = ({
   onLoadingChange,
   loadProfile,
 }: UseAuthListenerProps) => {
-  // Ref para la suscripción de Realtime (DESHABILITADO)
-  const profileSubscriptionRef = useRef<any>(null);
   const currentUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -39,54 +40,38 @@ export const useAuthListener = ({
      * Inicializar autenticación
      */
     const initAuth = async () => {
-      // Timeout de emergencia
+      // Timeout de emergencia — solo fallback si todo lo demás falla
       const emergencyTimeoutId = setTimeout(() => {
         if (mounted) {
-          console.warn(
-            "⏰ Auth init emergency timeout (15s), forcing loading false",
-          );
+          log.warn("Auth init emergency timeout (20s), forcing loading false");
           onLoadingChange(false);
         }
-      }, 15000);
+      }, 20000);
 
       try {
-        // Obtener sesión con timeout
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Session timeout")), 8000);
-        });
+        // Obtener sesión — sin timeout agresivo, onAuthStateChange maneja el resto
+        const { data: { session }, error } = await supabase.auth.getSession();
 
-        const result = await Promise.race([sessionPromise, timeoutPromise]);
-        const {
-          data: { session },
-          error,
-        } = result;
-
-        clearTimeout(emergencyTimeoutId);
+        if (!mounted) return;
 
         if (error) {
-          console.error("❌ Error getting session:", error);
-          if (
-            error.message?.includes("expired") ||
-            error.message?.includes("invalid")
-          ) {
+          log.error("Error getting session:", error);
+          // Solo limpiar en errores reales (token inválido), no en timeouts de red
+          if (error.message?.includes("invalid") || error.message?.includes("expired")) {
             onSessionChange(null);
             onUserChange(null);
             onProfileChange(null);
           }
+          return;
         }
-
-        if (!mounted) return;
 
         // Verificar expiración
         if (session?.expires_at) {
           const expiresAt = session.expires_at * 1000;
-          const now = Date.now();
-          if (now >= expiresAt) {
+          if (Date.now() >= expiresAt) {
             onSessionChange(null);
             onUserChange(null);
             onProfileChange(null);
-            onLoadingChange(false);
             return;
           }
         }
@@ -96,107 +81,31 @@ export const useAuthListener = ({
 
         if (session?.user) {
           if (Platform.OS !== "web") OneSignal.login(session.user.id);
+
+          try {
+            const profileData = await loadProfile(session.user.id);
+            if (mounted) {
+              onProfileChange(profileData);
+              currentUserIdRef.current = session.user.id;
+            }
+          } catch (profileErr) {
+            log.error("Error loading profile:", profileErr);
+            if (mounted) onProfileChange(null);
+          }
         } else {
+          onProfileChange(null);
           if (Platform.OS !== "web") {
             OneSignal.User.removeAlias("external_id");
             OneSignal.logout();
           }
         }
-
-        // Cargar perfil si hay usuario
-        if (session?.user) {
-          try {
-            const profilePromise = loadProfile(session.user.id);
-            const profileTimeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error("Profile load timeout")), 8000);
-            });
-
-            const profileData = (await Promise.race([
-              profilePromise,
-              profileTimeoutPromise,
-            ])) as perfiles | null;
-
-            if (mounted) {
-              onProfileChange(profileData);
-              // ✅ REALTIME DESHABILITADO - No se crea suscripción
-              currentUserIdRef.current = session.user.id;
-            }
-          } catch (profileErr) {
-            console.error("❌ Error loading profile:", profileErr);
-            if (mounted) {
-              onProfileChange(null);
-            }
-          }
-        } else {
-          onProfileChange(null);
-        }
       } catch (err: any) {
-        console.error("❌ Unexpected error during auth init:", err);
-        if (
-          err.message?.includes("timeout") ||
-          err.message?.includes("Network")
-        ) {
-          onSessionChange(null);
-          onUserChange(null);
-          onProfileChange(null);
-        }
+        log.error("Unexpected error during auth init:", err);
       } finally {
-        if (mounted) {
-          onLoadingChange(false);
-        }
+        clearTimeout(emergencyTimeoutId);
+        if (mounted) onLoadingChange(false);
       }
     };
-    /*
-    const setupProfileSubscription = async (userId: string) => {
-      // Si ya existe una suscripción para este usuario, no crear otra
-      if (profileSubscriptionRef.current && currentUserIdRef.current === userId) {
-        console.log("✅ Profile subscription already exists for", userId.substring(0, 8));
-        return;
-      }
-
-      // Limpiar suscripción anterior si existe
-      await cleanupProfileSubscription();
-
-      console.log("📡 Setting up profile subscription for", userId.substring(0, 8));
-
-      profileSubscriptionRef.current = supabase
-        .channel(`profile-updates-${userId}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "perfiles",
-            filter: `id=eq.${userId}`,
-          },
-          (payload) => {
-            console.log("🔄 Profile updated via Realtime");
-            const updatedProfile = payload.new as perfiles;
-            onProfileChange(updatedProfile);
-          }
-        )
-        .subscribe((status) => {
-          console.log("📡 Subscription status:", status);
-        });
-
-      currentUserIdRef.current = userId;
-    };
-    */
-    /*
-    const cleanupProfileSubscription = async () => {
-      if (profileSubscriptionRef.current) {
-        console.log("🧹 Cleaning up profile subscription");
-        try {
-          await supabase.removeChannel(profileSubscriptionRef.current);
-        } catch (err) {
-          console.warn("⚠️ Error removing channel:", err);
-        }
-        profileSubscriptionRef.current = null;
-        currentUserIdRef.current = null;
-      }
-    };
-    */
-
     /**
      * Manejar cambios de autenticación
      * FIX: Realtime deshabilitado
@@ -246,7 +155,7 @@ export const useAuthListener = ({
             // }
           }
         } catch (profileErr) {
-          console.error("❌ Error loading profile:", profileErr);
+          log.error("Error loading profile:", profileErr);
           if (mounted) {
             onProfileChange(null);
           }

@@ -58,47 +58,47 @@ export const PropertyMapCard: React.FC<PropertyMapCardProps> = ({
           </Text>
         </View>
         <View style={styles.statsRow}>
-          {(property.features?.beds || (property as any).habitaciones) ? (
+          {(property.features?.beds || property.habitaciones) ? (
             <View style={styles.statItem}>
               <Ionicons name="bed-outline" size={14} color={COLORS.textTertiary} />
               <Text style={styles.statValue}>
-                {property.features?.beds || (property as any).habitaciones}
+                {property.features?.beds || property.habitaciones}
               </Text>
             </View>
           ) : null}
 
-          {(property.features?.baths || (property as any).banos) ? (
+          {(property.features?.baths || property.banos) ? (
             <View style={styles.statItem}>
               <Bath size={12} color={COLORS.textTertiary} />
               <Text style={styles.statValue}>
-                {property.features?.baths || (property as any).banos}
+                {property.features?.baths || property.banos}
               </Text>
             </View>
           ) : null}
 
-          {(property.features?.parking !== undefined || (property as any).estacionamientos !== undefined) ? (
+          {(property.features?.parking !== undefined || property.estacionamientos !== undefined) ? (
             <View style={styles.statItem}>
               <Ionicons name="car-outline" size={14} color={COLORS.textTertiary} />
               <Text style={styles.statValue}>
-                {property.features?.parking ?? (property as any).estacionamientos}
+                {property.features?.parking ?? property.estacionamientos}
               </Text>
             </View>
           ) : null}
 
-          {(property.features?.constructionSqft || (property as any).metros_construccion) ? (
+          {(property.features?.constructionSqft || property.metros_construccion) ? (
             <View style={styles.statItem}>
               <Ionicons name="home-outline" size={14} color={COLORS.textTertiary} />
               <Text style={styles.statValue}>
-                {property.features?.constructionSqft || (property as any).metros_construccion}m²
+                {property.features?.constructionSqft || property.metros_construccion}m²
               </Text>
             </View>
           ) : null}
 
-          {(property.features?.landSqft || (property as any).metros_terreno) ? (
+          {(property.features?.landSqft || property.metros_terreno) ? (
             <View style={[styles.statItem, { borderRightWidth: 0 }]}>
               <Ionicons name="resize-outline" size={14} color={COLORS.textTertiary} />
               <Text style={styles.statValue}>
-                {property.features?.landSqft || (property as any).metros_terreno}m²
+                {property.features?.landSqft || property.metros_terreno}m²
               </Text>
             </View>
           ) : null}

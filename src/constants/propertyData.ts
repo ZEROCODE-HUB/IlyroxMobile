@@ -153,16 +153,28 @@ export const getLabelRecamaras = (tipoPrincipal: TipoPrincipal): string => {
   return esComercialIndustrial(tipoPrincipal) ? "Espacios" : "Recámaras";
 };
 
+// ============================================
+// CAMPOS ESPECIALIZADOS POR TIPO
+// ============================================
+export const TIPOS_AGUA = ['Pozo', 'Riego', 'Presa', 'Canal', 'Otro'] as const;
+export const USOS_TERRENO = ['Agrícola', 'Ganadero'] as const;
+export const TIPOS_RIEGO = ['Temporal', 'Riego', 'Mixto'] as const;
+export const TIPOS_UBICACION_COMERCIAL = ['Dentro de plaza', 'Fuera de plaza'] as const;
+export const TIPOS_UBICACION_INDUSTRIAL = ['Dentro de parque', 'Fuera de parque'] as const;
+export const ALTURAS_LIBRES = ['4-6m', '6-8m', '8-10m', '10-12m', '+12m'] as const;
+export const TIPOS_ENERGIA_KVA = ['Trifásica 25 kVA', 'Trifásica 45 kVA', 'Trifásica 150 kVA', 'Más de 150 kVA'] as const;
+
 /**
- * Define qué campos mostrar según el subtipo
+ * Define qué campos mostrar según el subtipo y tipo principal
  */
-export const getCamposVisibles = (subtipo: string | string[]) => {
+export const getCamposVisibles = (subtipo: string | string[], tipoPrincipal?: TipoPrincipal) => {
   const isTerreno = esTerreno(subtipo);
   const isDepartamento = esDepartamento(subtipo);
+  const isIndustrial = tipoPrincipal === "industrial";
 
   return {
     // Características numéricas
-    recamaras: !isTerreno,
+    recamaras: !isTerreno && !isIndustrial,
     banos: !isTerreno,
     mediosBanos: !isTerreno,
     estacionamientos: !isTerreno,
@@ -176,5 +188,10 @@ export const getCamposVisibles = (subtipo: string | string[]) => {
     // Características adicionales
     amueblado: !isTerreno,
     petFriendly: !isTerreno,
+
+    // Secciones completas
+    amenidades: !isTerreno,
+    gravamen: true,
+    financiamiento: true,
   };
 };

@@ -4,21 +4,30 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
 } from "react-native";
 import { FlatList } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
-import { AppInput } from "../design-system/components/AppInput";
 import { COLORS } from "../constants/colors";
-import { LocationSuggestion } from "../lib/locationService";
 import {
   useLocationSearchStore,
   LocationSuggestionWithCount,
 } from "../store/locationSearchStore";
+
+interface PropertyCodeSuggestion {
+  type: "property_code";
+  name: string;
+  propertyId: string;
+  subtipo: string;
+  municipio: string;
+  fotos?: string[];
+}
+
+type SearchSuggestion = LocationSuggestionWithCount | PropertyCodeSuggestion;
 import { useRouter } from "expo-router";
 import { supabase } from "../lib/supabase";
 import { Image } from "expo-image";
 import { useApp } from "@/context/AppContext";
+import SearchOverlay from "./search/SearchOverlay";
 
 interface LocationSearchBarProps {
   onLocationSelect: (location: LocationSuggestionWithCount | null) => void;
@@ -41,11 +50,12 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
 }) => {
   const [query, setQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [propertySuggestions, setPropertySuggestions] = useState<any[]>([]);
+  const [propertySuggestions, setPropertySuggestions] = useState<PropertyCodeSuggestion[]>([]);
+  const [showSearchOverlay, setShowSearchOverlay] = useState(false);
   const { selectedLocation } = useApp();
 
   const router = useRouter();
-  const { suggestions, isLoading, searchLocations, clearSuggestions } =
+  const { suggestions, isLoading, searchLocations } =
     useLocationSearchStore();
 
   // Buscar ubicaciones con debounce
@@ -102,7 +112,7 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
     }
   }, [isHeaderVisible]);
 
-  const handleSelectLocation = (location: any) => {
+  const handleSelectLocation = (location: SearchSuggestion) => {
     if (location.type === "property_code") {
       setShowSuggestions(false);
       router.push({
@@ -114,22 +124,6 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
     setQuery(location.name);
     setShowSuggestions(false);
     onLocationSelect(location as LocationSuggestionWithCount);
-  };
-
-  const handleClearSearch = () => {
-    setQuery("");
-    setShowSuggestions(false);
-    setPropertySuggestions([]);
-    clearSuggestions();
-    onLocationSelect(null);
-  };
-
-  const handleChangeText = (text: string) => {
-    setQuery(text);
-    setShowSuggestions(!!text.trim());
-    if (!text.trim()) {
-      onLocationSelect(null);
-    }
   };
 
   const getIconName = (type: string) => {
@@ -149,40 +143,21 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
 
   return (
     <>
+      <SearchOverlay
+        visible={showSearchOverlay}
+        onClose={() => setShowSearchOverlay(false)}
+        initialQuery={query}
+      />
+
       <View style={styles.inputRow}>
-        <AppInput
-          containerStyle={[styles.searchWrapper, containerStyle]}
-          placeholder="Ingresa una ubicación..."
-          value={query}
-          onChangeText={handleChangeText}
-          onFocus={() => {
-            if (query.trim()) setShowSuggestions(true);
-          }}
-          onBlur={() => {
-            // Delay para permitir el click en sugerencias
-            setTimeout(() => setShowSuggestions(false), 200);
-          }}
-          autoCorrect={false}
-          autoCapitalize="words"
-          returnKeyType="search"
-          rightIcon={
-            query.length > 0 ? (
-              <TouchableOpacity onPress={handleClearSearch}>
-                <Ionicons
-                  name="close-circle-outline"
-                  size={22}
-                  color={COLORS.textTertiary}
-                />
-              </TouchableOpacity>
-            ) : (
-              <Ionicons
-                name="search-outline"
-                size={22}
-                color={COLORS.textTertiary}
-              />
-            )
-          }
-        />
+        <TouchableOpacity
+          style={[styles.searchButton, containerStyle]}
+          onPress={() => setShowSearchOverlay(true)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="search-outline" size={18} color={COLORS.textTertiary} />
+          <Text style={styles.searchButtonText}>Buscar usuarios, posts, reels...</Text>
+        </TouchableOpacity>
 
         {showMapButton && !showSuggestions && selectedLocation && (
           <TouchableOpacity
@@ -200,10 +175,10 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
           pointerEvents="auto"
           style={[styles.suggestionsContainer, { top: topOffset }]}
         >
-          <FlatList
+          <FlatList<SearchSuggestion>
             data={[...propertySuggestions, ...suggestions]}
             keyExtractor={(item, index) =>
-              `${(item as any).type}-${(item as any).name}-${index}`
+              `${item.type}-${item.name}-${index}`
             }
             keyboardShouldPersistTaps="always"
             nestedScrollEnabled={true}
@@ -226,22 +201,22 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
                   <Text style={styles.suggestionType}>Propiedad</Text>
                   {item.type === "colonia" && (
                     <Text style={styles.propertyCountText}>
-                      {(item as any).municipio_nombre
-                        ? `${(item as any).municipio_nombre} • `
+                      {item.municipio_nombre
+                        ? `${item.municipio_nombre} • `
                         : ""}
-                      {(item as any).propertyCount || 0}{" "}
-                      {(item as any).propertyCount === 1
+                      {item.propertyCount || 0}{" "}
+                      {item.propertyCount === 1
                         ? "propiedad"
                         : "propiedades"}
                     </Text>
                   )}
                   {item.type === "property_code" && (
                     <Text style={styles.propertyCountText}>
-                      {(item as any).subtipo} • {(item as any).municipio}
+                      {item.subtipo} • {item.municipio}
                     </Text>
                   )}
                 </View>
-                {item.fotos && item.fotos.length > 0 && (
+                {item.type === "property_code" && item.fotos && item.fotos.length > 0 && (
                   <View style={styles.suggestionImageContainer}>
                     <Image
                       source={item.fotos[0]}
@@ -285,6 +260,23 @@ const styles = StyleSheet.create({
   searchWrapper: {
     flex: 1,
     marginBottom: 0,
+  },
+  searchButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  searchButtonText: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.textSecondary,
   },
   inputRow: {
     flexDirection: "row",

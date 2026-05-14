@@ -12,7 +12,7 @@ import {
 import { VideoView, useVideoPlayer as useExpoVideoPlayer } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { FeedItem, User } from "../../types";
-import { COLORS } from "../../constants";
+import { COLORS, FALLBACKS } from "../../constants";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import ActionButtons from "../ActionButtons";
 import { Avatar } from "../shared";
@@ -143,7 +143,7 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
   const handleToggle = useCallback(() => toggleRef.current(), []);
 
   const videoSource =
-    item.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
+    item.videoUrl || FALLBACKS.VIDEO_URL;
   const SAFE_BOTTOM = Platform.OS === "ios" ? 34 : 20;
 
   const handlePlayingChange = useCallback((v: boolean) => setIsPlaying(v), []);

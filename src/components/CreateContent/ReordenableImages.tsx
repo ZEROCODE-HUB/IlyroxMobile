@@ -111,7 +111,7 @@ export default function ReordenableImages({
 
               {!isActive && (
                 <View style={styles.dragHint}>
-                  <Ionicons name="move" size={12} color="#FFF" />
+                  <Ionicons name="move" size={12} color={COLORS.white} />
                 </View>
               )}
 
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.cardBorder,
   },
   imageContainerActive: {
-    shadowColor: "#000",
+    shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.4,
     shadowRadius: 15,
@@ -239,10 +239,10 @@ const styles = StyleSheet.create({
     zIndex: 30,
   },
   removeButton: {
-    backgroundColor: "#FFF",
+    backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 2,
-    shadowColor: "#000",
+    shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,

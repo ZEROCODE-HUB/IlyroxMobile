@@ -11,6 +11,8 @@ import {
 import { User } from "../types";
 import Avatar from "./shared/Avatar";
 import { COLORS } from "../constants/colors";
+import { formatDateShort, formatTime } from "../utils/dateFormatter";
+import { EmptyState } from "@/design-system/components";
 import { supabase } from "../lib/supabase";
 
 interface UserHeaderProps {
@@ -127,18 +129,9 @@ const UserHeader: React.FC<UserHeaderProps> = ({
             </View>
           </View>
           <Text style={styles.timestamp}>
-            {isNaN(new Date(timestamp).getTime()) ? (
-              `${timestamp} ${user.role}`
-            ) : (
-              <>
-                {new Date(timestamp).toLocaleDateString("es-MX", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })}{" "}
-                • {user.role}
-              </>
-            )}
+            {isNaN(new Date(timestamp).getTime())
+              ? timestamp
+              : `${formatDateShort(timestamp)}, ${formatTime(timestamp)}`}
           </Text>
           {showRecommendedPreview && positiveRecommendations > 0 && (
             <TouchableOpacity
@@ -221,11 +214,7 @@ const UserHeader: React.FC<UserHeaderProps> = ({
                     </View>
                   )}
                   ListEmptyComponent={
-                    <View style={styles.recommendedModalEmpty}>
-                      <Text style={styles.recommendedModalEmptyText}>
-                        Aún no hay recomendaciones
-                      </Text>
-                    </View>
+                    <EmptyState title="Aún no hay recomendaciones" />
                   }
                 />
               )}

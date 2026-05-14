@@ -8,20 +8,17 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
-  ActivityIndicator,
-  FlatList,
   Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FeedItem, User } from "../../types";
-import { useFeedInteractions, useViewTracking } from "@/hooks/hooks";
+import { useFeedInteractions, useViewTracking } from "@/hooks";
 import { DIMENSIONS, COLORS } from "../../constants";
 import { commonStyles } from "../../../styles";
 import { UserHeader, VideoPlayer, Avatar, ExpandableText } from "../shared";
 import ActionButtons from "../ActionButtons";
 // import { supabase } from "../../lib/supabase";
-import { useUserRecommendations } from "@/hooks/hooks/useUserRecommendations";
+import { useUserRecommendations } from "@/hooks/useUserRecommendations";
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
 import { useApp } from "../../context/AppContext";
 
@@ -42,7 +39,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
   isVisible = false,
   currentUserId,
 }) => {
-  const { showOptions, showReportModal, setShowOptions, setShowReportModal } =
+  const { showOptions, setShowOptions, setShowReportModal } =
     useFeedInteractions();
   // Hook de view tracking
   const { trackInteraction } = useViewTracking({

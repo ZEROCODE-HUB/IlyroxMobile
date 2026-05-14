@@ -6,7 +6,7 @@ import {
   ScrollView,
   StyleSheet,
 } from "react-native";
-import { BaseChartProps, SearchByGenderData } from "./types";
+import { BaseChartProps } from "./types";
 import { COLORS } from "../../constants/colors";
 
 interface Chart05Props extends BaseChartProps {
