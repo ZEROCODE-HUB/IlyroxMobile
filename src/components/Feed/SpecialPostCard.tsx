@@ -378,6 +378,10 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
     const isDetail = mode === "detail";
     const f = busquedas_json.filtros ?? {};
 
+    // Operación (venta/renta)
+    const operacion: string =
+      typeof f.operacion === "string" ? f.operacion.toLowerCase() : "";
+
     // Título grande: subtipo principal o tipo_propiedad
     const subtipoArr: string[] = Array.isArray(f.subtipo) ? f.subtipo : [];
     const rawTipo = subtipoArr[0] || f.tipo_propiedad || "Propiedad";
@@ -401,11 +405,22 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
       ? f.zonas_interes
       : [];
 
+    // Colonias múltiples (nuevo schema) o legacy (string)
+    const coloniasArr: string[] = Array.isArray(f.ubicacion?.colonias)
+      ? f.ubicacion.colonias.filter(
+          (c: unknown) => typeof c === "string" && (c as string).trim().length > 0,
+        )
+      : typeof f.ubicacion?.colonia === "string" && f.ubicacion.colonia.trim()
+        ? [f.ubicacion.colonia]
+        : [];
+
     // Fallback de ubicación: si no hay zonas pero sí hay ubicacion explícita, mostrarla como un chip
     const ubicacionFallback = !zonas.length
-      ? [f.ubicacion?.ciudad, f.ubicacion?.colonia, f.ubicacion?.municipio, f.ubicacion?.estado]
-          .filter((s) => typeof s === "string" && s.trim().length > 0)
-          .slice(0, 1)
+      ? coloniasArr.length > 0
+        ? [coloniasArr.join(", ")]
+        : [f.ubicacion?.ciudad, f.ubicacion?.municipio, f.ubicacion?.estado]
+            .filter((s) => typeof s === "string" && s.trim().length > 0)
+            .slice(0, 1)
       : [];
 
     const habitaciones = f.caracteristicas?.habitaciones;
@@ -420,10 +435,17 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
             isDetail && styles.searchPostDetail,
           ]}
         >
-          {/* Chip SE BUSCA */}
+          {/* Chip SE BUSCA + Operación */}
           <View style={styles.busquedaTagRow}>
             <Ionicons name="search-outline" size={14} color={COLORS.primary} />
             <Text style={styles.busquedaTagText}>SE BUSCA</Text>
+            {operacion === "venta" || operacion === "renta" ? (
+              <View style={styles.operacionChip}>
+                <Text style={styles.operacionChipText}>
+                  {operacion === "venta" ? "EN VENTA" : "EN RENTA"}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           {/* Título grande */}
@@ -792,6 +814,19 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: COLORS.primary,
     letterSpacing: 1.2,
+  },
+  operacionChip: {
+    marginLeft: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: COLORS.primary,
+  },
+  operacionChipText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: COLORS.white,
+    letterSpacing: 0.8,
   },
   busquedaTitulo: {
     fontSize: 24,

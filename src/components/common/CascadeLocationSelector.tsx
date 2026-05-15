@@ -10,6 +10,7 @@ interface LocationData {
   ciudad: string;
   municipio: string;
   colonia: string;
+  colonias?: string[];
   latitud?: number;
   longitud?: number;
 }
@@ -19,6 +20,7 @@ interface CascadeLocationSelectorProps {
   onChange: (data: LocationData) => void;
   showColonia?: boolean;
   isMandatory?: boolean;
+  multiColonia?: boolean;
 }
 
 export default function CascadeLocationSelector({
@@ -26,6 +28,7 @@ export default function CascadeLocationSelector({
   onChange,
   showColonia = false,
   isMandatory = true,
+  multiColonia = false,
 }: CascadeLocationSelectorProps) {
   // We need to match existing string values to IDs or just allow selection
   const [estadoLabel, setEstadoLabel] = useState(initialData?.estado || "");
@@ -33,6 +36,13 @@ export default function CascadeLocationSelector({
     initialData?.municipio || "",
   );
   const [coloniaLabel, setColoniaLabel] = useState(initialData?.colonia || "");
+  const [coloniaLabels, setColoniaLabels] = useState<string[]>(
+    Array.isArray(initialData?.colonias) && initialData!.colonias!.length > 0
+      ? initialData!.colonias!
+      : initialData?.colonia
+        ? [initialData.colonia]
+        : [],
+  );
 
   const [estadoId, setEstadoId] = useState("");
   const [municipioId, setMunicipioId] = useState("");
@@ -59,14 +69,25 @@ export default function CascadeLocationSelector({
   // Sync with asynchronous updates to initialData (when editing a property)
   useEffect(() => {
     if (initialData) {
-      const { estado, municipio, colonia, latitud: initLat, longitud: initLng } = initialData;
+      const { estado, municipio, colonia, colonias, latitud: initLat, longitud: initLng } = initialData;
       if (estado !== undefined && estado !== estadoLabel) setEstadoLabel(estado);
       if (municipio !== undefined && municipio !== municipioLabel) setMunicipioLabel(municipio);
       if (colonia !== undefined && colonia !== coloniaLabel) setColoniaLabel(colonia);
+      if (multiColonia) {
+        const incoming = Array.isArray(colonias) && colonias.length > 0
+          ? colonias
+          : colonia
+            ? [colonia]
+            : [];
+        const equal =
+          incoming.length === coloniaLabels.length &&
+          incoming.every((c, i) => c === coloniaLabels[i]);
+        if (!equal && incoming.length > 0) setColoniaLabels(incoming);
+      }
       if (initLat !== undefined && initLat !== latitud) setLatitud(initLat);
       if (initLng !== undefined && initLng !== longitud) setLongitud(initLng);
     }
-  }, [initialData?.estado, initialData?.municipio, initialData?.colonia]);
+  }, [initialData?.estado, initialData?.municipio, initialData?.colonia, initialData?.colonias]);
 
   // Modals visibility
   const [showEstadoModal, setShowEstadoModal] = useState(false);
@@ -117,15 +138,19 @@ export default function CascadeLocationSelector({
 
   // Handle onChange
   useEffect(() => {
+    const primaryColonia = multiColonia
+      ? coloniaLabels[0] ?? ""
+      : coloniaLabel;
     onChange({
       estado: estadoLabel,
       ciudad: "", // Ciudad is removed, keeping empty string.
       municipio: municipioLabel,
-      colonia: coloniaLabel,
+      colonia: primaryColonia,
+      colonias: multiColonia ? coloniaLabels : primaryColonia ? [primaryColonia] : [],
       latitud,
       longitud,
     });
-  }, [estadoLabel, municipioLabel, coloniaLabel, latitud, longitud]);
+  }, [estadoLabel, municipioLabel, coloniaLabel, coloniaLabels, latitud, longitud, multiColonia]);
 
   // SIMPLE ID RESOLUTION (For editing mode)
   // When options are loaded, if we have a label but no ID, find the ID.
@@ -180,6 +205,7 @@ export default function CascadeLocationSelector({
       if (valId !== municipioId) {
         setColoniaId("");
         setColoniaLabel("");
+        setColoniaLabels([]);
       }
     }
   };
@@ -187,15 +213,25 @@ export default function CascadeLocationSelector({
   const handleColoniaSelect = (valId: string) => {
     const selected = colonias.find((c) => c.value === valId);
     if (selected) {
-      setColoniaId(valId);
       // Remove text after " - " which was added for label context
       const nameOnly = selected.label.split(" - ")[0] || selected.label;
-      setColoniaLabel(nameOnly);
+      if (multiColonia) {
+        setColoniaLabels((prev) =>
+          prev.includes(nameOnly) ? prev : [...prev, nameOnly],
+        );
+      } else {
+        setColoniaId(valId);
+        setColoniaLabel(nameOnly);
+      }
       if (selected.latitud && selected.longitud) {
         setLatitud(selected.latitud);
         setLongitud(selected.longitud);
       }
     }
+  };
+
+  const handleRemoveColonia = (name: string) => {
+    setColoniaLabels((prev) => prev.filter((c) => c !== name));
   };
 
   return (
@@ -293,7 +329,9 @@ export default function CascadeLocationSelector({
       {showColonia && (
         <>
           <View style={styles.field}>
-            <Text style={styles.label}>Colonia</Text>
+            <Text style={styles.label}>
+              {multiColonia ? "Colonias" : "Colonia"}
+            </Text>
             <TouchableOpacity
               style={[styles.selector, !municipioId && styles.selectorDisabled]}
               onPress={() => {
@@ -305,7 +343,7 @@ export default function CascadeLocationSelector({
             >
               <Text
                 style={
-                  coloniaLabel
+                  (multiColonia ? coloniaLabels.length > 0 : !!coloniaLabel)
                     ? styles.selectorText
                     : styles.selectorPlaceholder
                 }
@@ -316,7 +354,11 @@ export default function CascadeLocationSelector({
                     ? "Cargando..."
                     : colonias.length === 0
                       ? "No hay colonias disponibles"
-                      : coloniaLabel || "Selecciona una colonia..."}
+                      : multiColonia
+                        ? coloniaLabels.length > 0
+                          ? "Agregar otra colonia..."
+                          : "Selecciona una o más colonias..."
+                        : coloniaLabel || "Selecciona una colonia..."}
               </Text>
               <Ionicons
                 name="chevron-down"
@@ -324,6 +366,29 @@ export default function CascadeLocationSelector({
                 color={COLORS.textSecondary}
               />
             </TouchableOpacity>
+
+            {multiColonia && coloniaLabels.length > 0 && (
+              <View style={styles.coloniaChipsRow}>
+                {coloniaLabels.map((name) => (
+                  <View key={name} style={styles.coloniaChip}>
+                    <Text style={styles.coloniaChipText} numberOfLines={1}>
+                      {name}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => handleRemoveColonia(name)}
+                      hitSlop={8}
+                      style={styles.coloniaChipRemove}
+                    >
+                      <Ionicons
+                        name="close"
+                        size={14}
+                        color={COLORS.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
 
           <SelectionModal
@@ -332,7 +397,7 @@ export default function CascadeLocationSelector({
             onSelect={handleColoniaSelect}
             title="Selecciona una Colonia"
             options={colonias}
-            currentValue={coloniaId}
+            currentValue={multiColonia ? "" : coloniaId}
             searchable
           />
         </>
@@ -381,5 +446,31 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.primary,
     flex: 1,
+  },
+  coloniaChipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 10,
+  },
+  coloniaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: COLORS.primaryTransparent,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  coloniaChipText: {
+    fontSize: 13,
+    color: COLORS.textPrimary,
+    fontWeight: "500",
+    maxWidth: 160,
+  },
+  coloniaChipRemove: {
+    paddingLeft: 2,
   },
 });

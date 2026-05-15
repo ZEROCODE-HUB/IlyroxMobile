@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { COLORS } from "@/constants";
 import { useModal } from "@/context/ModalContext";
 import { Avatar } from "../shared";
@@ -47,6 +48,14 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
     onContactInternal(profile);
   };
 
+  const handleProfilePress = () => {
+    if (!profile?.id) return;
+    router.push({
+      pathname: "/(stack)/user/[id]",
+      params: { id: profile.id },
+    });
+  };
+
   const handleCall = () => {
     const phone = `${profile.prefijo_celular || ""}${profile.celular || ""}`;
     if (phone && phone.trim().length > 0) {
@@ -63,7 +72,11 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
 
   return (
     <>
-      <View style={styles.profileSection}>
+      <TouchableOpacity
+        style={styles.profileSection}
+        onPress={handleProfilePress}
+        activeOpacity={0.7}
+      >
         <Avatar
           uri={profile.foto}
           name={profile.nombre}
@@ -87,7 +100,7 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
             />
           </TouchableOpacity>
         )}
-      </View>
+      </TouchableOpacity>
 
       {isOwnProperty ? (
         <TouchableOpacity

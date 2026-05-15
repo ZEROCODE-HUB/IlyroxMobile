@@ -2,7 +2,18 @@ import { COLORS } from "@/constants/colors";
 import { PROPERTY_TYPES } from "@/constants/propertyData";
 import { AppInput } from "@/design-system/components/AppInput";
 import { Post } from "@/types";
+import CascadeLocationSelector from "@/components/common/CascadeLocationSelector";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+interface LocationData {
+  estado: string;
+  ciudad: string;
+  municipio: string;
+  colonia: string;
+  colonias?: string[];
+  latitud?: number;
+  longitud?: number;
+}
 
 interface BusquedaPostProps {
   post: Post;
@@ -16,13 +27,44 @@ interface BusquedaPostProps {
   setOperacion: (val: string) => void;
   subtipo: string[];
   setSubtipo: (val: string[]) => void;
-  tipoPropiedad?: string;
+  tipoPropiedad: string;
+  setTipoPropiedad: (val: string) => void;
+  moneda: string;
+  setMoneda: (val: string) => void;
+  banos: string;
+  setBanos: (val: string) => void;
+  estacionamientos: string;
+  setEstacionamientos: (val: string) => void;
+  niveles: string;
+  setNiveles: (val: string) => void;
+  antiguedad: string;
+  setAntiguedad: (val: string) => void;
+  m2Terreno: string;
+  setM2Terreno: (val: string) => void;
+  m2Construccion: string;
+  setM2Construccion: (val: string) => void;
+  locationData: LocationData | null;
+  setLocationData: (data: LocationData) => void;
+  nota: string;
+  setNota: (val: string) => void;
 }
 
 const OPERACION_OPTIONS = ["venta", "renta"] as const;
+const MONEDA_OPTIONS = ["MXN", "USD"] as const;
+const TIPO_PROPIEDAD_OPTIONS = Object.keys(PROPERTY_TYPES) as Array<
+  keyof typeof PROPERTY_TYPES
+>;
+
+const handleCurrencyChange = (text: string, setter: (val: string) => void) => {
+  const rawValue = text.replace(/,/g, "");
+  if (/^\d*\.?\d*$/.test(rawValue)) {
+    const parts = rawValue.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    setter(parts.join("."));
+  }
+};
 
 export const BusquedaPost = ({
-  post,
   precioMin,
   setPrecioMin,
   precioMax,
@@ -34,6 +76,25 @@ export const BusquedaPost = ({
   subtipo,
   setSubtipo,
   tipoPropiedad,
+  setTipoPropiedad,
+  moneda,
+  setMoneda,
+  banos,
+  setBanos,
+  estacionamientos,
+  setEstacionamientos,
+  niveles,
+  setNiveles,
+  antiguedad,
+  setAntiguedad,
+  m2Terreno,
+  setM2Terreno,
+  m2Construccion,
+  setM2Construccion,
+  locationData,
+  setLocationData,
+  nota,
+  setNota,
 }: BusquedaPostProps) => {
   const subtipoOptions =
     (PROPERTY_TYPES as Record<string, readonly string[]>)[tipoPropiedad ?? ""] ?? [];
@@ -44,96 +105,246 @@ export const BusquedaPost = ({
     );
   };
 
-  const handleCurrencyChange = (text: string, setter: (val: string) => void) => {
-    const rawValue = text.replace(/,/g, "");
-    if (/^\d*\.?\d*$/.test(rawValue)) {
-      const parts = rawValue.split(".");
-      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-      setter(parts.join("."));
+  const handleTipoPropiedadSelect = (val: string) => {
+    if (val === tipoPropiedad) {
+      setTipoPropiedad("");
+      setSubtipo([]);
+    } else {
+      setTipoPropiedad(val);
+      setSubtipo([]);
     }
   };
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.label}>Parámetros de Búsqueda</Text>
+    <View style={{ gap: 12 }}>
+      {/* Parámetros principales */}
+      <View style={styles.card}>
+        <Text style={styles.label}>Parámetros de Búsqueda</Text>
 
-      <View style={{ marginTop: 12, gap: 16 }}>
-        {/* Operación */}
-        <View>
-          <Text style={styles.fieldLabel}>Operación</Text>
-          <View style={styles.chipsRow}>
-            {OPERACION_OPTIONS.map((op) => {
-              const active = operacion.toLowerCase() === op;
-              return (
-                <TouchableOpacity
-                  key={op}
-                  style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => setOperacion(active ? "" : op)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {op.charAt(0).toUpperCase() + op.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Subtipo */}
-        {subtipoOptions.length > 0 && (
+        <View style={{ marginTop: 12, gap: 16 }}>
+          {/* Operación */}
           <View>
-            <Text style={styles.fieldLabel}>Tipo de inmueble</Text>
+            <Text style={styles.fieldLabel}>Operación</Text>
             <View style={styles.chipsRow}>
-              {subtipoOptions.map((opt) => {
-                const active = subtipo.includes(opt);
+              {OPERACION_OPTIONS.map((op) => {
+                const active = operacion.toLowerCase() === op;
                 return (
                   <TouchableOpacity
-                    key={opt}
+                    key={op}
                     style={[styles.chip, active && styles.chipActive]}
-                    onPress={() => toggleSubtipo(opt)}
+                    onPress={() => setOperacion(active ? "" : op)}
                     activeOpacity={0.75}
                   >
                     <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {opt}
+                      {op.charAt(0).toUpperCase() + op.slice(1)}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
           </View>
-        )}
 
-        {/* Precios */}
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          <View style={{ flex: 1 }}>
-            <AppInput
-              label="Precio Mínimo"
-              placeholder="Ej. 1,000,000"
-              keyboardType="numeric"
-              value={precioMin}
-              onChangeText={(t) => handleCurrencyChange(t, setPrecioMin)}
-            />
+          {/* Tipo de propiedad */}
+          <View>
+            <Text style={styles.fieldLabel}>Tipo de propiedad</Text>
+            <View style={styles.chipsRow}>
+              {TIPO_PROPIEDAD_OPTIONS.map((opt) => {
+                const active = tipoPropiedad === opt;
+                return (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.chip, active && styles.chipActive]}
+                    onPress={() => handleTipoPropiedadSelect(opt)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
+
+          {/* Subtipo */}
+          {subtipoOptions.length > 0 && (
+            <View>
+              <Text style={styles.fieldLabel}>Tipo de inmueble</Text>
+              <View style={styles.chipsRow}>
+                {subtipoOptions.map((opt) => {
+                  const active = subtipo.includes(opt);
+                  return (
+                    <TouchableOpacity
+                      key={opt}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => toggleSubtipo(opt)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {opt}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Moneda */}
+          <View>
+            <Text style={styles.fieldLabel}>Moneda</Text>
+            <View style={styles.chipsRow}>
+              {MONEDA_OPTIONS.map((m) => {
+                const active = moneda === m;
+                return (
+                  <TouchableOpacity
+                    key={m}
+                    style={[styles.chip, active && styles.chipActive]}
+                    onPress={() => setMoneda(m)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {m}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Precios */}
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <AppInput
+                label="Precio Mínimo"
+                placeholder="Ej. 1,000,000"
+                keyboardType="numeric"
+                value={precioMin}
+                onChangeText={(t) => handleCurrencyChange(t, setPrecioMin)}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppInput
+                label="Precio Máximo"
+                placeholder="Ej. 5,000,000"
+                keyboardType="numeric"
+                value={precioMax}
+                onChangeText={(t) => handleCurrencyChange(t, setPrecioMax)}
+              />
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Ubicación */}
+      <View style={styles.card}>
+        <Text style={styles.label}>Ubicación</Text>
+        <View style={{ marginTop: 12 }}>
+          <CascadeLocationSelector
+            isMandatory={false}
+            showColonia={true}
+            multiColonia={true}
+            initialData={locationData ?? undefined}
+            onChange={(data) => setLocationData(data)}
+          />
+        </View>
+      </View>
+
+      {/* Características */}
+      <View style={styles.card}>
+        <Text style={styles.label}>Características</Text>
+        <View style={{ marginTop: 12, gap: 10 }}>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <AppInput
+                label="Recámaras"
+                placeholder="Ej. 3"
+                keyboardType="numeric"
+                value={habitaciones}
+                onChangeText={setHabitaciones}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppInput
+                label="Baños"
+                placeholder="Ej. 2"
+                keyboardType="numeric"
+                value={banos}
+                onChangeText={setBanos}
+              />
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <AppInput
+                label="Estacionamientos"
+                placeholder="Ej. 2"
+                keyboardType="numeric"
+                value={estacionamientos}
+                onChangeText={setEstacionamientos}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppInput
+                label="Niveles"
+                placeholder="Ej. 2"
+                keyboardType="numeric"
+                value={niveles}
+                onChangeText={setNiveles}
+              />
+            </View>
+          </View>
+          <View>
             <AppInput
-              label="Precio Máximo"
-              placeholder="Ej. 5,000,000"
-              keyboardType="numeric"
-              value={precioMax}
-              onChangeText={(t) => handleCurrencyChange(t, setPrecioMax)}
+              label="Antigüedad"
+              placeholder="Ej. Nueva, 5 años, etc."
+              value={antiguedad}
+              onChangeText={setAntiguedad}
             />
           </View>
         </View>
+      </View>
 
-        {/* Habitaciones */}
-        <View style={{ width: "50%" }}>
+      {/* Superficies */}
+      <View style={styles.card}>
+        <Text style={styles.label}>Superficies</Text>
+        <View style={{ flexDirection: "row", gap: 12, marginTop: 12 }}>
+          <View style={{ flex: 1 }}>
+            <AppInput
+              label="m² Terreno (mín.)"
+              placeholder="Ej. 120"
+              keyboardType="numeric"
+              value={m2Terreno}
+              onChangeText={setM2Terreno}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <AppInput
+              label="m² Construcción (mín.)"
+              placeholder="Ej. 80"
+              keyboardType="numeric"
+              value={m2Construccion}
+              onChangeText={setM2Construccion}
+            />
+          </View>
+        </View>
+      </View>
+
+      {/* Nota */}
+      <View style={styles.card}>
+        <Text style={styles.label}>Nota adicional</Text>
+        <View style={{ marginTop: 12 }}>
           <AppInput
-            label="Recámaras"
-            placeholder="Ej. 3"
-            keyboardType="numeric"
-            value={habitaciones}
-            onChangeText={setHabitaciones}
+            multiline
+            placeholder="Cuéntanos más sobre lo que buscas..."
+            value={nota}
+            onChangeText={(text) => {
+              if (text.length <= 500) setNota(text);
+            }}
+            inputStyle={styles.noteTextArea}
+            numberOfLines={5}
+            maxLength={500}
+            helperText={`${nota.length}/500`}
           />
         </View>
       </View>
@@ -146,7 +357,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: 16,
     padding: 16,
-    marginBottom: 16,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
@@ -189,5 +399,9 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: COLORS.white,
+  },
+  noteTextArea: {
+    minHeight: 90,
+    textAlignVertical: "top",
   },
 });

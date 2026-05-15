@@ -313,6 +313,10 @@ export default function MapResultsScreen() {
         onPublished={() => {
           setPublishModalVisible(false);
           setPendingPostMetadata(null);
+          router.replace({
+            pathname: "/(tabs)",
+            params: { refresh: String(Date.now()) },
+          });
         }}
         userId={user?.id}
       />

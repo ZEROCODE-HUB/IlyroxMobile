@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/utils/logger";
 import { RealtimeChannel } from "@supabase/supabase-js";
@@ -51,6 +52,7 @@ const PAGE_SIZE = 20;
 export function useMessages(conversationId: string | null, userId?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const { showModal } = useModal();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -247,6 +249,16 @@ export function useMessages(conversationId: string | null, userId?: string) {
         .single();
 
       if (createError) throw createError;
+
+      // Forzar refresh inmediato de las listas de conversaciones de ambos usuarios,
+      // sin esperar al debounce de realtime ni al trigger de agrupaciones.
+      queryClient.invalidateQueries({
+        queryKey: ["conversations", userId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["conversations", metadata.destinatario_id],
+      });
+
       return newConv.id;
     } catch (err: any) {
       log.error("Error ensuring conversation exists:", err);

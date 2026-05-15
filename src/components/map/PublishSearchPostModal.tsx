@@ -28,6 +28,7 @@ interface LocationData {
   ciudad: string;
   municipio: string;
   colonia: string;
+  colonias?: string[];
   latitud?: number;
   longitud?: number;
 }
@@ -119,12 +120,18 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
 
       const ub = f.ubicacion ?? {};
       const hasLocation = !!(ub.estado || ub.municipio || ub.ciudad);
+      const incomingColonias: string[] = Array.isArray(ub.colonias)
+        ? ub.colonias.filter((c: unknown) => typeof c === "string" && c.trim())
+        : typeof ub.colonia === "string" && ub.colonia.trim()
+          ? [ub.colonia]
+          : [];
       if (hasLocation) {
         setLocationData({
           estado: ub.estado ?? "",
           ciudad: ub.ciudad ?? "",
           municipio: ub.municipio ?? "",
-          colonia: typeof ub.colonia === "string" ? ub.colonia : (ub.colonia ?? ""),
+          colonia: incomingColonias[0] ?? "",
+          colonias: incomingColonias,
         });
         setEditingLocation(false);
       } else {
@@ -166,7 +173,10 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
 
   const locationSummary = () => {
     if (!locationData) return null;
-    const parts = [locationData.estado, locationData.municipio, locationData.colonia]
+    const colonias = locationData.colonias && locationData.colonias.length > 0
+      ? locationData.colonias.join(", ")
+      : locationData.colonia;
+    const parts = [locationData.estado, locationData.municipio, colonias]
       .filter(Boolean);
     return parts.join(", ") || null;
   };
@@ -189,7 +199,14 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
           estado: loc.estado ?? "",
           ciudad: loc.ciudad ?? "",
           municipio: loc.municipio ?? "",
-          colonia: loc.colonia ?? "",
+          colonia: (Array.isArray(loc.colonias) && loc.colonias.length > 0
+            ? loc.colonias[0]
+            : loc.colonia) ?? "",
+          colonias: Array.isArray(loc.colonias)
+            ? loc.colonias
+            : loc.colonia
+              ? [loc.colonia]
+              : [],
           icon: "location-outline",
         },
         zonas_interes: zonasInteres,
@@ -364,6 +381,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
                 <CascadeLocationSelector
                   isMandatory={false}
                   showColonia={true}
+                  multiColonia={true}
                   initialData={locationData ?? undefined}
                   onChange={(data) => setLocationData(data)}
                 />

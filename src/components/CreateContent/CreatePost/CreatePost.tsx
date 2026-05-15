@@ -37,6 +37,20 @@ import { logger } from "@/utils/logger";
 
 const log = logger.scoped("CreatePost");
 
+const formatNumericInput = (num: number | string): string => {
+  const raw = String(num).replace(/,/g, "");
+  if (!raw || isNaN(Number(raw))) return "";
+  const parts = raw.split(".");
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return parts.join(".");
+};
+
+const parseNum = (val: string): number | null => {
+  if (!val || !val.trim()) return null;
+  const n = parseFloat(val.replace(/,/g, ""));
+  return isNaN(n) ? null : n;
+};
+
 interface CreatePostProps {
   post?: Post;
   onBack: () => void;
@@ -67,6 +81,25 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   const [tipoPropiedad, setTipoPropiedad] = useState("");
   const [ubicacion, setUbicacion] = useState("");
   const [statusPost, setStatusPost] = useState("Visible");
+
+  // Campos extra para post de búsqueda
+  const [moneda, setMoneda] = useState("MXN");
+  const [banos, setBanos] = useState("");
+  const [estacionamientos, setEstacionamientos] = useState("");
+  const [niveles, setNiveles] = useState("");
+  const [antiguedad, setAntiguedad] = useState("");
+  const [m2Terreno, setM2Terreno] = useState("");
+  const [m2Construccion, setM2Construccion] = useState("");
+  const [busquedaLocation, setBusquedaLocation] = useState<{
+    estado: string;
+    ciudad: string;
+    municipio: string;
+    colonia: string;
+    colonias?: string[];
+    latitud?: number;
+    longitud?: number;
+  } | null>(null);
+  const [nota, setNota] = useState("");
 
   const isEditing = !!post;
   const [isUploadingManual, setIsUploadingManual] = useState(false);
@@ -106,15 +139,62 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
 
           if (data.tipo === "busqueda" && data.busquedas_json) {
             const filtros = data.busquedas_json.filtros || {};
-            setPrecioMin(filtros.precio_min?.toString() || "");
-            setPrecioMax(filtros.precio_max?.toString() || "");
-            setHabitaciones(
-              filtros.caracteristicas?.habitaciones?.toString() || "",
+            const caracteristicas = filtros.caracteristicas || {};
+            const superficies = filtros.superficies || {};
+            const ub = filtros.ubicacion || {};
+
+            setPrecioMin(
+              typeof filtros.precio_min === "number" && filtros.precio_min > 0
+                ? formatNumericInput(filtros.precio_min)
+                : "",
             );
+            setPrecioMax(
+              typeof filtros.precio_max === "number" && filtros.precio_max > 0
+                ? formatNumericInput(filtros.precio_max)
+                : "",
+            );
+            setHabitaciones(
+              caracteristicas.habitaciones?.toString() || "",
+            );
+            setBanos(caracteristicas.banos?.toString() || "");
+            setEstacionamientos(
+              caracteristicas.estacionamientos?.toString() || "",
+            );
+            setNiveles(caracteristicas.niveles?.toString() || "");
+            setAntiguedad(
+              caracteristicas.antiguedad ? String(caracteristicas.antiguedad) : "",
+            );
+            setM2Terreno(
+              typeof superficies.m2_terreno_min === "number" && superficies.m2_terreno_min > 0
+                ? String(superficies.m2_terreno_min)
+                : "",
+            );
+            setM2Construccion(
+              typeof superficies.m2_construccion_min === "number" && superficies.m2_construccion_min > 0
+                ? String(superficies.m2_construccion_min)
+                : "",
+            );
+            setMoneda(filtros.moneda || "MXN");
+            setNota(typeof filtros.nota === "string" ? filtros.nota : "");
             setOperacion(filtros.operacion || "");
             setTipoPropiedad(filtros.tipo_propiedad || "");
             const rawSubtipo = filtros.subtipo;
             setSubtipo(Array.isArray(rawSubtipo) ? rawSubtipo : rawSubtipo ? [rawSubtipo] : []);
+
+            const incomingColonias: string[] = Array.isArray(ub.colonias)
+              ? ub.colonias.filter((c: unknown) => typeof c === "string" && (c as string).trim())
+              : typeof ub.colonia === "string" && ub.colonia.trim()
+                ? [ub.colonia]
+                : [];
+            setBusquedaLocation({
+              estado: ub.estado ?? "",
+              ciudad: ub.ciudad ?? "",
+              municipio: ub.municipio ?? "",
+              colonia: incomingColonias[0] ?? "",
+              colonias: incomingColonias,
+              latitud: ub.latitud,
+              longitud: ub.longitud,
+            });
           }
         }
       } catch (err) {
@@ -222,25 +302,77 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
           const currentJson = post.busquedas_json || {};
           const currentFiltros = currentJson.filtros || {};
           const currentCaracteristicas = currentFiltros.caracteristicas || {};
+          const currentSuperficies = currentFiltros.superficies || {};
+          const currentUbicacion = currentFiltros.ubicacion || {};
+
+          const loc = busquedaLocation ?? currentUbicacion;
+          const coloniasArr: string[] = Array.isArray(loc.colonias)
+            ? loc.colonias
+            : loc.colonia
+              ? [loc.colonia]
+              : [];
+
+          const minParsed = parseNum(precioMin);
+          const maxParsed = parseNum(precioMax);
+          const habitacionesParsed = parseNum(habitaciones);
+          const banosParsed = parseNum(banos);
+          const estacionamientosParsed = parseNum(estacionamientos);
+          const nivelesParsed = parseNum(niveles);
+          const m2TerrenoParsed = parseNum(m2Terreno);
+          const m2ConstruccionParsed = parseNum(m2Construccion);
 
           updatedData.busquedas_json = {
             ...currentJson,
             filtros: {
               ...currentFiltros,
               operacion: operacion || currentFiltros.operacion,
+              tipo_propiedad: tipoPropiedad || currentFiltros.tipo_propiedad,
               subtipo: subtipo.length > 0 ? subtipo : currentFiltros.subtipo,
-              precio_min: precioMin
-                ? Number(precioMin)
-                : currentFiltros.precio_min,
-              precio_max: precioMax
-                ? Number(precioMax)
-                : currentFiltros.precio_max,
+              moneda: moneda || currentFiltros.moneda,
+              precio_min: minParsed !== null ? minParsed : currentFiltros.precio_min,
+              precio_max: maxParsed !== null ? maxParsed : currentFiltros.precio_max,
+              ubicacion: {
+                ...currentUbicacion,
+                estado: loc.estado ?? currentUbicacion.estado ?? "",
+                ciudad: loc.ciudad ?? currentUbicacion.ciudad ?? "",
+                municipio: loc.municipio ?? currentUbicacion.municipio ?? "",
+                colonia: coloniasArr[0] ?? "",
+                colonias: coloniasArr,
+                icon: currentUbicacion.icon || "location-outline",
+              },
               caracteristicas: {
                 ...currentCaracteristicas,
-                habitaciones: habitaciones
-                  ? Number(habitaciones)
-                  : currentCaracteristicas.habitaciones,
+                habitaciones:
+                  habitacionesParsed !== null
+                    ? habitacionesParsed
+                    : currentCaracteristicas.habitaciones,
+                banos:
+                  banosParsed !== null
+                    ? banosParsed
+                    : currentCaracteristicas.banos,
+                estacionamientos:
+                  estacionamientosParsed !== null
+                    ? estacionamientosParsed
+                    : currentCaracteristicas.estacionamientos,
+                niveles:
+                  nivelesParsed !== null
+                    ? nivelesParsed
+                    : currentCaracteristicas.niveles,
+                antiguedad: antiguedad || currentCaracteristicas.antiguedad,
               },
+              superficies: {
+                ...currentSuperficies,
+                m2_terreno_min:
+                  m2TerrenoParsed !== null
+                    ? m2TerrenoParsed
+                    : currentSuperficies.m2_terreno_min,
+                m2_construccion_min:
+                  m2ConstruccionParsed !== null
+                    ? m2ConstruccionParsed
+                    : currentSuperficies.m2_construccion_min,
+                icon: currentSuperficies.icon || "resize-outline",
+              },
+              nota: nota.trim(),
             },
           };
         }
@@ -267,6 +399,12 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
         setUploadProgress(0);
         setIsUploadingManual(false);
         if (!isEditing) {
+          router.replace({
+            pathname: "/(tabs)",
+            params: { refresh: String(Date.now()) },
+          });
+        } else if (post?.tipo === "busqueda") {
+          onBack();
           router.replace({
             pathname: "/(tabs)",
             params: { refresh: String(Date.now()) },
@@ -353,6 +491,25 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             subtipo={subtipo}
             setSubtipo={setSubtipo}
             tipoPropiedad={tipoPropiedad}
+            setTipoPropiedad={setTipoPropiedad}
+            moneda={moneda}
+            setMoneda={setMoneda}
+            banos={banos}
+            setBanos={setBanos}
+            estacionamientos={estacionamientos}
+            setEstacionamientos={setEstacionamientos}
+            niveles={niveles}
+            setNiveles={setNiveles}
+            antiguedad={antiguedad}
+            setAntiguedad={setAntiguedad}
+            m2Terreno={m2Terreno}
+            setM2Terreno={setM2Terreno}
+            m2Construccion={m2Construccion}
+            setM2Construccion={setM2Construccion}
+            locationData={busquedaLocation}
+            setLocationData={setBusquedaLocation}
+            nota={nota}
+            setNota={setNota}
           />
         )}
 

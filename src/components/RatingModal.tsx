@@ -8,6 +8,8 @@ import {
   TextInput,
   ScrollView,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../constants/colors";
@@ -88,7 +90,10 @@ export const RatingModal: React.FC<RatingModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
         <View style={styles.rateModalCard}>
           <View style={styles.modalHeaderRow}>
             <Text style={styles.modalTitle}>Calificar Asesor</Text>
@@ -100,6 +105,7 @@ export const RatingModal: React.FC<RatingModalProps> = ({
           <ScrollView
             style={styles.modalContent}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             <Text style={styles.modalLabel}>Calificación general</Text>
             <View style={styles.starsLarge}>
@@ -185,7 +191,7 @@ export const RatingModal: React.FC<RatingModalProps> = ({
             </View>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -203,6 +209,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     width: "100%",
     maxWidth: 400,
+    maxHeight: "90%",
     elevation: 5,
     shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },

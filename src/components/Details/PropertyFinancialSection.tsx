@@ -18,8 +18,16 @@ export const PropertyFinancialSection: React.FC<PropertyFinancialSectionProps> =
   sinDatos,
 }) => {
   const showFinancial = financiamientos.length > 0 || gravamenes.length > 0;
-  const showCommissions =
-    !sinDatos && operations.some((op) => op.comparte_comision);
+
+  const hasCommissionData = (op: any) =>
+    !!op?.comparte_comision &&
+    (op.comision_porcentaje != null ||
+      op.comision_monto_fijo != null ||
+      op.porcentaje_comision_compartida != null ||
+      op.monto_comision_compartida != null);
+
+  const validOps = operations.filter(hasCommissionData);
+  const showCommissions = !sinDatos && validOps.length > 0;
 
   if (!showFinancial && !showCommissions) return null;
 
@@ -86,32 +94,38 @@ export const PropertyFinancialSection: React.FC<PropertyFinancialSectionProps> =
       {showCommissions && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Esquema de Comisión</Text>
-          {operations.map((op, i) =>
-            op.comparte_comision ? (
+          {validOps.map((op, i) => {
+            const hasComision =
+              op.comision_porcentaje != null || op.comision_monto_fijo != null;
+            const hasComparte =
+              op.porcentaje_comision_compartida != null ||
+              op.monto_comision_compartida != null;
+
+            return (
               <View key={i} style={styles.commissionBox}>
                 <Text style={styles.commissionTitle}>
                   {op.tipo_operacion === "venta" ? "Venta" : "Renta"}
                 </Text>
-                <View style={styles.commissionRow}>
-                  <Text style={styles.commissionLabel}>Comisión:</Text>
-                  <Text style={styles.commissionValue}>
-                    {op.comision_porcentaje
-                      ? `${op.comision_porcentaje}%`
-                      : op.comision_monto_fijo
-                        ? `$${op.comision_monto_fijo}`
-                        : "No especificado"}
-                  </Text>
-                </View>
-                <View style={styles.commissionRow}>
-                  <Text style={styles.commissionLabel}>Comparte:</Text>
-                  <Text style={styles.commissionValue}>
-                    {op.porcentaje_comision_compartida
-                      ? `${op.porcentaje_comision_compartida}%`
-                      : op.monto_comision_compartida
-                        ? `$${op.monto_comision_compartida.toLocaleString()}`
-                        : "No especificado"}
-                  </Text>
-                </View>
+                {hasComision && (
+                  <View style={styles.commissionRow}>
+                    <Text style={styles.commissionLabel}>Comisión:</Text>
+                    <Text style={styles.commissionValue}>
+                      {op.comision_porcentaje != null
+                        ? `${op.comision_porcentaje}%`
+                        : `$${op.comision_monto_fijo}`}
+                    </Text>
+                  </View>
+                )}
+                {hasComparte && (
+                  <View style={styles.commissionRow}>
+                    <Text style={styles.commissionLabel}>Comparte:</Text>
+                    <Text style={styles.commissionValue}>
+                      {op.porcentaje_comision_compartida != null
+                        ? `${op.porcentaje_comision_compartida}%`
+                        : `$${op.monto_comision_compartida.toLocaleString()}`}
+                    </Text>
+                  </View>
+                )}
                 {op.condiciones_comision_compartida && (
                   <View style={styles.commissionRow}>
                     <Text style={styles.commissionLabel}>Condiciones:</Text>
@@ -121,8 +135,8 @@ export const PropertyFinancialSection: React.FC<PropertyFinancialSectionProps> =
                   </View>
                 )}
               </View>
-            ) : null,
-          )}
+            );
+          })}
         </View>
       )}
     </>

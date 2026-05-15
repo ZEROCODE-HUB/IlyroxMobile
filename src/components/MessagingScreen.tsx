@@ -178,67 +178,73 @@ export default function MessagingScreen({
   const handleInitialUser = async (user: User) => {
     if (!profile?.id) return;
 
-    // Esperar un poco para que las conversaciones se carguen
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Esperar a que la lista de conversaciones termine de cargar (hasta 2 s).
+    // Evita el race condition donde una conversación recién creada todavía no
+    // figura en `conversations` cuando llegamos a esta pantalla.
+    const start = Date.now();
+    while (conversationsHook.loading && Date.now() - start < 2000) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
 
-    // Buscar si ya existe una agrupación con este usuario
+    // Datos del other_user: usar la agrupación si existe, si no, construir desde initialUser
     const existingGrouping = conversations.find(
       (conv) => conv.other_user?.id === user.id,
     );
-
-    if (existingGrouping && getConversationsForUser) {
-      // Si existe agrupación, obtener las conversaciones específicas
-      const specificConvs = await getConversationsForUser(user.id);
-
-      // 🏠 Si viene de una PROPIEDAD, buscar chat de esa propiedad
-      if (initialPropertyId) {
-        const propertyChat = specificConvs.find(
-          (conv) => conv.propiedad?.id === initialPropertyId,
-        );
-
-        if (propertyChat) {
-          // ✅ Existe chat de esta propiedad, abrirlo
-          setActiveConversationId(propertyChat.id);
-          setOtherUser(existingGrouping.other_user);
-          setActivePropertyId(initialPropertyId);
-          return;
-        } else {
-          // ❌ No existe chat de esta propiedad, crear uno nuevo
-          setActiveConversationId("new");
-          setOtherUser(existingGrouping.other_user);
-          setActivePropertyId(initialPropertyId);
-          return;
-        }
-      } else {
-        // 💬 Si NO viene de propiedad, buscar chat GENERAL
-        const generalChat = specificConvs.find((conv) => !conv.propiedad?.id);
-
-        if (generalChat) {
-          // ✅ Existe chat general, abrirlo
-          setActiveConversationId(generalChat.id);
-          setOtherUser(existingGrouping.other_user);
-          setActivePropertyId(null);
-          return;
-        } else {
-          // ❌ No existe chat general, crear uno nuevo
-          setActiveConversationId("new");
-          setOtherUser(existingGrouping.other_user);
-          setActivePropertyId(null);
-          return;
-        }
-      }
-    } else {
-      // 🆕 No existe NINGUNA conversación con este usuario
-      setActiveConversationId("new");
-      setOtherUser({
+    const otherUserData =
+      existingGrouping?.other_user ?? {
         id: user.id,
         nombre: (user as any).nombre || user.name?.split(" ")[0] || "",
         apellido_paterno:
           (user as any).apellido_paterno || user.name?.split(" ")[1] || "",
         foto: (user as any).foto || (user as any).avatar || null,
-      });
-      setActivePropertyId(initialPropertyId || null);
+      };
+
+    // Siempre consultar las conversaciones específicas (no solo si hay agrupación):
+    // cubre el caso donde la conversación ya existe pero el trigger de
+    // agrupaciones aún no la incluyó en la lista agrupada.
+    let specificConvs: any[] = [];
+    if (getConversationsForUser) {
+      try {
+        specificConvs = await getConversationsForUser(user.id);
+      } catch {
+        specificConvs = [];
+      }
     }
+
+    // 🏠 Si viene de una PROPIEDAD, buscar chat de esa propiedad
+    if (initialPropertyId) {
+      const propertyChat = specificConvs.find(
+        (conv) => conv.propiedad?.id === initialPropertyId,
+      );
+
+      if (propertyChat) {
+        setActiveConversationId(propertyChat.id);
+        setOtherUser(otherUserData);
+        setActivePropertyId(initialPropertyId);
+        return;
+      }
+
+      // No existe chat de esta propiedad → abrir uno nuevo
+      setActiveConversationId("new");
+      setOtherUser(otherUserData);
+      setActivePropertyId(initialPropertyId);
+      return;
+    }
+
+    // 💬 Si NO viene de propiedad, buscar chat GENERAL (sin propiedad asociada)
+    const generalChat = specificConvs.find((conv) => !conv.propiedad?.id);
+
+    if (generalChat) {
+      setActiveConversationId(generalChat.id);
+      setOtherUser(otherUserData);
+      setActivePropertyId(null);
+      return;
+    }
+
+    // No existe chat general → abrir uno nuevo
+    setActiveConversationId("new");
+    setOtherUser(otherUserData);
+    setActivePropertyId(null);
   };
 
   const handleSelectConversation = (
