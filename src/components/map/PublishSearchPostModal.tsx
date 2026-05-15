@@ -15,7 +15,10 @@ import { PROPERTY_TYPES } from "@/constants/propertyData";
 import { AppInput } from "@/design-system/components/AppInput";
 import { useCreateContent } from "@/hooks/useCreateContent";
 import { useToast } from "@/context/ToastContext";
-import CascadeLocationSelector from "@/components/common/CascadeLocationSelector";
+import {
+  MultiLevelLocationPicker,
+  LocationChipItem,
+} from "@/components/common/MultiLevelLocationPicker";
 import type {
   LocationChip,
   ComercialFilters,
@@ -43,6 +46,9 @@ interface PublishSearchPostModalProps {
 
 const OPERACION_OPTIONS = ["venta", "renta"] as const;
 const MONEDA_OPTIONS = ["MXN", "USD"] as const;
+const TIPO_PROPIEDAD_OPTIONS = Object.keys(PROPERTY_TYPES) as Array<
+  keyof typeof PROPERTY_TYPES
+>;
 
 function formatNumericInput(num: number): string {
   const parts = String(num).split(".");
@@ -77,9 +83,11 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
   const [precioMin, setPrecioMin] = useState("");
   const [precioMax, setPrecioMax] = useState("");
 
-  // Ubicación: si ya viene del filtro se muestra como read-only; si no, muestra el selector
+  // Ubicación legacy: mantenida para retrocompat con metadata anterior
   const [locationData, setLocationData] = useState<LocationData | null>(null);
-  const [editingLocation, setEditingLocation] = useState(false);
+
+  // Lista de ubicaciones agregadas como chips multi-nivel
+  const [ubicaciones, setUbicaciones] = useState<LocationChipItem[]>([]);
 
   // Características
   const [habitaciones, setHabitaciones] = useState("");
@@ -133,11 +141,15 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
           colonia: incomingColonias[0] ?? "",
           colonias: incomingColonias,
         });
-        setEditingLocation(false);
       } else {
         setLocationData(null);
-        setEditingLocation(true);
       }
+
+      // Ubicaciones multi-nivel: si vienen del filtro las cargamos
+      const incomingUbicaciones: LocationChipItem[] = Array.isArray(f.ubicaciones)
+        ? f.ubicaciones.filter((u: any) => u && u.level && u.estado)
+        : [];
+      setUbicaciones(incomingUbicaciones);
 
       const car = f.caracteristicas ?? {};
       setHabitaciones(car.habitaciones ? String(car.habitaciones) : "");
@@ -171,44 +183,52 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
   const parseNum = (val: string) =>
     val.trim() ? parseFloat(val.replace(/,/g, "")) : null;
 
-  const locationSummary = () => {
-    if (!locationData) return null;
-    const colonias = locationData.colonias && locationData.colonias.length > 0
-      ? locationData.colonias.join(", ")
-      : locationData.colonia;
-    const parts = [locationData.estado, locationData.municipio, colonias]
-      .filter(Boolean);
-    return parts.join(", ") || null;
-  };
-
   const handlePublish = async () => {
     if (!initialMetadata) return;
 
-    const loc = locationData ?? initialMetadata.filtros?.ubicacion ?? {};
+    // Derivar ubicacion legacy desde el primer chip multi-nivel (si hay)
+    const firstChip = ubicaciones[0];
+    const legacyUbicacion = firstChip
+      ? {
+          estado: firstChip.estado ?? "",
+          ciudad: "",
+          municipio: firstChip.municipio ?? "",
+          colonia: firstChip.colonia ?? "",
+          colonias: ubicaciones
+            .filter((u) => u.level === "colonia" && !!u.colonia)
+            .map((u) => u.colonia as string),
+          icon: "location-outline",
+        }
+      : (() => {
+          const loc = locationData ?? initialMetadata.filtros?.ubicacion ?? {};
+          return {
+            estado: loc.estado ?? "",
+            ciudad: loc.ciudad ?? "",
+            municipio: loc.municipio ?? "",
+            colonia: (Array.isArray(loc.colonias) && loc.colonias.length > 0
+              ? loc.colonias[0]
+              : loc.colonia) ?? "",
+            colonias: Array.isArray(loc.colonias)
+              ? loc.colonias
+              : loc.colonia
+                ? [loc.colonia]
+                : [],
+            icon: "location-outline",
+          };
+        })();
 
     const updatedMetadata = {
       ...initialMetadata,
       filtros: {
         ...initialMetadata.filtros,
         operacion: operacion || initialMetadata.filtros?.operacion,
+        tipo_propiedad: tipoPropiedad || initialMetadata.filtros?.tipo_propiedad,
         subtipo,
         moneda,
         precio_min: parseNum(precioMin) ?? initialMetadata.filtros?.precio_min ?? 0,
         precio_max: parseNum(precioMax) ?? initialMetadata.filtros?.precio_max ?? null,
-        ubicacion: {
-          estado: loc.estado ?? "",
-          ciudad: loc.ciudad ?? "",
-          municipio: loc.municipio ?? "",
-          colonia: (Array.isArray(loc.colonias) && loc.colonias.length > 0
-            ? loc.colonias[0]
-            : loc.colonia) ?? "",
-          colonias: Array.isArray(loc.colonias)
-            ? loc.colonias
-            : loc.colonia
-              ? [loc.colonia]
-              : [],
-          icon: "location-outline",
-        },
+        ubicacion: legacyUbicacion,
+        ubicaciones,
         zonas_interes: zonasInteres,
         caracteristicas: {
           ...initialMetadata.filtros?.caracteristicas,
@@ -300,6 +320,31 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
             </View>
           </SectionCard>
 
+          {/* ── Tipo de propiedad ─────────────────────────── */}
+          <SectionCard label="Tipo de propiedad">
+            <View style={styles.chipsRow}>
+              {TIPO_PROPIEDAD_OPTIONS.map((opt) => {
+                const active = tipoPropiedad === opt;
+                return (
+                  <Chip
+                    key={opt}
+                    label={opt.charAt(0).toUpperCase() + opt.slice(1)}
+                    active={active}
+                    onPress={() => {
+                      if (active) {
+                        setTipoPropiedad("");
+                        setSubtipo([]);
+                      } else {
+                        setTipoPropiedad(opt);
+                        setSubtipo([]);
+                      }
+                    }}
+                  />
+                );
+              })}
+            </View>
+          </SectionCard>
+
           {/* ── Tipo de inmueble ──────────────────────────── */}
           {subtipoOptions.length > 0 && (
             <SectionCard label="Tipo de inmueble">
@@ -350,43 +395,12 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
             </View>
           </SectionCard>
 
-          {/* ── Ubicación ─────────────────────────────────── */}
+          {/* ── Ubicación (multi-nivel) ──────────────────── */}
           <SectionCard label="Ubicación">
-            {locationData && !editingLocation ? (
-              /* Mostrar la ubicación que ya viene del filtro */
-              <View style={styles.locationDisplay}>
-                <Ionicons name="location-outline" size={18} color={COLORS.primary} />
-                <Text style={styles.locationText}>{locationSummary()}</Text>
-                <TouchableOpacity
-                  onPress={() => setEditingLocation(true)}
-                  style={styles.changeLocationBtn}
-                  hitSlop={8}
-                >
-                  <Text style={styles.changeLocationText}>Cambiar</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              /* Selector en cascada */
-              <>
-                {locationData && editingLocation && (
-                  <TouchableOpacity
-                    onPress={() => setEditingLocation(false)}
-                    style={styles.cancelEditLocation}
-                    hitSlop={8}
-                  >
-                    <Ionicons name="arrow-back-outline" size={16} color={COLORS.primary} />
-                    <Text style={styles.changeLocationText}>Volver a la selección anterior</Text>
-                  </TouchableOpacity>
-                )}
-                <CascadeLocationSelector
-                  isMandatory={false}
-                  showColonia={true}
-                  multiColonia={true}
-                  initialData={locationData ?? undefined}
-                  onChange={(data) => setLocationData(data)}
-                />
-              </>
-            )}
+            <MultiLevelLocationPicker
+              value={ubicaciones}
+              onChange={setUbicaciones}
+            />
           </SectionCard>
 
           {/* ── Zonas de interés (chips del mapa) ────────── */}

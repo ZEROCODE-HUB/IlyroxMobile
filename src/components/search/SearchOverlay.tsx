@@ -94,9 +94,18 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
 
   const renderTabTodos = () => (
     <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      {results.locations.length > 0 && (
+        <>
+          <SectionHeader title="Ubicaciones" />
+          {results.locations.slice(0, 5).map((l, i) => (
+            <LocationRow key={`${l.id}-${i}`} location={l} onPress={() => handleNavigate(() => selectLocation(l))} />
+          ))}
+        </>
+      )}
+
       {results.properties.length > 0 && (
         <>
-          <SectionHeader title="Fichas" />
+          <SectionHeader title="Fichas" style={{ marginTop: 20 }} />
           <PropertyFichasGrid
             items={results.properties.slice(0, 4)}
             onPress={(id) => handleNavigate(() => navigateToProperty(id))}
@@ -106,7 +115,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
 
       {results.users.length > 0 && (
         <>
-          <SectionHeader title="Usuarios" />
+          <SectionHeader title="Usuarios" style={{ marginTop: 20 }} />
           {results.users.slice(0, 3).map((u) => (
             <UserRow key={u.id} user={u} onPress={() => handleNavigate(() => navigateToUser(u.id))} />
           ))}
@@ -124,15 +133,6 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
         <>
           <SectionHeader title="Reels" style={{ marginTop: 20 }} />
           <ReelGrid items={results.reels.slice(0, 4)} onPress={(id) => handleNavigate(() => navigateToReel(id))} />
-        </>
-      )}
-
-      {results.locations.length > 0 && (
-        <>
-          <SectionHeader title="Ubicaciones" style={{ marginTop: 20 }} />
-          {results.locations.slice(0, 3).map((l, i) => (
-            <LocationRow key={`${l.id}-${i}`} location={l} onPress={() => handleNavigate(() => selectLocation(l))} />
-          ))}
         </>
       )}
 
@@ -360,8 +360,6 @@ function UserRow({ user, onPress }: { user: SearchUser; onPress: () => void }) {
   );
 }
 
-const SPECIAL_TYPES = new Set(["openhouse", "busqueda", "sold", "aniversario"]);
-
 function searchPostToFeedItem(post: SearchPost): FeedItem {
   return {
     id: post.id,
@@ -399,12 +397,11 @@ const CARD_HEIGHT_ESTIMATES: Record<string, number> = {
   busqueda: 325,
   aniversario: 390,
 };
-const SCALE = COL2 / SCREEN_WIDTH;
+const SCALE = COL3 / SCREEN_WIDTH;
 
-// Renderiza SpecialPostCard preview escalado a la mitad del ancho.
+// Renderiza SpecialPostCard preview escalado a un tercio del ancho.
 // Usa transform (no margin) para que los cambios de posición no afecten el layout
-// y no redisparar onLayout en un ciclo. feedItem memoizado para estabilizar el
-// source de las imágenes internas y evitar parpadeo.
+// y no redisparar onLayout en un ciclo.
 const ScaledSpecialCard = React.memo(function ScaledSpecialCard({
   post,
   onPress,
@@ -417,8 +414,6 @@ const ScaledSpecialCard = React.memo(function ScaledSpecialCard({
 
   const feedItem = React.useMemo(() => searchPostToFeedItem(post), [post]);
 
-  // translateX/translateY en transform NO afectan layout (a diferencia de marginLeft/marginTop)
-  // → cambiar offsetY no dispara onLayout de nuevo
   const offsetX = -(SCREEN_WIDTH * (1 - SCALE)) / 2;
   const offsetY = -(cardHeight * (1 - SCALE)) / 2;
 
@@ -444,44 +439,43 @@ const ScaledSpecialCard = React.memo(function ScaledSpecialCard({
   );
 });
 
-// Posts con imagen → grid 3 columnas. Posts especiales → grid 2 columnas escalado.
+// Todos los posts (imagen y special) van en grid de 3 columnas para evitar
+// huecos visuales a la derecha.
 function PostGrid({ items, onPress }: { items: SearchPost[]; onPress: (feedItemId: string) => void }) {
-  const imageItems = items.filter((i) => i.img);
-  const specialItems = items.filter((i) => !i.img && SPECIAL_TYPES.has(i.tipo ?? ""));
-
-  const imageRows: SearchPost[][] = [];
-  for (let i = 0; i < imageItems.length; i += 3) imageRows.push(imageItems.slice(i, i + 3));
-
-  const specialRows: SearchPost[][] = [];
-  for (let i = 0; i < specialItems.length; i += 2) specialRows.push(specialItems.slice(i, i + 2));
+  const rows: SearchPost[][] = [];
+  for (let i = 0; i < items.length; i += 3) rows.push(items.slice(i, i + 3));
 
   return (
     <View>
-      {imageRows.map((row, ri) => (
-        <View key={`img-${ri}`} style={gridStyles.row}>
-          {row.map((item, ci) => (
-            <TouchableOpacity key={item.id} activeOpacity={0.9} onPress={() => onPress(item.feed_item_id)}>
-              <Image
-                source={{ uri: item.img }}
-                style={[gridStyles.postCell, ci < row.length - 1 && gridStyles.postCellGap]}
-                contentFit="cover"
-              />
-            </TouchableOpacity>
+      {rows.map((row, ri) => (
+        <View key={`row-${ri}`} style={gridStyles.row}>
+          {row.map((item, ci) => {
+            const isImage = !!item.img;
+            const showGap = ci < row.length - 1;
+            if (isImage) {
+              return (
+                <TouchableOpacity key={item.id} activeOpacity={0.9} onPress={() => onPress(item.feed_item_id)}>
+                  <Image
+                    source={{ uri: item.img }}
+                    style={[gridStyles.postCell, showGap && gridStyles.postCellGap]}
+                    contentFit="cover"
+                  />
+                </TouchableOpacity>
+              );
+            }
+            return (
+              <View key={item.id} style={showGap && gridStyles.postCellGap}>
+                <ScaledSpecialCard
+                  post={item}
+                  onPress={() => onPress(item.feed_item_id)}
+                />
+              </View>
+            );
+          })}
+          {/* Celdas vacías para completar la fila si quedan menos de 3 items */}
+          {Array.from({ length: 3 - row.length }).map((_, idx) => (
+            <View key={`empty-${idx}`} style={[gridStyles.postCell, { backgroundColor: "transparent" }]} />
           ))}
-        </View>
-      ))}
-
-      {specialRows.map((row, ri) => (
-        <View key={`sp-${ri}`} style={[gridStyles.row, { marginBottom: 2 }]}>
-          {row.map((item, ci) => (
-            <ScaledSpecialCard
-              key={item.id}
-              post={item}
-              onPress={() => onPress(item.feed_item_id)}
-            />
-          ))}
-          {/* Celda vacía si la fila tiene solo 1 item */}
-          {row.length === 1 && <View style={gridStyles.specialCell} />}
         </View>
       ))}
     </View>
@@ -789,7 +783,7 @@ const gridStyles = StyleSheet.create({
     marginBottom: 1,
   },
   specialCell: {
-    width: COL2,
+    width: COL3,
     overflow: "hidden",
   },
   postCell: {

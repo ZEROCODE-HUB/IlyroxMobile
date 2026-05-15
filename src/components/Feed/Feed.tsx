@@ -78,8 +78,10 @@ const Feed: React.FC<FeedProps> = ({
     }, [refreshUserStats]),
   );
 
+  const lastRefreshTimestampRef = useRef<number | null>(null);
   useEffect(() => {
-    if (refreshTimestamp) {
+    if (refreshTimestamp && refreshTimestamp !== lastRefreshTimestampRef.current) {
+      lastRefreshTimestampRef.current = refreshTimestamp;
       refresh();
     }
   }, [refreshTimestamp, refresh]);

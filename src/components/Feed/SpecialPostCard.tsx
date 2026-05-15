@@ -405,7 +405,14 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
       ? f.zonas_interes
       : [];
 
-    // Colonias múltiples (nuevo schema) o legacy (string)
+    // Ubicaciones multi-nivel (nuevo schema): un chip por entrada con su label
+    const ubicacionesMulti: string[] = Array.isArray(f.ubicaciones)
+      ? f.ubicaciones
+          .filter((u: any) => u && typeof u.label === "string" && u.label.trim())
+          .map((u: any) => u.label as string)
+      : [];
+
+    // Colonias múltiples (schema anterior) o legacy (string)
     const coloniasArr: string[] = Array.isArray(f.ubicacion?.colonias)
       ? f.ubicacion.colonias.filter(
           (c: unknown) => typeof c === "string" && (c as string).trim().length > 0,
@@ -414,13 +421,15 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
         ? [f.ubicacion.colonia]
         : [];
 
-    // Fallback de ubicación: si no hay zonas pero sí hay ubicacion explícita, mostrarla como un chip
+    // Fallback: priorizar las ubicaciones multi-nivel; si no hay, usar los datos legacy
     const ubicacionFallback = !zonas.length
-      ? coloniasArr.length > 0
-        ? [coloniasArr.join(", ")]
-        : [f.ubicacion?.ciudad, f.ubicacion?.municipio, f.ubicacion?.estado]
-            .filter((s) => typeof s === "string" && s.trim().length > 0)
-            .slice(0, 1)
+      ? ubicacionesMulti.length > 0
+        ? ubicacionesMulti
+        : coloniasArr.length > 0
+          ? [coloniasArr.join(", ")]
+          : [f.ubicacion?.ciudad, f.ubicacion?.municipio, f.ubicacion?.estado]
+              .filter((s) => typeof s === "string" && s.trim().length > 0)
+              .slice(0, 1)
       : [];
 
     const habitaciones = f.caracteristicas?.habitaciones;

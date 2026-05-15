@@ -2,18 +2,11 @@ import { COLORS } from "@/constants/colors";
 import { PROPERTY_TYPES } from "@/constants/propertyData";
 import { AppInput } from "@/design-system/components/AppInput";
 import { Post } from "@/types";
-import CascadeLocationSelector from "@/components/common/CascadeLocationSelector";
+import {
+  MultiLevelLocationPicker,
+  LocationChipItem,
+} from "@/components/common/MultiLevelLocationPicker";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-
-interface LocationData {
-  estado: string;
-  ciudad: string;
-  municipio: string;
-  colonia: string;
-  colonias?: string[];
-  latitud?: number;
-  longitud?: number;
-}
 
 interface BusquedaPostProps {
   post: Post;
@@ -43,8 +36,8 @@ interface BusquedaPostProps {
   setM2Terreno: (val: string) => void;
   m2Construccion: string;
   setM2Construccion: (val: string) => void;
-  locationData: LocationData | null;
-  setLocationData: (data: LocationData) => void;
+  ubicaciones: LocationChipItem[];
+  setUbicaciones: (next: LocationChipItem[]) => void;
   nota: string;
   setNota: (val: string) => void;
 }
@@ -91,8 +84,8 @@ export const BusquedaPost = ({
   setM2Terreno,
   m2Construccion,
   setM2Construccion,
-  locationData,
-  setLocationData,
+  ubicaciones,
+  setUbicaciones,
   nota,
   setNota,
 }: BusquedaPostProps) => {
@@ -240,12 +233,9 @@ export const BusquedaPost = ({
       <View style={styles.card}>
         <Text style={styles.label}>Ubicación</Text>
         <View style={{ marginTop: 12 }}>
-          <CascadeLocationSelector
-            isMandatory={false}
-            showColonia={true}
-            multiColonia={true}
-            initialData={locationData ?? undefined}
-            onChange={(data) => setLocationData(data)}
+          <MultiLevelLocationPicker
+            value={ubicaciones}
+            onChange={setUbicaciones}
           />
         </View>
       </View>

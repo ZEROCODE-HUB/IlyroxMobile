@@ -7,7 +7,7 @@
  * auto-refresh y enriquecimiento post-carga (stats + recomendaciones).
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useInfiniteQuery,
   useQuery,
@@ -197,18 +197,24 @@ export function useFeed(options: UseFeedOptions = {}) {
     };
   }, [baseItems, pageSize, queryClient]);
 
+  const loadMore = useCallback(() => {
+    if (query.hasNextPage && !query.isFetchingNextPage) {
+      query.fetchNextPage();
+    }
+  }, [query.hasNextPage, query.isFetchingNextPage, query.fetchNextPage]);
+
+  const refresh = useCallback(() => {
+    return query.refetch();
+  }, [query.refetch]);
+
   return {
     items,
     loading: query.isLoading,
     refreshing: query.isRefetching && !query.isFetchingNextPage,
     hasMore: Boolean(query.hasNextPage),
     error: query.error ? (query.error as Error).message : null,
-    loadMore: () => {
-      if (query.hasNextPage && !query.isFetchingNextPage) {
-        query.fetchNextPage();
-      }
-    },
-    refresh: () => query.refetch(),
+    loadMore,
+    refresh,
     refreshUserStats,
   };
 }

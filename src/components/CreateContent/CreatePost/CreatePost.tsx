@@ -33,6 +33,7 @@ import { uploadImage as uploadImageService } from "@/services/uploadService";
 import { AppHeader } from "@/components/AppHeader";
 import { OpenHousePost } from "./OpenHousePost";
 import { BusquedaPost } from "./BusquedaPost";
+import { LocationChipItem } from "@/components/common/MultiLevelLocationPicker";
 import { logger } from "@/utils/logger";
 
 const log = logger.scoped("CreatePost");
@@ -90,15 +91,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   const [antiguedad, setAntiguedad] = useState("");
   const [m2Terreno, setM2Terreno] = useState("");
   const [m2Construccion, setM2Construccion] = useState("");
-  const [busquedaLocation, setBusquedaLocation] = useState<{
-    estado: string;
-    ciudad: string;
-    municipio: string;
-    colonia: string;
-    colonias?: string[];
-    latitud?: number;
-    longitud?: number;
-  } | null>(null);
+  const [ubicaciones, setUbicaciones] = useState<LocationChipItem[]>([]);
   const [nota, setNota] = useState("");
 
   const isEditing = !!post;
@@ -181,20 +174,63 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             const rawSubtipo = filtros.subtipo;
             setSubtipo(Array.isArray(rawSubtipo) ? rawSubtipo : rawSubtipo ? [rawSubtipo] : []);
 
-            const incomingColonias: string[] = Array.isArray(ub.colonias)
-              ? ub.colonias.filter((c: unknown) => typeof c === "string" && (c as string).trim())
-              : typeof ub.colonia === "string" && ub.colonia.trim()
-                ? [ub.colonia]
-                : [];
-            setBusquedaLocation({
-              estado: ub.estado ?? "",
-              ciudad: ub.ciudad ?? "",
-              municipio: ub.municipio ?? "",
-              colonia: incomingColonias[0] ?? "",
-              colonias: incomingColonias,
-              latitud: ub.latitud,
-              longitud: ub.longitud,
-            });
+            const rawUbic: any[] = Array.isArray(filtros.ubicaciones)
+              ? filtros.ubicaciones
+              : [];
+            const ubicacionesFromArray: LocationChipItem[] = rawUbic
+              .filter((u) => u && u.level && u.estado)
+              .map((u) => ({
+                level: u.level,
+                estado: u.estado,
+                municipio: u.municipio,
+                colonia: u.colonia,
+                label:
+                  u.label ||
+                  [u.colonia, u.municipio, u.estado].filter(Boolean).join(", "),
+                latitud: u.latitud,
+                longitud: u.longitud,
+              }));
+
+            // Fallback: derivar desde el campo legacy `ubicacion`
+            let derivedUbicaciones: LocationChipItem[] = ubicacionesFromArray;
+            if (derivedUbicaciones.length === 0 && ub && ub.estado) {
+              const coloniasLegacy: string[] = Array.isArray(ub.colonias)
+                ? ub.colonias.filter(
+                    (c: unknown) => typeof c === "string" && (c as string).trim(),
+                  )
+                : typeof ub.colonia === "string" && ub.colonia.trim()
+                  ? [ub.colonia]
+                  : [];
+
+              if (coloniasLegacy.length > 0) {
+                derivedUbicaciones = coloniasLegacy.map((col) => ({
+                  level: "colonia" as const,
+                  estado: ub.estado,
+                  municipio: ub.municipio,
+                  colonia: col,
+                  label: [col, ub.municipio, ub.estado].filter(Boolean).join(", "),
+                }));
+              } else if (ub.municipio) {
+                derivedUbicaciones = [
+                  {
+                    level: "municipio",
+                    estado: ub.estado,
+                    municipio: ub.municipio,
+                    label: [ub.municipio, ub.estado].filter(Boolean).join(", "),
+                  },
+                ];
+              } else {
+                derivedUbicaciones = [
+                  {
+                    level: "estado",
+                    estado: ub.estado,
+                    label: ub.estado,
+                  },
+                ];
+              }
+            }
+
+            setUbicaciones(derivedUbicaciones);
           }
         }
       } catch (err) {
@@ -305,12 +341,20 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
           const currentSuperficies = currentFiltros.superficies || {};
           const currentUbicacion = currentFiltros.ubicacion || {};
 
-          const loc = busquedaLocation ?? currentUbicacion;
-          const coloniasArr: string[] = Array.isArray(loc.colonias)
-            ? loc.colonias
-            : loc.colonia
-              ? [loc.colonia]
-              : [];
+          // Derivar ubicacion legacy desde el primer chip multi-nivel
+          const firstChip = ubicaciones[0];
+          const derivedUbicacion = firstChip
+            ? {
+                ...currentUbicacion,
+                estado: firstChip.estado ?? "",
+                municipio: firstChip.municipio ?? "",
+                colonia: firstChip.colonia ?? "",
+                colonias: ubicaciones
+                  .filter((u) => u.level === "colonia" && !!u.colonia)
+                  .map((u) => u.colonia as string),
+                icon: currentUbicacion.icon || "location-outline",
+              }
+            : currentUbicacion;
 
           const minParsed = parseNum(precioMin);
           const maxParsed = parseNum(precioMax);
@@ -331,15 +375,8 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
               moneda: moneda || currentFiltros.moneda,
               precio_min: minParsed !== null ? minParsed : currentFiltros.precio_min,
               precio_max: maxParsed !== null ? maxParsed : currentFiltros.precio_max,
-              ubicacion: {
-                ...currentUbicacion,
-                estado: loc.estado ?? currentUbicacion.estado ?? "",
-                ciudad: loc.ciudad ?? currentUbicacion.ciudad ?? "",
-                municipio: loc.municipio ?? currentUbicacion.municipio ?? "",
-                colonia: coloniasArr[0] ?? "",
-                colonias: coloniasArr,
-                icon: currentUbicacion.icon || "location-outline",
-              },
+              ubicacion: derivedUbicacion,
+              ubicaciones,
               caracteristicas: {
                 ...currentCaracteristicas,
                 habitaciones:
@@ -506,8 +543,8 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             setM2Terreno={setM2Terreno}
             m2Construccion={m2Construccion}
             setM2Construccion={setM2Construccion}
-            locationData={busquedaLocation}
-            setLocationData={setBusquedaLocation}
+            ubicaciones={ubicaciones}
+            setUbicaciones={setUbicaciones}
             nota={nota}
             setNota={setNota}
           />
