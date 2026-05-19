@@ -10,12 +10,13 @@ export const PROPERTY_TYPES = {
   habitacional: [
     "Casa (Fracc. Abierto)",
     "Casa en Condominio",
-    "Casa de campo/Descanso",
+    "Casa de campo/descanso/cabaña",
+    "Casa de un nivel",
     "Departamento",
-    "Quinta",
-    "Rancho",
-    "Terreno",
-    "Villa",
+    "Penthouse",
+    "Loft",
+    "Terreno (Fracc. abierto)",
+    "Terreno en Condominio",
   ],
   comercial: [
     "Local",
@@ -24,10 +25,10 @@ export const PROPERTY_TYPES = {
     "Bodega",
     "Edificio",
     "Terreno Comercial",
-    "Casa con uso comercial",
+    "Casa con local/casa con uso comercial",
   ],
-  industrial: ["Bodega Industrial", "Nave Industrial", "Terreno Industrial"],
-  agricola: ["Rancho agrícola", "Granja", "Invernadero", "Terreno Agrícola"],
+  industrial: ["Bodega", "Nave", "Terreno para nave o bodega"],
+  agricola: ["Rancho / Finca", "Terreno Rural"],
 } as const;
 
 export type TipoPrincipal = keyof typeof PROPERTY_TYPES;
@@ -52,52 +53,48 @@ export const AMENIDADES = [
   "Gym",
   "Salón de eventos",
   "Cancha deportiva",
+  "Cancha de pádel",
   "Área de juegos infantiles",
   "Seguridad 24/7",
-  "Portón eléctrico",
-  "Sistema de alarma",
-  "Intercomunicador",
-  "Cocina integral",
-  "Closets",
-  "Aire acondicionado",
-  "Calefacción",
-  "Amueblado",
-  "Mascotas permitidas",
-  "Cuarto de servicio",
-  "Bodega/storage",
+  "Pet Park",
+  "Área para yoga",
+  "Lago artificial",
+  "Trotapista",
+  "Campo de golf",
 ] as const;
 
 // ============================================
 // INSTITUCIONES FINANCIERAS (Gravamen)
 // ============================================
 export const INSTITUCIONES_GRAVAMEN = [
-  "BBVA",
+  "BBVA México",
   "Santander",
   "Banorte",
   "HSBC",
   "Scotiabank",
   "Citibanamex",
-  "Banco Azteca",
+  "Afirme",
+  "Banco del Bajío",
+  "Banregio",
+  "Crédito Inmobiliario",
+  "Inmobiliaria del Sur",
   "Infonavit",
   "Fovissste",
-  "Hipotecaria Nacional",
-  "Cofinavit",
+  "Otro",
 ] as const;
 
 // ============================================
 // TIPOS DE FINANCIAMIENTO
 // ============================================
 export const TIPOS_FINANCIAMIENTO = [
-  "BBVA",
-  "Santander",
-  "Banorte",
-  "HSBC",
-  "Scotiabank",
-  "Citibanamex",
+  "Crédito bancario",
   "Infonavit",
   "Fovissste",
-  "Apoyo Infonavit",
-  "Crédito Cofinavit",
+  "Cofinavit",
+  "Arrendamiento financiero",
+  "Crédito puente",
+  "Desarrollador",
+  "Pago de contado",
 ] as const;
 
 // ============================================
@@ -156,13 +153,13 @@ export const getLabelRecamaras = (tipoPrincipal: TipoPrincipal): string => {
 // ============================================
 // CAMPOS ESPECIALIZADOS POR TIPO
 // ============================================
-export const TIPOS_AGUA = ['Pozo', 'Riego', 'Presa', 'Canal', 'Otro'] as const;
+export const TIPOS_AGUA = ['Pozo', 'Presa', 'Canal', 'Otro'] as const;
 export const USOS_TERRENO = ['Agrícola', 'Ganadero'] as const;
-export const TIPOS_RIEGO = ['Temporal', 'Riego', 'Mixto'] as const;
+export const TIPOS_RIEGO = ['Temporal', 'Sistema de riego', 'Mixto'] as const;
 export const TIPOS_UBICACION_COMERCIAL = ['Dentro de plaza', 'Fuera de plaza'] as const;
 export const TIPOS_UBICACION_INDUSTRIAL = ['Dentro de parque', 'Fuera de parque'] as const;
 export const ALTURAS_LIBRES = ['4-6m', '6-8m', '8-10m', '10-12m', '+12m'] as const;
-export const TIPOS_ENERGIA_KVA = ['Trifásica 25 kVA', 'Trifásica 45 kVA', 'Trifásica 150 kVA', 'Más de 150 kVA'] as const;
+export const TIPOS_ENERGIA_KVA = ['Monofásica: hasta 25 kVA', 'Trifásica: 25 a 45 kVA', 'Industrial: 45 a 150 kVA', 'Alta capacidad: más de 150 kVA'] as const;
 
 /**
  * Define qué campos mostrar según el subtipo y tipo principal
@@ -171,26 +168,28 @@ export const getCamposVisibles = (subtipo: string | string[], tipoPrincipal?: Ti
   const isTerreno = esTerreno(subtipo);
   const isDepartamento = esDepartamento(subtipo);
   const isIndustrial = tipoPrincipal === "industrial";
+  const isComercial = tipoPrincipal === "comercial";
+  const isAgricola = tipoPrincipal === "agricola";
 
   return {
     // Características numéricas
-    recamaras: !isTerreno && !isIndustrial,
-    banos: !isTerreno,
-    mediosBanos: !isTerreno,
-    estacionamientos: !isTerreno,
-    niveles: !isTerreno && !isDepartamento,
-    antiguedad: !isTerreno,
+    recamaras: !isTerreno && !isIndustrial && !isComercial && !isAgricola,
+    banos: !isTerreno && !isAgricola,
+    mediosBanos: !isTerreno && !isAgricola,
+    estacionamientos: !isTerreno && !isAgricola,
+    niveles: !isTerreno && !isDepartamento && !isComercial && !isAgricola,
+    antiguedad: !isTerreno && !isAgricola,
 
     // Superficies
     m2Construccion: !isTerreno,
     m2Terreno: !isDepartamento,
 
     // Características adicionales
-    amueblado: !isTerreno,
-    petFriendly: !isTerreno,
+    amueblado: !isTerreno && !isIndustrial && !isAgricola,
+    petFriendly: !isTerreno && !isAgricola,
 
     // Secciones completas
-    amenidades: !isTerreno,
+    amenidades: !isTerreno && !isAgricola,
     gravamen: true,
     financiamiento: true,
   };
