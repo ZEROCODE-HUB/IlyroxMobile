@@ -13,8 +13,6 @@ export const ComercialSection = React.memo(function ComercialSection() {
     setTipoUbicacionComercial,
     frenteMetros,
     setFrenteMetros,
-    nivelPiso,
-    setNivelPiso,
     sobreAvenidaPrincipal,
     setSobreAvenidaPrincipal,
     enEsquina,
@@ -40,27 +38,14 @@ export const ComercialSection = React.memo(function ComercialSection() {
         onSelect={setTipoUbicacionComercial}
       />
 
-      {/* FRENTE Y NIVEL */}
-      <View style={styles.row}>
-        <View style={styles.half}>
-          <AppInput
-            label="Frente (metros)"
-            placeholder="ej. 10"
-            keyboardType="decimal-pad"
-            value={frenteMetros}
-            onChangeText={setFrenteMetros}
-          />
-        </View>
-        <View style={styles.half}>
-          <AppInput
-            label="Nivel / Piso"
-            placeholder="ej. 2"
-            keyboardType="number-pad"
-            value={nivelPiso}
-            onChangeText={setNivelPiso}
-          />
-        </View>
-      </View>
+      {/* FRENTE */}
+      <AppInput
+        label="Frente (metros)"
+        placeholder="ej. 10"
+        keyboardType="decimal-pad"
+        value={frenteMetros}
+        onChangeText={setFrenteMetros}
+      />
 
       {/* CARACTERÍSTICAS */}
       <Text style={styles.label}>Características de Ubicación</Text>

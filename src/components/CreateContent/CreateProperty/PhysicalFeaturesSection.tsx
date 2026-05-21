@@ -302,7 +302,7 @@ export const PhysicalFeaturesSection = React.memo(
             {camposVisibles.m2Construccion && (
               <View style={styles.m2Col}>
                 <AppInput
-                  label="m² Construcción *"
+                  label="m² Construidos *"
                   placeholder="m²"
                   keyboardType="decimal-pad"
                   value={m2Construccion || ""}

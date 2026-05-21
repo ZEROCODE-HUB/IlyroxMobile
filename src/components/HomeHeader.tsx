@@ -85,7 +85,6 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
             style={styles.headerLogo}
             resizeMode="cover"
           />
-          <Text style={styles.headerTitle}>ilyrox</Text>
         </View>
         <View style={styles.headerIcons}>
           {(["Matches", "Messages", "Requests", "Appointments"] as const).map(
@@ -174,11 +173,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: COLORS.white,
-  },
   headerTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -186,9 +180,9 @@ const styles = StyleSheet.create({
     height: 60,
   },
   headerLogo: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 100,
+    height: 50,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: COLORS.whiteTransparent30,
   },

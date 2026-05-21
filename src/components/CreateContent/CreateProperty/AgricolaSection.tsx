@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../../constants/colors";
 import {
   TIPOS_AGUA,
-  USOS_TERRENO,
   TIPOS_RIEGO,
 } from "../../../constants/propertyData";
 import RadioGroupSelector from "../../common/RadioGroupSelector";
@@ -16,8 +15,6 @@ export const AgricolaSection = React.memo(function AgricolaSection() {
     toggleTipoAgua,
     concesionAgua,
     setConcesionAgua,
-    usoTerreno,
-    setUsoTerreno,
     tipoRiego,
     setTipoRiego,
     infraElectricidad,
@@ -39,8 +36,8 @@ export const AgricolaSection = React.memo(function AgricolaSection() {
         <Text style={styles.sectionTitleBand}>Características Agrícolas</Text>
       </View>
 
-      {/* TIPO DE AGUA */}
-      <Text style={styles.label}>Tipo de Agua</Text>
+      {/* FUENTE DE AGUA */}
+      <Text style={styles.label}>Fuente de Agua</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow}>
         {TIPOS_AGUA.map((tipo) => {
           const selected = tiposAgua.includes(tipo);
@@ -72,17 +69,9 @@ export const AgricolaSection = React.memo(function AgricolaSection() {
         />
       </View>
 
-      {/* USO DEL TERRENO */}
+      {/* SISTEMA DE RIEGO */}
       <RadioGroupSelector
-        label="Uso del Terreno"
-        options={[...USOS_TERRENO]}
-        selectedValue={usoTerreno}
-        onSelect={setUsoTerreno}
-      />
-
-      {/* TIPO DE RIEGO */}
-      <RadioGroupSelector
-        label="Tipo de Riego"
+        label="Sistema de Riego"
         options={[...TIPOS_RIEGO]}
         selectedValue={tipoRiego}
         onSelect={setTipoRiego}
@@ -101,7 +90,7 @@ export const AgricolaSection = React.memo(function AgricolaSection() {
           />
         </View>
         <View style={styles.switchCard}>
-          <Text style={styles.switchCardLabel}>Camino de Acceso</Text>
+          <Text style={styles.switchCardLabel}>Acceso</Text>
           <Switch
             value={infraCaminoAcceso}
             onValueChange={setInfraCaminoAcceso}
@@ -120,8 +109,8 @@ export const AgricolaSection = React.memo(function AgricolaSection() {
         </View>
       </View>
 
-      {/* ACCESOS */}
-      <Text style={[styles.label, { marginTop: 12 }]}>Accesos</Text>
+      {/* UBICACIÓN */}
+      <Text style={[styles.label, { marginTop: 12 }]}>Ubicación</Text>
       <View style={styles.grid2Col}>
         <View style={styles.switchCard}>
           <Text style={styles.switchCardLabel}>A pie de Carretera</Text>
@@ -133,7 +122,7 @@ export const AgricolaSection = React.memo(function AgricolaSection() {
           />
         </View>
         <View style={styles.switchCard}>
-          <Text style={styles.switchCardLabel}>Acceso para Camiones</Text>
+          <Text style={styles.switchCardLabel}>Acceso para tráiler</Text>
           <Switch
             value={accesoCamiones}
             onValueChange={setAccesoCamiones}

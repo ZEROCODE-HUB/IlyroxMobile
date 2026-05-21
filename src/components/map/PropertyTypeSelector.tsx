@@ -30,7 +30,7 @@ export const PropertyTypeSelector: React.FC<PropertyTypeSelectorProps> = ({
     { label: "Habitacional", value: "habitacional" },
     { label: "Comercial", value: "comercial" },
     { label: "Industrial", value: "industrial" },
-    { label: "Agrícola", value: "agricola" },
+    { label: "Agropecuario", value: "agricola" },
   ];
 
   return (

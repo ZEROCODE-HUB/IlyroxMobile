@@ -293,9 +293,8 @@ export const propertyService = {
         if (catInst) {
           await supabase.from("propiedad_gravamenes").insert({
             propiedad_id: propiedadId,
-            institucion_financiera_id: catInst.id,
+            institucion_id: catInst.id,
             monto: grav.monto,
-            fecha_gravamen: new Date(), // Default
           });
         }
       }

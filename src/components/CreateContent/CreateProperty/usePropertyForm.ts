@@ -100,7 +100,7 @@ const INITIAL_STATE: PropertyFormState = {
 
   // Gravamen
   tieneGravamen: "No",
-  institucionGravamen: "",
+  institucionGravamen: [],
   montoGravamen: "",
 
   // Financiamiento
@@ -717,12 +717,13 @@ export function usePropertyForm(
       // 8. Gravamen
       if (data.propiedad_gravamenes && data.propiedad_gravamenes.length > 0) {
         payload.tieneGravamen = "Sí";
-        const grav = data.propiedad_gravamenes[0];
-        payload.institucionGravamen =
-          grav.catalogo_instituciones_financieras?.nombre || "";
-        payload.montoGravamen = grav.monto?.toString() || "";
+        payload.institucionGravamen = data.propiedad_gravamenes.map(
+          (grav: any) => grav.catalogo_instituciones_financieras?.nombre || ""
+        );
+        payload.montoGravamen = data.propiedad_gravamenes[0].monto?.toString() || "";
       } else {
         payload.tieneGravamen = "No";
+        payload.institucionGravamen = [];
       }
 
       // 9. Campos especializados
@@ -744,7 +745,15 @@ export function usePropertyForm(
       payload.altoFlujoVehicular = data.alto_flujo_vehicular ?? false;
       payload.ubicacionIndustrial = data.ubicacion_industrial ?? '';
       payload.alturaLibreM = data.altura_libre_m ?? '';
-      payload.tipoEnergiaKva = data.tipo_energia_kva ?? [];
+      const ENERGIA_LEGACY: Record<string, string> = {
+        'Trifásica 25 kVA': 'Monofásica: hasta 25 kVA',
+        'Trifásica 45 kVA': 'Trifásica: 25 a 45 kVA',
+        'Trifásica 150 kVA': 'Industrial: 45 a 150 kVA',
+        'Más de 150 kVA': 'Alta capacidad: más de 150 kVA',
+      };
+      payload.tipoEnergiaKva = (data.tipo_energia_kva ?? []).map(
+        (v: string) => ENERGIA_LEGACY[v] ?? v
+      );
       payload.areaOficinas = data.area_oficinas_m2?.toString() ?? '';
       payload.patioManiobras = data.patio_maniobras_m2?.toString() ?? '';
 

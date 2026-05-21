@@ -354,15 +354,13 @@ export function usePublishProperty(
               ? form.tiposFinanciamientoSeleccionados
               : [],
           gravamenes:
-            form.tieneGravamen === "Sí" && form.institucionGravamen
-              ? [
-                  {
-                    institucion: form.institucionGravamen,
-                    monto: form.montoGravamen
-                      ? parseFloat(form.montoGravamen)
-                      : null,
-                  },
-                ]
+            form.tieneGravamen === "Sí" && form.institucionGravamen.length > 0
+              ? form.institucionGravamen.map((institucion) => ({
+                  institucion,
+                  monto: form.montoGravamen
+                    ? parseFloat(form.montoGravamen)
+                    : null,
+                }))
               : [],
         };
 

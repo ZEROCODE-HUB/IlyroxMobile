@@ -120,7 +120,7 @@ export interface PropertyFormState {
 
   // Gravamen
   tieneGravamen: SiNo;
-  institucionGravamen: string;
+  institucionGravamen: string[];
   montoGravamen: string;
 
   // Financiamiento
