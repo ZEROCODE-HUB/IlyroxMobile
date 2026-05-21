@@ -229,7 +229,10 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         onAddZone={openZoneSearch}
         onRemoveChip={removeLocationChip}
         onRemovePolygon={removePolygon}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (isZoneSearchOpen) { closeZoneSearch(); return; }
+          router.back();
+        }}
       />
 
       {/* ── Overlay de búsqueda de zonas ── */}

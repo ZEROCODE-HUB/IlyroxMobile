@@ -80,6 +80,7 @@ export const INSTITUCIONES_GRAVAMEN = [
   "Inmobiliaria del Sur",
   "Infonavit",
   "Fovissste",
+  "Particular",
   "Otro",
 ] as const;
 

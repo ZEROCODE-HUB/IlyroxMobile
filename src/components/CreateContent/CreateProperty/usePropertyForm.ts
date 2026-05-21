@@ -74,10 +74,13 @@ const INITIAL_STATE: PropertyFormState = {
   estacionamientos: "0",
   m2Construccion: "",
   m2Terreno: "",
+  anchoTerreno: "",
+  largoTerreno: "",
   niveles: "1",
   antiguedad: "",
   amueblado: "No",
   petFriendly: "No",
+  costoMantenimiento: "",
 
   // Amenidades
   amenidadesSeleccionadas: [],
@@ -289,7 +292,10 @@ export function usePropertyForm(
   const setEstacionamientos = makeSetter("estacionamientos");
   const setM2Construccion = makeSetter("m2Construccion");
   const setM2Terreno = makeSetter("m2Terreno");
+  const setAnchoTerreno = makeSetter("anchoTerreno");
+  const setLargoTerreno = makeSetter("largoTerreno");
   const setNiveles = makeSetter("niveles");
+  const setCostoMantenimiento = makeSetter("costoMantenimiento");
   const setAntiguedad = makeSetter("antiguedad");
   const setAmueblado = makeSetter("amueblado");
   const setPetFriendly = makeSetter("petFriendly");
@@ -606,6 +612,9 @@ export function usePropertyForm(
       payload.m2Terreno = data.metros_cuadrados_terreno
         ? formatThousands(data.metros_cuadrados_terreno.toString())
         : "";
+      payload.anchoTerreno = data.ancho_terreno?.toString() ?? '';
+      payload.largoTerreno = data.largo_terreno?.toString() ?? '';
+      payload.costoMantenimiento = data.costo_mantenimiento?.toString() ?? '';
       payload.niveles = data.pisos?.toString() || "1";
       payload.antiguedad = data.antiguedad || "";
       payload.amueblado = (data.amueblado || "No") as AmuebladoType;
@@ -890,8 +899,14 @@ export function usePropertyForm(
     setM2Construccion,
     m2Terreno: state.m2Terreno,
     setM2Terreno,
+    anchoTerreno: state.anchoTerreno,
+    setAnchoTerreno,
+    largoTerreno: state.largoTerreno,
+    setLargoTerreno,
     niveles: state.niveles,
     setNiveles,
+    costoMantenimiento: state.costoMantenimiento,
+    setCostoMantenimiento,
     antiguedad: state.antiguedad,
     setAntiguedad,
     amueblado: state.amueblado,

@@ -274,6 +274,9 @@ export function usePublishProperty(
           metros_cuadrados_terreno: camposVisibles.m2Terreno
             ? parseFloat(form.m2Terreno?.replace(/,/g, "") || "") || null
             : null,
+          ancho_terreno: parseFloat(form.anchoTerreno?.replace(/,/g, "") || "") || null,
+          largo_terreno: parseFloat(form.largoTerreno?.replace(/,/g, "") || "") || null,
+          costo_mantenimiento: parseFloat(form.costoMantenimiento?.replace(/,/g, "") || "") || null,
           pisos: camposVisibles.niveles ? parseInt(form.niveles) || 1 : null,
           amueblado: camposVisibles.amueblado ? form.amueblado : null,
           pet_friendly: camposVisibles.petFriendly ? form.petFriendly : "No",

@@ -94,10 +94,13 @@ export interface PropertyFormState {
   estacionamientos: string;
   m2Construccion: string;
   m2Terreno: string;
+  anchoTerreno: string;
+  largoTerreno: string;
   niveles: string;
   antiguedad: string;
   amueblado: AmuebladoType;
   petFriendly: SiNo;
+  costoMantenimiento: string;
 
   // Amenidades
   amenidadesSeleccionadas: string[];

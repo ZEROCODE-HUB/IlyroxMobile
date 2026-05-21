@@ -12,6 +12,7 @@ import {
   useLocationSearchStore,
   LocationSuggestionWithCount,
 } from "../store/locationSearchStore";
+import { getUniqueLocations } from "../lib/locationService";
 
 interface PropertyCodeSuggestion {
   type: "property_code";
@@ -51,6 +52,7 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
   const [query, setQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [propertySuggestions, setPropertySuggestions] = useState<PropertyCodeSuggestion[]>([]);
+  const [preloadedSuggestions, setPreloadedSuggestions] = useState<LocationSuggestionWithCount[]>([]);
   const [showSearchOverlay, setShowSearchOverlay] = useState(false);
   const { selectedLocation } = useApp();
 
@@ -104,6 +106,17 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
   useEffect(() => {
     onSearchingChange?.(showSuggestions);
   }, [showSuggestions, onSearchingChange]);
+
+  // Precargar sugerencias populares cuando se abre el buscador sin texto
+  useEffect(() => {
+    if (showSuggestions && !query.trim() && preloadedSuggestions.length === 0) {
+      getUniqueLocations().then((locs) => {
+        setPreloadedSuggestions(
+          locs.map((l) => ({ ...l, propertyCount: 0 })) as LocationSuggestionWithCount[],
+        );
+      });
+    }
+  }, [showSuggestions, query]);
 
   // Cerrar sugerencias si el header desaparece
   useEffect(() => {
@@ -170,15 +183,15 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
         )}
       </View>
 
-      {showSuggestions && query.trim() && (
+      {showSuggestions && (query.trim() ? (suggestions.length > 0 || propertySuggestions.length > 0) : preloadedSuggestions.length > 0) && (
         <View
           pointerEvents="auto"
           style={[styles.suggestionsContainer, { top: topOffset }]}
         >
           <FlatList<SearchSuggestion>
-            data={[...propertySuggestions, ...suggestions]}
+            data={query.trim() ? [...propertySuggestions, ...suggestions] : preloadedSuggestions}
             keyExtractor={(item, index) =>
-              `${item.type}-${item.name}-${index}`
+              `${item.type}-${item.name}-${(item as LocationSuggestionWithCount).estado_nombre ?? ""}-${index}`
             }
             keyboardShouldPersistTaps="always"
             nestedScrollEnabled={true}

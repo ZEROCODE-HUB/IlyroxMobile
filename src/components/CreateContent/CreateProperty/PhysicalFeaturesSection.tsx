@@ -49,6 +49,10 @@ export const PhysicalFeaturesSection = React.memo(
       setM2Construccion,
       m2Terreno,
       setM2Terreno,
+      anchoTerreno,
+      setAnchoTerreno,
+      largoTerreno,
+      setLargoTerreno,
       niveles,
       setNiveles,
       antiguedad,
@@ -57,6 +61,8 @@ export const PhysicalFeaturesSection = React.memo(
       setAmueblado,
       petFriendly,
       setPetFriendly,
+      costoMantenimiento,
+      setCostoMantenimiento,
       errors,
       clearError,
     } = usePropertyFormContext();
@@ -337,6 +343,39 @@ export const PhysicalFeaturesSection = React.memo(
             )}
           </View>
         )}
+
+        {/* ANCHO Y LARGO (solo terrenos, opcionales) */}
+        {esTerreno(subtipo) && (
+          <View style={styles.m2Row}>
+            <View style={styles.m2Col}>
+              <AppInput
+                label="Ancho (m)"
+                placeholder="Opcional"
+                keyboardType="decimal-pad"
+                value={anchoTerreno || ""}
+                onChangeText={(text) => setAnchoTerreno(formatThousands(text))}
+              />
+            </View>
+            <View style={styles.m2Col}>
+              <AppInput
+                label="Largo (m)"
+                placeholder="Opcional"
+                keyboardType="decimal-pad"
+                value={largoTerreno || ""}
+                onChangeText={(text) => setLargoTerreno(formatThousands(text))}
+              />
+            </View>
+          </View>
+        )}
+
+        {/* COSTO DE MANTENIMIENTO MENSUAL (todas las propiedades, opcional) */}
+        <AppInput
+          label="Mantenimiento mensual (opcional)"
+          placeholder="ej. 1,500"
+          keyboardType="decimal-pad"
+          value={costoMantenimiento || ""}
+          onChangeText={(text) => setCostoMantenimiento(formatThousands(text))}
+        />
 
         {/* AMUEBLADO */}
         {camposVisibles.amueblado && (
