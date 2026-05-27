@@ -142,6 +142,36 @@ export function usePublishProperty(
         return "SHOW_CONTRACT_MODAL";
       }
 
+      // ── Aviso de sin comisión ANTES de arrancar la subida ──────────────────
+      // Si no hay comisión definida, mostramos la advertencia y esperamos
+      // confirmación del usuario antes de iniciar cualquier carga.
+      const tieneComision = checkComisionPresente(form);
+      if (!tieneComision && form.status === "Publicada") {
+        showModal({
+          title: "Sin comisión definida",
+          message:
+            "Tu propiedad se guardará pero no aparecerá en el feed ni en el mapa hasta que definas tu comisión. ¿Deseas continuar de todas formas?",
+          confirmText: "Publicar de todas formas",
+          cancelText: "Agregar comisión",
+          confirmVariant: "primary",
+          onConfirm: () => void doUpload(resolvedContractData),
+          onCancel: () => {},
+        });
+        return;
+      }
+
+      // Sin advertencia pendiente: arrancar directamente
+      void doUpload(resolvedContractData);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [form, propertyId, user, onBack, router, saveProperty, updateProgress, showModal, showToast],
+  );
+
+  // ── Lógica de subida separada para poder llamarla desde el modal ──────────
+  const doUpload = useCallback(
+    async (resolvedContractData: ContractData | null | undefined) => {
+      if (!user) return; // handlePublish ya lo valida; guarda defensiva
+
       // Resetear cancelación
       cancelledRef.current = false;
 
@@ -243,6 +273,7 @@ export function usePublishProperty(
 
         const tieneComision = checkComisionPresente(form);
         const sinComision = !tieneComision;
+        // Nota: el aviso de sinComision ya se mostró ANTES de arrancar doUpload.
 
         const propertyData = {
           tipo: form.tipoPrincipal,
@@ -327,14 +358,6 @@ export function usePublishProperty(
             patio_maniobras_m2: parseFloat(form.patioManiobras) || null,
           } : {}),
         };
-
-        if (sinComision && form.status === "Publicada") {
-          showModal({
-            title: "Propiedad oculta",
-            message: "Tu propiedad se guardará, pero no será visible en el feed ni en el mapa hasta que agregues la comisión.",
-            confirmText: "Entendido",
-          });
-        }
 
         if (cancelledRef.current) throw new Error("CANCELLED");
 
@@ -485,12 +508,13 @@ export function usePublishProperty(
           confirmText: "Reintentar",
           cancelText: "Cerrar",
           confirmVariant: "primary",
-          onConfirm: () => void handlePublish(resolvedContractData),
+          onConfirm: () => void doUpload(resolvedContractData),
           onCancel: () => {},
         });
       }
     },
-    [form, propertyId, user, onBack, router, saveProperty, updateProgress, showModal],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [form, propertyId, user, onBack, router, saveProperty, updateProgress, showModal, showToast],
   );
 
   return {
