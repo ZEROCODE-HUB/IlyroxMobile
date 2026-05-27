@@ -1,3 +1,9 @@
+/**
+ * estadosMexico.ts
+ * Lista de los 32 estados de México y sus coordenadas centrales aproximadas.
+ * Usado en formularios de auth/perfil y como fallback de centrado en el mapa.
+ */
+
 export const ESTADOS_MEXICO = [
   "Aguascalientes",
   "Baja California",
@@ -35,11 +41,7 @@ export const ESTADOS_MEXICO = [
 
 export type EstadoMexico = (typeof ESTADOS_MEXICO)[number];
 
-
-// ============================================
-// COORDENADAS: Estado
-// ============================================
-
+/** Coordenadas del centro aproximado de cada estado — fallback para centrar el mapa */
 export const COORDENADAS_ESTADO: Record<string, { lat: number; lng: number }> =
   {
     Aguascalientes: { lat: 21.8853, lng: -102.2916 },

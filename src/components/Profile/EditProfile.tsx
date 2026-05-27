@@ -21,7 +21,7 @@ import { perfiles } from "../../types";
 import * as ImagePicker from "expo-image-picker";
 import { decode } from "base64-arraybuffer";
 import { SelectionModal } from "../modals";
-import { ESTADOS_MEXICO } from "../../constants/locations";
+import { ESTADOS_MEXICO } from "../../constants/estadosMexico";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
 import { logger } from "@/utils/logger";
 

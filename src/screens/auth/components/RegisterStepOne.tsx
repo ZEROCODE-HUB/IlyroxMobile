@@ -12,7 +12,7 @@ import { SubmitButton } from "./SubmitButton";
 import { BackButton } from "./BackButton";
 import SelectionModal from "../../../components/modals/SelectionModal";
 import { AuthFormState, getPasswordStrength } from "../hooks/useAuthForm";
-import { ESTADOS_MEXICO } from "../../../constants/locations";
+import { ESTADOS_MEXICO } from "../../../constants/estadosMexico";
 import { COLORS } from "../../../constants/colors";
 
 interface RegisterStepOneProps {

@@ -14,7 +14,7 @@ import { SubmitButton } from "./SubmitButton";
 import { BackButton } from "./BackButton";
 import SelectionModal from "../../../components/modals/SelectionModal";
 import { PendingExternalUser, ExternalAuthFormData } from "../hooks/useExternalAuth";
-import { ESTADOS_MEXICO } from "../../../constants/locations";
+import { ESTADOS_MEXICO } from "../../../constants/estadosMexico";
 import { COLORS } from "../../../constants/colors";
 
 interface ExternalAuthFormProps {

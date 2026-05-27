@@ -11,14 +11,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
-import {
-  ESTADOS_MEXICO,
-  getCiudadesPorEstado,
-  getMunicipiosPorCiudad,
-  getColoniasPorMunicipio,
-} from "../../constants/locations";
 import { PROPERTY_TYPES, TipoPrincipal } from "../../constants/propertyData";
 import SelectionModal from "../modals/SelectionModal";
+import CascadeLocationSelector, {
+  LocationData,
+} from "../common/CascadeLocationSelector";
 
 const { height } = Dimensions.get("window");
 
@@ -59,14 +56,12 @@ export const StatisticsFilterModal: React.FC<StatisticsFilterModalProps> = ({
   onApply,
   currentFilters,
 }) => {
-  // Local state for filters
   const [location, setLocation] = useState(currentFilters.location);
   const [pType, setPType] = useState(currentFilters.propertyType);
   const [opType, setOpType] = useState(currentFilters.operationType);
 
-  // Selection Modal State
   const [activeSelector, setActiveSelector] = useState<{
-    type: "estado" | "ciudad" | "municipio" | "colonia" | "tipo" | "subtipo";
+    type: "tipo" | "subtipo";
     options: string[];
     visible: boolean;
     title: string;
@@ -80,71 +75,28 @@ export const StatisticsFilterModal: React.FC<StatisticsFilterModalProps> = ({
     }
   }, [visible, currentFilters]);
 
-  const handleLocationChange = (
-    field: "estado" | "ciudad" | "municipio" | "colonia",
-    value: string,
-  ) => {
-    setLocation((prev) => {
-      const newState = { ...prev, [field]: value };
-      // Cascading resets
-      if (field === "estado") {
-        newState.ciudad = "";
-        newState.municipio = "";
-        newState.colonia = "";
-      } else if (field === "ciudad") {
-        newState.municipio = "";
-        newState.colonia = "";
-      } else if (field === "municipio") {
-        newState.colonia = "";
-      }
-      return newState;
+  const handleLocationChange = (data: LocationData) => {
+    setLocation({
+      estado: data.estado ?? "",
+      ciudad: data.ciudad ?? "",
+      municipio: data.municipio ?? "",
+      colonia: data.colonia ?? "",
     });
   };
 
-  const openSelector = (
-    type: "estado" | "ciudad" | "municipio" | "colonia" | "tipo" | "subtipo",
-  ) => {
+  const openSelector = (type: "tipo" | "subtipo") => {
     let options: string[] = [];
     let title = "";
 
-    switch (type) {
-      case "estado":
-        options = [...ESTADOS_MEXICO];
-        title = "Selecciona Estado";
-        break;
-      case "ciudad":
-        options = getCiudadesPorEstado(location.estado);
-        title = "Selecciona Ciudad";
-        break;
-      case "municipio":
-        options = getMunicipiosPorCiudad(location.ciudad);
-        title = "Selecciona Municipio";
-        break;
-      case "colonia":
-        options = getColoniasPorMunicipio(location.municipio);
-        title = "Selecciona Colonia";
-        break;
-      case "tipo":
-        options = Object.keys(PROPERTY_TYPES).map(
-          (k) => k.charAt(0).toUpperCase() + k.slice(1),
-        );
-        title = "Tipo de Propiedad";
-        break;
-      case "subtipo":
-        if (pType.type) {
-          const key = pType.type.toLowerCase() as TipoPrincipal;
-          options = [...(PROPERTY_TYPES[key] || [])];
-        }
-        title = "Subtipo de Propiedad";
-        break;
-    }
-
-    if (type !== "estado" && type !== "tipo" && options.length === 0) {
-      if (type === "subtipo" && !pType.type) {
-        // No type selected
-      } else {
-        // Handle empty options or notify user? For now just allow clear
-      }
+    if (type === "tipo") {
+      options = Object.keys(PROPERTY_TYPES).map(
+        (k) => k.charAt(0).toUpperCase() + k.slice(1),
+      );
+      title = "Tipo de Propiedad";
+    } else if (type === "subtipo" && pType.type) {
+      const key = pType.type.toLowerCase() as TipoPrincipal;
+      options = [...(PROPERTY_TYPES[key] || [])];
+      title = "Subtipo de Propiedad";
     }
 
     setActiveSelector({
@@ -159,14 +111,7 @@ export const StatisticsFilterModal: React.FC<StatisticsFilterModalProps> = ({
     if (!activeSelector) return;
     const val = value === "Todos" ? "" : value;
 
-    if (
-      activeSelector.type === "estado" ||
-      activeSelector.type === "ciudad" ||
-      activeSelector.type === "municipio" ||
-      activeSelector.type === "colonia"
-    ) {
-      handleLocationChange(activeSelector.type, val);
-    } else if (activeSelector.type === "tipo") {
+    if (activeSelector.type === "tipo") {
       setPType({ type: val, subtype: "" });
     } else if (activeSelector.type === "subtipo") {
       setPType((prev) => ({ ...prev, subtype: val }));
@@ -174,6 +119,10 @@ export const StatisticsFilterModal: React.FC<StatisticsFilterModalProps> = ({
 
     setActiveSelector(null);
   };
+
+  const locationDisplayLabel = [location.colonia, location.municipio, location.estado]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <Modal
@@ -191,8 +140,11 @@ export const StatisticsFilterModal: React.FC<StatisticsFilterModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.scrollContent}>
-            {/* Operation Type */}
+          <ScrollView
+            style={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Tipo de operación */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Operación</Text>
               <View style={styles.chipsContainer}>
@@ -215,72 +167,51 @@ export const StatisticsFilterModal: React.FC<StatisticsFilterModalProps> = ({
               </View>
             </View>
 
-            {/* Location */}
+            {/* Ubicación con Google Places */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Ubicación</Text>
-
-              <TouchableOpacity
-                style={styles.dropdown}
-                onPress={() => openSelector("estado")}
-              >
-                <Text style={styles.label}>Estado</Text>
-                <Text style={styles.value}>{location.estado || "Todos"}</Text>
-                <Ionicons
-                  name="chevron-down"
-                  size={20}
-                  color={COLORS.textTertiary}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.dropdown, !location.estado && styles.disabled]}
-                onPress={() => location.estado && openSelector("ciudad")}
-                disabled={!location.estado}
-              >
-                <Text style={styles.label}>Ciudad</Text>
-                <Text style={styles.value}>{location.ciudad || "Todas"}</Text>
-                <Ionicons
-                  name="chevron-down"
-                  size={20}
-                  color={COLORS.textTertiary}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.dropdown, !location.ciudad && styles.disabled]}
-                onPress={() => location.ciudad && openSelector("municipio")}
-                disabled={!location.ciudad}
-              >
-                <Text style={styles.label}>Municipio</Text>
-                <Text style={styles.value}>
-                  {location.municipio || "Todos"}
-                </Text>
-                <Ionicons
-                  name="chevron-down"
-                  size={20}
-                  color={COLORS.textTertiary}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.dropdown,
-                  !location.municipio && styles.disabled,
-                ]}
-                onPress={() => location.municipio && openSelector("colonia")}
-                disabled={!location.municipio}
-              >
-                <Text style={styles.label}>Colonia</Text>
-                <Text style={styles.value}>{location.colonia || "Todas"}</Text>
-                <Ionicons
-                  name="chevron-down"
-                  size={20}
-                  color={COLORS.textTertiary}
-                />
-              </TouchableOpacity>
+              {locationDisplayLabel ? (
+                <View style={styles.locationPreview}>
+                  <Ionicons
+                    name="location-outline"
+                    size={16}
+                    color={COLORS.primary}
+                  />
+                  <Text style={styles.locationPreviewText} numberOfLines={1}>
+                    {locationDisplayLabel}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      setLocation({
+                        estado: "",
+                        ciudad: "",
+                        municipio: "",
+                        colonia: "",
+                      })
+                    }
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name="close-circle"
+                      size={18}
+                      color={COLORS.textTertiary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+              <CascadeLocationSelector
+                initialData={{
+                  estado: location.estado,
+                  ciudad: location.ciudad,
+                  municipio: location.municipio,
+                  colonia: location.colonia,
+                }}
+                onChange={handleLocationChange}
+                placeholder="Buscar colonia, municipio o estado..."
+              />
             </View>
 
-            {/* Property Type */}
+            {/* Tipo de propiedad */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Tipo de Propiedad</Text>
 
@@ -317,12 +248,7 @@ export const StatisticsFilterModal: React.FC<StatisticsFilterModalProps> = ({
             <TouchableOpacity
               style={styles.resetBtn}
               onPress={() => {
-                setLocation({
-                  estado: "",
-                  ciudad: "",
-                  municipio: "",
-                  colonia: "",
-                });
+                setLocation({ estado: "", ciudad: "", municipio: "", colonia: "" });
                 setPType({ type: "Todos", subtype: "" });
                 setOpType("Venta");
               }}
@@ -345,7 +271,6 @@ export const StatisticsFilterModal: React.FC<StatisticsFilterModalProps> = ({
         </View>
       </View>
 
-      {/* Selection Modal Reuse */}
       {activeSelector && (
         <SelectionModal
           visible={activeSelector.visible}
@@ -451,6 +376,21 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     textAlign: "right",
     marginRight: 8,
+  },
+  locationPreview: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: COLORS.background,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  locationPreviewText: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.textPrimary,
   },
   footer: {
     padding: 16,

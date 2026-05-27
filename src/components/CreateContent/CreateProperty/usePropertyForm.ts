@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useModal } from "@/context/ModalContext";
 import { supabase } from "../../../lib/supabase";
-import { COORDENADAS_ESTADO } from "../../../constants/MexLocations/estados";
+import { COORDENADAS_ESTADO } from "../../../constants/estadosMexico";
 import {
   PROPERTY_TYPES,
   TipoPrincipal,
