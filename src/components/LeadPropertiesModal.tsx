@@ -94,7 +94,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
   };
 
   const activeList = activeTab === "coincidencia" ? coincidences : similars;
-  const badgeColor = activeTab === "coincidencia" ? "#FF3B30" : "#8E8E93";
+  const badgeColor = activeTab === "coincidencia" ? COLORS.primary : "#8E8E93";
   const badgeText = activeTab === "coincidencia" ? "Match" : "Similar";
 
   const formatCompactPrice = (amount: number) => {

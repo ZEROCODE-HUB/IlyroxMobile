@@ -223,13 +223,30 @@ export const useSaveSearch = (userId?: string) => {
         : [filters.locationFilter.colonia];
     }
 
-    // Location chips (zonas nombradas)
+    // Location chips (zonas nombradas con bounds geográficos)
     if (filters.locationChips?.length > 0) {
       criterios_busqueda.location_chips = filters.locationChips.map((c: any) => ({
         label: c.label,
         type: c.type,
+        bounds: c.bounds,        // nuevo campo
         locationFilter: c.locationFilter,
       }));
+
+      // Guardar bounds del primer chip (o unión de todos) en el campo de nivel superior
+      const chipsConBounds = filters.locationChips.filter((c: any) => c.bounds);
+      if (chipsConBounds.length > 0) {
+        let north = chipsConBounds[0].bounds.north;
+        let south = chipsConBounds[0].bounds.south;
+        let east = chipsConBounds[0].bounds.east;
+        let west = chipsConBounds[0].bounds.west;
+        for (const chip of chipsConBounds) {
+          north = Math.max(north, chip.bounds.north);
+          south = Math.min(south, chip.bounds.south);
+          east = Math.max(east, chip.bounds.east);
+          west = Math.min(west, chip.bounds.west);
+        }
+        criterios_busqueda.bounds = { north, south, east, west };
+      }
     }
 
     // Comisiones
@@ -332,9 +349,43 @@ export const useSaveSearch = (userId?: string) => {
       );
       if (!isNaN(m2Terr)) insertData.metros_terreno = m2Terr;
     }
+    if (filters.niveles && filters.niveles !== "No indicado") {
+      const niv = parseInt(filters.niveles);
+      if (!isNaN(niv)) insertData.pisos = niv;
+    }
+    if (filters.antiguedad && filters.antiguedad !== "No indicado") {
+      insertData.antiguedad = filters.antiguedad;
+    }
+    if (filters.comisionVentaMin) {
+      const cvm = parseFloat(filters.comisionVentaMin);
+      if (!isNaN(cvm) && cvm > 0) insertData.comision_venta_min = cvm;
+    }
+    if (filters.comisionRentaMin) {
+      const crm = parseFloat(filters.comisionRentaMin);
+      if (!isNaN(crm) && crm > 0) insertData.comision_renta_min = crm;
+    }
 
     if (filters.polygons && filters.polygons.length > 0) {
       insertData.polygon_coords = filters.polygons;
+    }
+
+    // Bounds y place_name de la zona buscada (nuevo sistema Google Places)
+    if (filters.locationChips?.length > 0) {
+      const chipsConBounds = filters.locationChips.filter((c: any) => c.bounds);
+      if (chipsConBounds.length > 0) {
+        let north = chipsConBounds[0].bounds.north;
+        let south = chipsConBounds[0].bounds.south;
+        let east = chipsConBounds[0].bounds.east;
+        let west = chipsConBounds[0].bounds.west;
+        for (const chip of chipsConBounds) {
+          north = Math.max(north, chip.bounds.north);
+          south = Math.min(south, chip.bounds.south);
+          east = Math.max(east, chip.bounds.east);
+          west = Math.min(west, chip.bounds.west);
+        }
+        insertData.bounds = { north, south, east, west };
+        insertData.place_name = chipsConBounds.map((c: any) => c.label).join(", ");
+      }
     }
 
     if (filters.moneda) {

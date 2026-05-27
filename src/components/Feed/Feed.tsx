@@ -14,7 +14,7 @@ import {
   RefreshControl,
   Platform,
 } from "react-native";
-import { FlashList } from "@shopify/flash-list";
+import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { FeedItem, User } from "../../types";
 import UsersSlider from "../UsersSlider";
 import { ReelCard, PropertyCard, PostCard } from "../cards";
@@ -53,7 +53,7 @@ const Feed: React.FC<FeedProps> = ({
   const [activeCommentItem, setActiveCommentItem] = useState<FeedItem | null>(
     null,
   );
-  const flatListRef = useRef<any>(null);
+  const flatListRef = useRef<FlashListRef<FeedItem>>(null);
 
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
 
@@ -66,6 +66,7 @@ const Feed: React.FC<FeedProps> = ({
     loadMore,
     refresh,
     refreshUserStats,
+    error,
   } = useFeed({
     userId: currentUserId,
     pageSize: 20,
@@ -289,6 +290,7 @@ const Feed: React.FC<FeedProps> = ({
               onUserClick={onUserClick}
               onCommentClick={() => handleOpenComments(item)}
               currentUserId={currentUserId}
+              onPostUpdated={refresh}
             />
           );
       }
@@ -335,6 +337,17 @@ const Feed: React.FC<FeedProps> = ({
   }, [hasMore, loading, finalItems.length]);
 
   const ListEmpty = useMemo(() => {
+    if (error) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No se pudo cargar el feed</Text>
+          <Text style={styles.emptySubtext}>{error}</Text>
+          <Text style={styles.retryButton} onPress={refresh}>
+            Reintentar
+          </Text>
+        </View>
+      );
+    }
     if (loading) {
       return (
         <View style={styles.emptyContainer}>
@@ -348,7 +361,7 @@ const Feed: React.FC<FeedProps> = ({
         <Text style={styles.emptySubtext}>¡Sé el primero en publicar!</Text>
       </View>
     );
-  }, [loading]);
+  }, [loading, error, refresh]);
 
   return (
     <>
@@ -474,6 +487,12 @@ const styles = StyleSheet.create({
   emptySubtext: {
     color: COLORS.textTertiary,
     fontSize: 14,
+  },
+  retryButton: {
+    marginTop: 16,
+    color: COLORS.primary,
+    fontSize: 15,
+    fontWeight: "600",
   },
 });
 

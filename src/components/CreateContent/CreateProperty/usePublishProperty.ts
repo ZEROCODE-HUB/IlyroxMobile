@@ -265,6 +265,7 @@ export function usePublishProperty(
             ? parseInt(form.recamaras) || 0
             : 0,
           banos: camposVisibles.banos ? parseInt(form.banosCompletos) || 0 : 0,
+          medios_banos: camposVisibles.mediosBanos ? parseInt(form.mediosBanos) || 0 : null,
           estacionamientos: camposVisibles.estacionamientos
             ? parseInt(form.estacionamientos) || 0
             : 0,
@@ -408,6 +409,7 @@ export function usePublishProperty(
         }
 
         // Éxito
+        const newPropertyId = !propertyId ? (saveResult?.id ?? null) : null;
         setTimeout(() => {
           setPublishState({
             uploading: false,
@@ -422,9 +424,16 @@ export function usePublishProperty(
             message: propertyId
               ? "Propiedad actualizada correctamente"
               : "Propiedad publicada correctamente",
-            confirmText: "Listo",
+            confirmText: newPropertyId ? "Ver propiedad" : "Listo",
+            cancelText: newPropertyId ? "Ir al feed" : undefined,
+            confirmVariant: "primary",
             onConfirm: () => {
-              if (!propertyId) {
+              if (newPropertyId) {
+                router.push({
+                  pathname: "/(stack)/property/[id]",
+                  params: { id: newPropertyId },
+                });
+              } else if (!propertyId) {
                 router.replace({
                   pathname: "/(tabs)",
                   params: { refresh: String(Date.now()) },
@@ -433,6 +442,14 @@ export function usePublishProperty(
                 if (onBack) onBack(true);
               }
             },
+            onCancel: newPropertyId
+              ? () => {
+                  router.replace({
+                    pathname: "/(tabs)",
+                    params: { refresh: String(Date.now()) },
+                  });
+                }
+              : undefined,
           });
         }, 500); // Pequeño delay para que el usuario vea el 100%
       } catch (error: any) {

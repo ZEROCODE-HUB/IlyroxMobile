@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, Platform, Pressable } from "react-native";
+import * as Haptics from "expo-haptics";
 
 import MapView, {
   Marker,
@@ -80,8 +81,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     const sc = new Supercluster({ radius: 50, maxZoom: 14 });
     const points = properties
       .map((p) => {
-        const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
-        const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
+        const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
+        const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
         if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return null;
         return {
           type: "Feature" as const,
@@ -180,17 +181,17 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       const maxLng = longitude + longitudeDelta + lngBuffer;
 
       const visibleProps = properties.filter((p) => {
-        const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
-        const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
+        const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
+        const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
         if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return false;
         return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
       });
 
-      const limitedProps = visibleProps.slice(0, 200);
+      const limitedProps = visibleProps.slice(0, 500);
       const newPositions: any = {};
       const propPromises = limitedProps.map(async (p) => {
-        const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
-        const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
+        const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
+        const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
         try {
           if (!nativeMapRef.current) return;
           const point = await nativeMapRef.current.pointForCoordinate({
@@ -265,8 +266,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     let maxLng = -Infinity;
 
     properties.forEach((p) => {
-      const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
-      const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
+      const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
+      const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
 
       if (lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng)) {
         minLat = Math.min(minLat, lat);
@@ -314,6 +315,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     if (Platform.OS === "web" || !nativeMapRef.current || !mapReady) return;
     if (!focusRegion) return;
     nativeMapRef.current?.animateToRegion(focusRegion, 700);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }, [focusRegion, mapReady]);
 
   // Auto-fit inicial solo cuando no hay focusRegion (carga sin ubicación seleccionada)
@@ -355,8 +357,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     const bounds = new (window as any).google.maps.LatLngBounds();
 
     properties.forEach((p) => {
-      const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
-      const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
+      const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
+      const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
 
       if (lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng)) {
         bounds.extend({ lat, lng });
@@ -415,8 +417,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     markersRef.current = [];
 
     properties.forEach((p) => {
-      const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
-      const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
+      const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
+      const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
 
       if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return;
 
@@ -479,8 +481,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     if (!highlightedPropertyId) return;
     const target = properties.find((p) => p.id === highlightedPropertyId);
     if (!target) return;
-    const lat = target.coordinates?.lat ?? (target.latitud ? parseFloat(target.latitud) : undefined);
-    const lng = target.coordinates?.lng ?? (target.longitud ? parseFloat(target.longitud) : undefined);
+    const lat = target.coordinates?.lat ?? target.latitud ?? undefined;
+    const lng = target.coordinates?.lng ?? target.longitud ?? undefined;
     if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return;
     const region = makeFocusRegion(Number(lat), Number(lng));
     nativeMapRef.current?.animateToRegion(region, 600);
@@ -622,8 +624,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
             const propertyId = point.properties.propertyId as string;
             const p = propertyMap.get(propertyId);
             if (!p) return null;
-            const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
-            const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
+            const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
+            const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
             if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return null;
             return (
               <Marker
@@ -632,6 +634,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
                 onPress={() => {
                   const r = makeFocusRegion(Number(lat), Number(lng));
                   nativeMapRef.current?.animateToRegion(r, 600);
+                  if (Platform.OS !== "web") Haptics.selectionAsync();
                   onMarkerPress(p.id, p);
                 }}
                 opacity={0}

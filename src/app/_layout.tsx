@@ -77,7 +77,17 @@ function RootLayoutNav() {
 
   const loading = authLoading || versionLoading;
 
-  // Handler de tap en notificaciones push
+  // Mostrar notificaciones aunque la app esté en foreground — efecto estable sin dependencias
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const handleForegroundDisplay = (event: any) => {
+      try { event.getNotification().display(); } catch {}
+    };
+    OneSignal.Notifications.addEventListener("foregroundWillDisplay", handleForegroundDisplay);
+    return () => OneSignal.Notifications.removeEventListener("foregroundWillDisplay", handleForegroundDisplay);
+  }, []);
+
+  // Handler de tap en notificaciones push — depende de router para navegación correcta
   useEffect(() => {
     if (Platform.OS === "web") return;
     const handleNotificationClick = (event: any) => {
@@ -87,12 +97,25 @@ function RootLayoutNav() {
         router.push("/(stack)/matches");
       } else if (data.type === "recordar_filtros") {
         router.push("/(stack)/map");
+      } else if (
+        (data.type === "new_recommendation" ||
+          data.type === "new_rating" ||
+          data.type === "new_follower") &&
+        data.sender_id
+      ) {
+        router.push({
+          pathname: "/(stack)/profile/[id]",
+          params: { id: data.sender_id },
+        });
+      } else if (data.type === "new_message" && data.conversation_id) {
+        router.push({
+          pathname: "/(stack)/chat/[id]",
+          params: { id: data.conversation_id },
+        });
       }
     };
     OneSignal.Notifications.addEventListener("click", handleNotificationClick);
-    return () => {
-      OneSignal.Notifications.removeEventListener("click", handleNotificationClick);
-    };
+    return () => OneSignal.Notifications.removeEventListener("click", handleNotificationClick);
   }, [router]);
 
   // Global StatusBar setup

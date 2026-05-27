@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
+import { useApp } from "@/context/AppContext";
 import { COLORS } from "@/constants";
 import { Bath } from "lucide-react-native";
 
@@ -49,6 +50,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   sinDatos,
 }) => {
   const { user } = useAuth();
+  const { currentUser } = useApp();
   const { propertyDetails, loading, refetch } = usePropertyDetails(
     propertyId || "",
   );
@@ -239,7 +241,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                     {op.tipo_operacion === "venta" ? "Venta" : "Renta"}
                   </Text>
                   <Text style={styles.price}>
-                    {op.moneda} {op.precio.toLocaleString()}
+                    {op.moneda} {op.precio.toLocaleString("es-MX")}
                   </Text>
                 </View>
               ))}
@@ -354,7 +356,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           </View>
 
           {/* Amenidades */}
-          {amenities.length > 0 && (
+          {amenities.length > 0 && propertyDetails.tipo?.toLowerCase() !== "industrial" && propertyDetails.tipo?.toLowerCase() !== "agricola" && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Amenidades</Text>
               <View style={styles.amenitiesContainer}>
@@ -404,7 +406,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
             operations={operations}
             gravamenes={gravamenes}
             financiamientos={financiamientos}
-            sinDatos={sinDatos}
+            sinDatos={sinDatos || currentUser?.role === "User"}
           />
 
           <View style={styles.section}>

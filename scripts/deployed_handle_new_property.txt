@@ -1,0 +1,10 @@
+
+BEGIN
+  PERFORM public.evaluate_property_matches(
+    NEW.propiedad_id,
+    NEW.tipo_operacion::text,
+    NEW.precio
+  );
+  RETURN NEW;
+END;
+

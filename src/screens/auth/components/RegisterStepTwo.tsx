@@ -4,10 +4,20 @@
  */
 
 import React, { useState } from "react";
-import { Text, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  Modal,
+  View,
+} from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { Avatar } from "../../../components/shared";
 import { SubmitButton } from "./SubmitButton";
@@ -36,15 +46,25 @@ const OCUPACIONES = [
 
 const MODALIDADES = ["Inmobiliaria", "Independiente"];
 
-const EXPERIENCIA_OPTIONS = [...Array(51).keys()].map((n) => ({
-  label: `${n} años`,
-  value: n.toString(),
-}));
+const CAREER_LABELS: Record<string, string> = {
+  "Asesor Inmobiliario": "¿Cuándo iniciaste como Asesor Inmobiliario? *",
+  "Desarrollador Inmobiliario": "¿Cuándo iniciaste como Desarrollador Inmobiliario? *",
+  "Arquitecto": "¿Cuándo iniciaste como Arquitecto? *",
+  "Constructor": "¿Cuándo iniciaste como Constructor? *",
+};
 
-EXPERIENCIA_OPTIONS.push({
-  label: "+ 50 años",
-  value: "50+",
-});
+function getCareerLabel(ocupacion: string): string {
+  return CAREER_LABELS[ocupacion] ?? "¿Cuándo iniciaste tu carrera? *";
+}
+
+function formatDate(isoDate: string): string {
+  const d = new Date(isoDate + "T12:00:00");
+  return d.toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
 
 export function RegisterStepTwo({
   formState,
@@ -55,7 +75,7 @@ export function RegisterStepTwo({
 }: RegisterStepTwoProps) {
   const [showOcupacionModal, setShowOcupacionModal] = useState(false);
   const [showModalidadModal, setShowModalidadModal] = useState(false);
-  const [showExperienciaModal, setShowExperienciaModal] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [photoTouched, setPhotoTouched] = useState(false);
 
   const handleSubmit = () => {
@@ -69,8 +89,6 @@ export function RegisterStepTwo({
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
       quality: 0.7,
     });
 
@@ -78,6 +96,29 @@ export function RegisterStepTwo({
       onUpdateField("avatarUri", result.assets[0].uri);
     }
   };
+
+  const handleDateChange = (
+    event: DateTimePickerEvent,
+    date?: Date,
+  ) => {
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+      if (event.type === "set" && date) {
+        const iso = date.toISOString().split("T")[0];
+        onUpdateField("fechaInicioCarrera", iso);
+      }
+    } else {
+      // iOS: actualiza en tiempo real mientras gira el spinner
+      if (date) {
+        const iso = date.toISOString().split("T")[0];
+        onUpdateField("fechaInicioCarrera", iso);
+      }
+    }
+  };
+
+  const pickerDate = formState.fechaInicioCarrera
+    ? new Date(formState.fechaInicioCarrera + "T12:00:00")
+    : new Date(new Date().getFullYear() - 5, 0, 1);
 
   return (
     <KeyboardAwareScrollView
@@ -179,41 +220,75 @@ export function RegisterStepTwo({
         </>
       )}
 
-      {/* Años de experiencia */}
+      {/* Fecha de inicio de carrera */}
       <TouchableOpacity
         style={styles.selectButton}
-        onPress={() => setShowExperienciaModal(true)}
+        onPress={() => setShowDatePicker(true)}
         activeOpacity={0.7}
       >
         <Text
           style={[
             styles.selectText,
-            !formState.anosExperiencia && styles.selectPlaceholder,
+            !formState.fechaInicioCarrera && styles.selectPlaceholder,
           ]}
         >
-          {formState.anosExperiencia
-            ? `${formState.anosExperiencia} años`
-            : "Años de experiencia *"}
+          {formState.fechaInicioCarrera
+            ? formatDate(formState.fechaInicioCarrera)
+            : getCareerLabel(formState.ocupacion)}
         </Text>
-        <Ionicons name="chevron-down" size={20} color={COLORS.textSecondary} />
+        <Ionicons name="calendar-outline" size={20} color={COLORS.textSecondary} />
       </TouchableOpacity>
 
-      <SelectionModal
-        visible={showExperienciaModal}
-        onClose={() => setShowExperienciaModal(false)}
-        onSelect={(v) => onUpdateField("anosExperiencia", v)}
-        title="Años de experiencia"
-        options={EXPERIENCIA_OPTIONS}
-        currentValue={formState.anosExperiencia}
-      />
+      {/* DatePicker Android — aparece directamente */}
+      {showDatePicker && Platform.OS === "android" && (
+        <DateTimePicker
+          value={pickerDate}
+          mode="date"
+          display="default"
+          maximumDate={new Date()}
+          onChange={handleDateChange}
+        />
+      )}
+
+      {/* DatePicker iOS — en Modal con botón "Listo" */}
+      {Platform.OS === "ios" && (
+        <Modal
+          transparent
+          animationType="slide"
+          visible={showDatePicker}
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <View style={styles.iosOverlay}>
+            <View style={styles.iosPickerContainer}>
+              <View style={styles.iosPickerHeader}>
+                <Text style={styles.iosPickerTitle}>Fecha de inicio</Text>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={styles.iosDoneButton}>Listo</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={pickerDate}
+                mode="date"
+                display="spinner"
+                maximumDate={new Date()}
+                locale="es-MX"
+                onChange={handleDateChange}
+                style={styles.iosPicker}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
 
       <AppInput
-        placeholder="Biografía *"
+        placeholder="Ej: Asesor con 5 años en el sector residencial de Guadalajara, especializado en propiedades de lujo y arrendamiento *"
         autoCapitalize="sentences"
         keyboardType="default"
         value={formState.biografia}
         onChangeText={(v) => onUpdateField("biografia", v)}
+        multiline
         numberOfLines={4}
+        textAlignVertical="top"
         inputStyle={{ height: 100 }}
         maxLength={200}
         showCounter
@@ -257,7 +332,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: COLORS.background,
     borderWidth: 1,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.cardBorder,
     borderRadius: 10,
     padding: 16,
     marginBottom: 16,
@@ -265,6 +340,7 @@ const styles = StyleSheet.create({
   selectText: {
     fontSize: 16,
     color: COLORS.textPrimary,
+    flex: 1,
   },
   selectPlaceholder: {
     color: COLORS.textTertiary,
@@ -282,5 +358,39 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: -12,
     marginBottom: 12,
+  },
+  // iOS DatePicker Modal
+  iosOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  iosPickerContainer: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 30,
+  },
+  iosPickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
+  },
+  iosPickerTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+  },
+  iosDoneButton: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.primary,
+  },
+  iosPicker: {
+    height: 200,
   },
 });

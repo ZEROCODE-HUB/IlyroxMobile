@@ -4,7 +4,8 @@ import MapView, {
   PROVIDER_DEFAULT,
   PROVIDER_GOOGLE,
 } from "../shared/MapComponents";
-import { View, StyleSheet, Text, Platform, Pressable } from "react-native";
+import { View, StyleSheet, Text, Platform, Pressable, Linking, TouchableOpacity } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Property } from "../../types";
 import { COLORS } from "../../constants";
 import { Globe, MapIcon } from "lucide-react-native";
@@ -27,6 +28,15 @@ export const MapDetails: React.FC<PropertyMapProps> = ({
     "standard",
   );
   const deferredMapTypeId = useDeferredValue(mapTypeId);
+
+  const openInMaps = () => {
+    const url = Platform.select({
+      ios: `maps:0,0?q=${lat},${lng}`,
+      android: `geo:${lat},${lng}?q=${lat},${lng}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+    });
+    if (url) Linking.openURL(url).catch(() => {});
+  };
 
   if (!lat || !lng || isNaN(Number(lat)) || isNaN(Number(lng))) {
     return (
@@ -112,6 +122,10 @@ export const MapDetails: React.FC<PropertyMapProps> = ({
           coordinate={{ latitude: Number(lat), longitude: Number(lng) }}
         />
       </MapView>
+      <TouchableOpacity style={styles.openMapsButton} onPress={openInMaps} activeOpacity={0.8}>
+        <Ionicons name="navigate-outline" size={14} color={COLORS.white} />
+        <Text style={styles.openMapsText}>Abrir en mapa</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -151,5 +165,27 @@ const styles = StyleSheet.create({
   mapTypeButtonText: {
     fontSize: 10,
     fontWeight: "bold",
+  },
+  openMapsButton: {
+    position: "absolute",
+    bottom: 12,
+    left: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    elevation: 3,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  openMapsText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: "600",
   },
 });

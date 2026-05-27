@@ -13,7 +13,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/constants";
-import { useMapProperties } from "@/hooks/useMapProperties";
+import { useMapProperties, MapServerFilters } from "@/hooks/useMapProperties";
 import { usePropertyFilters } from "@/hooks/usePropertyFilters";
 import { useMapFeedItems } from "@/hooks/useMapFeedItems";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
@@ -24,6 +24,67 @@ import { SaveSearchSuccessSheet } from "@/components/map/SaveSearchSuccessSheet"
 import { PublishSearchPostModal } from "@/components/map/PublishSearchPostModal";
 import { useAuth } from "@/context/AuthContext";
 import { FeedItem, User } from "@/types";
+
+function extractServerFilters(
+  filters: ReturnType<typeof usePropertyFiltersStore.getState>["filters"],
+): MapServerFilters {
+  const f: MapServerFilters = {};
+  if (filters.tipoPropiedad) f.tipoPropiedad = filters.tipoPropiedad;
+  if (filters.subtipo?.length > 0) f.subtipo = filters.subtipo;
+  const loc = filters.locationFilter;
+  if (loc.estado) f.estado = loc.estado;
+  if (loc.municipio) f.municipio = loc.municipio;
+  if (filters.habitaciones && filters.habitaciones !== "No indicado") {
+    const n = parseInt(filters.habitaciones);
+    if (!isNaN(n)) f.habitacionesMin = n;
+  }
+  if (filters.banos && filters.banos !== "No indicado") {
+    const n = parseInt(filters.banos);
+    if (!isNaN(n)) f.banosMin = n;
+  }
+  if (filters.estacionamientos && filters.estacionamientos !== "No indicado") {
+    const n = parseInt(filters.estacionamientos);
+    if (!isNaN(n)) f.estacionamientosMin = n;
+  }
+  if (filters.m2ConstruccionMin) {
+    const n = parseFloat(filters.m2ConstruccionMin.replace(/,/g, ""));
+    if (!isNaN(n) && n > 0) f.m2ConstruccionMin = n;
+  }
+  if (filters.m2TerrenoMin) {
+    const n = parseFloat(filters.m2TerrenoMin.replace(/,/g, ""));
+    if (!isNaN(n) && n > 0) f.m2TerrenoMin = n;
+  }
+  if (filters.tipoPropiedad === "comercial" && filters.comercialFilters) {
+    const cf = filters.comercialFilters;
+    if (cf.tipoUbicacion) f.tipoUbicacion = cf.tipoUbicacion;
+    if (cf.frenteMin) { const n = parseFloat(cf.frenteMin); if (!isNaN(n) && n > 0) f.frenteMin = n; }
+    if (cf.sobreAvenidaPrincipal) f.sobreAvenidaPrincipal = true;
+    if (cf.enEsquina) f.enEsquina = true;
+    if (cf.altaVisibilidad) f.altaVisibilidad = true;
+    if (cf.altoFlujoVehicular) f.altoFlujoVehicular = true;
+  }
+  if (filters.tipoPropiedad === "industrial" && filters.industrialFilters) {
+    const inf = filters.industrialFilters;
+    if (inf.ubicacion) f.ubicacionIndustrial = inf.ubicacion;
+    if (inf.alturaLibre) f.alturaLibre = inf.alturaLibre;
+    if (inf.energiaKva?.length > 0) f.energiaKva = inf.energiaKva;
+    if (inf.areaOficinasMin) { const n = parseFloat(inf.areaOficinasMin); if (!isNaN(n) && n > 0) f.areaOficinasMin = n; }
+    if (inf.patioManiobrasMin) { const n = parseFloat(inf.patioManiobrasMin); if (!isNaN(n) && n > 0) f.patioManiobrasMin = n; }
+  }
+  if (filters.tipoPropiedad === "agricola" && filters.agricolaFilters) {
+    const ag = filters.agricolaFilters;
+    if (ag.tiposAgua?.length > 0) f.tiposAgua = ag.tiposAgua;
+    if (ag.concesionAgua) f.concesionAgua = true;
+    if (ag.usoTerreno) f.usoTerreno = ag.usoTerreno;
+    if (ag.tipoRiego) f.tipoRiego = ag.tipoRiego;
+    if (ag.electricidad) f.infraElectricidad = true;
+    if (ag.caminoAcceso) f.infraCaminoAcceso = true;
+    if (ag.cercado) f.infraCercado = true;
+    if (ag.pieCarretera) f.accesoCarretera = true;
+    if (ag.accesCamiones) f.accesoCamiones = true;
+  }
+  return f;
+}
 
 const PAGE_SIZE = 20;
 
@@ -157,7 +218,20 @@ const summaryStyles = StyleSheet.create({
 export default function MapResultsScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { data: allProperties = [] } = useMapProperties();
+  const storeFilters = usePropertyFiltersStore((s) => s.filters);
+  const [debouncedFilters, setDebouncedFilters] = useState<MapServerFilters>(
+    () => extractServerFilters(storeFilters),
+  );
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      setDebouncedFilters(extractServerFilters(storeFilters));
+    }, 600);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [storeFilters]);
+
+  const { data: allProperties = [] } = useMapProperties(debouncedFilters);
   const { filteredProperties, hasActiveFilters } = usePropertyFilters(allProperties, null);
 
   const [activeCommentItem, setActiveCommentItem] = useState<FeedItem | null>(null);

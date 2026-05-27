@@ -12,7 +12,8 @@ import {
   useLocationSearchStore,
   LocationSuggestionWithCount,
 } from "../store/locationSearchStore";
-import { getUniqueLocations } from "../lib/locationService";
+// getUniqueLocations fue removida en la migración a Google Places API
+// Las sugerencias precargadas ahora se omiten (el usuario busca por texto)
 
 interface PropertyCodeSuggestion {
   type: "property_code";
@@ -52,7 +53,7 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
   const [query, setQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [propertySuggestions, setPropertySuggestions] = useState<PropertyCodeSuggestion[]>([]);
-  const [preloadedSuggestions, setPreloadedSuggestions] = useState<LocationSuggestionWithCount[]>([]);
+  const [preloadedSuggestions] = useState<LocationSuggestionWithCount[]>([]);
   const [showSearchOverlay, setShowSearchOverlay] = useState(false);
   const { selectedLocation } = useApp();
 
@@ -107,15 +108,10 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
     onSearchingChange?.(showSuggestions);
   }, [showSuggestions, onSearchingChange]);
 
-  // Precargar sugerencias populares cuando se abre el buscador sin texto
+  // Sugerencias precargadas: ya no se cargan desde Supabase Geo.
+  // Con Google Places API la búsqueda es siempre por texto del usuario.
   useEffect(() => {
-    if (showSuggestions && !query.trim() && preloadedSuggestions.length === 0) {
-      getUniqueLocations().then((locs) => {
-        setPreloadedSuggestions(
-          locs.map((l) => ({ ...l, propertyCount: 0 })) as LocationSuggestionWithCount[],
-        );
-      });
-    }
+    // No-op: preloadedSuggestions permanece vacío en la nueva arquitectura
   }, [showSuggestions, query]);
 
   // Cerrar sugerencias si el header desaparece

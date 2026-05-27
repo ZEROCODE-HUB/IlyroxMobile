@@ -49,7 +49,7 @@ export const PropertyFinancialSection: React.FC<PropertyFinancialSectionProps> =
                 {gravamenes.map((g, i) => (
                   <Text key={i} style={styles.warningText}>
                     {g.institucion?.nombre} :
-                    {g.monto ? g.monto : " Monto no especificado"}
+                    {g.monto ? ` $${Number(g.monto).toLocaleString("es-MX")}` : " Monto no especificado"}
                   </Text>
                 ))}
               </View>
@@ -112,7 +112,7 @@ export const PropertyFinancialSection: React.FC<PropertyFinancialSectionProps> =
                     <Text style={styles.commissionValue}>
                       {op.comision_porcentaje != null
                         ? `${op.comision_porcentaje}%`
-                        : `$${op.comision_monto_fijo}`}
+                        : `$${Number(op.comision_monto_fijo).toLocaleString("es-MX")}`}
                     </Text>
                   </View>
                 )}
@@ -122,7 +122,7 @@ export const PropertyFinancialSection: React.FC<PropertyFinancialSectionProps> =
                     <Text style={styles.commissionValue}>
                       {op.porcentaje_comision_compartida != null
                         ? `${op.porcentaje_comision_compartida}%`
-                        : `$${op.monto_comision_compartida.toLocaleString()}`}
+                        : `$${Number(op.monto_comision_compartida).toLocaleString("es-MX")}`}
                     </Text>
                   </View>
                 )}

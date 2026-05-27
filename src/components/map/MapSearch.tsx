@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { Property } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
@@ -31,6 +32,7 @@ import {
 } from "@/store/locationSearchStore";
 import { COLORS } from "@/constants/colors";
 import { logger } from "@/utils/logger";
+import { getPlaceDetails, boundsToRegion } from "@/lib/geocodingService";
 
 const log = logger.scoped("MapSearch");
 
@@ -58,6 +60,8 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     useLocationSearchStore();
 
   const googleApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  // Token de sesión para Places API (se reutiliza entre búsqueda y selección)
+  const sessionTokenRef = useRef<string>(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   const [focusRegion, setFocusRegion] = useState<{
     latitude: number;
@@ -77,57 +81,71 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     filters,
   } = usePropertyFilters(properties, null);
 
-  // ── Geocodificar selectedLocation solo para navegación del mapa (no aplica filtro base) ──
+  // ── Geocodificar selectedLocation para navegación inicial del mapa ──
+  // selectedLocation viene del contexto (home page). Si tiene placeId, usa Place Details
+  // directamente para obtener los bounds. Si no, usa Geocoding API como fallback.
   useEffect(() => {
-    if (selectedLocation) {
-      const geocode = async () => {
-        try {
-          if (!googleApiKey) return;
-          const q = encodeURIComponent(`${selectedLocation.name}, Mexico`);
-          const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${q}&region=mx&key=${googleApiKey}`;
-          const res = await fetch(url);
-          const json = await res.json();
-          const result = json.results?.[0];
-          if (result?.geometry) {
-            const { location, bounds, viewport } = result.geometry;
-            const b = bounds || viewport;
-            if (b) {
-              const minLat = Math.min(b.southwest.lat, b.northeast.lat);
-              const maxLat = Math.max(b.southwest.lat, b.northeast.lat);
-              const minLng = Math.min(b.southwest.lng, b.northeast.lng);
-              const maxLng = Math.max(b.southwest.lng, b.northeast.lng);
-              const latSpan = Math.max(maxLat - minLat, 0);
-              const lngSpan = Math.max(maxLng - minLng, 0);
-              const type = selectedLocation.type;
-              const MIN_DELTA = type === "colonia" ? 0.02 : type === "municipio" ? 0.04 : 0.03;
-              const MAX_DELTA = type === "colonia" ? 0.1 : type === "municipio" ? 0.5 : 3.0;
-              const latDelta = Math.min(Math.max(latSpan * 1.4 || MIN_DELTA, MIN_DELTA), MAX_DELTA);
-              const lngDelta = Math.min(Math.max(lngSpan * 1.4 || MIN_DELTA, MIN_DELTA), MAX_DELTA);
-              setFocusRegion({
-                latitude: (minLat + maxLat) / 2,
-                longitude: (minLng + maxLng) / 2,
-                latitudeDelta: latDelta,
-                longitudeDelta: lngDelta,
-              });
-            } else if (location) {
-              const type = selectedLocation.type;
-              const fallbackDelta = type === "colonia" ? 0.03 : type === "municipio" ? 0.06 : 0.05;
-              setFocusRegion({
-                latitude: location.lat,
-                longitude: location.lng,
-                latitudeDelta: fallbackDelta,
-                longitudeDelta: fallbackDelta,
-              });
-            }
-          }
-        } catch (e) {
-          log.warn("Error geocoding location", e);
-        }
-      };
-      geocode();
-    } else {
+    if (!selectedLocation) {
       setFocusRegion(null);
+      return;
     }
+    const geocode = async () => {
+      try {
+        if (!googleApiKey) return;
+
+        // Intentar con Place Details si hay placeId
+        const placeId = (selectedLocation as any).placeId;
+        if (placeId) {
+          const details = await getPlaceDetails(placeId);
+          if (details?.bounds) {
+            setFocusRegion(boundsToRegion(details.bounds, selectedLocation.type));
+            return;
+          }
+          if (details?.location) {
+            const type = selectedLocation.type;
+            const fallbackDelta = type === "colonia" ? 0.03 : type === "municipio" ? 0.06 : 0.05;
+            setFocusRegion({
+              latitude: details.location.lat,
+              longitude: details.location.lng,
+              latitudeDelta: fallbackDelta,
+              longitudeDelta: fallbackDelta,
+            });
+            return;
+          }
+        }
+
+        // Fallback: Geocoding API con el nombre del lugar
+        const q = encodeURIComponent(`${selectedLocation.name}, Mexico`);
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${q}&region=mx&key=${googleApiKey}`;
+        const res = await fetch(url);
+        const json = await res.json();
+        const result = json.results?.[0];
+        if (result?.geometry) {
+          const { location, bounds, viewport } = result.geometry;
+          const b = bounds || viewport;
+          if (b) {
+            setFocusRegion(boundsToRegion({
+              north: b.northeast.lat,
+              south: b.southwest.lat,
+              east: b.northeast.lng,
+              west: b.southwest.lng,
+            }, selectedLocation.type));
+          } else if (location) {
+            const type = selectedLocation.type;
+            const fallbackDelta = type === "colonia" ? 0.03 : type === "municipio" ? 0.06 : 0.05;
+            setFocusRegion({
+              latitude: location.lat,
+              longitude: location.lng,
+              latitudeDelta: fallbackDelta,
+              longitudeDelta: fallbackDelta,
+            });
+          }
+        }
+      } catch (e) {
+        log.warn("Error geocoding location", e);
+      }
+    };
+    geocode();
   }, [selectedLocation]);
 
   // ── Debounce búsqueda de zonas ──
@@ -154,11 +172,33 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     clearSuggestions();
   };
 
-  const handleAddLocationChip = (loc: LocationSuggestionWithCount) => {
+  const handleAddLocationChip = async (loc: LocationSuggestionWithCount) => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    closeZoneSearch();
+
+    // Obtener bounds del lugar via Place Details API
+    let bounds = undefined;
+    try {
+      if (loc.placeId) {
+        const details = await getPlaceDetails(loc.placeId, sessionTokenRef.current);
+        // Refrescar token después de completar la sesión
+        sessionTokenRef.current = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        if (details?.bounds) {
+          bounds = details.bounds;
+          // Centrar el mapa en la zona seleccionada
+          setFocusRegion(boundsToRegion(bounds, loc.type));
+        }
+      }
+    } catch (e) {
+      log.warn("Error obteniendo bounds del chip:", e);
+    }
+
     const chip: LocationChip = {
       id: `${loc.type}-${loc.name}-${Date.now()}`,
       label: loc.name,
       type: loc.type as "estado" | "municipio" | "colonia",
+      bounds,
+      // locationFilter legacy (fallback si no hay bounds)
       locationFilter: {
         estado: loc.estado_nombre || (loc.type === "estado" ? loc.name : ""),
         ciudad: "",
@@ -167,7 +207,6 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
       },
     };
     addLocationChip(chip);
-    closeZoneSearch();
   };
 
   // ── Handlers de marker ──
@@ -201,6 +240,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
 
   const handleConfirmPolygon = () => {
     if (draftPoints.length < 3) return;
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     addPolygon(draftPoints);
     setDraftPoints([]);
     setDrawingMode(false);

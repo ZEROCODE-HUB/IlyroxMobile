@@ -209,6 +209,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             authorId={item.user.id}
             propertyId={property.id}
             shareCode={property.codigo_propiedad || property.code}
+            initialViews={item.views}
           />
         </View>
       </View>
@@ -242,7 +243,16 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
           <View style={styles.priceRow}>
             <Text style={styles.priceText}>{renderOperationsLabel()}</Text>
-            <View></View>
+            {property.operations?.[0]?.comparte_comision && (
+              <View style={styles.commissionBadge}>
+                <Ionicons name="people-outline" size={10} color={COLORS.primary} />
+                <Text style={styles.commissionText}>
+                  {property.operations[0].porcentaje_comision_compartida
+                    ? `${property.operations[0].porcentaje_comision_compartida}% co-op`
+                    : "Co-op"}
+                </Text>
+              </View>
+            )}
           </View>
           <Pressable
             style={styles.locationInline}
@@ -442,6 +452,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: COLORS.textPrimary,
+  },
+  commissionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "#eff6ff",
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  commissionText: {
+    fontSize: 10,
+    color: COLORS.primary,
+    fontWeight: "600",
   },
   locationInline: {
     flexDirection: "row",

@@ -3,8 +3,8 @@
  * ACTUALIZADO: Usa hooks reales para likes y share
  */
 
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Modal } from "react-native";
 import { FeedItem, User } from "../../types";
 
 import { DIMENSIONS, COLORS } from "../../constants";
@@ -17,6 +17,10 @@ import {
   RichText,
   ExpandableText,
 } from "../shared";
+import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
+import ConfirmDialog from "../shared/ConfirmDialog";
+import CreatePost from "../CreateContent/CreatePost/CreatePost";
+import { postsService } from "../../services/postsService";
 import ActionButtons from "../ActionButtons";
 
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
@@ -30,6 +34,7 @@ interface PostCardProps {
   onUserClick?: (user: User) => void;
   onCommentClick: () => void;
   currentUserId?: string;
+  onPostUpdated?: () => void;
 }
 
 const PostCard: React.FC<PostCardProps> = ({
@@ -38,7 +43,12 @@ const PostCard: React.FC<PostCardProps> = ({
   onUserClick,
   onCommentClick,
   currentUserId,
+  onPostUpdated,
 }) => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   // Hook de interacciones (reportes, opciones)
   const {
     showOptions,
@@ -54,6 +64,36 @@ const PostCard: React.FC<PostCardProps> = ({
     userId: currentUserId,
     isVisible: true,
   });
+  const isOwner = !!(currentUserId && currentUserId === item.user.id);
+
+  const handleDelete = async () => {
+    if (!item.postDetails) return;
+    try {
+      setDeleting(true);
+      await postsService.deletePost(item.postDetails);
+      setShowDeleteConfirm(false);
+      onPostUpdated?.();
+    } catch {
+      // postsService.deletePost shows toast on success; errors bubble silently
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const ownerMenuOptions: MenuOption[] = [
+    {
+      icon: "pencil-outline",
+      label: "Editar",
+      onPress: () => setShowEditModal(true),
+    },
+    {
+      icon: "trash-outline",
+      label: "Eliminar",
+      onPress: () => setShowDeleteConfirm(true),
+      danger: true,
+    },
+  ];
+
   const isSpecialPost =
     ["openhouse", "aniversario", "sold"].includes(item.postType ?? "") ||
     (item.postType === "busqueda" && !!item.postDetails?.busquedas_json);
@@ -85,19 +125,29 @@ const PostCard: React.FC<PostCardProps> = ({
   return (
     <View style={commonStyles.card}>
       <View style={styles.contentCard}>
-        {/* Usamos TouchableOpacity solo para las áreas que deben disparar el click general */}
-        <TouchableOpacity activeOpacity={0.9} onPress={onClick}>
-          <UserHeader
-            user={item.user}
-            timestamp={item.timestamp}
-            onUserClick={onUserClick}
-            showOptions={showOptions}
-            setShowOptions={setShowOptions}
-            onReport={() => setShowReportModal(true)}
-            totalRatings={item.user.totalRatings}
-            showRecommendedPreview={false}
-          />
-        </TouchableOpacity>
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.headerFill} activeOpacity={0.9} onPress={onClick}>
+            <UserHeader
+              user={item.user}
+              timestamp={item.timestamp}
+              onUserClick={onUserClick}
+              showOptions={showOptions}
+              setShowOptions={setShowOptions}
+              onReport={() => setShowReportModal(true)}
+              totalRatings={item.user.totalRatings}
+              showRecommendedPreview={false}
+            />
+          </TouchableOpacity>
+          {isOwner && (
+            <View style={styles.headerMenuWrapper}>
+              <ThreeDotsMenu
+                options={ownerMenuOptions}
+                iconColor={COLORS.textSecondary}
+                menuPosition="top-right"
+              />
+            </View>
+          )}
+        </View>
 
         {positiveRecommendations > 0 && (
           <TouchableOpacity
@@ -183,6 +233,7 @@ const PostCard: React.FC<PostCardProps> = ({
             orientation="horizontal"
             authorId={item.user.id}
             contentId={item.postDetails?.id}
+            initialViews={item.views}
           />
         </View>
 
@@ -200,6 +251,17 @@ const PostCard: React.FC<PostCardProps> = ({
           users={recommendedList}
           totalCount={positiveRecommendations}
         />
+        <ConfirmDialog
+          visible={showDeleteConfirm}
+          title="¿Eliminar post?"
+          message="Esta acción no se puede deshacer."
+          confirmText="Eliminar"
+          cancelText="Cancelar"
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+          danger
+          loading={deleting}
+        />
       </View>
       {hasImages && (
         <View style={styles.captionContainer}>
@@ -211,11 +273,31 @@ const PostCard: React.FC<PostCardProps> = ({
           />
         </View>
       )}
+      <Modal visible={showEditModal} animationType="slide">
+        <CreatePost
+          post={item.postDetails}
+          onBack={() => {
+            setShowEditModal(false);
+            onPostUpdated?.();
+          }}
+        />
+      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerFill: {
+    flex: 1,
+  },
+  headerMenuWrapper: {
+    paddingRight: 12,
+    paddingTop: 8,
+  },
   imageContainer: {
     width: "100%",
     backgroundColor: COLORS.white,

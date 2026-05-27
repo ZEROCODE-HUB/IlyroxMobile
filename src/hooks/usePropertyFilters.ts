@@ -162,20 +162,38 @@ export const usePropertyFilters = (
       if (hasPolygons || hasChips || hasBaseLocation) {
         let geoMatch = false;
 
+        // Coordenadas de la propiedad (latitud/longitud ya son number en la BD)
+        const propLat = p.coordinates?.lat ?? p.latitud ?? undefined;
+        const propLng = p.coordinates?.lng ?? p.longitud ?? undefined;
+        const hasCoords =
+          propLat != null && propLng != null &&
+          !isNaN(propLat) && !isNaN(propLng);
+
         if (hasPolygons && !geoMatch) {
-          const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
-          const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
-          if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+          if (hasCoords) {
             geoMatch = filters.polygons.some(
-              (polygon) => polygon.length >= 3 && isPointInPolygon(lat, lng, polygon),
+              (polygon) =>
+                polygon.length >= 3 &&
+                isPointInPolygon(propLat!, propLng!, polygon),
             );
           }
         }
 
         if (hasChips && !geoMatch) {
-          geoMatch = filters.locationChips.some((chip) =>
-            matchesLocationFilter(p, rawP, chip.locationFilter),
-          );
+          geoMatch = filters.locationChips.some((chip) => {
+            // Prioridad: filtrado por bounds geográficos (nuevo sistema)
+            if (chip.bounds && hasCoords) {
+              const b = chip.bounds;
+              return (
+                propLat! >= b.south &&
+                propLat! <= b.north &&
+                propLng! >= b.west &&
+                propLng! <= b.east
+              );
+            }
+            // Fallback: filtrado por strings (chips legacy sin bounds)
+            return matchesLocationFilter(p, rawP, chip.locationFilter);
+          });
         }
 
         if (hasBaseLocation && !geoMatch) {
@@ -185,8 +203,8 @@ export const usePropertyFilters = (
         if (!geoMatch) return false;
       } else if (geofenceBounds) {
         // Sin filtros explícitos: solo geobounds del mapa
-        const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
-        const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
+        const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
+        const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
         const valid =
           lat != null && lng != null && !isNaN(lat) && !isNaN(lng) &&
           lat >= geofenceBounds.minLat && lat <= geofenceBounds.maxLat &&

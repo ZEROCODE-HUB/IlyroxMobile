@@ -42,6 +42,7 @@ const CLASIFICACION = [
 const MOTIVOS = [
   { clasificacion_id: 1, label: "Información falsa" },
   { clasificacion_id: 1, label: "Propiedad ya vendida o rentada" },
+  { clasificacion_id: 1, label: "Ubicación incorrecta" },
   { clasificacion_id: 2, label: "Suplantación de identidad" },
   { clasificacion_id: 2, label: "Perfil falso / No verificado" },
   { clasificacion_id: 3, label: "Estafa o fraude" },

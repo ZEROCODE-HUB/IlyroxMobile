@@ -15,6 +15,7 @@ interface ModalOptions {
     onConfirm?: () => Promise<void> | void;
     onCancel?: () => void;
     loading?: boolean;
+    confirmVariant?: "primary" | "danger";
 }
 
 interface ModalContextData {
@@ -87,6 +88,7 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
                     onConfirm={handleConfirm}
                     onCancel={modalConfig.onCancel ? handleCancel : undefined}
                     loading={isLoading}
+                    confirmVariant={modalConfig.confirmVariant}
                 // If it's an alert, we can hide the cancel button (check ConfirmationModal implementation)
                 // For now, assuming ConfirmationModal always shows cancel unless type is handled there.
                 // Let's modify ConfirmationModal to handle single button alerts if needed, or just pass onCancel=undefined?

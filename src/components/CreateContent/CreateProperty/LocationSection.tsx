@@ -38,6 +38,7 @@ export const LocationSection = React.memo(function LocationSection() {
         initialData={ubicacionData}
         onChange={setUbicacionData}
         showColonia={true}
+        multiColonia={true}
       />
       {errors.estado && <Text style={styles.errorText}>{errors.estado}</Text>}
       {errors.municipio && (

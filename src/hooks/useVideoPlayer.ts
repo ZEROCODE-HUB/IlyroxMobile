@@ -70,16 +70,20 @@ export const useVideoPlayer = (
     try {
       if (!player) return;
       if (!isVisible) {
+        player.volume = 0;
+        player.muted = true;
         player.pause();
         setIsPlaying(false);
       } else if (autoPlay) {
+        player.volume = 1;
+        player.muted = muted;
         player.play();
         setIsPlaying(true);
       }
     } catch {
       // ignore released errors
     }
-  }, [isVisible, autoPlay, player]);
+  }, [isVisible, autoPlay, player, muted]);
 
   // Sincronizar muted
   useEffect(() => {

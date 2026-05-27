@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: COLORS.background,
     borderWidth: 1,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.cardBorder,
     borderRadius: 10,
     padding: 16,
     marginBottom: 16,

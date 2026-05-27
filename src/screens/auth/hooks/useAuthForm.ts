@@ -28,7 +28,7 @@ export interface AuthFormState {
   ocupacion: string;
   modalidad: string;
   nombreInmobiliaria: string;
-  anosExperiencia: string;
+  fechaInicioCarrera: string;
   biografia: string;
 }
 
@@ -46,7 +46,7 @@ const initialFormState: AuthFormState = {
   ocupacion: "",
   modalidad: "",
   nombreInmobiliaria: "",
-  anosExperiencia: "",
+  fechaInicioCarrera: "",
   biografia: "",
 };
 
@@ -177,7 +177,7 @@ export function useAuthForm() {
         ocupacion,
         modalidad,
         nombreInmobiliaria,
-        anosExperiencia,
+        fechaInicioCarrera,
         biografia,
       } = formState;
 
@@ -215,10 +215,10 @@ export function useAuthForm() {
           return false;
         }
       }
-      if (anosExperiencia === "") {
+      if (!fechaInicioCarrera) {
         showModal({
           title: "Error",
-          message: "Selecciona tus años de experiencia",
+          message: "Selecciona la fecha en que iniciaste tu carrera",
           confirmText: "OK",
         });
         return false;
@@ -346,7 +346,13 @@ export function useAuthForm() {
           estado_registro: "pendiente",
           aprobaciones_recibidas: 0,
           aprobaciones_requeridas: 3,
-          anos_experiencia: formState.anosExperiencia,
+          anos_experiencia: formState.fechaInicioCarrera
+            ? String(
+                new Date().getFullYear() -
+                  new Date(formState.fechaInicioCarrera).getFullYear(),
+              )
+            : undefined,
+          fecha_inicio_carrera: formState.fechaInicioCarrera || undefined,
           ocupacion: formState.ocupacion,
           otro_ocupacion: undefined,
           modalidad: formState.modalidad || undefined,

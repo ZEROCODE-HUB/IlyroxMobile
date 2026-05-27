@@ -118,7 +118,14 @@ const RequestScreen = () => {
     }
 
     try {
-      const cleanPhone = phone.replace(/\D/g, "");
+      let cleanPhone = phone.replace(/\D/g, "");
+      // Número mexicano de 10 dígitos → agregar prefijo de país 52
+      if (cleanPhone.length === 10) cleanPhone = `52${cleanPhone}`;
+      // Validar longitud mínima (país + número)
+      if (cleanPhone.length < 11) {
+        showToast("El número de teléfono no es válido.", "warning");
+        return;
+      }
       const url = `https://wa.me/${cleanPhone}`;
 
       const canOpen = await Linking.canOpenURL(url);
@@ -172,56 +179,83 @@ const RequestScreen = () => {
         onBack={() => router.back()}
       />
 
+      <View style={styles.subtitleContainer}>
+        <Text style={styles.subtitleHighlight}>Nuevos leads </Text>
+        <Text style={styles.subtitleText}>
+          generados por la página web de ILYROX.com
+        </Text>
+      </View>
+
       {/* Tabs */}
       <View style={styles.tabsContainer}>
         <Pressable
           style={[styles.tab, activeTab === "info" && styles.activeTab]}
           onPress={() => handleTabPress("info")}
         >
-          <Ionicons
-            name="information-circle-outline"
-            size={20}
-            color={activeTab === "info" ? COLORS.primary : COLORS.textTertiary}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "info" && styles.activeTabText,
-            ]}
-          >
-            Información
-          </Text>
-          {infoRequests.length > 0 && (
+          <View style={styles.tabTopRow}>
+            <Ionicons
+              name="people-outline"
+              size={20}
+              color={
+                activeTab === "info" ? COLORS.primary : COLORS.textTertiary
+              }
+            />
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "info" && styles.activeTabText,
+              ]}
+            >
+              Clientes
+            </Text>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{infoRequests.length}</Text>
             </View>
-          )}
+          </View>
+          <Text
+            style={[
+              styles.tabSubtext,
+              activeTab === "info" && styles.activeTabSubtext,
+            ]}
+          >
+            Interesados en comprar o rentar
+          </Text>
         </Pressable>
 
         <Pressable
           style={[styles.tab, activeTab === "properties" && styles.activeTab]}
           onPress={() => handleTabPress("properties")}
         >
-          <Ionicons
-            name="business-outline"
-            size={20}
-            color={
-              activeTab === "properties" ? COLORS.primary : COLORS.textTertiary
-            }
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "properties" && styles.activeTabText,
-            ]}
-          >
-            Propiedades
-          </Text>
-          {propertyRequests.length > 0 && (
+          <View style={styles.tabTopRow}>
+            <Ionicons
+              name="home-outline"
+              size={20}
+              color={
+                activeTab === "properties"
+                  ? COLORS.primary
+                  : COLORS.textTertiary
+              }
+            />
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "properties" && styles.activeTabText,
+              ]}
+            >
+              Propietarios
+            </Text>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{propertyRequests.length}</Text>
             </View>
-          )}
+          </View>
+          <Text
+            style={[
+              styles.tabSubtext,
+              activeTab === "properties" && styles.activeTabSubtext,
+            ]}
+          >
+            Quieren vender o rentar su propiedad
+          </Text>
         </Pressable>
       </View>
 
@@ -287,25 +321,50 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  subtitleContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    backgroundColor: COLORS.white,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
+  },
+  subtitleHighlight: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.primary,
+  },
+  subtitleText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
   tabsContainer: {
     flexDirection: "row",
     backgroundColor: COLORS.white,
     paddingHorizontal: 16,
+    paddingBottom: 4,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
   },
   tab: {
     flex: 1,
-    flexDirection: "row",
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 14,
-    gap: 8,
+    paddingVertical: 12,
     borderBottomWidth: 2,
     borderBottomColor: "transparent",
   },
   activeTab: {
     borderBottomColor: COLORS.primary,
+  },
+  tabTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 2,
   },
   tabText: {
     fontSize: 14,
@@ -313,6 +372,14 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
   },
   activeTabText: {
+    color: COLORS.primary,
+  },
+  tabSubtext: {
+    fontSize: 11,
+    color: COLORS.textTertiary,
+    textAlign: "center",
+  },
+  activeTabSubtext: {
     color: COLORS.primary,
   },
   badge: {
@@ -323,7 +390,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 4,
-    marginLeft: 4,
   },
   badgeText: {
     color: COLORS.white,

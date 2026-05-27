@@ -38,6 +38,7 @@ export type FeedItem = {
   reelDetails?: Reel;
   likes: number;
   comments: number;
+  views?: number;
   commentsList?: Comment[];
   timestamp: string;
   status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
@@ -111,6 +112,14 @@ export type LegalDetails = {
   institution?: string;
 };
 
+/** Bounding box geográfica (norte/sur/este/oeste en decimal degrees) */
+export type GeoBounds = {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+};
+
 export type Property = {
   id: string;
   code?: string;
@@ -151,8 +160,9 @@ export type Property = {
   sin_comision?: boolean;
   es_easybroker?: boolean;
   legal?: LegalDetails;
-  longitud?: string;
-  latitud?: string;
+  /** Coordenada numérica directa de la BD (tipo numeric en Supabase) */
+  longitud?: number;
+  latitud?: number;
   municipio?: string;
   colonia?: string;
   subtipo?: string;
@@ -243,6 +253,7 @@ export type perfiles = {
   biografia?: string;
   sitio_web?: string;
   anos_experiencia?: string;
+  fecha_inicio_carrera?: string;
   ocupacion?: string;
   otro_ocupacion?: string;
   modalidad?: string;
@@ -334,6 +345,10 @@ export type busquedas_guardadas = {
   metros_terreno?: number;
   genero?: "Masculino" | "Femenino";
   polygon_coords?: { latitude: number; longitude: number }[];
+  /** Bounds geográficos para el filtro de zona (nuevo campo) */
+  bounds?: GeoBounds;
+  /** Nombre display de la zona buscada (ej: "Polanco, CDMX") */
+  place_name?: string;
 };
 
 export type agrupaciones_conversaciones = {

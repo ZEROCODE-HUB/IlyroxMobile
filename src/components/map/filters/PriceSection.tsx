@@ -63,6 +63,18 @@ export const PriceSection: React.FC<PriceSectionProps> = ({
           />
         </View>
       </View>
+      {(() => {
+        const min = parseFloat(filters.precioMin.replace(/,/g, "")) || 0;
+        const max = parseFloat(filters.precioMax.replace(/,/g, "")) || 0;
+        if (min > 0 && max > 0 && min > max) {
+          return (
+            <Text style={styles.priceWarning}>
+              El precio mínimo no puede ser mayor al máximo
+            </Text>
+          );
+        }
+        return null;
+      })()}
     </View>
   );
 };
@@ -121,5 +133,11 @@ const styles = StyleSheet.create({
   },
   halfWidth: {
     flex: 1,
+  },
+  priceWarning: {
+    color: COLORS.error,
+    fontSize: 12,
+    marginTop: -12,
+    marginBottom: 8,
   },
 });

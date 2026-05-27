@@ -16,7 +16,7 @@ interface SpecialPostCardProps {
 
 const SPECIAL_COLORS = {
   aniversario: COLORS.eventAnniversary,
-  openhouse: COLORS.tagPurpleDark,
+  openhouse: COLORS.openHouse,
   sold: COLORS.sold,
   textWhite: COLORS.white,
 };

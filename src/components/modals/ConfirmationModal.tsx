@@ -11,6 +11,7 @@ interface ConfirmationModalProps {
     onConfirm: () => void;
     onCancel?: () => void;
     loading?: boolean;
+    confirmVariant?: "primary" | "danger";
 }
 
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -22,6 +23,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     onConfirm,
     onCancel,
     loading = false,
+    confirmVariant,
 }) => {
     const handleClose = () => {
         if (loading) return;
@@ -51,7 +53,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                     />
                 )}
                 <Button
-                    variant={!onCancel ? "primary" : "danger"}
+                    variant={confirmVariant ?? (!onCancel ? "primary" : "danger")}
                     label={confirmText}
                     loading={loading}
                     onPress={onConfirm}

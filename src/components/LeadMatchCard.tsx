@@ -60,14 +60,17 @@ export const LeadMatchCard: React.FC<LeadMatchCardProps> = ({
         </Text>
       </View>
 
-      {/* Right: Phone */}
-      <View style={styles.pillContainer}>
-        <View style={styles.leftPill}>
-          <Text style={styles.pillTextWhite}>{matchCount}</Text>
+      {/* Right: Total count pill */}
+      <View style={styles.pillWrapper}>
+        <View style={styles.totalPill}>
+          <Text style={styles.totalPillText}>{matchCount + similarCount}</Text>
+          <Text style={styles.totalPillLabel}> props</Text>
         </View>
-        <View style={styles.rightPill}>
-          <Text style={styles.pillTextDark}>{similarCount}</Text>
-        </View>
+        {(matchCount > 0 || similarCount > 0) && (
+          <Text style={styles.pillBreakdown}>
+            {matchCount} exactas · {similarCount} similares
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -83,37 +86,33 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder || COLORS.mediumGray,
   },
-  pillContainer: {
+  pillWrapper: {
+    alignItems: "center",
+    marginRight: 4,
+  },
+  totalPill: {
     flexDirection: "row",
-    borderRadius: 8,
-    overflow: "hidden",
-    marginRight: 12,
+    alignItems: "baseline",
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
   },
-  leftPill: {
-    backgroundColor: "#FF3B30", // Red for matches
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    minWidth: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rightPill: {
-    backgroundColor: "#E5E5EA", // Gray for similar
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    minWidth: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pillTextWhite: {
+  totalPillText: {
     color: COLORS.white,
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "700",
   },
-  pillTextDark: {
-    color: COLORS.black,
-    fontSize: 12,
-    fontWeight: "700",
+  totalPillLabel: {
+    color: COLORS.whiteTransparent80,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  pillBreakdown: {
+    fontSize: 9,
+    color: COLORS.textSecondary,
+    marginTop: 3,
+    textAlign: "center",
   },
   infoContainer: {
     flex: 1,

@@ -10,7 +10,7 @@ import {
   StyleSheet,
   Platform,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { SelectionModal } from "../../modals";
 import RadioGroupSelector from "../../common/RadioGroupSelector";
@@ -27,7 +27,7 @@ const TIPO_CARDS = [
   { value: "habitacional", label: "Habitacional", icon: "home-outline" },
   { value: "comercial", label: "Comercial", icon: "storefront-outline" },
   { value: "industrial", label: "Industrial", icon: "business-outline" },
-  { value: "agricola", label: "Agropecuario", icon: "leaf-outline" },
+  { value: "agricola", label: "Agrícola", icon: "leaf-outline" },
 ] as const;
 
 const SUBTIPO_ICONS: Record<string, string> = {
@@ -120,11 +120,19 @@ export const BasicInfoSection = React.memo(function BasicInfoSection() {
               }}
               activeOpacity={0.75}
             >
-              <Ionicons
-                name={t.icon as any}
-                size={28}
-                color={selected ? COLORS.primary : COLORS.textSecondary}
-              />
+              {t.value === "agricola" ? (
+                <MaterialCommunityIcons
+                  name="tractor"
+                  size={28}
+                  color={selected ? COLORS.primary : COLORS.textSecondary}
+                />
+              ) : (
+                <Ionicons
+                  name={t.icon as any}
+                  size={28}
+                  color={selected ? COLORS.primary : COLORS.textSecondary}
+                />
+              )}
               <Text style={[styles.tipoLabel, selected && styles.tipoLabelSelected]}>
                 {t.label}
               </Text>

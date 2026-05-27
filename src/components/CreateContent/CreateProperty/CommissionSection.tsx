@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../../design-system/components/AppInput";
 import RadioGroupSelector from "../../common/RadioGroupSelector";
@@ -163,11 +163,32 @@ export const CommissionSection = React.memo(function CommissionSection({
       <View style={withTopBorder ? styles.secondSection : undefined}>
         {!!title && <Text style={styles.operationTitle}>{title}</Text>}
 
+        <View style={styles.presetRow}>
+          {[2, 3, 4, 5, 8, 10].map((p) => (
+            <TouchableOpacity
+              key={p}
+              style={[
+                styles.presetChip,
+                parseFloat(values.valor) === p && styles.presetChipActive,
+              ]}
+              onPress={() => setters.setValor(String(p))}
+            >
+              <Text
+                style={[
+                  styles.presetChipText,
+                  parseFloat(values.valor) === p && styles.presetChipTextActive,
+                ]}
+              >
+                {p}%
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
         <CommissionSlider
           label="Mi comisión"
           value={values.valor}
           onChange={setters.setValor}
-          min={0} max={10} step={0.5}
+          min={0} max={20} step={0.5}
           formatValue={fmtPct}
           hint={precio > 0 ? formatMXN(miMonto) : undefined}
           onScrollLock={onScrollLock}
@@ -472,5 +493,31 @@ const styles = StyleSheet.create({
   },
   summaryAmountShare: {
     color: COLORS.primary,
+  },
+  presetRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 8,
+  },
+  presetChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    backgroundColor: COLORS.white,
+  },
+  presetChipActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
+  },
+  presetChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
+  presetChipTextActive: {
+    color: COLORS.white,
   },
 });

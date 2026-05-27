@@ -38,6 +38,9 @@ export interface ProfileInfoHeaderProps {
   onSettings: () => void;
   onUpdatePhoto: (url: string) => void;
   onMessage: () => void;
+  onRecommend?: (recomienda: boolean) => void;
+  isRecommended?: boolean | null;
+  submittingRecommendation?: boolean;
   showRatingDetails: boolean;
   onToggleRatingDetails: () => void;
   showRecommendedByModal: boolean;
@@ -61,6 +64,9 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = ({
   onSettings,
   onUpdatePhoto,
   onMessage,
+  onRecommend,
+  isRecommended,
+  submittingRecommendation,
   showRatingDetails,
   onToggleRatingDetails,
   showRecommendedByModal,
@@ -145,6 +151,31 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = ({
               />
               <Text style={styles.messageBtnText}>Mensaje</Text>
             </TouchableOpacity>
+            {onRecommend && (
+              <TouchableOpacity
+                style={[
+                  styles.recommendBtn,
+                  isRecommended && styles.recommendBtnActive,
+                ]}
+                onPress={() => onRecommend(!isRecommended)}
+                disabled={submittingRecommendation}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={isRecommended ? "thumbs-up" : "thumbs-up-outline"}
+                  size={16}
+                  color={isRecommended ? COLORS.white : COLORS.primary}
+                />
+                <Text
+                  style={[
+                    styles.recommendBtnText,
+                    isRecommended && styles.recommendBtnTextActive,
+                  ]}
+                >
+                  {isRecommended ? "Recomendado" : "Recomendar"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
@@ -281,8 +312,11 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     marginTop: 16,
+    flexDirection: "row",
+    gap: 8,
   },
   messageBtn: {
+    flex: 1,
     backgroundColor: COLORS.background,
     flexDirection: "row",
     alignItems: "center",
@@ -295,6 +329,30 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     fontWeight: "600",
     fontSize: 14,
+  },
+  recommendBtn: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  recommendBtnActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  recommendBtnText: {
+    color: COLORS.primary,
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  recommendBtnTextActive: {
+    color: COLORS.white,
   },
   ratingSection: {
     marginBottom: 16,

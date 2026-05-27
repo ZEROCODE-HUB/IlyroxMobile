@@ -77,6 +77,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     fetchProfileData,
     loadRecommendedByUsers,
     updateProfilePhoto,
+    handleRecommendation,
+    userRecommendation,
+    submittingRecommendation,
     isMe,
   } = useProfile(userId);
 
@@ -165,7 +168,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     () => ({
       name: formatFullName(profile),
       avatar: profile?.foto || undefined,
-      role: profile?.ocupacion || formatRole(profile?.rol || "cliente"),
+      role: profile?.ocupacion || (profile?.rol ? formatRole(profile?.rol) : ""),
       location: formatLocation(
         profile?.estado || null,
         profile?.pais || "México",
@@ -339,6 +342,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         onSettings={() => router.push("/settings")}
         onUpdatePhoto={updateProfilePhoto}
         onMessage={handleMessage}
+        onRecommend={handleRecommendation}
+        isRecommended={userRecommendation}
+        submittingRecommendation={submittingRecommendation}
         showRatingDetails={showRatingDetails}
         onToggleRatingDetails={() => setShowRatingDetails((v) => !v)}
         showRecommendedByModal={showRecommendedByModal}
@@ -368,6 +374,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       contentCounts,
       activeFilter,
       filteredProperties.length,
+      userRecommendation,
+      submittingRecommendation,
     ],
   );
 

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { GeoBounds } from "@/types";
 
 export interface PolygonCoord {
   latitude: number;
@@ -8,7 +9,16 @@ export interface PolygonCoord {
 export interface LocationChip {
   id: string;
   label: string;
-  type: "estado" | "municipio" | "colonia";
+  type: "estado" | "municipio" | "colonia" | "zona";
+  /**
+   * Bounds geográficos del lugar — fuente principal del filtro.
+   * Cuando está presente, el filtrado usa BETWEEN lat/lng en lugar de ilike.
+   */
+  bounds?: GeoBounds;
+  /**
+   * @deprecated Usar `bounds` cuando sea posible.
+   * Se mantiene para compatibilidad con chips sin bounds.
+   */
   locationFilter: {
     estado: string;
     ciudad: string;

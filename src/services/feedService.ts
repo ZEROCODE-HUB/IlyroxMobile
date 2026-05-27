@@ -63,10 +63,14 @@ const PROPERTY_SELECT = `
   descripcion,
   longitud,
   latitud,
-  operaciones_propiedad!inner (
+  operaciones_propiedad (
     tipo_operacion,
     precio,
-    moneda
+    moneda,
+    comision_tipo,
+    comision_porcentaje,
+    comparte_comision,
+    porcentaje_comision_compartida
   )
 ` as const;
 
@@ -147,6 +151,7 @@ const mapPostToFeedItem = (
   images: post.imagenes || [],
   likes: feedData.likes_count,
   comments: feedData.comentarios_count,
+  views: feedData.vistas_count ?? 0,
   timestamp: formatTimestamp(feedData.publicado_en),
   commentsList: [],
   foto_perfil_usuario: post.foto_perfil,
@@ -192,6 +197,7 @@ const mapPropertyToFeedItem = (
     content: property.descripcion || "",
     likes: feedData.likes_count,
     comments: feedData.comentarios_count,
+    views: feedData.vistas_count ?? 0,
     timestamp: formatTimestamp(feedData.publicado_en),
     commentsList: [],
     propertyDetails: {

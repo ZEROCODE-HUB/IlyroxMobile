@@ -27,6 +27,7 @@ interface ActionButtonsProps {
   feedItemType: "post" | "reel" | "property";
   initialLikes: number;
   comments: number;
+  initialViews?: number;
   userId?: string;
   onCommentClick: () => void;
   shareTitle?: string;
@@ -49,6 +50,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   feedItemType,
   initialLikes,
   comments,
+  initialViews,
   userId,
   onCommentClick,
   shareTitle = "Check this out!",
@@ -188,6 +190,20 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             {currentCommentCount}
           </Text>
         </TouchableOpacity>
+
+        {/* Views counter (display only) */}
+        {initialViews !== undefined && (
+          <View style={itemStyle}>
+            <Ionicons
+              name="eye-outline"
+              size={isVertical ? 26 : 20}
+              color={tintColor}
+            />
+            <Text style={[styles.iconCountText, { color: textColor }]}>
+              {initialViews}
+            </Text>
+          </View>
+        )}
 
         {/* Share Button */}
         <TouchableOpacity

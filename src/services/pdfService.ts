@@ -142,6 +142,7 @@ interface OperacionPropiedad {
 }
 
 interface PerfilCreador {
+  id?: string | null;
   nombre: string | null;
   nombre_completo: string | null;
   apellido_paterno: string | null;
@@ -154,6 +155,8 @@ interface PerfilCreador {
   nombre_inmobiliaria: string | null;
   biografia: string | null;
   ocupacion: string | null;
+  calificacion_promedio?: number | null;
+  total_resenas?: number | null;
 }
 
 // ============================================================================
@@ -352,6 +355,15 @@ const generatePropertyHtml = (
             ${data.perfil.foto && config.showFotoCreador ? `<img src="${data.perfil.foto}" class="agent-avatar" />` : ""}
             <div class="agent-details">
                 ${config.showNombreCreador ? `<div class="agent-name">${safeText(getCreatorFullName(data.perfil))}</div>` : ""}
+                ${(() => {
+                  const rating = data.perfil?.calificacion_promedio;
+                  const reviews = data.perfil?.total_resenas;
+                  if (!rating || !reviews) return "";
+                  const fullStars = Math.floor(rating);
+                  const halfStar = rating - fullStars >= 0.5;
+                  const stars = "★".repeat(fullStars) + (halfStar ? "½" : "") + "☆".repeat(5 - fullStars - (halfStar ? 1 : 0));
+                  return `<div class="agent-rating"><span class="agent-stars">${stars}</span><span class="agent-reviews">${rating.toFixed(1)} (${reviews} reseñas)</span></div>`;
+                })()}
                 ${config.showInmobiliariaCreador && data.perfil.nombre_inmobiliaria ? `<div class="agent-company">${safeText(data.perfil.nombre_inmobiliaria)}</div>` : ""}
                 ${config.showInmobiliariaCreador && data.perfil.nombre_inmobiliaria && data.perfil.celular ? `<div class="agent-company">${safeText(data.perfil.nombre_inmobiliaria)}    ${safeText(data.perfil.celular)}</div>` : ""}
                 <div class="agent-contact">
@@ -362,7 +374,7 @@ const generatePropertyHtml = (
         </div>
         <div class="footer-logo-container">
           <img src="https://www.ilyrox.com/Logo.jpeg" alt="Logo" class="Logo" />
-          <div class="footer-logo-text">ilyrox</div>
+          <div class="footer-logo-text">ILROX</div>
         </div>
       </div>
     `;
@@ -373,7 +385,7 @@ const generatePropertyHtml = (
          <div class="agent-details">
             <div class="footer-logo-container">
               <img src="https://www.ilyrox.com/Logo.jpeg" alt="Logo" class="Logo" />
-              <div class="footer-logo-text">ilyrox</div>
+              <div class="footer-logo-text">ILROX</div>
             </div>
             ${idDateHtml}
          </div>
@@ -637,6 +649,24 @@ const generatePropertyHtml = (
         .agent-company {
             font-size: 12px;
             color: #666;
+        }
+
+        .agent-rating {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 2px;
+        }
+
+        .agent-stars {
+            color: #f59e0b;
+            font-size: 13px;
+            letter-spacing: 1px;
+        }
+
+        .agent-reviews {
+            font-size: 11px;
+            color: #888;
         }
 
         .footer-logo-container {

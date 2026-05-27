@@ -1,11 +1,33 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+/**
+ * CascadeLocationSelector.tsx
+ *
+ * Selector de ubicación basado en Google Places Autocomplete.
+ * Reemplaza el antiguo selector cascada Estado → Municipio → Colonia
+ * que dependía de Supabase Geo.
+ *
+ * Flujo:
+ * 1. Usuario escribe una dirección/zona
+ * 2. Se consulta Places Autocomplete API → sugerencias
+ * 3. Usuario selecciona → se obtienen detalles del lugar (lat/lng)
+ * 4. Se hace Reverse Geocoding para extraer estado/municipio/colonia
+ * 5. Se llama onChange con los datos estructurados
+ */
+
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  StyleSheet,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
-import SelectionModal from "../modals/SelectionModal";
-import { useGeoLocation } from "../../hooks/useGeoLocation";
+import { searchPlaces, getPlaceDetails, reverseGeocode, type PlaceSuggestion } from "../../lib/geocodingService";
 
-interface LocationData {
+export interface LocationData {
   estado: string;
   ciudad: string;
   municipio: string;
@@ -20,397 +42,278 @@ interface CascadeLocationSelectorProps {
   onChange: (data: LocationData) => void;
   showColonia?: boolean;
   isMandatory?: boolean;
+  /** multiColonia se mantiene en la firma para compatibilidad, pero en Places solo habrá una colonia por predicción */
   multiColonia?: boolean;
+  placeholder?: string;
 }
 
 export default function CascadeLocationSelector({
   initialData,
   onChange,
-  showColonia = false,
   isMandatory = true,
-  multiColonia = false,
+  placeholder = "Buscar dirección o zona...",
 }: CascadeLocationSelectorProps) {
-  // We need to match existing string values to IDs or just allow selection
-  const [estadoLabel, setEstadoLabel] = useState(initialData?.estado || "");
-  const [municipioLabel, setMunicipioLabel] = useState(
-    initialData?.municipio || "",
+  // Valor en el input de texto
+  const [query, setQuery] = useState(
+    initialData
+      ? [initialData.colonia, initialData.municipio, initialData.estado]
+          .filter(Boolean)
+          .join(", ")
+      : "",
   );
-  const [coloniaLabel, setColoniaLabel] = useState(initialData?.colonia || "");
-  const [coloniaLabels, setColoniaLabels] = useState<string[]>(
-    Array.isArray(initialData?.colonias) && initialData!.colonias!.length > 0
-      ? initialData!.colonias!
-      : initialData?.colonia
-        ? [initialData.colonia]
-        : [],
-  );
+  // Sugerencias de Places Autocomplete
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  // Indica que ya hay una selección válida (no mostrar sugerencias)
+  const [isSelected, setIsSelected] = useState(!!initialData?.estado);
 
-  const [estadoId, setEstadoId] = useState("");
-  const [municipioId, setMunicipioId] = useState("");
-  const [coloniaId, setColoniaId] = useState("");
+  // Session token para agrupar requests y reducir costos de Places API
+  const sessionTokenRef = useRef<string>(generateToken());
 
-  const [latitud, setLatitud] = useState<number | undefined>(
-    initialData?.latitud,
-  );
-  const [longitud, setLongitud] = useState<number | undefined>(
-    initialData?.longitud,
-  );
+  // Datos seleccionados actualmente
+  const [currentData, setCurrentData] = useState<LocationData>({
+    estado: initialData?.estado ?? "",
+    ciudad: initialData?.ciudad ?? "",
+    municipio: initialData?.municipio ?? "",
+    colonia: initialData?.colonia ?? "",
+    colonias: initialData?.colonias ?? (initialData?.colonia ? [initialData.colonia] : []),
+    latitud: initialData?.latitud,
+    longitud: initialData?.longitud,
+  });
 
-  const {
-    estados,
-    municipios,
-    colonias,
-    isLoading,
-    fetchMunicipios,
-    fetchColonias,
-    clearMunicipios,
-    clearColonias,
-  } = useGeoLocation();
-
-  // Sync with asynchronous updates to initialData (when editing a property)
+  // Sincronizar si initialData cambia asincrónicamente (modo edición)
   useEffect(() => {
-    if (initialData) {
-      const { estado, municipio, colonia, colonias, latitud: initLat, longitud: initLng } = initialData;
-      if (estado !== undefined && estado !== estadoLabel) setEstadoLabel(estado);
-      if (municipio !== undefined && municipio !== municipioLabel) setMunicipioLabel(municipio);
-      if (colonia !== undefined && colonia !== coloniaLabel) setColoniaLabel(colonia);
-      if (multiColonia) {
-        const incoming = Array.isArray(colonias) && colonias.length > 0
-          ? colonias
-          : colonia
-            ? [colonia]
-            : [];
-        const equal =
-          incoming.length === coloniaLabels.length &&
-          incoming.every((c, i) => c === coloniaLabels[i]);
-        if (!equal && incoming.length > 0) setColoniaLabels(incoming);
-      }
-      if (initLat !== undefined && initLat !== latitud) setLatitud(initLat);
-      if (initLng !== undefined && initLng !== longitud) setLongitud(initLng);
-    }
-  }, [initialData?.estado, initialData?.municipio, initialData?.colonia, initialData?.colonias]);
-
-  // Modals visibility
-  const [showEstadoModal, setShowEstadoModal] = useState(false);
-  const [showMunicipioModal, setShowMunicipioModal] = useState(false);
-  const [showColoniaModal, setShowColoniaModal] = useState(false);
-
-  // Re-fetch dependent dropdowns if IDs are selected
-  useEffect(() => {
-    if (estadoId) {
-      fetchMunicipios(estadoId);
-    } else {
-      clearMunicipios();
-    }
-  }, [estadoId]);
-
-  useEffect(() => {
-    if (municipioId) {
-      fetchColonias(municipioId);
-    } else {
-      clearColonias();
-    }
-  }, [municipioId]);
-
-  // Resolve IDs from labels if they were provided as strings in initialData
-  useEffect(() => {
-    if (estados.length > 0 && estadoLabel && !estadoId) {
-      const match = estados.find(e => e.label === estadoLabel);
-      if (match) setEstadoId(match.value);
-    }
-  }, [estados, estadoLabel, estadoId]);
-
-  useEffect(() => {
-    if (municipios.length > 0 && municipioLabel && !municipioId) {
-      const match = municipios.find(m => m.label === municipioLabel);
-      if (match) setMunicipioId(match.value);
-    }
-  }, [municipios, municipioLabel, municipioId]);
-
-  useEffect(() => {
-    if (colonias.length > 0 && coloniaLabel && !coloniaId) {
-      const match = colonias.find(c => {
-        const nameOnly = c.label.split(" - ")[0] || c.label;
-        return nameOnly === coloniaLabel;
+    if (!initialData) return;
+    const newQuery = [initialData.colonia, initialData.municipio, initialData.estado]
+      .filter(Boolean)
+      .join(", ");
+    if (newQuery && newQuery !== query) {
+      setQuery(newQuery);
+      setIsSelected(true);
+      setCurrentData({
+        estado: initialData.estado ?? "",
+        ciudad: initialData.ciudad ?? "",
+        municipio: initialData.municipio ?? "",
+        colonia: initialData.colonia ?? "",
+        colonias: initialData.colonias ?? (initialData.colonia ? [initialData.colonia] : []),
+        latitud: initialData.latitud,
+        longitud: initialData.longitud,
       });
-      if (match) setColoniaId(match.value);
     }
-  }, [colonias, coloniaLabel, coloniaId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData?.estado, initialData?.municipio, initialData?.colonia]);
 
-  // Handle onChange
-  useEffect(() => {
-    const primaryColonia = multiColonia
-      ? coloniaLabels[0] ?? ""
-      : coloniaLabel;
-    onChange({
-      estado: estadoLabel,
-      ciudad: "", // Ciudad is removed, keeping empty string.
-      municipio: municipioLabel,
-      colonia: primaryColonia,
-      colonias: multiColonia ? coloniaLabels : primaryColonia ? [primaryColonia] : [],
-      latitud,
-      longitud,
-    });
-  }, [estadoLabel, municipioLabel, coloniaLabel, coloniaLabels, latitud, longitud, multiColonia]);
+  // Debounce para el autocompletado
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // SIMPLE ID RESOLUTION (For editing mode)
-  // When options are loaded, if we have a label but no ID, find the ID.
-  useEffect(() => {
-    if (estados.length > 0 && estadoLabel && !estadoId) {
-      const match = estados.find(e => e.label === estadoLabel);
-      if (match) setEstadoId(match.value);
+  const handleQueryChange = useCallback((text: string) => {
+    setQuery(text);
+    setIsSelected(false);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (text.trim().length < 2) {
+      setSuggestions([]);
+      return;
     }
-  }, [estados, estadoLabel, estadoId]);
 
-  useEffect(() => {
-    if (municipios.length > 0 && municipioLabel && !municipioId) {
-      const match = municipios.find(m => m.label === municipioLabel);
-      if (match) setMunicipioId(match.value);
-    }
-  }, [municipios, municipioLabel, municipioId]);
-
-  useEffect(() => {
-    if (colonias.length > 0 && coloniaLabel && !coloniaId) {
-      const match = colonias.find(c => {
-        const nameOnly = c.label.split(" - ")[0] || c.label;
-        return nameOnly === coloniaLabel;
-      });
-      if (match) setColoniaId(match.value);
-    }
-  }, [colonias, coloniaLabel, coloniaId]);
-
-  // Mappers and handlers
-  const handleEstadoSelect = (valId: string) => {
-    const selected = estados.find((e) => e.value === valId);
-    if (selected) {
-      setEstadoId(valId);
-      setEstadoLabel(selected.label);
-      if (selected.latitud && selected.longitud) {
-        setLatitud(selected.latitud);
-        setLongitud(selected.longitud);
+    debounceRef.current = setTimeout(async () => {
+      setIsLoading(true);
+      try {
+        const results = await searchPlaces(text, sessionTokenRef.current);
+        setSuggestions(results.slice(0, 8));
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setIsLoading(false);
       }
-      if (valId !== estadoId) {
-        setMunicipioId("");
-        setMunicipioLabel("");
-        setColoniaId("");
-        setColoniaLabel("");
-      }
-    }
-  };
+    }, 300);
+  }, []);
 
-  const handleMunicipioSelect = (valId: string) => {
-    const selected = municipios.find((m) => m.value === valId);
-    if (selected) {
-      setMunicipioId(valId);
-      setMunicipioLabel(selected.label);
-      if (valId !== municipioId) {
-        setColoniaId("");
-        setColoniaLabel("");
-        setColoniaLabels([]);
-      }
-    }
-  };
+  const handleSelectSuggestion = useCallback(
+    async (suggestion: PlaceSuggestion) => {
+      setSuggestions([]);
+      setIsLoading(true);
+      setQuery(suggestion.description);
 
-  const handleColoniaSelect = (valId: string) => {
-    const selected = colonias.find((c) => c.value === valId);
-    if (selected) {
-      // Remove text after " - " which was added for label context
-      const nameOnly = selected.label.split(" - ")[0] || selected.label;
-      if (multiColonia) {
-        setColoniaLabels((prev) =>
-          prev.includes(nameOnly) ? prev : [...prev, nameOnly],
-        );
-      } else {
-        setColoniaId(valId);
-        setColoniaLabel(nameOnly);
-      }
-      if (selected.latitud && selected.longitud) {
-        setLatitud(selected.latitud);
-        setLongitud(selected.longitud);
-      }
-    }
-  };
+      try {
+        // Obtener geometría exacta del lugar
+        const details = await getPlaceDetails(suggestion.placeId, sessionTokenRef.current);
 
-  const handleRemoveColonia = (name: string) => {
-    setColoniaLabels((prev) => prev.filter((c) => c !== name));
-  };
+        // Refrescar session token después de completar una selección
+        sessionTokenRef.current = generateToken();
+
+        const lat = details?.location.lat ?? 0;
+        const lng = details?.location.lng ?? 0;
+
+        // Reverse geocoding para extraer estado/municipio/colonia
+        let estado = "";
+        let municipio = "";
+        let ciudad = "";
+        let colonia = "";
+
+        if (lat && lng) {
+          const geo = await reverseGeocode(lat, lng);
+          if (geo) {
+            estado = geo.components.estado;
+            municipio = geo.components.municipio;
+            ciudad = geo.components.ciudad;
+            colonia = geo.components.colonia;
+          }
+        }
+
+        // Fallback: parsear desde la descripción de la sugerencia si Reverse Geocoding falla
+        if (!estado) {
+          const parts = suggestion.description
+            .replace(/, México$/, "")
+            .replace(/, Mexico$/, "")
+            .split(", ")
+            .map((s) => s.trim());
+          estado = parts[parts.length - 1] ?? "";
+          municipio = parts[parts.length - 2] ?? "";
+          colonia = parts[0] ?? "";
+          ciudad = municipio;
+        }
+
+        const newData: LocationData = {
+          estado,
+          ciudad,
+          municipio,
+          colonia,
+          colonias: colonia ? [colonia] : [],
+          latitud: lat || undefined,
+          longitud: lng || undefined,
+        };
+
+        setCurrentData(newData);
+        setIsSelected(true);
+        onChange(newData);
+      } catch (e) {
+        console.warn("[CascadeLocationSelector] handleSelectSuggestion error:", e);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [onChange],
+  );
+
+  const handleClear = useCallback(() => {
+    setQuery("");
+    setIsSelected(false);
+    setSuggestions([]);
+    const empty: LocationData = {
+      estado: "",
+      ciudad: "",
+      municipio: "",
+      colonia: "",
+      colonias: [],
+      latitud: undefined,
+      longitud: undefined,
+    };
+    setCurrentData(empty);
+    onChange(empty);
+    sessionTokenRef.current = generateToken();
+  }, [onChange]);
+
+  const isEmpty = !currentData.estado && !currentData.municipio;
 
   return (
     <View style={styles.container}>
-      {/* Estado */}
-      <View style={styles.field}>
-        <Text style={styles.label}>Estado{isMandatory ? " *" : ""}</Text>
-        <TouchableOpacity
-          style={[
-            styles.selector,
-            isMandatory && !estadoLabel && styles.selectorEmpty,
-          ]}
-          onPress={() => setShowEstadoModal(true)}
-        >
-          <Text
-            style={
-              estadoLabel ? styles.selectorText : styles.selectorPlaceholder
-            }
-          >
-            {estadoLabel || "Selecciona un estado..."}
-          </Text>
-          <Ionicons
-            name="chevron-down"
-            size={20}
-            color={COLORS.textSecondary}
-          />
-        </TouchableOpacity>
-      </View>
-
-      <SelectionModal
-        visible={showEstadoModal}
-        onClose={() => setShowEstadoModal(false)}
-        onSelect={handleEstadoSelect}
-        title="Selecciona un Estado"
-        options={estados}
-        currentValue={estadoId}
-        searchable
-      />
-
-      {/* Municipio */}
+      {/* Input de búsqueda */}
       <View style={styles.field}>
         <Text style={styles.label}>
-          Municipio
-          {isMandatory && municipios.length > 0 ? " *" : ""}
+          Ubicación{isMandatory ? " *" : ""}
         </Text>
-        <TouchableOpacity
+        <View
           style={[
-            styles.selector,
-            isMandatory &&
-              estadoId &&
-              municipios.length > 0 &&
-              !municipioLabel &&
-              styles.selectorEmpty,
-            !estadoId && styles.selectorDisabled,
+            styles.inputContainer,
+            isMandatory && isEmpty && styles.inputContainerEmpty,
           ]}
-          onPress={() => {
-            if (municipios.length > 0) {
-              setShowMunicipioModal(true);
-            }
-          }}
-          disabled={!estadoId || municipios.length === 0}
         >
-          <Text
-            style={
-              municipioLabel ? styles.selectorText : styles.selectorPlaceholder
-            }
-          >
-            {!estadoId
-              ? "Primero selecciona un estado"
-              : isLoading
-                ? "Cargando..."
-                : municipios.length === 0
-                  ? "No hay municipios disponibles"
-                  : municipioLabel || "Selecciona un municipio..."}
-          </Text>
           <Ionicons
-            name="chevron-down"
-            size={20}
+            name="search-outline"
+            size={18}
             color={COLORS.textSecondary}
+            style={styles.searchIcon}
           />
-        </TouchableOpacity>
+          <TextInput
+            style={styles.input}
+            value={query}
+            onChangeText={handleQueryChange}
+            placeholder={placeholder}
+            placeholderTextColor={COLORS.primary}
+            returnKeyType="search"
+            autoCorrect={false}
+          />
+          {isLoading ? (
+            <ActivityIndicator size="small" color={COLORS.primary} style={styles.inputAction} />
+          ) : query.length > 0 ? (
+            <TouchableOpacity onPress={handleClear} hitSlop={8} style={styles.inputAction}>
+              <Ionicons name="close-circle" size={18} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
 
-      <SelectionModal
-        visible={showMunicipioModal}
-        onClose={() => setShowMunicipioModal(false)}
-        onSelect={handleMunicipioSelect}
-        title="Selecciona un Municipio"
-        options={municipios}
-        currentValue={municipioId}
-        searchable
-      />
-
-      {/* Colonia (Opcional) */}
-      {showColonia && (
-        <>
-          <View style={styles.field}>
-            <Text style={styles.label}>
-              {multiColonia ? "Colonias" : "Colonia"}
-            </Text>
-            <TouchableOpacity
-              style={[styles.selector, !municipioId && styles.selectorDisabled]}
-              onPress={() => {
-                if (colonias.length > 0) {
-                  setShowColoniaModal(true);
-                }
-              }}
-              disabled={!municipioId || colonias.length === 0}
-            >
-              <Text
-                style={
-                  (multiColonia ? coloniaLabels.length > 0 : !!coloniaLabel)
-                    ? styles.selectorText
-                    : styles.selectorPlaceholder
-                }
+      {/* Lista de sugerencias */}
+      {suggestions.length > 0 && !isSelected && (
+        <View style={styles.suggestionsList}>
+          <FlatList
+            data={suggestions}
+            keyExtractor={(item) => item.placeId}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.suggestionItem}
+                onPress={() => handleSelectSuggestion(item)}
+                activeOpacity={0.7}
               >
-                {!municipioId
-                  ? "Primero selecciona un municipio"
-                  : isLoading
-                    ? "Cargando..."
-                    : colonias.length === 0
-                      ? "No hay colonias disponibles"
-                      : multiColonia
-                        ? coloniaLabels.length > 0
-                          ? "Agregar otra colonia..."
-                          : "Selecciona una o más colonias..."
-                        : coloniaLabel || "Selecciona una colonia..."}
-              </Text>
-              <Ionicons
-                name="chevron-down"
-                size={20}
-                color={COLORS.textSecondary}
-              />
-            </TouchableOpacity>
-
-            {multiColonia && coloniaLabels.length > 0 && (
-              <View style={styles.coloniaChipsRow}>
-                {coloniaLabels.map((name) => (
-                  <View key={name} style={styles.coloniaChip}>
-                    <Text style={styles.coloniaChipText} numberOfLines={1}>
-                      {name}
+                <Ionicons
+                  name="location-outline"
+                  size={16}
+                  color={COLORS.primary}
+                  style={styles.suggestionIcon}
+                />
+                <View style={styles.suggestionText}>
+                  <Text style={styles.suggestionMain} numberOfLines={1}>
+                    {item.mainText}
+                  </Text>
+                  {item.secondaryText ? (
+                    <Text style={styles.suggestionSub} numberOfLines={1}>
+                      {item.secondaryText}
                     </Text>
-                    <TouchableOpacity
-                      onPress={() => handleRemoveColonia(name)}
-                      hitSlop={8}
-                      style={styles.coloniaChipRemove}
-                    >
-                      <Ionicons
-                        name="close"
-                        size={14}
-                        color={COLORS.textSecondary}
-                      />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
+                  ) : null}
+                </View>
+              </TouchableOpacity>
             )}
-          </View>
-
-          <SelectionModal
-            visible={showColoniaModal}
-            onClose={() => setShowColoniaModal(false)}
-            onSelect={handleColoniaSelect}
-            title="Selecciona una Colonia"
-            options={colonias}
-            currentValue={multiColonia ? "" : coloniaId}
-            searchable
           />
-        </>
+        </View>
+      )}
+
+      {/* Resumen de la ubicación seleccionada */}
+      {isSelected && currentData.estado && (
+        <View style={styles.selectedSummary}>
+          <Ionicons name="checkmark-circle" size={16} color={COLORS.success ?? COLORS.primary} />
+          <Text style={styles.selectedSummaryText} numberOfLines={1}>
+            {[currentData.colonia, currentData.municipio, currentData.estado]
+              .filter(Boolean)
+              .join(", ")}
+          </Text>
+        </View>
       )}
     </View>
   );
 }
+
+function generateToken(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 const styles = StyleSheet.create({
   container: {
     gap: 0,
   },
   field: {
-    marginBottom: 12,
+    marginBottom: 4,
   },
   label: {
     fontSize: 13,
@@ -419,58 +322,77 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: "uppercase",
   },
-  selector: {
+  inputContainer: {
     backgroundColor: COLORS.background,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
     borderRadius: 12,
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 8,
   },
-  selectorEmpty: {
+  inputContainerEmpty: {
     borderColor: COLORS.primary,
     backgroundColor: COLORS.primaryTransparent,
   },
-  selectorDisabled: {
-    opacity: 0.6,
-    backgroundColor: COLORS.cardBorder,
+  searchIcon: {
+    flexShrink: 0,
   },
-  selectorText: {
+  input: {
+    flex: 1,
     fontSize: 15,
     color: COLORS.textPrimary,
-    flex: 1,
+    paddingVertical: 0,
   },
-  selectorPlaceholder: {
-    fontSize: 15,
-    color: COLORS.primary,
-    flex: 1,
+  inputAction: {
+    flexShrink: 0,
   },
-  coloniaChipsRow: {
+  suggestionsList: {
+    backgroundColor: COLORS.white ?? COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    borderRadius: 12,
+    marginTop: 4,
+    maxHeight: 240,
+    overflow: "hidden",
+  },
+  suggestionItem: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 10,
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.background,
+    gap: 10,
   },
-  coloniaChip: {
+  suggestionIcon: {
+    flexShrink: 0,
+  },
+  suggestionText: {
+    flex: 1,
+  },
+  suggestionMain: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+  },
+  suggestionSub: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 1,
+  },
+  selectedSummary: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: COLORS.primaryTransparent,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
+    paddingTop: 8,
+    paddingHorizontal: 4,
   },
-  coloniaChipText: {
+  selectedSummaryText: {
     fontSize: 13,
-    color: COLORS.textPrimary,
-    fontWeight: "500",
-    maxWidth: 160,
-  },
-  coloniaChipRemove: {
-    paddingLeft: 2,
+    color: COLORS.textSecondary,
+    flex: 1,
   },
 });

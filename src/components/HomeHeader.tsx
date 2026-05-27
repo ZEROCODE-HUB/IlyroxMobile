@@ -18,10 +18,7 @@ import { LocationSuggestionWithCount } from "../store/locationSearchStore";
 import { usePropertyFiltersStore } from "../store/propertyFiltersStore";
 import { useChatStore } from "../store/chatStore";
 
-// Assuming Logo is in assets folder relative to src/components -> ../../assets/Logo.jpeg
-// Adjust path if necessary based on project structure.
-// User's App.tsx had require("./assets/Logo.jpeg") from root.
-const LOGO_SOURCE = require("../assets/Logo.jpeg");
+const LOGO_SOURCE = require("../assets/Logo.png");
 
 interface HomeHeaderProps {
   style?: any;
@@ -83,7 +80,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
           <Image
             source={LOGO_SOURCE}
             style={styles.headerLogo}
-            resizeMode="cover"
+            resizeMode="contain"
           />
         </View>
         <View style={styles.headerIcons}>
@@ -180,11 +177,8 @@ const styles = StyleSheet.create({
     height: 60,
   },
   headerLogo: {
-    width: 100,
-    height: 50,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.whiteTransparent30,
+    width: 120,
+    height: 48,
   },
   headerIcons: {
     flexDirection: "row",

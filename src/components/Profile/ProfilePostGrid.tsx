@@ -89,8 +89,7 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
     const hasImages = item.imagenes && item.imagenes.length > 0;
     const hasMultipleImages = item.imagenes && item.imagenes.length > 1;
 
-    const postType = (item.tipo || "post").toLowerCase().replace(/\s+/g, "");
-    const canEdit = ["post", "openhouse", "busqueda"].includes(postType);
+    const canEdit = true;
 
     const menuOptions: MenuOption[] = [
       ...(canEdit

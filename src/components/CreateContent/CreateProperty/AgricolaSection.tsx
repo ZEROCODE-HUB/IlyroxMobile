@@ -1,10 +1,11 @@
 import React from "react";
 import { View, Text, Switch, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../../constants/colors";
 import {
   TIPOS_AGUA,
   TIPOS_RIEGO,
+  USOS_TERRENO,
 } from "../../../constants/propertyData";
 import RadioGroupSelector from "../../common/RadioGroupSelector";
 import { usePropertyFormContext } from "./PropertyFormContext";
@@ -15,6 +16,8 @@ export const AgricolaSection = React.memo(function AgricolaSection() {
     toggleTipoAgua,
     concesionAgua,
     setConcesionAgua,
+    usoTerreno,
+    setUsoTerreno,
     tipoRiego,
     setTipoRiego,
     infraElectricidad,
@@ -32,7 +35,7 @@ export const AgricolaSection = React.memo(function AgricolaSection() {
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeaderBand}>
-        <Ionicons name="leaf-outline" size={18} color={COLORS.primary} />
+        <MaterialCommunityIcons name="tractor" size={18} color={COLORS.primary} />
         <Text style={styles.sectionTitleBand}>Características Agrícolas</Text>
       </View>
 
@@ -68,6 +71,14 @@ export const AgricolaSection = React.memo(function AgricolaSection() {
           thumbColor={COLORS.white}
         />
       </View>
+
+      {/* USO DE TERRENO */}
+      <RadioGroupSelector
+        label="Uso de Terreno"
+        options={[...USOS_TERRENO]}
+        selectedValue={usoTerreno}
+        onSelect={setUsoTerreno}
+      />
 
       {/* SISTEMA DE RIEGO */}
       <RadioGroupSelector
