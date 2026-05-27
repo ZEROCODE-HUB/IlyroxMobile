@@ -19,7 +19,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
@@ -254,19 +253,18 @@ export default function CascadeLocationSelector({
         </View>
       </View>
 
-      {/* Lista de sugerencias — ScrollView para evitar FlatList anidado en ScrollView */}
+      {/* Lista de sugerencias — View plano sin maxHeight para que el ScrollView
+          externo del formulario maneje el scroll. Evita el problema de scroll
+          anidado en React Native. */}
       {suggestions.length > 0 && !isSelected && (
-        <ScrollView
-          style={styles.suggestionsList}
-          keyboardShouldPersistTaps="handled"
-          nestedScrollEnabled
-          showsVerticalScrollIndicator
-          bounces={false}
-        >
-          {suggestions.map((item) => (
+        <View style={styles.suggestionsList}>
+          {suggestions.map((item, index) => (
             <TouchableOpacity
               key={item.placeId}
-              style={styles.suggestionItem}
+              style={[
+                styles.suggestionItem,
+                index === suggestions.length - 1 && styles.suggestionItemLast,
+              ]}
               onPress={() => handleSelectSuggestion(item)}
               activeOpacity={0.7}
             >
@@ -288,7 +286,7 @@ export default function CascadeLocationSelector({
               </View>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
       )}
 
       {/* Resumen de la ubicación seleccionada */}
@@ -357,7 +355,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.cardBorder,
     borderRadius: 12,
     marginTop: 4,
-    maxHeight: 300,
+    overflow: "hidden",
   },
   suggestionItem: {
     flexDirection: "row",
@@ -367,6 +365,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.background,
     gap: 10,
+  },
+  suggestionItemLast: {
+    borderBottomWidth: 0,
   },
   suggestionIcon: {
     flexShrink: 0,
