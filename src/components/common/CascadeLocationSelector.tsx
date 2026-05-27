@@ -19,7 +19,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
+  ScrollView,
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
@@ -254,39 +254,41 @@ export default function CascadeLocationSelector({
         </View>
       </View>
 
-      {/* Lista de sugerencias */}
+      {/* Lista de sugerencias — ScrollView para evitar FlatList anidado en ScrollView */}
       {suggestions.length > 0 && !isSelected && (
-        <View style={styles.suggestionsList}>
-          <FlatList
-            data={suggestions}
-            keyExtractor={(item) => item.placeId}
-            keyboardShouldPersistTaps="handled"
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.suggestionItem}
-                onPress={() => handleSelectSuggestion(item)}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name="location-outline"
-                  size={16}
-                  color={COLORS.primary}
-                  style={styles.suggestionIcon}
-                />
-                <View style={styles.suggestionText}>
-                  <Text style={styles.suggestionMain} numberOfLines={1}>
-                    {item.mainText}
+        <ScrollView
+          style={styles.suggestionsList}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+          showsVerticalScrollIndicator
+          bounces={false}
+        >
+          {suggestions.map((item) => (
+            <TouchableOpacity
+              key={item.placeId}
+              style={styles.suggestionItem}
+              onPress={() => handleSelectSuggestion(item)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name="location-outline"
+                size={16}
+                color={COLORS.primary}
+                style={styles.suggestionIcon}
+              />
+              <View style={styles.suggestionText}>
+                <Text style={styles.suggestionMain} numberOfLines={1}>
+                  {item.mainText}
+                </Text>
+                {item.secondaryText ? (
+                  <Text style={styles.suggestionSub} numberOfLines={1}>
+                    {item.secondaryText}
                   </Text>
-                  {item.secondaryText ? (
-                    <Text style={styles.suggestionSub} numberOfLines={1}>
-                      {item.secondaryText}
-                    </Text>
-                  ) : null}
-                </View>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
+                ) : null}
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       )}
 
       {/* Resumen de la ubicación seleccionada */}
@@ -355,8 +357,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.cardBorder,
     borderRadius: 12,
     marginTop: 4,
-    maxHeight: 240,
-    overflow: "hidden",
+    maxHeight: 300,
   },
   suggestionItem: {
     flexDirection: "row",
