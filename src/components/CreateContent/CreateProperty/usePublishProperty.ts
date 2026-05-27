@@ -167,7 +167,9 @@ export function usePublishProperty(
             message: "La publicación tardó demasiado. ¿Deseas intentar de nuevo?",
             confirmText: "Reintentar",
             cancelText: "No",
+            confirmVariant: "primary",
             onConfirm: () => void handlePublish(resolvedContractData),
+            onCancel: () => {},
           });
         }
       }, PUBLISH_TIMEOUT_MS);
@@ -482,7 +484,9 @@ export function usePublishProperty(
           message: errorMessage,
           confirmText: "Reintentar",
           cancelText: "Cerrar",
+          confirmVariant: "primary",
           onConfirm: () => void handlePublish(resolvedContractData),
+          onCancel: () => {},
         });
       }
     },
