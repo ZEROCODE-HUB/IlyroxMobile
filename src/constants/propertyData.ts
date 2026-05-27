@@ -11,7 +11,6 @@ export const PROPERTY_TYPES = {
     "Casa (Fracc. Abierto)",
     "Casa en Condominio",
     "Casa de campo/descanso/cabaña",
-    "Casa de un nivel",
     "Departamento",
     "Penthouse",
     "Loft",

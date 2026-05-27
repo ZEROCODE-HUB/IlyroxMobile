@@ -472,11 +472,20 @@ export function usePropertyForm(
   useEffect(() => {
     const { latitud, longitud, estado } = state.ubicacionData;
     if (latitud && longitud) {
+      // Centrar el mapa en las coordenadas del lugar seleccionado
       dispatch({
         type: "SET_FIELD",
         field: "mapCenter",
         value: { lat: latitud, lng: longitud },
       });
+      // Auto-colocar el pin si el usuario aún no ha posicionado uno manualmente
+      if (state.location.latitude === 0 && state.location.longitude === 0) {
+        dispatch({
+          type: "SET_FIELD",
+          field: "location",
+          value: { latitude: latitud, longitude: longitud },
+        });
+      }
     } else if (estado && COORDENADAS_ESTADO[estado]) {
       dispatch({
         type: "SET_FIELD",
@@ -484,6 +493,7 @@ export function usePropertyForm(
         value: COORDENADAS_ESTADO[estado],
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.ubicacionData]);
 
   // ============================================
