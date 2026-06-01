@@ -169,12 +169,17 @@ export const propertyService = {
     await this.addPropertyRelations(propiedadId, relatedData);
 
     // 3. Create Feed Item
+    // estado_moderacion: "activo" siempre — la visibilidad real la controla
+    // propiedades.activo (filtro en feedService). Si se publica sin comisión
+    // (activo=false), el feed_item existe pero propiedades.activo=false lo oculta.
+    // Cuando el usuario agrega comisión y actualiza, updateProperty activa el
+    // feed_item con publicado_en=NOW() para que aparezca "fresco" en el feed.
     const { error: feedError } = await supabase.from("feed_items").insert({
       tipo_contenido: "propiedad",
       contenido_id: propiedadId,
       publicado_por: propertyData.created_by,
       visibilidad: "publico",
-      estado_moderacion: "activo",
+      estado_moderacion: propertyData.activo ? "activo" : "inactivo",
     });
 
     if (feedError) throw feedError;
@@ -195,7 +200,29 @@ export const propertyService = {
 
     if (updateError) throw updateError;
 
-    // 2. Clean existing relations
+    // 2. Sincronizar feed_items según el nuevo estado activo/inactivo
+    if (propertyData.activo === true) {
+      // La propiedad se vuelve visible: activar el feed_item y refrescar
+      // publicado_en para que aparezca "fresco" en el feed (ordenado por
+      // engagement_score DESC, publicado_en DESC).
+      await supabase
+        .from("feed_items")
+        .update({
+          estado_moderacion: "activo",
+          publicado_en: new Date().toISOString(),
+        })
+        .eq("contenido_id", propertyId)
+        .eq("tipo_contenido", "propiedad");
+    } else if (propertyData.activo === false) {
+      // La propiedad queda suspendida: desactivar en el feed
+      await supabase
+        .from("feed_items")
+        .update({ estado_moderacion: "inactivo" })
+        .eq("contenido_id", propertyId)
+        .eq("tipo_contenido", "propiedad");
+    }
+
+    // 3. Clean existing relations
     await supabase
       .from("operaciones_propiedad")
       .delete()
@@ -213,7 +240,7 @@ export const propertyService = {
       .delete()
       .eq("propiedad_id", propertyId);
 
-    // 3. Add new Relations
+    // 4. Add new Relations
     await this.addPropertyRelations(propertyId, relatedData);
 
     return true;

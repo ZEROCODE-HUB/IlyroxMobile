@@ -1,10 +1,14 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { propertyService } from "../services/propertyService";
-import { logger } from "@/utils/logger";const log = logger.scoped("usePropertyMutation");
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("usePropertyMutation");
 
 export const usePropertyMutation = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<any>(null);
+  const queryClient = useQueryClient();
 
   const saveProperty = async (
     propertyId: string | undefined,
@@ -14,6 +18,8 @@ export const usePropertyMutation = () => {
     setIsSaving(true);
     setError(null);
     try {
+      let result: { success: boolean; id: string; mode: string };
+
       if (propertyId) {
         // UPDATE
         await propertyService.updateProperty(
@@ -21,15 +27,26 @@ export const usePropertyMutation = () => {
           propertyData,
           relatedData,
         );
-        return { success: true, id: propertyId, mode: "update" };
+        result = { success: true, id: propertyId, mode: "update" };
       } else {
         // CREATE
         const newProp = await propertyService.createProperty(
           propertyData,
           relatedData,
         );
-        return { success: true, id: newProp.id, mode: "create" };
+        result = { success: true, id: newProp.id, mode: "create" };
       }
+
+      // Invalidar caches de feed y mapa para que reflejen la propiedad
+      // recién creada/actualizada inmediatamente.
+      queryClient.invalidateQueries({ queryKey: ["feed"] });
+      queryClient.invalidateQueries({ queryKey: ["map-properties"] });
+      // Invalidar también el detalle de la propiedad si es una edición
+      if (propertyId) {
+        queryClient.invalidateQueries({ queryKey: ["property", propertyId] });
+      }
+
+      return result;
     } catch (err) {
       log.error("Error saving property:", err);
       setError(err);

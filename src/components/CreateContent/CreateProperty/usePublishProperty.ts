@@ -56,10 +56,28 @@ async function uploadImageWithTimeout(
   });
 }
 
+/** Callback que se llama al publicar una propiedad NUEVA con éxito,
+ *  para que el caller pueda abrir el flujo de Open House. */
+export interface OpenHousePrefill {
+  propertyId: string;
+  location: string;
+  firstPhoto: string | null;
+}
+
+/** Info que se pasa al callback de éxito para que el caller maneje la UI */
+export interface PublishSuccessInfo {
+  newPropertyId: string | null;
+  isUpdate: boolean;
+  firstPhotoUrl: string | null;
+  location: string;
+}
+
 export function usePublishProperty(
   form: ReturnType<typeof usePropertyForm>,
   propertyId?: string,
   onBack?: (shouldRefresh?: boolean) => void,
+  onOpenHousePrompt?: (prefill: OpenHousePrefill) => void,
+  onPublishSuccess?: (info: PublishSuccessInfo) => void,
 ) {
   const { user } = useAuth();
   const router = useRouter();
@@ -129,6 +147,39 @@ export function usePublishProperty(
 
       if (!user) {
         showModal({ title: "Sesión requerida", message: "Debes iniciar sesión para continuar.", confirmText: "OK" });
+        return;
+      }
+
+      // ── Validar comisión 0% con compartir activado ────────────────────────
+      // No tiene sentido compartir una comisión de 0%: bloquear antes de subir.
+      const comisionVentaNum = parseFloat(form.comisionValor) || 0;
+      const comisionRentaNum = parseFloat(
+        form.tipoOperacion === "ambas" ? form.comisionValorRenta : form.comisionValor
+      ) || 0;
+
+      if (
+        (form.tipoOperacion === "venta" || form.tipoOperacion === "ambas") &&
+        form.comparteComision === "Sí" &&
+        comisionVentaNum === 0
+      ) {
+        showModal({
+          title: "Comisión inválida",
+          message: "No puedes compartir una comisión de 0%. Define un porcentaje mayor antes de publicar.",
+          confirmText: "Corregir",
+        });
+        return;
+      }
+
+      if (
+        (form.tipoOperacion === "renta" || form.tipoOperacion === "ambas") &&
+        (form.tipoOperacion === "ambas" ? form.comparteComisionRenta : form.comparteComision) === "Sí" &&
+        comisionRentaNum === 0
+      ) {
+        showModal({
+          title: "Comisión inválida",
+          message: "No puedes compartir una comisión de 0 meses. Define un valor mayor antes de publicar.",
+          confirmText: "Corregir",
+        });
         return;
       }
 
@@ -444,38 +495,48 @@ export function usePublishProperty(
             canCancel: true,
           });
 
-          showModal({
-            title: propertyId ? "¡Propiedad actualizada!" : "¡Propiedad publicada!",
-            message: propertyId
-              ? "Propiedad actualizada correctamente"
-              : "Propiedad publicada correctamente",
-            confirmText: newPropertyId ? "Ver propiedad" : "Listo",
-            cancelText: newPropertyId ? "Ir al feed" : undefined,
-            confirmVariant: "primary",
-            onConfirm: () => {
-              if (newPropertyId) {
-                router.push({
-                  pathname: "/(stack)/property/[id]",
-                  params: { id: newPropertyId },
-                });
-              } else if (!propertyId) {
-                router.replace({
-                  pathname: "/(tabs)",
-                  params: { refresh: String(Date.now()) },
-                });
-              } else {
-                if (onBack) onBack(true);
-              }
-            },
-            onCancel: newPropertyId
-              ? () => {
+          if (onPublishSuccess) {
+            // El caller (CreateProperty/index.tsx) muestra el bottom sheet
+            const location = [
+              form.calle,
+              form.ubicacionData.municipio,
+              form.ubicacionData.estado,
+            ]
+              .filter(Boolean)
+              .join(" - ");
+
+            onPublishSuccess({
+              newPropertyId,
+              isUpdate: !!propertyId,
+              firstPhotoUrl: uploadedUrls[0] ?? null,
+              location,
+            });
+          } else {
+            // Fallback: modal legacy (si se usa el hook sin el nuevo callback)
+            showModal({
+              title: propertyId ? "¡Propiedad actualizada!" : "¡Propiedad publicada!",
+              message: propertyId
+                ? "Propiedad actualizada correctamente"
+                : "Propiedad publicada correctamente",
+              confirmText: newPropertyId ? "Ver propiedad" : "Listo",
+              confirmVariant: "primary",
+              onConfirm: () => {
+                if (newPropertyId) {
+                  router.push({
+                    pathname: "/(stack)/property/[id]",
+                    params: { id: newPropertyId },
+                  });
+                } else if (!propertyId) {
                   router.replace({
                     pathname: "/(tabs)",
                     params: { refresh: String(Date.now()) },
                   });
+                } else {
+                  if (onBack) onBack(true);
                 }
-              : undefined,
-          });
+              },
+            });
+          }
         }, 500); // Pequeño delay para que el usuario vea el 100%
       } catch (error: any) {
         // Limpiar timeout global
@@ -514,7 +575,7 @@ export function usePublishProperty(
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [form, propertyId, user, onBack, router, saveProperty, updateProgress, showModal, showToast],
+    [form, propertyId, user, onBack, router, saveProperty, updateProgress, showModal, showToast, onOpenHousePrompt, onPublishSuccess],
   );
 
   return {
@@ -526,16 +587,18 @@ export function usePublishProperty(
 }
 
 // ============================================
-// HELPER: Verificar si hay comisión definida
+// HELPER: Verificar si hay comisión definida (y > 0)
 // ============================================
 function checkComisionPresente(form: ReturnType<typeof usePropertyForm>): boolean {
   if (form.tipoOperacion === "venta" || form.tipoOperacion === "ambas") {
-    if (!form.comisionValor) return false;
+    const val = parseFloat(form.comisionValor) || 0;
+    if (val === 0) return false;
   }
   if (form.tipoOperacion === "renta" || form.tipoOperacion === "ambas") {
-    const rentaVal =
+    const rawVal =
       form.tipoOperacion === "ambas" ? form.comisionValorRenta : form.comisionValor;
-    if (!rentaVal) return false;
+    const val = parseFloat(rawVal) || 0;
+    if (val === 0) return false;
   }
   return true;
 }

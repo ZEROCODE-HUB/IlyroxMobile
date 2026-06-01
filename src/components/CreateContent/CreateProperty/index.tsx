@@ -3,7 +3,7 @@
 // Orquesta todos los sub-componentes y hooks
 // ============================================
 
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../../constants/colors";
@@ -18,6 +19,11 @@ import { ScreenWrapper } from "../../../screens/ScreenWrapper";
 import { AppHeader } from "../../AppHeader";
 import { SelectionModal } from "../../modals";
 import { SaleContractModal } from "../../modals/SaleContractModal";
+import { useRouter } from "expo-router";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
+import CreatePost from "../CreatePost/CreatePost";
+import type { Post } from "@/types";
 
 // Sub-componentes
 import { ImageGallerySection } from "./ImageGallerySection";
@@ -36,8 +42,9 @@ import { ProgressModal } from "./ProgressModal";
 
 // Hooks
 import { usePropertyForm } from "./usePropertyForm";
-import { usePublishProperty } from "./usePublishProperty";
+import { usePublishProperty, type OpenHousePrefill, type PublishSuccessInfo } from "./usePublishProperty";
 import { PropertyFormProvider } from "./PropertyFormContext";
+import { PropertyPublishedSheet } from "./PropertyPublishedSheet";
 
 // Types
 import type { CreatePropertyProps } from "./types";
@@ -46,12 +53,79 @@ export default function CreateProperty({
   onBack,
   propertyId,
 }: CreatePropertyProps) {
+  const { user } = useAuth();
+  const router = useRouter();
   const form = usePropertyForm(propertyId, onBack);
+
+  // Estado para el flujo de Open House post-publicación
+  const [showOpenHouseModal, setShowOpenHouseModal] = useState(false);
+  const [openHousePost, setOpenHousePost] = useState<Post | null>(null);
+
+  // Estado del bottom sheet de éxito
+  const [showPublishedSheet, setShowPublishedSheet] = useState(false);
+  const [publishedInfo, setPublishedInfo] = useState<PublishSuccessInfo | null>(null);
+
+  // Callback que se invoca cuando se publica una propiedad nueva y el usuario
+  // elige "Crear Open House" desde el modal de éxito.
+  const handleOpenHousePrompt = useCallback(
+    async (prefill: OpenHousePrefill) => {
+      if (!user) return;
+      try {
+        // Verificar si ya existe un post de tipo openhouse para esta propiedad
+        const { data: existing } = await supabase
+          .from("posts")
+          .select("*")
+          .eq("propiedad_id", prefill.propertyId)
+          .eq("tipo", "openhouse")
+          .is("deleted_at", null)
+          .maybeSingle();
+
+        if (existing) {
+          setOpenHousePost(existing as Post);
+        } else {
+          // Crear el post con status "oculto" para que el usuario lo edite
+          const { data: newPost, error } = await supabase
+            .from("posts")
+            .insert({
+              publicado_por: user.id,
+              tipo: "openhouse",
+              propiedad_id: prefill.propertyId,
+              ubicacion: prefill.location,
+              foto_propiedad: prefill.firstPhoto ?? null,
+              contenido: "Open House",
+              fecha_hora: new Date().toISOString(),
+              status: "oculto",
+            })
+            .select()
+            .single();
+
+          if (error) throw error;
+          setOpenHousePost(newPost as Post);
+        }
+
+        setShowOpenHouseModal(true);
+      } catch (err: any) {
+        console.warn("[CreateProperty] handleOpenHousePrompt error:", err);
+        // Si falla, simplemente no abrimos el modal; el usuario ya tiene la propiedad guardada
+      }
+    },
+    [user],
+  );
+
+  // Callback de éxito: muestra el bottom sheet con las acciones post-publicación
+  const handlePublishSuccess = useCallback((info: PublishSuccessInfo) => {
+    setPublishedInfo(info);
+    setShowPublishedSheet(true);
+  }, []);
+
   // 4. Hook de publicación (maneja guardado final y UI de load/error)
   const { publishState, handlePublish, cancelPublish, clearPublishError } = usePublishProperty(
     form,
     propertyId as string | undefined,
     onBack,
+    // Solo pasar el callback cuando es una propiedad nueva (no edición)
+    !propertyId ? handleOpenHousePrompt : undefined,
+    handlePublishSuccess,
   );
 
   const [scrollEnabled, setScrollEnabled] = useState(true);
@@ -121,6 +195,7 @@ export default function CreateProperty({
   }
 
   return (
+    <>
     <PropertyFormProvider value={form}>
     <ScreenWrapper withHeader={false} style={styles.container}>
       <AppHeader
@@ -263,6 +338,69 @@ export default function CreateProperty({
       />
     </ScreenWrapper>
     </PropertyFormProvider>
+
+    {/* BOTTOM SHEET DE ÉXITO POST-PUBLICACIÓN */}
+    <PropertyPublishedSheet
+      visible={showPublishedSheet}
+      isUpdate={publishedInfo?.isUpdate ?? false}
+      newPropertyId={publishedInfo?.newPropertyId ?? null}
+      onViewProperty={() => {
+        setShowPublishedSheet(false);
+        if (publishedInfo?.newPropertyId) {
+          router.push({
+            pathname: "/(stack)/property/[id]",
+            params: { id: publishedInfo.newPropertyId },
+          });
+        } else {
+          if (onBack) onBack(true);
+        }
+      }}
+      onCreateOpenHouse={
+        !propertyId && publishedInfo?.newPropertyId
+          ? () => {
+              setShowPublishedSheet(false);
+              void handleOpenHousePrompt({
+                propertyId: publishedInfo.newPropertyId!,
+                location: publishedInfo.location,
+                firstPhoto: publishedInfo.firstPhotoUrl,
+              });
+            }
+          : undefined
+      }
+      onGoToFeed={() => {
+        setShowPublishedSheet(false);
+        router.replace({
+          pathname: "/(tabs)",
+          params: { refresh: String(Date.now()) },
+        });
+      }}
+      onDismiss={() => {
+        setShowPublishedSheet(false);
+        // Si es edición y cierra el sheet, volver con refresh
+        if (publishedInfo?.isUpdate && onBack) onBack(true);
+      }}
+    />
+
+    {/* MODAL OPEN HOUSE — fuera del ScreenWrapper para que ocupe toda la pantalla */}
+    {showOpenHouseModal && openHousePost && (
+      <Modal
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => {
+          setShowOpenHouseModal(false);
+          setOpenHousePost(null);
+        }}
+      >
+        <CreatePost
+          post={openHousePost}
+          onBack={() => {
+            setShowOpenHouseModal(false);
+            setOpenHousePost(null);
+          }}
+        />
+      </Modal>
+    )}
+    </>
   );
 }
 
