@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -53,6 +53,8 @@ interface LeadGroup {
   leadEmail?: string;
   coincidences: FeedItem[];
   similars: FeedItem[];
+  /** Objeto completo de busquedas_guardadas para el flujo de edición */
+  busquedaObject?: any;
   searchCriteria: {
     tipo_propiedad?: string;
     subtipo?: string;
@@ -74,7 +76,8 @@ interface LeadGroup {
 
 import { usePropertyFeedItems } from "../hooks/usePropertyFeedItems";
 import { LeadMatchCard } from "./LeadMatchCard";
-// ... (keep existing imports)
+import { SearchFiltersModal } from "./map/SearchFiltersModal";
+import { usePropertyFiltersStore } from "../store/propertyFiltersStore";
 import { logger } from "@/utils/logger";
 
 const log = logger.scoped("Matches");
@@ -82,15 +85,17 @@ const log = logger.scoped("Matches");
 const Matches: React.FC = () => {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { setFiltersFromSearch } = usePropertyFiltersStore();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [savedSearches, setSavedSearches] = useState<any[]>([]);
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(
-    null,
-  );
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  // Estado para edición de búsqueda
+  const [editingBusqueda, setEditingBusqueda] = useState<any | null>(null);
+  const [showEditFilters, setShowEditFilters] = useState(false);
 
   // Hook para obtener FeedItems (likes/comments)
   const propertyIds = React.useMemo(
@@ -224,6 +229,18 @@ const Matches: React.FC = () => {
     fetchMatches();
   };
 
+  const handleEditSearch = useCallback((busqueda: any) => {
+    setFiltersFromSearch(busqueda);
+    setEditingBusqueda(busqueda);
+    setShowEditFilters(true);
+  }, [setFiltersFromSearch]);
+
+  const handleUpdateDone = useCallback(() => {
+    setShowEditFilters(false);
+    setEditingBusqueda(null);
+    fetchMatches();
+  }, []);
+
   // Agrupar matches por lead e incluir búsquedas sin matches
   const groupMatchesByLead = (
     matchesList: MatchData[],
@@ -242,6 +259,7 @@ const Matches: React.FC = () => {
           leadPhone: lead.telefono || "Sin teléfono",
           leadEmail: lead.correo || lead.email,
           busquedaId: search.id,
+          busquedaObject: search,
           matches: [],
           properties: [],
           latestMatchDate: search.created_at, // Usar fecha de creación de búsqueda por defecto
@@ -569,6 +587,7 @@ const Matches: React.FC = () => {
           leadPhone={selectedLead.leadPhone}
           leadEmail={selectedLead.leadEmail ?? ""}
           busquedaId={selectedLead.busquedaId}
+          busqueda={selectedLead.busquedaObject}
           coincidences={selectedLead.coincidences}
           similars={selectedLead.similars}
           searchCriteria={selectedLead.searchCriteria}
@@ -580,8 +599,26 @@ const Matches: React.FC = () => {
           }}
           onDeleteSearch={handleDeleteSearch}
           currentUserId={user?.id}
+          onEditSearch={
+            selectedLead.busquedaObject
+              ? () => handleEditSearch(selectedLead.busquedaObject)
+              : undefined
+          }
         />
       )}
+
+      {/* Modal de filtros en modo edición */}
+      <SearchFiltersModal
+        visible={showEditFilters}
+        onClose={() => {
+          setShowEditFilters(false);
+          setEditingBusqueda(null);
+        }}
+        editBusquedaId={editingBusqueda?.id}
+        onUpdateSearch={handleUpdateDone}
+        filteredPropertiesCount={0}
+        userId={user?.id}
+      />
 
       {/* Modal de detalle de propiedad */}
       {selectedPropertyId && (

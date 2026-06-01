@@ -25,11 +25,13 @@ interface ProfilePropertyItemProps {
   onEdit?: (item: Property) => void;
   onDelete?: (item: Property) => void;
   onPublishOpenHouse?: (item: Property) => void;
+  /** true = la propiedad ya tiene un Open House activo → mostrar "Editar Open House" */
+  hasOpenHouse?: boolean;
   isLastInRow?: boolean;
 }
 
 const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
-  ({ item, onPress, isOwnProfile, onEdit, onDelete, onPublishOpenHouse, isLastInRow }) => {
+  ({ item, onPress, isOwnProfile, onEdit, onDelete, onPublishOpenHouse, hasOpenHouse, isLastInRow }) => {
     const commissionText = formatCommission(item.commission);
 
     const menuOptions: MenuOption[] = [
@@ -38,13 +40,11 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
         label: "Editar",
         onPress: () => onEdit && onEdit(item),
       },
-      ...(item.es_easybroker
-        ? [{
-            icon: "home-outline" as const,
-            label: "Publicar OpenHouse",
-            onPress: () => onPublishOpenHouse && onPublishOpenHouse(item),
-          }]
-        : []),
+      {
+        icon: hasOpenHouse ? "create-outline" : "home-outline",
+        label: hasOpenHouse ? "Editar Open House" : "Publicar Open House",
+        onPress: () => onPublishOpenHouse && onPublishOpenHouse(item),
+      },
       {
         icon: "trash-outline",
         label: "Eliminar",

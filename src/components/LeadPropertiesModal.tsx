@@ -12,7 +12,7 @@ import { useModal } from "../context/ModalContext";
 import PropertyCard from "./cards/PropertyCard";
 import { AppHeader } from "./AppHeader";
 import { COLORS } from "../constants";
-import { FeedItem, User } from "../types";
+import { busquedas_guardadas, FeedItem, User } from "../types";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
 import { CommentsBottomSheet } from "./modals";
 
@@ -48,6 +48,10 @@ interface LeadPropertiesModalProps {
   onUserClick: (user: User) => void;
   onDeleteSearch: (busquedaId: string) => void;
   currentUserId?: string;
+  /** Objeto completo de la búsqueda guardada (para pasar al flujo de edición) */
+  busqueda?: busquedas_guardadas;
+  /** Callback para abrir el flujo de edición de criterios */
+  onEditSearch?: () => void;
 }
 
 export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
@@ -64,6 +68,8 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
   onUserClick,
   onDeleteSearch,
   currentUserId,
+  busqueda,
+  onEditSearch,
 }) => {
   const { showModal } = useModal();
   const [activeTab, setActiveTab] = useState<"coincidencia" | "similar">(
@@ -134,16 +140,30 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
               showBackButton
               onBack={onClose}
               rightComponent={
-                <TouchableOpacity
-                  onPress={handleDeleteSearchInternal}
-                  style={styles.deleteBtn}
-                >
-                  <Ionicons
-                    name="trash-outline"
-                    size={22}
-                    color={COLORS.error}
-                  />
-                </TouchableOpacity>
+                <View style={styles.headerActions}>
+                  {onEditSearch && (
+                    <TouchableOpacity
+                      onPress={onEditSearch}
+                      style={styles.headerBtn}
+                    >
+                      <Ionicons
+                        name="create-outline"
+                        size={22}
+                        color={COLORS.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={handleDeleteSearchInternal}
+                    style={styles.headerBtn}
+                  >
+                    <Ionicons
+                      name="trash-outline"
+                      size={22}
+                      color={COLORS.error}
+                    />
+                  </TouchableOpacity>
+                </View>
               }
             />
 
@@ -227,6 +247,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                   styles.tabText,
                   activeTab === "coincidencia" && styles.activeTabText,
                 ]}
+                numberOfLines={1}
               >
                 Coincidencias ({coincidences.length})
               </Text>
@@ -243,6 +264,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                   styles.tabText,
                   activeTab === "similar" && styles.activeTabText,
                 ]}
+                numberOfLines={1}
               >
                 Similares ({similars.length})
               </Text>
@@ -323,7 +345,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
   },
-  deleteBtn: {
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  headerBtn: {
     padding: 4,
   },
   searchInfoSection: {
