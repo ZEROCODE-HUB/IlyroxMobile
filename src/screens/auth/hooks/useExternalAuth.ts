@@ -35,7 +35,7 @@ export interface ExternalAuthFormData {
   ocupacion: string;
   modalidad: string;
   nombreInmobiliaria: string;
-  anosExperiencia: string;
+  fechaInicioCarrera: string;
 }
 
 export function useExternalAuth() {
@@ -181,8 +181,8 @@ export function useExternalAuth() {
           return false;
         }
       }
-      if (!formData.anosExperiencia) {
-        showModal({ title: "Error", message: "Selecciona tus años de experiencia", confirmText: "OK" });
+      if (!formData.fechaInicioCarrera) {
+        showModal({ title: "Error", message: "Selecciona la fecha en que iniciaste tu carrera", confirmText: "OK" });
         return false;
       }
 
@@ -214,7 +214,7 @@ export function useExternalAuth() {
           estado_registro: "pendiente",
           aprobaciones_recibidas: 0,
           aprobaciones_requeridas: 3,
-          anos_experiencia: formData.anosExperiencia,
+          fecha_inicio_carrera: formData.fechaInicioCarrera || undefined,
           ocupacion: formData.ocupacion,
           otro_ocupacion: undefined,
           modalidad: formData.modalidad || undefined,

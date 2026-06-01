@@ -10,9 +10,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Modal,
   Image,
 } from "react-native";
+import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/colors";
@@ -50,7 +50,7 @@ export default function AuthScreen() {
       ocupacion: "",
       modalidad: "",
       nombreInmobiliaria: "",
-      anosExperiencia: "",
+      fechaInicioCarrera: "",
     });
 
   const { bottom } = useStableSafeInsets();
@@ -95,7 +95,7 @@ export default function AuthScreen() {
             ocupacion: "",
             modalidad: "",
             nombreInmobiliaria: "",
-            anosExperiencia: "",
+            fechaInicioCarrera: "",
           });
           setAuthMethod("external");
         },
@@ -251,9 +251,9 @@ export default function AuthScreen() {
         <View style={styles.header}>
           <View style={styles.logoWrapper}>
             <Image
-              source={require("../../assets/Logo.jpeg")}
+              source={require("../../assets/Logo.png")}
               style={styles.logo}
-              resizeMode="cover"
+              resizeMode="contain"
             />
           </View>
         </View>
@@ -283,19 +283,13 @@ export default function AuthScreen() {
       </View>
 
       {/* Modal de autenticación */}
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={handleCloseModal}
-      >
-        <View style={[styles.modalOverlay, { paddingBottom: bottom }]}>
-          <View
-            style={[
-              styles.modalContent,
-              { paddingBottom: Math.max(30, bottom) },
-            ]}
-          >
+      <AppBottomSheet visible={modalVisible} onClose={handleCloseModal}>
+        <View
+          style={[
+            styles.modalContent,
+            { paddingBottom: Math.max(30, bottom) },
+          ]}
+        >
             {/* Header del modal */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{getModalTitle()}</Text>
@@ -307,8 +301,7 @@ export default function AuthScreen() {
             {/* Contenido del modal */}
             {renderModalContent()}
           </View>
-        </View>
-      </Modal>
+      </AppBottomSheet>
     </View>
   );
 }
@@ -346,20 +339,11 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   logoWrapper: {
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 15,
-    borderRadius: 30,
     backgroundColor: "transparent",
   },
   logo: {
-    width: 160,
-    height: 160,
-    borderRadius: 26,
-    borderWidth: 5,
-    borderColor: "rgba(177, 165, 165, 0.2)",
+    width: 240,
+    height: 96,
   },
   buttonsContainer: {
     gap: 16,
@@ -386,11 +370,6 @@ const styles = StyleSheet.create({
   registerButtonText: {
     fontSize: 18,
     fontWeight: "bold",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: COLORS.blackTransparent50,
-    justifyContent: "flex-end",
   },
   modalContent: {
     backgroundColor: COLORS.white,

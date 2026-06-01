@@ -346,12 +346,6 @@ export function useAuthForm() {
           estado_registro: "pendiente",
           aprobaciones_recibidas: 0,
           aprobaciones_requeridas: 3,
-          anos_experiencia: formState.fechaInicioCarrera
-            ? String(
-                new Date().getFullYear() -
-                  new Date(formState.fechaInicioCarrera).getFullYear(),
-              )
-            : undefined,
           fecha_inicio_carrera: formState.fechaInicioCarrera || undefined,
           ocupacion: formState.ocupacion,
           otro_ocupacion: undefined,

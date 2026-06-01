@@ -4,10 +4,20 @@
  */
 
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  Platform,
+} from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { Avatar } from "../../../components/shared";
 import { SubmitButton } from "./SubmitButton";
@@ -38,12 +48,14 @@ const OCUPACIONES = [
 
 const MODALIDADES = ["Inmobiliaria", "Independiente"];
 
-const EXPERIENCIA_OPTIONS = [...Array(51).keys()].map((n) => ({
-  label: `${n} años`,
-  value: n.toString(),
-}));
-
-EXPERIENCIA_OPTIONS.push({ label: "+ 50 años", value: "50+" });
+function formatDate(isoDate: string): string {
+  const d = new Date(isoDate + "T12:00:00");
+  return d.toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
 
 export function ExternalAuthForm({
   pendingUser,
@@ -56,7 +68,7 @@ export function ExternalAuthForm({
   const [showEstadoModal, setShowEstadoModal] = useState(false);
   const [showOcupacionModal, setShowOcupacionModal] = useState(false);
   const [showModalidadModal, setShowModalidadModal] = useState(false);
-  const [showExperienciaModal, setShowExperienciaModal] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -70,6 +82,26 @@ export function ExternalAuthForm({
       onUpdateField("avatarUri", result.assets[0].uri);
     }
   };
+
+  const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+      if (event.type === "set" && date) {
+        const iso = date.toISOString().split("T")[0];
+        onUpdateField("fechaInicioCarrera", iso);
+      }
+    } else {
+      // iOS: actualiza en tiempo real mientras gira el spinner
+      if (date) {
+        const iso = date.toISOString().split("T")[0];
+        onUpdateField("fechaInicioCarrera", iso);
+      }
+    }
+  };
+
+  const pickerDate = formData.fechaInicioCarrera
+    ? new Date(formData.fechaInicioCarrera + "T12:00:00")
+    : new Date(new Date().getFullYear() - 5, 0, 1);
 
   return (
     <KeyboardAwareScrollView
@@ -210,33 +242,64 @@ export function ExternalAuthForm({
         </>
       )}
 
-      {/* Años de experiencia */}
+      {/* Fecha de inicio de carrera */}
       <TouchableOpacity
         style={styles.selectButton}
-        onPress={() => setShowExperienciaModal(true)}
+        onPress={() => setShowDatePicker(true)}
         activeOpacity={0.7}
       >
         <Text
           style={[
             styles.selectText,
-            !formData.anosExperiencia && styles.selectPlaceholder,
+            !formData.fechaInicioCarrera && styles.selectPlaceholder,
           ]}
         >
-          {formData.anosExperiencia
-            ? `${formData.anosExperiencia} años`
-            : "Años de experiencia *"}
+          {formData.fechaInicioCarrera
+            ? formatDate(formData.fechaInicioCarrera)
+            : "¿Cuándo iniciaste tu carrera? *"}
         </Text>
-        <Ionicons name="chevron-down" size={20} color={COLORS.textSecondary} />
+        <Ionicons name="calendar-outline" size={20} color={COLORS.textSecondary} />
       </TouchableOpacity>
 
-      <SelectionModal
-        visible={showExperienciaModal}
-        onClose={() => setShowExperienciaModal(false)}
-        onSelect={(v) => onUpdateField("anosExperiencia", v)}
-        title="Años de experiencia"
-        options={EXPERIENCIA_OPTIONS}
-        currentValue={formData.anosExperiencia}
-      />
+      {/* DatePicker Android — aparece directamente */}
+      {showDatePicker && Platform.OS === "android" && (
+        <DateTimePicker
+          value={pickerDate}
+          mode="date"
+          display="default"
+          maximumDate={new Date()}
+          onChange={handleDateChange}
+        />
+      )}
+
+      {/* DatePicker iOS — en Modal con botón "Listo" */}
+      {Platform.OS === "ios" && (
+        <Modal
+          transparent
+          animationType="slide"
+          visible={showDatePicker}
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <View style={styles.iosOverlay}>
+            <View style={styles.iosPickerContainer}>
+              <View style={styles.iosPickerHeader}>
+                <Text style={styles.iosPickerTitle}>Fecha de inicio</Text>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={styles.iosDoneButton}>Listo</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={pickerDate}
+                mode="date"
+                display="spinner"
+                maximumDate={new Date()}
+                onChange={handleDateChange}
+                style={styles.iosPicker}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
 
       <SubmitButton
         loading={loading}
@@ -293,5 +356,39 @@ const styles = StyleSheet.create({
   },
   selectPlaceholder: {
     color: COLORS.textTertiary,
+  },
+  // iOS DatePicker Modal
+  iosOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  iosPickerContainer: {
+    backgroundColor: COLORS.background,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 30,
+  },
+  iosPickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border ?? "#E0E0E0",
+  },
+  iosPickerTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+  },
+  iosDoneButton: {
+    fontSize: 16,
+    color: COLORS.primary,
+    fontWeight: "600",
+  },
+  iosPicker: {
+    height: 200,
   },
 });
