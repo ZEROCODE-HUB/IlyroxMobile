@@ -191,20 +191,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           </Text>
         </TouchableOpacity>
 
-        {/* Views counter (display only) */}
-        {initialViews !== undefined && (
-          <View style={itemStyle}>
-            <Ionicons
-              name="eye-outline"
-              size={isVertical ? 26 : 20}
-              color={tintColor}
-            />
-            <Text style={[styles.iconCountText, { color: textColor }]}>
-              {initialViews}
-            </Text>
-          </View>
-        )}
-
         {/* Share Button */}
         <TouchableOpacity
           onPress={handleShare}
@@ -219,7 +205,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           />
         </TouchableOpacity>
 
-        {feedItemType === "property" && (
+        {feedItemType === "property" && userId !== propertyAuthorId && (
           <TouchableOpacity
             onPress={handleReport}
             style={itemStyle}

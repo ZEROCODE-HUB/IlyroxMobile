@@ -53,7 +53,10 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
   const eventDate = item.fecha_hora || "Próximamente";
   // Asumimos antiguedad viene en el item aunque no esté en el tipo estricto aún, o usamos 1 por defecto
   const years = item.antiguedad || 1;
-  const userAvatar = item.postDetails?.foto_perfil_usuario;
+  const userAvatar =
+    item.foto_perfil_usuario ||
+    item.postDetails?.foto_perfil_usuario ||
+    item.user?.avatar;
   const headerImage = item.foto_propiedad || images?.[0] || propertyDetails?.images?.[0];
 
   // --- RENDER: COMPACT MODE (para grids de 2 columnas) ---
@@ -305,11 +308,15 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
 
         {/* Banner Central */}
         <View style={[styles.bannerStrip, { backgroundColor: mainColor }]}>
+          {/* Spacer para que el texto no quede detrás del avatar superpuesto */}
+          {!isSold && <View style={styles.bannerAvatarSpace} />}
           <Text
             style={[
               styles.bannerText,
               isSold ? styles.soldText : styles.openHouseText,
             ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
           >
             {bannerText}
           </Text>
@@ -617,20 +624,27 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   bannerStrip: {
-    paddingVertical: 8,
-
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    zIndex: 2, // Para asegurar que quede encima si hay solapamientos
+    paddingVertical: 10,
+    paddingRight: 16,
+    zIndex: 2,
     marginTop: -10,
-    paddingLeft: 120,
+  },
+  // Espacio en blanco que ocupa la zona donde el avatar se superpone
+  // (paddingLeft footer:20 + avatar+border:118 + marginRight:15 ≈ 153)
+  bannerAvatarSpace: {
+    width: 148,
+    flexShrink: 0,
   },
   bannerText: {
     color: "#ffffffff",
     fontWeight: "900",
-    fontSize: 28,
+    fontSize: 22,
     textTransform: "uppercase",
     letterSpacing: 2,
+    textAlign: "center",
+    flex: 1,
   },
   openHouseFooter: {
     flexDirection: "row",
@@ -695,10 +709,12 @@ const styles = StyleSheet.create({
   },
   openHouseText: {
     color: COLORS.white,
-    fontWeight: "bold",
-    fontSize: 30,
+    fontWeight: "900",
+    fontSize: 22,
     textTransform: "uppercase",
-    letterSpacing: 4,
+    letterSpacing: 3,
+    flex: 1,
+    textAlign: "center",
   },
 
   // ================= ESTILOS GRID =================

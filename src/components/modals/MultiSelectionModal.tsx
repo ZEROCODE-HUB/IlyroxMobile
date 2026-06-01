@@ -2,14 +2,13 @@ import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
-  Modal,
   StyleSheet,
   TouchableOpacity,
   FlatList,
   Platform,
   KeyboardAvoidingView,
-  SafeAreaView,
 } from "react-native";
+import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
 import { COLORS } from "../../constants";
@@ -99,17 +98,11 @@ export default function MultiSelectionModal({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.container}
-        >
+    <AppBottomSheet visible={visible} onClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.container}
+      >
           <View style={styles.modalContent}>
             {/* Header */}
             <View style={styles.header}>
@@ -178,17 +171,12 @@ export default function MultiSelectionModal({
               </TouchableOpacity>
             </View>
           </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </Modal>
+      </KeyboardAvoidingView>
+    </AppBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.blackTransparent50,
-  },
   container: {
     flex: 1,
     justifyContent: "flex-end",

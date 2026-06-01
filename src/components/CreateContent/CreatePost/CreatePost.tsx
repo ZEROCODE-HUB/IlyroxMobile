@@ -281,7 +281,9 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!content.trim()) {
+    // Los posts de Open House no tienen campo de texto libre obligatorio
+    const skipContent = isEditing && post?.tipo === "openhouse";
+    if (!skipContent && !content.trim()) {
       newErrors.content = "El contenido no puede estar vacío";
     }
 
@@ -471,31 +473,33 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Contenido */}
-        <View style={styles.card}>
-          <AppInput
-            label="Nueva Publicación *"
-            multiline
-            placeholder="¿Qué quieres compartir?"
-            value={content}
-            onChangeText={(text) => {
-              if (text.length <= 2500) {
-                setContent(text);
-              } else {
-                setContent(text.substring(0, 2500));
-              }
+        {/* Contenido — oculto al editar Open House (no tiene campo de texto libre) */}
+        {!(isEditing && post?.tipo === "openhouse") && (
+          <View style={styles.card}>
+            <AppInput
+              label="Nueva Publicación *"
+              multiline
+              placeholder="¿Qué quieres compartir?"
+              value={content}
+              onChangeText={(text) => {
+                if (text.length <= 2500) {
+                  setContent(text);
+                } else {
+                  setContent(text.substring(0, 2500));
+                }
 
-              if (errors.content) {
-                setErrors({ ...errors, content: "" });
-              }
-            }}
-            error={errors.content}
-            inputStyle={styles.textArea}
-            numberOfLines={10}
-            maxLength={2500}
-            helperText={`${content.length}/2500`}
-          />
-        </View>
+                if (errors.content) {
+                  setErrors({ ...errors, content: "" });
+                }
+              }}
+              error={errors.content}
+              inputStyle={styles.textArea}
+              numberOfLines={10}
+              maxLength={2500}
+              helperText={`${content.length}/2500`}
+            />
+          </View>
+        )}
 
         {isEditing && post?.tipo === "openhouse" && (
           <OpenHousePost

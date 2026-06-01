@@ -49,7 +49,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         )}
 
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.title} numberOfLines={1}>{title}</Text>
         </View>
 
         {rightComponent ? (
@@ -59,7 +59,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         )}
       </View>
 
-      {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+      {subtitle && <Text style={styles.subtitle} numberOfLines={2}>{subtitle}</Text>}
     </View>
   );
 };
