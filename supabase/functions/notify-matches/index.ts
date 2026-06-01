@@ -119,13 +119,17 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "propiedad_id requerido" }), { status: 400 });
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Consultar matches recientes enriquecidos con datos de propiedad y lead
-    const since = new Date(Date.now() - 60_000).toISOString();
-    const { data: matches, error } = await supabase
+    // Consultar matches pendientes y aún no notificados para esta propiedad.
+    // No filtramos por created_at (la ventana de 60 s era frágil y fallaba
+    // cuando el match ya existía por un ON CONFLICT sin actualizar created_at).
+    // Usamos notificado_en IS NULL para ser idempotente: si procesar-matches
+    // ya notificó, esta función no envía duplicados.
+    const { data: matches, error } = await db
       .from("matches")
       .select(`
+        id,
         usuario_id,
         tipo_match,
         busqueda_id,
@@ -137,12 +141,20 @@ serve(async (req) => {
       `)
       .eq("propiedad_id", propiedad_id)
       .eq("estado", "pendiente")
-      .gte("created_at", since);
+      .is("notificado_en", null);
 
     if (error) throw error;
     if (!matches?.length) {
-      return new Response(JSON.stringify({ sent: 0 }), { status: 200 });
+      return new Response(JSON.stringify({ sent: 0, reason: "no_pending_matches" }), { status: 200 });
     }
+
+    // Marcar como notificado ANTES de enviar para evitar race condition si
+    // procesar-matches también está corriendo simultáneamente.
+    const matchIds = (matches as any[]).map((m) => m.id);
+    await db
+      .from("matches")
+      .update({ notificado_en: new Date().toISOString() })
+      .in("id", matchIds);
 
     // Agrupar por usuario_id + lead_id para enviar un push personalizado por lead
     const groups = new Map<string, UserGroup>();

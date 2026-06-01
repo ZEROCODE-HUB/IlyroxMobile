@@ -151,7 +151,7 @@ interface PerfilCreador {
   prefijo_celular: string | null;
   email: string | null;
   foto: string | null;
-  anos_experiencia: string | null;
+  fecha_inicio_carrera: string | null;
   nombre_inmobiliaria: string | null;
   biografia: string | null;
   ocupacion: string | null;

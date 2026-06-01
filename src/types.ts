@@ -252,7 +252,6 @@ export type perfiles = {
   prefijo_celular?: string;
   biografia?: string;
   sitio_web?: string;
-  anos_experiencia?: string;
   fecha_inicio_carrera?: string;
   ocupacion?: string;
   otro_ocupacion?: string;
