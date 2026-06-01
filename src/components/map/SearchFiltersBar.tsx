@@ -36,7 +36,7 @@ export const SearchFiltersBar: React.FC<SearchFiltersBarProps> = ({
     <View style={styles.container}>
       <View style={styles.buttonsRow}>
         {onBack && (
-          <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={8}>
+          <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 0 }}>
             <Ionicons name="arrow-back" size={20} color={COLORS.textPrimary} />
           </TouchableOpacity>
         )}

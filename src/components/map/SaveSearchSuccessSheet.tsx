@@ -2,13 +2,13 @@ import React from "react";
 import {
   View,
   Text,
-  Modal,
   Pressable,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
   Platform,
 } from "react-native";
+import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/colors";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
@@ -52,14 +52,8 @@ export const SaveSearchSuccessSheet: React.FC<SaveSearchSuccessSheetProps> = ({
   }
 
   return (
-    <Modal
-      transparent
-      visible={visible}
-      animationType="slide"
-      onRequestClose={onDismiss}
-    >
-      <Pressable style={styles.overlay} onPress={onDismiss}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+    <AppBottomSheet visible={visible} onClose={onDismiss}>
+      <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           {/* Handle */}
           <View style={styles.handle} />
 
@@ -102,18 +96,12 @@ export const SaveSearchSuccessSheet: React.FC<SaveSearchSuccessSheetProps> = ({
           <TouchableOpacity style={styles.dismissBtn} onPress={onDismiss} activeOpacity={0.7}>
             <Text style={styles.dismissBtnText}>Listo</Text>
           </TouchableOpacity>
-        </Pressable>
       </Pressable>
-    </Modal>
+    </AppBottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end",
-  },
   sheet: {
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 24,

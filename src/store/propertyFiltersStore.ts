@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { GeoBounds } from "@/types";
+import { GeoBounds, busquedas_guardadas } from "@/types";
 
 export interface PolygonCoord {
   latitude: number;
@@ -107,6 +107,11 @@ interface PropertyFiltersState {
   // General
   clearFilters: (newLocationFilter?: PropertyFilters["locationFilter"]) => void;
   hasActiveFilters: () => boolean;
+  /**
+   * Carga los filtros de una búsqueda guardada existente en el store.
+   * Útil para el flujo de "Editar búsqueda" desde la pantalla de Matches.
+   */
+  setFiltersFromSearch: (search: busquedas_guardadas) => void;
   pendingOpenMap: boolean;
   setPendingOpenMap: (v: boolean) => void;
 }
@@ -257,6 +262,93 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
           locationFilter: newLocationFilter || state.filters.locationFilter,
         },
       })),
+
+    setFiltersFromSearch: (search) => {
+      // Limpiar primero
+      set((state) => ({ filters: { ...initialFilters } }));
+
+      // Parsear subtipo (puede venir como array o como JSON string)
+      let subtipo: string[] = [];
+      if (Array.isArray(search.subtipo)) {
+        subtipo = search.subtipo as string[];
+      } else if (typeof search.subtipo === "string" && search.subtipo) {
+        try {
+          const parsed = JSON.parse(search.subtipo);
+          subtipo = Array.isArray(parsed) ? parsed : [search.subtipo];
+        } catch {
+          subtipo = [search.subtipo];
+        }
+      }
+
+      // Reconstruir locationChips desde criterios_busqueda si existen
+      const criterios = (search as any).criterios_busqueda;
+      const locationChips: LocationChip[] = [];
+      if (criterios?.location_chips && Array.isArray(criterios.location_chips)) {
+        criterios.location_chips.forEach((c: any, idx: number) => {
+          locationChips.push({
+            id: `restored-${idx}`,
+            label: c.label,
+            type: c.type,
+            bounds: c.bounds,
+            locationFilter: c.locationFilter || {
+              estado: "",
+              ciudad: "",
+              municipio: "",
+              colonia: "",
+            },
+          });
+        });
+      }
+
+      // Reconstruir polígonos (polygon_coords en DB puede ser [][] por cómo se guardó)
+      const rawPolygons = (search as any).polygon_coords;
+      const polygons: PolygonCoord[][] = Array.isArray(rawPolygons)
+        ? (rawPolygons as unknown as PolygonCoord[][])
+        : [];
+
+      // Filtros especializados
+      let comercialFilters = initialComercialFilters;
+      let industrialFilters = initialIndustrialFilters;
+      let agricolaFilters = initialAgricolaFilters;
+      if (criterios?.comercial) comercialFilters = { ...initialComercialFilters, ...criterios.comercial };
+      if (criterios?.industrial) industrialFilters = { ...initialIndustrialFilters, ...criterios.industrial };
+      if (criterios?.agricola) agricolaFilters = { ...initialAgricolaFilters, ...criterios.agricola };
+
+      set({
+        filters: {
+          tipoPropiedad: search.tipo_propiedad || "",
+          subtipo,
+          precioMin: search.precio_min ? String(search.precio_min) : "",
+          precioMax: search.precio_max ? String(search.precio_max) : "",
+          moneda: (search.moneda as "MXN" | "USD") || "MXN",
+          operacion: (search.tipo_operacion as "venta" | "renta" | "") || "",
+          locationFilter: {
+            estado: (Array.isArray(search.estado) ? (search.estado as string[])[0] : search.estado) || "",
+            ciudad: search.ciudad || "",
+            municipio: (Array.isArray(search.municipio) ? (search.municipio as string[])[0] : search.municipio) || "",
+            colonia: (search as any).colonias
+              ? (Array.isArray((search as any).colonias)
+                  ? ((search as any).colonias as string[])
+                  : [(search as any).colonias as string])
+              : search.colonia || "",
+          },
+          habitaciones: search.habitaciones ? String(search.habitaciones) : "",
+          banos: search.banos ? String(search.banos) : "",
+          estacionamientos: search.estacionamientos ? String(search.estacionamientos) : "",
+          antiguedad: (search as any).antiguedad || criterios?.antiguedad || "",
+          niveles: (search as any).pisos ? String((search as any).pisos) : (criterios?.niveles || ""),
+          m2TerrenoMin: search.metros_terreno ? String(search.metros_terreno) : "",
+          m2ConstruccionMin: search.metros_construccion ? String(search.metros_construccion) : "",
+          comisionVentaMin: criterios?.comision_venta_min ? String(criterios.comision_venta_min) : "",
+          comisionRentaMin: criterios?.comision_renta_min ? String(criterios.comision_renta_min) : "",
+          polygons,
+          locationChips,
+          comercialFilters,
+          industrialFilters,
+          agricolaFilters,
+        },
+      });
+    },
 
     pendingOpenMap: false,
     setPendingOpenMap: (v) => set({ pendingOpenMap: v }),

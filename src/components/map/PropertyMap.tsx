@@ -553,7 +553,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         }}
         scrollEnabled={true}
         zoomEnabled={true}
-        mapPadding={{ top: 20, right: 20, bottom: 20, left: 20 }}
+
         moveOnMarkerPress={false}
       >
         {/* Polígonos confirmados (múltiples) */}
@@ -770,7 +770,6 @@ const styles = StyleSheet.create({
     flex: 1,
     position: "relative",
     overflow: "hidden",
-    paddingLeft: 10,
   },
   markerWrapper: {
     display: "none",

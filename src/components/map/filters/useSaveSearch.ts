@@ -417,6 +417,114 @@ export const useSaveSearch = (userId?: string) => {
     return searchData;
   };
 
+  /**
+   * Actualiza una búsqueda guardada existente con los filtros actuales.
+   * Reutiliza la misma lógica de normalización de saveSearchToDatabase pero hace UPDATE.
+   */
+  const updateSearchInDatabase = async (busquedaId: string, filters: any): Promise<boolean> => {
+    if (!userId) throw new Error("No autenticado");
+
+    // Construir objeto con la misma lógica que saveSearchToDatabase
+    const criterios_busqueda: any = { operacion: filters.operacion };
+    if (filters.moneda) criterios_busqueda.moneda = filters.moneda;
+    if (filters.tipoPropiedad) criterios_busqueda.tipo_propiedad = filters.tipoPropiedad;
+    if (filters.subtipo) criterios_busqueda.subtipo = filters.subtipo;
+    if (filters.precioMin) criterios_busqueda.precio_min = parseFloat(filters.precioMin.toString().replace(/,/g, ""));
+    if (filters.precioMax) criterios_busqueda.precio_max = parseFloat(filters.precioMax.toString().replace(/,/g, ""));
+    if (filters.habitaciones && filters.habitaciones !== "No indicado") criterios_busqueda.habitaciones = filters.habitaciones;
+    if (filters.banos && filters.banos !== "No indicado") criterios_busqueda.banos = filters.banos;
+    if (filters.estacionamientos && filters.estacionamientos !== "No indicado") criterios_busqueda.estacionamientos = filters.estacionamientos;
+    if (filters.niveles && filters.niveles !== "No indicado") criterios_busqueda.niveles = filters.niveles;
+    if (filters.antiguedad && filters.antiguedad !== "No indicado") criterios_busqueda.antiguedad = filters.antiguedad;
+    if (filters.m2TerrenoMin) criterios_busqueda.m2_terreno_min = parseFloat(filters.m2TerrenoMin.toString().replace(/,/g, ""));
+    if (filters.m2ConstruccionMin) criterios_busqueda.m2_construccion_min = parseFloat(filters.m2ConstruccionMin.toString().replace(/,/g, ""));
+    if (filters.locationFilter.estado) criterios_busqueda.estado = filters.locationFilter.estado;
+    if (filters.locationFilter.ciudad) criterios_busqueda.ciudad = filters.locationFilter.ciudad;
+    if (filters.locationFilter.municipio) criterios_busqueda.municipio = filters.locationFilter.municipio;
+    if (filters.locationFilter.colonia) {
+      criterios_busqueda.colonias = Array.isArray(filters.locationFilter.colonia)
+        ? filters.locationFilter.colonia
+        : [filters.locationFilter.colonia];
+    }
+    if (filters.locationChips?.length > 0) {
+      criterios_busqueda.location_chips = filters.locationChips.map((c: any) => ({
+        label: c.label, type: c.type, bounds: c.bounds, locationFilter: c.locationFilter,
+      }));
+      const chipsConBounds = filters.locationChips.filter((c: any) => c.bounds);
+      if (chipsConBounds.length > 0) {
+        let north = chipsConBounds[0].bounds.north, south = chipsConBounds[0].bounds.south;
+        let east = chipsConBounds[0].bounds.east, west = chipsConBounds[0].bounds.west;
+        for (const chip of chipsConBounds) {
+          north = Math.max(north, chip.bounds.north); south = Math.min(south, chip.bounds.south);
+          east = Math.max(east, chip.bounds.east); west = Math.min(west, chip.bounds.west);
+        }
+        criterios_busqueda.bounds = { north, south, east, west };
+      }
+    }
+    if (filters.comisionVentaMin) criterios_busqueda.comision_venta_min = parseFloat(filters.comisionVentaMin);
+    if (filters.comisionRentaMin) criterios_busqueda.comision_renta_min = parseFloat(filters.comisionRentaMin);
+    if (filters.tipoPropiedad === "comercial" && filters.comercialFilters) criterios_busqueda.comercial = filters.comercialFilters;
+    if (filters.tipoPropiedad === "industrial" && filters.industrialFilters) criterios_busqueda.industrial = filters.industrialFilters;
+    if (filters.tipoPropiedad === "agricola" && filters.agricolaFilters) criterios_busqueda.agricola = filters.agricolaFilters;
+
+    const updateData: any = {
+      criterios_busqueda,
+      updated_at: new Date().toISOString(),
+    };
+    if (filters.operacion && filters.operacion !== "") updateData.tipo_operacion = filters.operacion;
+    if (filters.tipoPropiedad) updateData.tipo_propiedad = filters.tipoPropiedad;
+    if (filters.subtipo) updateData.subtipo = filters.subtipo;
+    if (filters.precioMin) { const v = parseFloat(filters.precioMin.toString().replace(/,/g, "")); if (!isNaN(v)) updateData.precio_min = v; }
+    if (filters.precioMax) { const v = parseFloat(filters.precioMax.toString().replace(/,/g, "")); if (!isNaN(v)) updateData.precio_max = v; }
+    if (filters.locationFilter.estado) updateData.estado = [filters.locationFilter.estado];
+    if (filters.locationFilter.ciudad) updateData.ciudad = filters.locationFilter.ciudad;
+    if (filters.locationFilter.municipio) updateData.municipio = [filters.locationFilter.municipio];
+    if (filters.locationFilter.colonia) {
+      updateData.colonias = Array.isArray(filters.locationFilter.colonia) ? filters.locationFilter.colonia : [filters.locationFilter.colonia];
+    }
+    if (filters.locationChips?.length > 0 && !filters.locationFilter?.estado) {
+      const estadosDeChips = [...new Set(filters.locationChips.map((c: any) => c.locationFilter?.estado).filter((e: string) => e && e.trim()))] as string[];
+      if (estadosDeChips.length > 0) updateData.estado = estadosDeChips;
+    }
+    if (filters.habitaciones && filters.habitaciones !== "No indicado") { const v = parseInt(filters.habitaciones); if (!isNaN(v)) updateData.habitaciones = v; }
+    if (filters.banos && filters.banos !== "No indicado") { const v = parseInt(filters.banos); if (!isNaN(v)) updateData.banos = v; }
+    if (filters.estacionamientos && filters.estacionamientos !== "No indicado") { const v = parseInt(filters.estacionamientos); if (!isNaN(v)) updateData.estacionamientos = v; }
+    if (filters.m2ConstruccionMin) { const v = parseFloat(filters.m2ConstruccionMin.toString().replace(/,/g, "")); if (!isNaN(v)) updateData.metros_construccion = v; }
+    if (filters.m2TerrenoMin) { const v = parseFloat(filters.m2TerrenoMin.toString().replace(/,/g, "")); if (!isNaN(v)) updateData.metros_terreno = v; }
+    if (filters.polygons?.length > 0) updateData.polygon_coords = filters.polygons;
+    if (filters.locationChips?.length > 0) {
+      const chipsConBounds = filters.locationChips.filter((c: any) => c.bounds);
+      if (chipsConBounds.length > 0) {
+        let north = chipsConBounds[0].bounds.north, south = chipsConBounds[0].bounds.south;
+        let east = chipsConBounds[0].bounds.east, west = chipsConBounds[0].bounds.west;
+        for (const chip of chipsConBounds) {
+          north = Math.max(north, chip.bounds.north); south = Math.min(south, chip.bounds.south);
+          east = Math.max(east, chip.bounds.east); west = Math.min(west, chip.bounds.west);
+        }
+        updateData.bounds = { north, south, east, west };
+        updateData.place_name = chipsConBounds.map((c: any) => c.label).join(", ");
+      }
+    }
+    if (filters.moneda) {
+      const { data: monedaData } = await supabase
+        .from("configuracion_monedas")
+        .select("codigo")
+        .eq("simbolo", filters.moneda === "MXN" ? "$" : "USD")
+        .eq("activa", true)
+        .single();
+      updateData.moneda = monedaData?.codigo || filters.moneda;
+    }
+
+    const { error } = await supabase
+      .from("busquedas_guardadas")
+      .update(updateData)
+      .eq("id", busquedaId)
+      .eq("usuario_id", userId);
+
+    if (error) throw error;
+    return true;
+  };
+
   const hasAnyCriteria = (filters: any): boolean => {
     if (!filters) return false;
     const trim = (v: any) => (typeof v === "string" ? v.trim() : v);
@@ -507,5 +615,6 @@ export const useSaveSearch = (userId?: string) => {
     setLeadEmail,
     errors,
     handleSaveSearch,
+    updateSearchInDatabase,
   };
 };

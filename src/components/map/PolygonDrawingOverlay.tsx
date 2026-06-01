@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { COLORS } from "@/constants/colors";
 import { PolygonCoord } from "@/store/propertyFiltersStore";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface Props {
   drawingMode: boolean;
@@ -18,7 +19,8 @@ interface Props {
   onCancel: () => void;
   onUndo: () => void;
   onClear: () => void;
-  onConfirm: () => void;
+  /** Distancia desde el tope del mapContainer hasta donde empieza el área libre de la barra superior */
+  topOffset?: number;
 }
 
 export default function PolygonDrawingOverlay({
@@ -27,10 +29,11 @@ export default function PolygonDrawingOverlay({
   onCancel,
   onUndo,
   onClear,
-  onConfirm,
+  topOffset = 0,
 }: Props) {
   const toolbarAnim = useRef(new Animated.Value(0)).current;
   const instructionAnim = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     Animated.spring(toolbarAnim, {
@@ -57,8 +60,6 @@ export default function PolygonDrawingOverlay({
     outputRange: [-60, 0],
   });
 
-  const canConfirm = draftPoints.length >= 3;
-
   return (
     <>
       {/* ── Instrucción superior (solo en drawing mode) ── */}
@@ -66,6 +67,7 @@ export default function PolygonDrawingOverlay({
         style={[
           styles.instruction,
           {
+            top: topOffset + 12,
             opacity: instructionAnim,
             transform: [{ translateY: instructionY }],
           },
@@ -88,6 +90,7 @@ export default function PolygonDrawingOverlay({
         style={[
           styles.toolbar,
           {
+            bottom: 24 + insets.bottom,
             opacity: toolbarAnim,
             transform: [{ translateY: toolbarY }],
           },
@@ -98,20 +101,16 @@ export default function PolygonDrawingOverlay({
           <BlurView intensity={80} tint="light" style={styles.toolbarBlur}>
             <ToolbarContent
               draftPoints={draftPoints}
-              canConfirm={canConfirm}
               onUndo={onUndo}
               onClear={onClear}
-              onConfirm={onConfirm}
             />
           </BlurView>
         ) : (
           <View style={styles.toolbarAndroid}>
             <ToolbarContent
               draftPoints={draftPoints}
-              canConfirm={canConfirm}
               onUndo={onUndo}
               onClear={onClear}
-              onConfirm={onConfirm}
             />
           </View>
         )}
@@ -123,16 +122,16 @@ export default function PolygonDrawingOverlay({
 // ── Sub-componentes ──────────────────────────────────────────────────────────
 
 function InstructionContent({ points, onCancel }: { points: number; onCancel: () => void }) {
+  const msg =
+    points <= 1
+      ? "Mantén presionado el mapa para añadir puntos"
+      : points < 3
+      ? `${points} puntos — mínimo 3 para el área`
+      : `${points} puntos · Presiona el primer punto para cerrar`;
+
   return (
     <View style={styles.instructionRow}>
-      <View style={styles.instructionDot} />
-      <Text style={styles.instructionText}>
-        {points <= 1
-          ? "Mantén presionado el mapa para añadir puntos"
-          : points < 3
-          ? `${points} puntos — mínimo 3 para el área`
-          : `${points} puntos · Toca Aplicar para filtrar`}
-      </Text>
+      <Text style={styles.instructionText}>{msg}</Text>
       <TouchableOpacity onPress={onCancel} hitSlop={8} style={styles.cancelBtn}>
         <Text style={styles.cancelText}>Cancelar</Text>
       </TouchableOpacity>
@@ -142,19 +141,17 @@ function InstructionContent({ points, onCancel }: { points: number; onCancel: ()
 
 function ToolbarContent({
   draftPoints,
-  canConfirm,
   onUndo,
   onClear,
-  onConfirm,
 }: {
   draftPoints: PolygonCoord[];
-  canConfirm: boolean;
   onUndo: () => void;
   onClear: () => void;
-  onConfirm: () => void;
 }) {
+  const empty = draftPoints.length === 0;
   return (
     <View style={styles.toolbarContent}>
+      {/* Contador */}
       <View style={styles.pointsCounter}>
         <Text style={styles.pointsCounterNum}>{draftPoints.length}</Text>
         <Text style={styles.pointsCounterLabel}>pts</Text>
@@ -162,49 +159,37 @@ function ToolbarContent({
 
       <View style={styles.toolbarDivider} />
 
+      {/* Deshacer */}
       <TouchableOpacity
-        style={[styles.toolbarBtn, draftPoints.length === 0 && styles.toolbarBtnDisabled]}
+        style={[styles.toolbarBtn, empty && styles.toolbarBtnDisabled]}
         onPress={onUndo}
-        disabled={draftPoints.length === 0}
+        disabled={empty}
         activeOpacity={0.7}
       >
         <Ionicons
           name="arrow-undo"
-          size={18}
-          color={draftPoints.length === 0 ? COLORS.cardBorder : COLORS.textSecondary}
+          size={16}
+          color={empty ? COLORS.cardBorder : COLORS.textSecondary}
         />
-        <Text style={[styles.toolbarBtnText, draftPoints.length === 0 && styles.toolbarBtnTextDisabled]}>
+        <Text style={[styles.toolbarBtnText, empty && styles.toolbarBtnTextDisabled]}>
           Deshacer
         </Text>
       </TouchableOpacity>
 
+      {/* Limpiar */}
       <TouchableOpacity
-        style={[styles.toolbarBtn, draftPoints.length === 0 && styles.toolbarBtnDisabled]}
+        style={[styles.toolbarBtn, empty && styles.toolbarBtnDisabled]}
         onPress={onClear}
-        disabled={draftPoints.length === 0}
+        disabled={empty}
         activeOpacity={0.7}
       >
         <Ionicons
           name="trash-outline"
-          size={18}
-          color={draftPoints.length === 0 ? COLORS.cardBorder : "#ef4444"}
+          size={16}
+          color={empty ? COLORS.cardBorder : "#ef4444"}
         />
-        <Text style={[styles.toolbarBtnText, draftPoints.length === 0 && styles.toolbarBtnTextDisabled]}>
+        <Text style={[styles.toolbarBtnText, empty && styles.toolbarBtnTextDisabled]}>
           Limpiar
-        </Text>
-      </TouchableOpacity>
-
-      <View style={styles.toolbarDivider} />
-
-      <TouchableOpacity
-        style={[styles.confirmBtn, !canConfirm && styles.confirmBtnDisabled]}
-        onPress={onConfirm}
-        disabled={!canConfirm}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="checkmark" size={18} color={canConfirm ? COLORS.white : COLORS.cardBorder} />
-        <Text style={[styles.confirmBtnText, !canConfirm && styles.confirmBtnTextDisabled]}>
-          Aplicar
         </Text>
       </TouchableOpacity>
     </View>
@@ -215,141 +200,113 @@ function ToolbarContent({
 
 const styles = StyleSheet.create({
   cancelBtn: {
-    marginLeft: 6,
+    marginLeft: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "rgba(255,255,255,0.18)",
   },
   cancelText: {
     color: COLORS.white,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
   },
   instruction: {
     position: "absolute",
     top: 16,
     left: 16,
-    right: 80,
+    right: 16,
     zIndex: 10,
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: "hidden",
   },
   instructionBlur: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   instructionAndroid: {
     backgroundColor: "rgba(15,23,42,0.82)",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
   },
   instructionRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-  },
-  instructionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.primary,
+    gap: 6,
   },
   instructionText: {
     color: COLORS.white,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "600",
     flex: 1,
   },
   toolbar: {
     position: "absolute",
     bottom: 24,
-    left: 20,
-    right: 20,
+    left: 24,
+    right: 24,
     zIndex: 10,
-    borderRadius: 20,
+    borderRadius: 18,
     overflow: "hidden",
     elevation: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
   },
   toolbarBlur: {
-    borderRadius: 20,
+    borderRadius: 18,
   },
   toolbarAndroid: {
     backgroundColor: COLORS.white,
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
   toolbarContent: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     gap: 4,
   },
   pointsCounter: {
     alignItems: "center",
-    minWidth: 36,
+    minWidth: 30,
   },
   pointsCounterNum: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "800",
     color: COLORS.primary,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   pointsCounterLabel: {
-    fontSize: 10,
+    fontSize: 9,
     color: COLORS.textSecondary,
     fontWeight: "600",
   },
   toolbarDivider: {
     width: 1,
-    height: 32,
+    height: 28,
     backgroundColor: COLORS.cardBorder,
-    marginHorizontal: 6,
+    marginHorizontal: 8,
   },
   toolbarBtn: {
     flex: 1,
     alignItems: "center",
-    gap: 3,
-    paddingVertical: 4,
+    gap: 2,
+    paddingVertical: 2,
   },
   toolbarBtnDisabled: {
-    opacity: 0.4,
+    opacity: 0.35,
   },
   toolbarBtnText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "600",
     color: COLORS.textSecondary,
   },
   toolbarBtnTextDisabled: {
-    color: COLORS.cardBorder,
-  },
-  confirmBtn: {
-    flex: 1.4,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  confirmBtnDisabled: {
-    backgroundColor: COLORS.background,
-  },
-  confirmBtnText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.white,
-  },
-  confirmBtnTextDisabled: {
     color: COLORS.cardBorder,
   },
 });

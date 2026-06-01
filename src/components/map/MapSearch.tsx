@@ -8,8 +8,10 @@ import {
   FlatList,
   Platform,
   ActivityIndicator,
+  Keyboard,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { Property } from "@/types";
 import { useAuth } from "@/context/AuthContext";
@@ -44,9 +46,13 @@ interface MapSearchProps {
 const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   const { user } = useAuth();
   const { selectedLocation } = useApp();
+  const insets = useSafeAreaInsets();
 
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [highlightedPropertyId, setHighlightedPropertyId] = useState<string | null>(null);
+
+  // Altura de la SearchFiltersBar para posicionar la instrucción de polígonos debajo de ella
+  const [searchBarHeight, setSearchBarHeight] = useState(64);
 
   // ── Polígonos (múltiples) ──
   const [drawingMode, setDrawingMode] = useState(false);
@@ -167,6 +173,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   };
 
   const closeZoneSearch = () => {
+    Keyboard.dismiss();
     setIsZoneSearchOpen(false);
     setZoneQuery("");
     clearSuggestions();
@@ -219,14 +226,35 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   };
 
   // ── Handlers de polígono ──
+
+  // Umbral de proximidad para cerrar el polígono tocando cerca del primer punto.
+  // ~0.0004° ≈ 40 m, funciona bien a zoom de barrio/ciudad.
+  const POLYGON_CLOSE_THRESHOLD = 0.0004;
+
   const handleLongPressMap = (coord: PolygonCoord) => {
     if (drawingMode) return;
+    if (Platform.OS !== "web") Haptics.selectionAsync();
     setDrawingMode(true);
     setDraftPoints([coord]);
   };
 
   const handleMapPress = (coord: PolygonCoord) => {
     if (!drawingMode) return;
+
+    // Auto-cerrar polígono si el usuario presiona cerca del primer punto (3+ pts)
+    if (draftPoints.length >= 3) {
+      const first = draftPoints[0];
+      if (
+        Math.abs(coord.latitude - first.latitude) < POLYGON_CLOSE_THRESHOLD &&
+        Math.abs(coord.longitude - first.longitude) < POLYGON_CLOSE_THRESHOLD
+      ) {
+        handleConfirmPolygon();
+        return;
+      }
+    }
+
+    // Vibración leve por cada nuevo punto
+    if (Platform.OS !== "web") Haptics.selectionAsync();
     setDraftPoints((prev) => [...prev, coord]);
   };
 
@@ -261,21 +289,48 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
 
   return (
     <View style={styles.container}>
-      <SearchFiltersBar
-        hasActiveFilters={hasActiveFilters}
-        onClearFilters={handleClearAll}
-        locationChips={locationChips}
-        polygonChips={polygonChips}
-        onAddZone={openZoneSearch}
-        onRemoveChip={removeLocationChip}
-        onRemovePolygon={removePolygon}
-        onBack={() => {
-          if (isZoneSearchOpen) { closeZoneSearch(); return; }
-          router.back();
-        }}
-      />
+      {/* ── Mapa — renderizado PRIMERO, llena TODO el contenedor ── */}
+      <View style={styles.mapContainer}>
+        <PropertyMap
+          properties={filteredProperties}
+          onMarkerPress={drawingMode ? () => {} : handleMarkerPress}
+          googleApiKey={googleApiKey}
+          highlightedPropertyId={highlightedPropertyId}
+          focusRegion={focusRegion}
+          drawingMode={drawingMode}
+          draftPolygonPoints={draftPoints}
+          confirmedPolygons={filters.polygons}
+          onMapPress={handleMapPress}
+          onLongPressMap={handleLongPressMap}
+        />
+        <PolygonDrawingOverlay
+          drawingMode={drawingMode}
+          draftPoints={draftPoints}
+          onCancel={handleCancelDrawing}
+          onUndo={handleUndoPoint}
+          onClear={handleClearDraft}
+          topOffset={searchBarHeight}
+        />
+      </View>
 
-      {/* ── Overlay de búsqueda de zonas ── */}
+      {/* Barra inferior — SIEMPRE en el DOM para evitar que el mapa cambie de tamaño.
+          En modo dibujo se oculta visualmente pero mantiene su espacio en el layout. */}
+      <View
+        style={[styles.bottomBar, { paddingBottom: 12 + insets.bottom }, drawingMode && styles.hidden]}
+        pointerEvents={drawingMode ? "none" : "auto"}
+      >
+        <TouchableOpacity
+          style={styles.refineSearchBtn}
+          onPress={() => setShowFiltersModal(true)}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="options-outline" size={18} color={COLORS.white} />
+          <Text style={styles.refineSearchBtnText}>Refinar Búsqueda</Text>
+          {hasActiveFilters && <View style={styles.activeFilterDot} />}
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Overlay de búsqueda de zonas (zIndex: 50 — encima de la barra) ── */}
       {isZoneSearchOpen && (
         <View style={styles.zoneSearchOverlay}>
           <View style={styles.zoneSearchInputRow}>
@@ -349,45 +404,25 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         </View>
       )}
 
-      {/* ── Mapa ── */}
-      <View style={styles.mapContainer}>
-        <PropertyMap
-          properties={filteredProperties}
-          onMarkerPress={drawingMode ? () => {} : handleMarkerPress}
-          googleApiKey={googleApiKey}
-          highlightedPropertyId={highlightedPropertyId}
-          focusRegion={focusRegion}
-          drawingMode={drawingMode}
-          draftPolygonPoints={draftPoints}
-          confirmedPolygons={filters.polygons}
-          onMapPress={handleMapPress}
-          onLongPressMap={handleLongPressMap}
+      {/* ── SearchFiltersBar — renderizada AL FINAL para estar delante del MapView nativo en Android ── */}
+      <View
+        style={styles.searchBarWrapper}
+        onLayout={(e) => setSearchBarHeight(e.nativeEvent.layout.height)}
+      >
+        <SearchFiltersBar
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={handleClearAll}
+          locationChips={locationChips}
+          polygonChips={polygonChips}
+          onAddZone={openZoneSearch}
+          onRemoveChip={removeLocationChip}
+          onRemovePolygon={removePolygon}
+          onBack={() => {
+            if (isZoneSearchOpen) { closeZoneSearch(); return; }
+            router.back();
+          }}
         />
-        <PolygonDrawingOverlay
-          drawingMode={drawingMode}
-          draftPoints={draftPoints}
-          onCancel={handleCancelDrawing}
-          onUndo={handleUndoPoint}
-          onClear={handleClearDraft}
-          onConfirm={handleConfirmPolygon}
-        />
-
       </View>
-
-      {/* Barra inferior — siempre visible (oculta durante modo dibujo) */}
-      {!drawingMode && (
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={styles.refineSearchBtn}
-            onPress={() => setShowFiltersModal(true)}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="options-outline" size={18} color={COLORS.white} />
-            <Text style={styles.refineSearchBtnText}>Refinar Búsqueda</Text>
-            {hasActiveFilters && <View style={styles.activeFilterDot} />}
-          </TouchableOpacity>
-        </View>
-      )}
 
       <SearchFiltersModal
         visible={showFiltersModal}
@@ -411,7 +446,21 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
   },
+  // Wrapper de SearchFiltersBar — position absolute para que se renderice
+  // ENCIMA del MapView nativo de Android (al estar al final del JSX)
+  searchBarWrapper: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    elevation: 10,
+  },
   bottomBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: "row",
     gap: 10,
     paddingHorizontal: 16,
@@ -419,6 +468,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
     borderTopColor: COLORS.background,
+    zIndex: 10,
+    elevation: 10,
+  },
+  // Usado para ocultar visualmente el bottomBar en modo dibujo sin desmontarlo
+  hidden: {
+    opacity: 0,
   },
   refineSearchBtn: {
     flex: 1,

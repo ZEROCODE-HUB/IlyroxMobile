@@ -4,15 +4,17 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  Modal,
   StyleSheet,
   Dimensions,
   Platform,
-  Pressable,
+  ActivityIndicator,
 } from "react-native";
+import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 import { Ionicons } from "@expo/vector-icons";
 import RadioGroupSelector from "../common/RadioGroupSelector";
 import { usePropertyFiltersStore } from "../../store/propertyFiltersStore";
+import { useSaveSearch } from "./filters/useSaveSearch";
+import { useToast } from "../../context/ToastContext";
 
 import NumberInputModal from "../modals/NumberInputModal";
 import { PropertyTypeSelector } from "./PropertyTypeSelector";
@@ -25,7 +27,6 @@ import { IndustrialFiltersSection } from "./filters/IndustrialFiltersSection";
 
 import { COLORS } from "../../constants/colors";
 import { getCamposVisibles } from "../../constants/propertyData";
-import { KeyboardAvoidingView } from "react-native";
 
 const { height } = Dimensions.get("window");
 
@@ -35,6 +36,10 @@ interface SearchFiltersModalProps {
   onViewResults?: () => void;
   filteredPropertiesCount: number;
   userId?: string;
+  /** Si está presente, el modal opera en modo "editar búsqueda" */
+  editBusquedaId?: string;
+  /** Callback llamado cuando la búsqueda se actualiza exitosamente */
+  onUpdateSearch?: () => void;
 }
 
 export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
@@ -43,9 +48,30 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   onViewResults,
   filteredPropertiesCount,
   userId,
+  editBusquedaId,
+  onUpdateSearch,
 }) => {
   const { filters, updateFilter: onUpdateFilter } = usePropertyFiltersStore();
+  const { updateSearchInDatabase } = useSaveSearch(userId);
+  const { showToast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
   const [scrollEnabled, setScrollEnabled] = useState(true);
+
+  const isEditMode = !!editBusquedaId;
+
+  const handleUpdateSearch = async () => {
+    if (!editBusquedaId) return;
+    setIsSaving(true);
+    try {
+      await updateSearchInDatabase(editBusquedaId, filters);
+      showToast("Búsqueda actualizada correctamente", "success");
+      onUpdateSearch?.();
+    } catch (err: any) {
+      showToast(err?.message || "Error al actualizar la búsqueda", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Estados para modals
   const [showRecamarasModal, setShowRecamarasModal] = useState(false);
@@ -96,25 +122,19 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   };
 
   return (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={visible}
-      onRequestClose={onClose}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.modalContainer}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-      >
-        <Pressable style={styles.modalOverlay} onPress={onClose} />
-        <View style={styles.modalContent}>
+    <AppBottomSheet visible={visible} onClose={onClose}>
+      <>
+      <View style={styles.modalContent}>
           {/* Header */}
           <View style={styles.modalHeader}>
             <View>
-              <Text style={styles.modalTitle}>Filtros de Búsqueda</Text>
+              <Text style={styles.modalTitle}>
+                {isEditMode ? "Editar búsqueda" : "Filtros de Búsqueda"}
+              </Text>
               <Text style={styles.modalSubtitle}>
-                Ajusta los criterios para encontrar tu propiedad
+                {isEditMode
+                  ? "Modifica los criterios y guarda los cambios"
+                  : "Ajusta los criterios para encontrar tu propiedad"}
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -218,17 +238,33 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
 
           {/* Footer */}
           <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={styles.applyBtn}
-              onPress={onViewResults ?? onClose}
-            >
-              <Text style={styles.applyBtnText}>
-                Ver {filteredPropertiesCount} propiedades
-              </Text>
-            </TouchableOpacity>
+            {isEditMode ? (
+              <TouchableOpacity
+                style={[styles.applyBtn, isSaving && { opacity: 0.7 }]}
+                onPress={handleUpdateSearch}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <ActivityIndicator size="small" color={COLORS.white} style={{ marginRight: 8 }} />
+                ) : (
+                  <Ionicons name="save-outline" size={18} color={COLORS.white} style={{ marginRight: 8 }} />
+                )}
+                <Text style={styles.applyBtnText}>
+                  {isSaving ? "Guardando…" : "Actualizar búsqueda"}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.applyBtn}
+                onPress={onViewResults ?? onClose}
+              >
+                <Text style={styles.applyBtnText}>
+                  Ver {filteredPropertiesCount} propiedades
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
-        </View>
-      </KeyboardAvoidingView>
+      </View>
 
       {/* Number Input Modal */}
       <NumberInputModal
@@ -237,25 +273,12 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
         onSave={numberInputConfig.onSave}
         title={numberInputConfig.title}
       />
-    </Modal>
+      </>
+    </AppBottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.blackTransparent50,
-    justifyContent: "flex-end",
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "transparent",
-    justifyContent: "flex-end",
-  },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.blackTransparent50,
-  },
   modalContent: {
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 24,
