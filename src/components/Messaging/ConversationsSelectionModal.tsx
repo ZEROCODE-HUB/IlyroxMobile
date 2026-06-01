@@ -2,12 +2,12 @@ import React from 'react';
 import {
   View,
   Text,
-  Modal,
   StyleSheet,
   TouchableOpacity,
   FlatList,
   Image,
 } from 'react-native';
+import { AppBottomSheet } from '@/design-system/components/AppBottomSheet';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants';
@@ -97,14 +97,8 @@ export default function ConversationsSelectionModal({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.overlay}>
-        <View style={[styles.container, { paddingBottom: insets.bottom || 16 }]}>
+    <AppBottomSheet visible={visible} onClose={onClose}>
+      <View style={[styles.container, { paddingBottom: insets.bottom || 16 }]}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Conversaciones con {otherUserName}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -123,18 +117,12 @@ export default function ConversationsSelectionModal({
               </View>
             }
           />
-        </View>
       </View>
-    </Modal>
+    </AppBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
   container: {
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 20,

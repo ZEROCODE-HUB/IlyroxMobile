@@ -49,8 +49,11 @@ export default function ConversationsList({
   const [specificConversations, setSpecificConversations] = useState<any[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [showTagsManager, setShowTagsManager] = useState(false);
+  const [longPressedGrouping, setLongPressedGrouping] = useState<any>(null);
+  const [longPressedConvTags, setLongPressedConvTags] = useState<any[]>([]);
+  const [showTagsAssignModal, setShowTagsAssignModal] = useState(false);
 
-  const { tags, createTag, deleteTag, updateTag } = useTags(userId);
+  const { tags, createTag, deleteTag, updateTag, assignTag, removeTag, getConversationTags } = useTags(userId);
 
   // Filtrar conversaciones por búsqueda y etiquetas
   const filteredConversations = React.useMemo(() => {
@@ -95,6 +98,16 @@ export default function ConversationsList({
     setSpecificConversations(specificConvs);
     setSelectedGroupingUser(grouping.other_user);
     setShowSelectionModal(true);
+  };
+
+  const handleGroupingLongPress = async (item: any) => {
+    const recentConvId = item.conversacion_mas_reciente_id;
+    if (!recentConvId) return;
+
+    const convTags = await getConversationTags(recentConvId);
+    setLongPressedGrouping(item);
+    setLongPressedConvTags(convTags);
+    setShowTagsAssignModal(true);
   };
 
   const handleToggleTag = (tagId: string) => {
@@ -158,6 +171,8 @@ export default function ConversationsList({
       <TouchableOpacity
         style={styles.conversationItem}
         onPress={() => handleGroupingPress(item)}
+        onLongPress={() => handleGroupingLongPress(item)}
+        delayLongPress={400}
       >
         <Avatar uri={otherUser?.foto} name={otherUser?.nombre} size={56} />
 
@@ -316,6 +331,43 @@ export default function ConversationsList({
         assignedTags={[]}
         onCreateTag={createTag}
         onDeleteTag={handleDeleteTag}
+        onUpdateTag={handleUpdateTag}
+      />
+
+      {/* Tags Assign Modal (long press) */}
+      <TagsModal
+        visible={showTagsAssignModal}
+        onClose={() => {
+          setShowTagsAssignModal(false);
+          setLongPressedGrouping(null);
+          setLongPressedConvTags([]);
+        }}
+        availableTags={tags}
+        assignedTags={longPressedConvTags}
+        onAssignTag={async (tagId) => {
+          const recentConvId = longPressedGrouping?.conversacion_mas_reciente_id;
+          if (!recentConvId) return false;
+          const ok = await assignTag(recentConvId, tagId);
+          if (ok) {
+            setLongPressedConvTags((prev) => [
+              ...prev,
+              tags.find((t) => t.id === tagId)!,
+            ]);
+            refresh();
+          }
+          return ok;
+        }}
+        onRemoveTag={async (tagId) => {
+          const recentConvId = longPressedGrouping?.conversacion_mas_reciente_id;
+          if (!recentConvId) return false;
+          const ok = await removeTag(recentConvId, tagId);
+          if (ok) {
+            setLongPressedConvTags((prev) => prev.filter((t) => t.id !== tagId));
+            refresh();
+          }
+          return ok;
+        }}
+        onCreateTag={createTag}
         onUpdateTag={handleUpdateTag}
       />
     </View>
