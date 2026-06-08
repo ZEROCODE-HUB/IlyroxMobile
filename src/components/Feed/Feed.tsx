@@ -24,11 +24,11 @@ import {
   useNavigation,
   useIsFocused,
 } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { COLORS } from "../../constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import { useFeed, useUserApprovals } from "@/hooks";
-import { usePropertyFilters } from "@/hooks/usePropertyFilters";
 
 interface FeedProps {
   currentUserId?: string;
@@ -49,6 +49,7 @@ const Feed: React.FC<FeedProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const router = useRouter();
   const isFocused = useIsFocused();
   const [activeCommentItem, setActiveCommentItem] = useState<FeedItem | null>(
     null,
@@ -84,6 +85,9 @@ const Feed: React.FC<FeedProps> = ({
     if (refreshTimestamp && refreshTimestamp !== lastRefreshTimestampRef.current) {
       lastRefreshTimestampRef.current = refreshTimestamp;
       refresh();
+      // Tras publicar, llevar al usuario al inicio para que vea su publicación
+      // recién creada arriba aunque el feed estuviera scrolleado.
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
     }
   }, [refreshTimestamp, refresh]);
 
@@ -113,34 +117,9 @@ const Feed: React.FC<FeedProps> = ({
   const [bannerVisible, setBannerVisible] = useState(false);
   const bannerAnim = useRef(new Animated.Value(0)).current;
 
-  // Filtrar los items de Feed que pasen por el filtro global del mapa/propiedades
-  const extractedProperties = useMemo(() => {
-    return items
-      .filter((it) => it.type === "property" && it.propertyDetails)
-      .map((it) => it.propertyDetails!);
-  }, [items]);
-
-  const { filteredProperties, hasActiveFilters } = usePropertyFilters(
-    extractedProperties,
-    null // Geo bounds form MapSearch is handled elsewhere or via named search
-  );
-
-  const finalItems = useMemo(() => {
-    // Si no hay filtros activos, mostrar todo tal cual
-    if (!hasActiveFilters) {
-      return items;
-    }
-
-    const validPropertyIds = new Set(filteredProperties.map((p) => p.id));
-    return items.filter((it) => {
-      // Solo mostramos las propiedades que pasan el filtro y ocultamos posts/reels
-      if (it.type === "property" && it.propertyDetails) {
-        return validPropertyIds.has(it.propertyDetails.id);
-      }
-      // Ocultar posts y reels si hay una búsqueda o filtro de propiedades activo
-      return false; 
-    });
-  }, [items, filteredProperties, hasActiveFilters]);
+  // El feed home muestra siempre todo el contenido. El filtrado por búsqueda de
+  // propiedades (filtros del store global) vive en el mapa / map-results, no aquí:
+  // acoplarlo dejaba el feed vacío al volver tras publicar si quedaban filtros activos.
 
   // Viewability config
 
@@ -194,19 +173,36 @@ const Feed: React.FC<FeedProps> = ({
 
   const handleOpenDetail = useCallback(
     (item: FeedItem) => {
+      console.log("[RDBG] Feed.handleOpenDetail", {
+        id: item.id,
+        type: item.type,
+      });
       if (item.type === "property" && item.propertyDetails?.id) {
         navigation.navigate("(stack)", {
           screen: "property/[id]",
           params: { id: item.propertyDetails.id },
         });
       } else if (item.type === "reel") {
-        navigation.navigate("(stack)", {
-          screen: "reel/[id]",
-          params: {
+        // `router.push` siempre monta una pantalla nueva (a diferencia de
+        // `navigate`, que reutiliza una instancia previa de reel/[id] y dejaba
+        // el visor con el reel anterior). Coincide con cómo abre el perfil.
+        try {
+          const payload = JSON.stringify(item);
+          console.log("[RDBG] Feed reel -> router.push", {
             id: item.id,
-            item: JSON.stringify(item),
-          },
-        });
+            itemLen: payload.length,
+          });
+          router.push({
+            pathname: "/(stack)/reel/[id]",
+            params: {
+              id: item.id,
+              item: payload,
+            },
+          });
+          console.log("[RDBG] Feed reel router.push OK");
+        } catch (e) {
+          console.log("[RDBG] Feed reel router.push ERROR", String(e));
+        }
       } else if (item.type === "post") {
         navigation.push("(stack)", {
           screen: "post/[id]",
@@ -214,7 +210,7 @@ const Feed: React.FC<FeedProps> = ({
         });
       }
     },
-    [navigation],
+    [navigation, router],
   );
 
   const handleScroll = useCallback(
@@ -319,14 +315,14 @@ const Feed: React.FC<FeedProps> = ({
   );
 
   const ListFooter = useMemo(() => {
-    if (!hasMore && finalItems.length > 0) {
+    if (!hasMore && items.length > 0) {
       return (
         <View style={styles.endMessage}>
           <Text style={styles.endMessageText}>¡Has visto todo! 🎉</Text>
         </View>
       );
     }
-    if (loading && finalItems.length > 0) {
+    if (loading && items.length > 0) {
       return (
         <View style={styles.loadingMore}>
           <Text style={styles.loadingMoreText}>Cargando más...</Text>
@@ -334,7 +330,7 @@ const Feed: React.FC<FeedProps> = ({
       );
     }
     return null;
-  }, [hasMore, loading, finalItems.length]);
+  }, [hasMore, loading, items.length]);
 
   const ListEmpty = useMemo(() => {
     if (error) {
@@ -367,7 +363,7 @@ const Feed: React.FC<FeedProps> = ({
     <>
       <FlashList
         ref={flatListRef}
-        data={finalItems}
+        data={items}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         extraData={focusedItemId}
