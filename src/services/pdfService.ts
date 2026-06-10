@@ -4,6 +4,7 @@ import { documentDirectory, moveAsync } from "expo-file-system/legacy";
 import { supabase } from "@/lib/supabase";
 import firstUpperCase from "@/utils/firstUpperCase";
 import { logger } from "@/utils/logger";
+import { LogoBase64 } from "@/assets/logoBase64";
 
 const log = logger.scoped("pdfService");
 // ============================================================================
@@ -373,8 +374,7 @@ const generatePropertyHtml = (
             </div>
         </div>
         <div class="footer-logo-container">
-          <img src="https://www.ilyrox.com/Logo.jpeg" alt="Logo" class="Logo" />
-          <div class="footer-logo-text">ILROX</div>
+          <img src="${LogoBase64}" alt="Ilyrox" class="Logo" />
         </div>
       </div>
     `;
@@ -384,8 +384,7 @@ const generatePropertyHtml = (
       <div class="footer-agent">
          <div class="agent-details">
             <div class="footer-logo-container">
-              <img src="https://www.ilyrox.com/Logo.jpeg" alt="Logo" class="Logo" />
-              <div class="footer-logo-text">ILROX</div>
+              <img src="${LogoBase64}" alt="Ilyrox" class="Logo" />
             </div>
             ${idDateHtml}
          </div>
@@ -673,19 +672,15 @@ const generatePropertyHtml = (
             display: flex;
             align-items: center;
             gap: 10px;
+            background: #45a0a5; /* teal de marca, como el header del feed */
+            padding: 8px 14px;
+            border-radius: 10px;
         }
 
         .Logo {
-            width: 40px;
             height: 40px;
-            border-radius: 8px;
-            object-fit: cover;
-        }
-
-        .footer-logo-text {
-            color: #3cc3ec;
-            font-weight: 900;
-            font-size: 24px;
+            width: auto;
+            object-fit: contain;
         }
         
         .id-date-footer {

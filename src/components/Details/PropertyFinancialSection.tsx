@@ -49,7 +49,9 @@ export const PropertyFinancialSection: React.FC<PropertyFinancialSectionProps> =
                 {gravamenes.map((g, i) => (
                   <Text key={i} style={styles.warningText}>
                     {g.institucion?.nombre} :
-                    {g.monto ? ` $${Number(g.monto).toLocaleString("es-MX")}` : " Monto no especificado"}
+                    {g.monto != null
+                      ? ` $${Number(g.monto).toLocaleString("es-MX")}`
+                      : " Sí"}
                   </Text>
                 ))}
               </View>

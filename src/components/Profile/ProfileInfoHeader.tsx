@@ -22,10 +22,10 @@ export interface ProfileData {
   negativeRecommendations: number;
   biography?: string;
   website?: string;
-  disponibilidad: number;
   profesionalismo: number;
-  comunicacion: number;
-  conocimientoMercado: number;
+  eticaValores: number;
+  pagoComisiones: number;
+  comunicacionServicio: number;
 }
 
 export interface ProfileInfoHeaderProps {
@@ -45,8 +45,11 @@ export interface ProfileInfoHeaderProps {
   onToggleRatingDetails: () => void;
   showRecommendedByModal: boolean;
   setShowRecommendedByModal: (v: boolean) => void;
+  showNotRecommendedByModal: boolean;
+  setShowNotRecommendedByModal: (v: boolean) => void;
   formatRole: (rol: string) => string;
   loadRecommendedByUsers: (options?: { reset?: boolean }) => Promise<void>;
+  loadNotRecommendedByUsers: (options?: { reset?: boolean }) => Promise<void>;
   activeTab: ProfileContentType;
   onTabChange: (tab: ProfileContentType) => void;
   contentCounts: { properties: number; posts: number; reels: number };
@@ -71,8 +74,11 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = ({
   onToggleRatingDetails,
   showRecommendedByModal,
   setShowRecommendedByModal,
+  showNotRecommendedByModal,
+  setShowNotRecommendedByModal,
   formatRole,
   loadRecommendedByUsers,
+  loadNotRecommendedByUsers,
   activeTab,
   onTabChange,
   contentCounts,
@@ -142,7 +148,7 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = ({
         </View>
 
         {!isMe && (
-          <View style={styles.actionButtons}>
+          <View style={styles.actionsWrap}>
             <TouchableOpacity style={styles.messageBtn} onPress={onMessage}>
               <Ionicons
                 name="chatbubble-outline"
@@ -152,29 +158,62 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = ({
               <Text style={styles.messageBtnText}>Mensaje</Text>
             </TouchableOpacity>
             {onRecommend && (
-              <TouchableOpacity
-                style={[
-                  styles.recommendBtn,
-                  isRecommended && styles.recommendBtnActive,
-                ]}
-                onPress={() => onRecommend(!isRecommended)}
-                disabled={submittingRecommendation}
-                activeOpacity={0.8}
-              >
-                <Ionicons
-                  name={isRecommended ? "thumbs-up" : "thumbs-up-outline"}
-                  size={16}
-                  color={isRecommended ? COLORS.white : COLORS.primary}
-                />
-                <Text
+              <View style={styles.recommendRow}>
+                <TouchableOpacity
                   style={[
-                    styles.recommendBtnText,
-                    isRecommended && styles.recommendBtnTextActive,
+                    styles.recommendBtn,
+                    isRecommended === true && styles.recommendBtnActive,
                   ]}
+                  onPress={() => onRecommend(true)}
+                  disabled={submittingRecommendation}
+                  activeOpacity={0.8}
                 >
-                  {isRecommended ? "Recomendado" : "Recomendar"}
-                </Text>
-              </TouchableOpacity>
+                  <Ionicons
+                    name={
+                      isRecommended === true ? "thumbs-up" : "thumbs-up-outline"
+                    }
+                    size={16}
+                    color={isRecommended === true ? COLORS.white : COLORS.primary}
+                  />
+                  <Text
+                    style={[
+                      styles.recommendBtnText,
+                      isRecommended === true && styles.recommendBtnTextActive,
+                    ]}
+                  >
+                    {isRecommended === true ? "Recomendado" : "Recomendar"}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.recommendBtn,
+                    styles.notRecommendBtn,
+                    isRecommended === false && styles.notRecommendBtnActive,
+                  ]}
+                  onPress={() => onRecommend(false)}
+                  disabled={submittingRecommendation}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={
+                      isRecommended === false
+                        ? "thumbs-down"
+                        : "thumbs-down-outline"
+                    }
+                    size={16}
+                    color={isRecommended === false ? COLORS.white : COLORS.error}
+                  />
+                  <Text
+                    style={[
+                      styles.recommendBtnText,
+                      styles.notRecommendBtnText,
+                      isRecommended === false && styles.recommendBtnTextActive,
+                    ]}
+                  >
+                    {isRecommended === false ? "No recomendado" : "No recomendar"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         )}
@@ -192,14 +231,24 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = ({
                 {profileData.rating.toFixed(1)}
               </Text>
               <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <Ionicons
-                    key={s}
-                    name="star"
-                    size={14}
-                    color={COLORS.warning}
-                  />
-                ))}
+                {[1, 2, 3, 4, 5].map((s) => {
+                  const rating = profileData.rating;
+                  const name =
+                    rating >= s
+                      ? "star"
+                      : rating >= s - 0.5
+                        ? "star-half"
+                        : "star-outline";
+                  const filled = rating >= s - 0.5;
+                  return (
+                    <Ionicons
+                      key={s}
+                      name={name}
+                      size={14}
+                      color={filled ? COLORS.warning : COLORS.cardBorder}
+                    />
+                  );
+                })}
               </View>
             </View>
             <Text style={styles.reviewCount}>
@@ -222,9 +271,12 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = ({
           <RecommendedSection
             setShowRecommendedByModal={setShowRecommendedByModal}
             showRecommendedByModal={showRecommendedByModal}
+            setShowNotRecommendedByModal={setShowNotRecommendedByModal}
+            showNotRecommendedByModal={showNotRecommendedByModal}
             formatRole={formatRole}
             isMe={isMe}
             loadRecommendedByUsers={loadRecommendedByUsers}
+            loadNotRecommendedByUsers={loadNotRecommendedByUsers}
           />
         )}
       </View>
@@ -310,13 +362,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
   },
-  actionButtons: {
+  actionsWrap: {
     marginTop: 16,
-    flexDirection: "row",
     gap: 8,
   },
   messageBtn: {
-    flex: 1,
     backgroundColor: COLORS.background,
     flexDirection: "row",
     alignItems: "center",
@@ -330,6 +380,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 14,
   },
+  recommendRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
   recommendBtn: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -338,7 +392,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 12,
     borderRadius: 12,
-    gap: 8,
+    gap: 6,
     borderWidth: 1,
     borderColor: COLORS.primary,
   },
@@ -349,10 +403,20 @@ const styles = StyleSheet.create({
   recommendBtnText: {
     color: COLORS.primary,
     fontWeight: "600",
-    fontSize: 14,
+    fontSize: 13,
   },
   recommendBtnTextActive: {
     color: COLORS.white,
+  },
+  notRecommendBtn: {
+    borderColor: COLORS.error,
+  },
+  notRecommendBtnActive: {
+    backgroundColor: COLORS.error,
+    borderColor: COLORS.error,
+  },
+  notRecommendBtnText: {
+    color: COLORS.error,
   },
   ratingSection: {
     marginBottom: 16,

@@ -2,6 +2,29 @@ import { useState } from "react";
 import { supabase } from "../../../lib/supabase";
 import { useToast } from "../../../context/ToastContext";
 import { useModal } from "../../../context/ModalContext";
+import { DEFAULT_COUNTRY } from "../../../lib/location/registry";
+import { geocodeAddress } from "../../../lib/geocodingService";
+
+/**
+ * Garantiza que `data.bounds` exista para el matching geográfico server-side.
+ * Si no hay bounds (p. ej. búsqueda por filtros de texto, sin chip de zona),
+ * geocodifica la ubicación más específica (colonia > municipio > estado) para
+ * obtener su área. Así una búsqueda por colonia trae propiedades del municipio
+ * que la contiene y viceversa, sin depender de comparar nombres.
+ */
+async function ensureSearchBounds(data: any, filters: any): Promise<void> {
+  if (data.bounds) return;
+  const lf = filters?.locationFilter || {};
+  const coloniaTxt = Array.isArray(lf.colonia) ? lf.colonia[0] : lf.colonia;
+  const partes = [coloniaTxt, lf.municipio, lf.estado].filter(Boolean);
+  if (partes.length === 0) return;
+  try {
+    const geo = await geocodeAddress(partes.join(", "), filters?.pais);
+    if (geo?.bounds) data.bounds = geo.bounds;
+  } catch {
+    // Si la geocodificación falla, el matching cae al texto normalizado.
+  }
+}
 
 export const useSaveSearch = (userId?: string) => {
   const { showToast } = useToast();
@@ -270,6 +293,8 @@ export const useSaveSearch = (userId?: string) => {
 
     const insertData: any = {
       usuario_id: userId,
+      // País de la búsqueda — el matching solo cruza propiedades del mismo país.
+      pais: filters.pais || DEFAULT_COUNTRY,
       criterios_busqueda: criterios_busqueda,
       activa: true,
       frecuencia_notificaciones: 24,
@@ -403,6 +428,9 @@ export const useSaveSearch = (userId?: string) => {
       }
     }
 
+    // Garantizar área geográfica para el matching server-side (resuelve jerarquía).
+    await ensureSearchBounds(insertData, filters);
+
     const { data: searchData, error: searchError } = await supabase
       .from("busquedas_guardadas")
       .insert([insertData])
@@ -514,6 +542,9 @@ export const useSaveSearch = (userId?: string) => {
         .single();
       updateData.moneda = monedaData?.codigo || filters.moneda;
     }
+
+    // Garantizar área geográfica también al actualizar.
+    await ensureSearchBounds(updateData, filters);
 
     const { error } = await supabase
       .from("busquedas_guardadas")

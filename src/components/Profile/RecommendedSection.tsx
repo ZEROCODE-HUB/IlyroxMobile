@@ -1,6 +1,5 @@
 import {
   ActivityIndicator,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -10,53 +9,77 @@ import { COLORS } from "@/constants";
 import { EmptyState } from "@/design-system/components";
 import { Ionicons } from "@expo/vector-icons";
 import { RecommendedModal } from "./RecommendedModal";
+import { stylesRecommendedSection } from "./RecommendedSection.styles";
 import { useProfileStore, useAuthProfileStore } from "@/store/profileStore";
 import { useMemo, useEffect } from "react";
+
+// Re-export para no romper imports existentes de `stylesRecommendedSection`.
+export { stylesRecommendedSection };
 
 interface RecommendedSectionProps {
   setShowRecommendedByModal: (show: boolean) => void;
   showRecommendedByModal: boolean;
+  setShowNotRecommendedByModal: (show: boolean) => void;
+  showNotRecommendedByModal: boolean;
   formatRole: (rol: string) => string;
   isMe: boolean;
   loadRecommendedByUsers: (options?: { reset?: boolean }) => Promise<void>;
+  loadNotRecommendedByUsers: (options?: { reset?: boolean }) => Promise<void>;
 }
 
 export const RecommendedSection = ({
   setShowRecommendedByModal,
   showRecommendedByModal,
+  setShowNotRecommendedByModal,
+  showNotRecommendedByModal,
   formatRole,
   isMe,
   loadRecommendedByUsers,
+  loadNotRecommendedByUsers,
 }: RecommendedSectionProps) => {
   // Use either external or auth store based on isMe
   const externalStore = useProfileStore();
   const authStore = useAuthProfileStore();
   const store = isMe ? authStore : externalStore;
 
-  const { 
-    reviewStats, 
-    loadingRecommendedBy, 
-    recommendedByError, 
-    recommendedByUsers 
+  const {
+    reviewStats,
+    loadingRecommendedBy,
+    recommendedByError,
+    recommendedByUsers,
+    recommendedByLoaded,
+    loadingNotRecommendedBy,
+    notRecommendedByError,
+    notRecommendedByUsers,
+    notRecommendedByLoaded,
   } = store;
 
   // Mapped profile data for easy access
   const stats = useMemo(() => ({
     positiveRecommendations: reviewStats?.total_recomiendan || 0,
-    disponibilidad: reviewStats?.promedio_disponibilidad || 0,
+    negativeRecommendations: reviewStats?.total_no_recomiendan || 0,
     profesionalismo: reviewStats?.promedio_profesionalismo || 0,
-    comunicacion: reviewStats?.promedio_comunicacion || 0,
-    conocimientoMercado: reviewStats?.promedio_conocimiento_mercado || 0,
+    eticaValores: reviewStats?.promedio_etica_valores || 0,
+    pagoComisiones: reviewStats?.promedio_pago_comisiones || 0,
+    comunicacionServicio: reviewStats?.promedio_comunicacion_servicio || 0,
     totalReviews: reviewStats?.total_resenas || 0,
   }), [reviewStats]);
 
   useEffect(() => {
-    // Only load if we have positive recommendations AND we haven't loaded them yet
-    // Also avoid calling it repeatedly if loading
-    if (!loadingRecommendedBy && recommendedByUsers.length === 0 && stats.positiveRecommendations > 0) {
+    // Cargar solo una vez por perfil. Usamos la bandera `loaded` en lugar de
+    // `length === 0`: si las estadísticas indican recomendaciones pero la query
+    // regresa vacío (datos desincronizados), `length` se quedaría en 0 y el
+    // efecto se dispararía en bucle al alternar `loading`, congelando la pantalla.
+    if (!loadingRecommendedBy && !recommendedByLoaded && stats.positiveRecommendations > 0) {
       loadRecommendedByUsers({ reset: true });
     }
-  }, [loadingRecommendedBy, recommendedByUsers.length, stats.positiveRecommendations, loadRecommendedByUsers]);
+  }, [loadingRecommendedBy, recommendedByLoaded, stats.positiveRecommendations, loadRecommendedByUsers]);
+
+  useEffect(() => {
+    if (!loadingNotRecommendedBy && !notRecommendedByLoaded && stats.negativeRecommendations > 0) {
+      loadNotRecommendedByUsers({ reset: true });
+    }
+  }, [loadingNotRecommendedBy, notRecommendedByLoaded, stats.negativeRecommendations, loadNotRecommendedByUsers]);
 
 
   return (
@@ -138,6 +161,83 @@ export const RecommendedSection = ({
         )}
       </View>
 
+      <View style={stylesRecommendedSection.recommendedBySection}>
+        <View style={stylesRecommendedSection.recommendedByHeader}>
+          <Text style={stylesRecommendedSection.recommendedByTitle}>
+            No recomendado por
+          </Text>
+          <Text style={stylesRecommendedSection.recommendedByCount}>
+            {stats.negativeRecommendations} usuarios
+          </Text>
+        </View>
+
+        {loadingNotRecommendedBy && notRecommendedByUsers.length === 0 ? (
+          <View style={stylesRecommendedSection.recommendedByLoading}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          </View>
+        ) : notRecommendedByError ? (
+          <Text style={stylesRecommendedSection.recommendedByEmptyText}>
+            {notRecommendedByError}
+          </Text>
+        ) : notRecommendedByUsers.length === 0 ? (
+          <EmptyState title="Aún no hay valoraciones negativas" />
+        ) : (
+          <TouchableOpacity
+            style={stylesRecommendedSection.recommendedByPreviewRow}
+            onPress={() => setShowNotRecommendedByModal(true)}
+            activeOpacity={0.85}
+          >
+            <View style={stylesRecommendedSection.recommendedByAvatars}>
+              {notRecommendedByUsers.slice(0, 2).map((u, idx) => {
+                const fullName = [
+                  u.nombre,
+                  u.apellido_paterno,
+                  u.apellido_materno,
+                ]
+                  .filter(Boolean)
+                  .join(" ")
+                  .trim();
+
+                return (
+                  <View
+                    key={u.id}
+                    style={[
+                      stylesRecommendedSection.recommendedByAvatarWrap,
+                      idx === 1 &&
+                        stylesRecommendedSection.recommendedByAvatarWrapSecond,
+                    ]}
+                  >
+                    <Avatar
+                      uri={u.foto || undefined}
+                      name={fullName || "Usuario"}
+                      size={26}
+                      style={stylesRecommendedSection.recommendedByAvatarSmall}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+
+            <Text
+              style={stylesRecommendedSection.recommendedByPreviewText}
+              numberOfLines={1}
+            >
+              {(() => {
+                const first = notRecommendedByUsers[0];
+                const firstName = first
+                  ? [first.nombre, first.apellido_paterno]
+                      .filter(Boolean)
+                      .join(" ")
+                      .trim()
+                  : "Usuario";
+                const rest = Math.max(0, stats.negativeRecommendations - 1);
+                return rest > 0 ? `${firstName} y ${rest} más` : firstName;
+              })()}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       <View style={stylesRecommendedSection.progressSection}>
         {[5, 4, 3, 2, 1].map((stars) => {
           const starCounts = {
@@ -178,10 +278,10 @@ export const RecommendedSection = ({
           Calificación de características
         </Text>
         {[
-          { label: "Disponibilidad", rating: stats.disponibilidad },
           { label: "Profesionalismo", rating: stats.profesionalismo },
-          { label: "Comunicación", rating: stats.comunicacion },
-          { label: "Conocimiento del Mercado", rating: stats.conocimientoMercado },
+          { label: "Ética y valores", rating: stats.eticaValores },
+          { label: "Pago de comisiones", rating: stats.pagoComisiones },
+          { label: "Comunicación y servicio", rating: stats.comunicacionServicio },
         ].map((f) => (
           <View key={f.label} style={stylesRecommendedSection.featureRow}>
             <Text style={stylesRecommendedSection.featureLabel}>{f.label}</Text>
@@ -204,220 +304,21 @@ export const RecommendedSection = ({
       </View>
 
       <RecommendedModal
-        showRecommendedByModal={showRecommendedByModal}
-        setShowRecommendedByModal={setShowRecommendedByModal}
+        variant="positive"
+        showModal={showRecommendedByModal}
+        setShowModal={setShowRecommendedByModal}
         formatRole={formatRole}
         isMe={isMe}
-        loadRecommendedByUsers={loadRecommendedByUsers}
+        loadUsers={loadRecommendedByUsers}
+      />
+      <RecommendedModal
+        variant="negative"
+        showModal={showNotRecommendedByModal}
+        setShowModal={setShowNotRecommendedByModal}
+        formatRole={formatRole}
+        isMe={isMe}
+        loadUsers={loadNotRecommendedByUsers}
       />
     </View>
   );
 };
-
-export const stylesRecommendedSection = StyleSheet.create({
-  container: {
-    paddingHorizontal: 20,
-    backgroundColor: COLORS.white,
-  },
-  recommendedBySection: {
-    paddingTop: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
-  },
-  recommendedByHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  recommendedByTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  recommendedByCount: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-  },
-  recommendedByLoading: {
-    paddingVertical: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  recommendedByEmptyText: {
-    fontSize: 12,
-    color: COLORS.textTertiary,
-  },
-  recommendedByPreviewRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  recommendedByAvatars: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: 46,
-  },
-  recommendedByAvatarWrap: {
-    borderRadius: 999,
-    backgroundColor: COLORS.white,
-  },
-  recommendedByAvatarWrapSecond: {
-    marginLeft: -10,
-  },
-  recommendedByAvatarSmall: {
-    borderWidth: 1,
-    borderColor: COLORS.white,
-  },
-  recommendedByPreviewText: {
-    flex: 1,
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    fontWeight: "600",
-  },
-  recommendedByModalContainer: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  recommendedByModalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
-  },
-  recommendedByModalBackBtn: {
-    width: 34,
-    height: 34,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  recommendedByModalTitleWrap: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  recommendedByModalTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: COLORS.textPrimary,
-  },
-  recommendedByModalSubtitle: {
-    marginTop: 2,
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-  },
-  recommendedByModalList: {
-    padding: 16,
-    paddingBottom: 30,
-  },
-  recommendedByModalItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 10,
-  },
-  recommendedByAvatar: {
-    borderWidth: 1,
-    borderColor: COLORS.white,
-  },
-  recommendedByInfo: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  recommendedByName: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  recommendedByRole: {
-    marginTop: 2,
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  recommendedByModalFooter: {
-    paddingVertical: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  recommendedByLoadMoreBtn: {
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
-  recommendedByLoadMoreText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  recommendedByModalEmpty: {
-    padding: 20,
-    alignItems: "center",
-  },
-  progressSection: {
-    marginTop: 16,
-    gap: 8,
-  },
-  progressRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  progressLabel: {
-    width: 80,
-    fontSize: 12,
-    color: COLORS.textPrimary,
-  },
-  progressBar: {
-    flex: 1,
-    height: 8,
-    backgroundColor: COLORS.cardBorder,
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
-  },
-  progressPerc: {
-    width: 40,
-    textAlign: "right",
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    fontWeight: "500",
-  },
-  featuresSection: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.cardBorder,
-  },
-  featuresTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-    marginBottom: 12,
-  },
-  featureRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-  },
-  featureLabel: {
-    fontSize: 13,
-    color: COLORS.textPrimary,
-  },
-  featureStars: {
-    flexDirection: "row",
-    gap: 4,
-  },
-});

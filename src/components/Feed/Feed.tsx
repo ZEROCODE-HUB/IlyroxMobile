@@ -274,6 +274,7 @@ const Feed: React.FC<FeedProps> = ({
               onUserClick={onUserClick}
               onCommentClick={() => handleOpenComments(item)}
               currentUserId={currentUserId}
+              onPropertyUpdated={refresh}
             />
           );
         default:

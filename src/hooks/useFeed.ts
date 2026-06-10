@@ -14,6 +14,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { FeedItem, RecommendedByPreviewUser, User } from "@/types";
+import { useAuth } from "@/context/AuthContext";
 import { feedService } from "@/services/feedService";
 import { profileService } from "@/services/profileService";
 import { PAGINATION, TIMEOUTS } from "@/constants/config";
@@ -32,8 +33,10 @@ interface UseFeedOptions {
 
 const feedKeys = {
   all: ["feed"] as const,
-  list: (pageSize: number) => [...feedKeys.all, "list", pageSize] as const,
-  item: (id: string) => [...feedKeys.all, "item", id] as const,
+  list: (pageSize: number, userId?: string) =>
+    [...feedKeys.all, "list", pageSize, userId ?? "anon"] as const,
+  item: (id: string, userId?: string) =>
+    [...feedKeys.all, "item", id, userId ?? "anon"] as const,
 };
 
 function dedupeItems(items: FeedItem[]): FeedItem[] {
@@ -52,6 +55,7 @@ function dedupeItems(items: FeedItem[]): FeedItem[] {
 
 export function useFeed(options: UseFeedOptions = {}) {
   const {
+    userId,
     pageSize = PAGINATION.FEED_PAGE_SIZE,
     enableAutoRefresh = true,
   } = options;
@@ -59,9 +63,9 @@ export function useFeed(options: UseFeedOptions = {}) {
   const queryClient = useQueryClient();
 
   const query = useInfiniteQuery({
-    queryKey: feedKeys.list(pageSize),
+    queryKey: feedKeys.list(pageSize, userId),
     queryFn: ({ pageParam = 0 }) =>
-      feedService.getFeedPage(pageParam as number, pageSize),
+      feedService.getFeedPage(pageParam as number, pageSize, userId),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextPage,
     staleTime: 30_000,
@@ -150,7 +154,7 @@ export function useFeed(options: UseFeedOptions = {}) {
 
       // Mutar la cache directamente con las stats frescas
       queryClient.setQueryData(
-        feedKeys.list(pageSize),
+        feedKeys.list(pageSize, userId),
         (prev: any) => {
           if (!prev) return prev;
           return {
@@ -195,7 +199,7 @@ export function useFeed(options: UseFeedOptions = {}) {
         return next;
       });
     };
-  }, [baseItems, pageSize, queryClient]);
+  }, [baseItems, pageSize, queryClient, userId]);
 
   const loadMore = useCallback(() => {
     if (query.hasNextPage && !query.isFetchingNextPage) {
@@ -223,9 +227,11 @@ export function useFeed(options: UseFeedOptions = {}) {
 export { formatTimestamp } from "@/services/feedService";
 
 export function useFeedItem(feedItemId: string) {
+  const { user } = useAuth();
+  const currentUserId = user?.id;
   const query = useQuery({
-    queryKey: feedKeys.item(feedItemId),
-    queryFn: () => feedService.getFeedItem(feedItemId),
+    queryKey: feedKeys.item(feedItemId, currentUserId),
+    queryFn: () => feedService.getFeedItem(feedItemId, currentUserId),
     enabled: Boolean(feedItemId),
     staleTime: TIMEOUTS.SESSION_REFRESH_MS,
   });

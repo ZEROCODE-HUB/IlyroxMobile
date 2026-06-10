@@ -10,6 +10,7 @@ import {
   derivePlaceType,
   type GeoBounds,
 } from "./geocodingService";
+import type { CountryCode } from "./location/types";
 
 export interface LocationSuggestion {
   placeId: string;
@@ -26,16 +27,27 @@ export interface LocationSuggestion {
  * @param searchTerm  Texto a buscar (ej. "Polanco", "Guadalajara", "Jalisco")
  * @param limit       Número máximo de resultados (default: 8)
  * @param sessionToken Token de sesión para agrupar llamadas de autocompletado
+ * @param country     País al que acotar la búsqueda (default: México)
+ * @param types       Filtro de tipos de Places. Default "(regions)" acota a zonas
+ *                    geográficas; pasar `undefined` devuelve TODO tipo de lugar
+ *                    (fraccionamientos, POIs, etc.), útil para el buscador general.
  */
 export async function searchLocations(
   searchTerm: string,
   limit: number = 8,
   sessionToken?: string,
+  country?: CountryCode | string | null,
+  types: string | undefined = "(regions)",
 ): Promise<LocationSuggestion[]> {
   if (!searchTerm.trim()) return [];
 
   try {
-    const predictions = await searchPlaces(searchTerm, sessionToken);
+    // "(regions)" acota a zonas geográficas (estado/municipio/colonia) y excluye
+    // negocios/POIs y calles sueltas. Mejora la relevancia y hace que zonas reales
+    // entren en las 5 predicciones que devuelve la API (límite de Autocomplete legacy).
+    // Si `types` es undefined, la API devuelve todos los tipos (paridad con el
+    // buscador de ubicaciones de los posts de búsqueda).
+    const predictions = await searchPlaces(searchTerm, sessionToken, country, types);
     return predictions.slice(0, limit).map((p) => ({
       placeId: p.placeId,
       name: p.mainText,

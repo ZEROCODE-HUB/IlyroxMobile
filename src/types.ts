@@ -1,3 +1,4 @@
+import type { CountryCode } from "./lib/location/types";
 
 export type Post = {
   id: string;
@@ -39,6 +40,7 @@ export type FeedItem = {
   likes: number;
   comments: number;
   views?: number;
+  shares?: number;
   commentsList?: Comment[];
   timestamp: string;
   status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
@@ -77,6 +79,7 @@ export type User = {
   avatar: string;
   isFollowing: boolean;
   role: "Agente" | "Cliente" | "Admin" | "Agent" | "User";
+  ocupacion?: string;
   rating?: number;
   totalRatings?: number;
   positiveRecommendations?: number;
@@ -137,6 +140,9 @@ export type Property = {
     colony: string;
     zip?: string;
   };
+  /** Código de país ISO (default: MX). Las columnas estado/municipio/colonia
+   *  se interpretan según este país vía la capa `@/lib/location`. */
+  pais?: CountryCode;
   coordinates?: { lat: number; lng: number };
   images: string[];
   features: {
@@ -150,6 +156,13 @@ export type Property = {
     landSqft: number;
     yearBuilt?: number;
     maintenanceFee?: number;
+    // Industrial
+    operationalAreaSqft?: number;
+    maneuveringYardSqft?: number;
+    clearHeight?: string;
+    // Comercial
+    frontMeters?: number;
+    commercialLocation?: string;
   };
   amenities: string[];
   type: PropertyType;
@@ -158,6 +171,8 @@ export type Property = {
   status: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
   commission?: CommissionDetails;
   sin_comision?: boolean;
+  /** Denormalizado: true si alguna operación comparte comisión. */
+  comparte_comision?: boolean;
   es_easybroker?: boolean;
   legal?: LegalDetails;
   /** Coordenada numérica directa de la BD (tipo numeric en Supabase) */
@@ -270,10 +285,10 @@ export type EstadisticasResenas = {
   profesional_id: string;
   total_resenas: number;
   calificacion_promedio: number;
-  promedio_conocimiento_mercado: number;
-  promedio_comunicacion: number;
   promedio_profesionalismo: number;
-  promedio_disponibilidad: number;
+  promedio_etica_valores: number;
+  promedio_pago_comisiones: number;
+  promedio_comunicacion_servicio: number;
   total_recomiendan: number;
   total_no_recomiendan: number;
   total_5_estrellas: number;

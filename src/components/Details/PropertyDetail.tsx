@@ -12,7 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { COLORS } from "@/constants";
-import { Bath } from "lucide-react-native";
+import { Toilet, Building2 } from "lucide-react-native";
 
 import { useViewTracking } from "@/hooks";
 import usePropertyDetails from "@/hooks/usePropertyDetails";
@@ -30,8 +30,11 @@ import { router } from "expo-router";
 
 import { PropertyDetailImages } from "./PropertyDetailImages";
 import { PropertyFinancialSection } from "./PropertyFinancialSection";
+import { PropertyTypeDetails } from "./PropertyTypeDetails";
 import { PropertyOwnerContact } from "./PropertyOwnerContact";
+import { PropertyPrivateOwner } from "./PropertyPrivateOwner";
 import { propertyDetailStyles as styles } from "./propertyDetailStyles";
+import { getCamposVisibles } from "@/constants/propertyData";
 
 const log = logger.scoped("PropertyDetail");
 
@@ -128,6 +131,13 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   const financiamientos =
     propertyDetails.financiamientos?.map((f: any) => f.tipo.nombre) || [];
 
+  // Qué características aplican según el tipo/subtipo de la propiedad.
+  // Defensa para datos ya guardados con valores espurios (p. ej. pisos=1 en ranchos).
+  const campos = getCamposVisibles(
+    propertyDetails.subtipo,
+    propertyDetails.tipo?.toLowerCase(),
+  );
+
   interface LocalStatItemProps {
     icon: keyof typeof Ionicons.glyphMap;
     label: string;
@@ -167,6 +177,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           feedItemId={propertyDetails.feed_items.id}
           feedItemLikes={propertyDetails.feed_items.likes_count || 0}
           feedItemComments={propertyDetails.feed_items.comentarios_count || 0}
+          feedItemShares={propertyDetails.feed_items.compartidos_count || 0}
           userId={user?.id}
           propertyId={propertyDetails.id}
           shareTitle={`Propiedad: ${propertyDetails.subtipo} en ${propertyDetails.municipio}`}
@@ -217,17 +228,19 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                   {propertyDetails.subtipo}
                 </Text>
               </View>
-              <View
-                style={[styles.typeTag, { backgroundColor: COLORS.background }]}
-              >
-                <Text
-                  style={[styles.typeTagText, { color: COLORS.textSecondary }]}
+              {campos.antiguedad && (
+                <View
+                  style={[styles.typeTag, { backgroundColor: COLORS.background }]}
                 >
-                  {propertyDetails.antiguedad
-                    ? `${propertyDetails.antiguedad} años`
-                    : "Nueva"}
-                </Text>
-              </View>
+                  <Text
+                    style={[styles.typeTagText, { color: COLORS.textSecondary }]}
+                  >
+                    {propertyDetails.antiguedad
+                      ? `${propertyDetails.antiguedad} años`
+                      : "Nueva"}
+                  </Text>
+                </View>
+              )}
             </View>
 
             <Text style={styles.title}>
@@ -273,24 +286,17 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Características</Text>
             <View style={styles.statsGrid}>
-              {propertyDetails.habitaciones > 0 &&
-                (propertyDetails.tipo?.toLowerCase() === "industrial" ? (
-                  <StatItem
-                    icon="grid-outline"
-                    label="Espacios"
-                    value={propertyDetails.habitaciones}
-                  />
-                ) : (
-                  <StatItem
-                    icon="bed-outline"
-                    label="Recámaras"
-                    value={propertyDetails.habitaciones}
-                  />
-                ))}
-              {propertyDetails.banos > 0 && (
+              {campos.recamaras && propertyDetails.habitaciones > 0 && (
+                <StatItem
+                  icon="bed-outline"
+                  label="Recámaras"
+                  value={propertyDetails.habitaciones}
+                />
+              )}
+              {campos.banos && propertyDetails.banos > 0 && (
                 <View style={styles.statItem}>
                   <View style={styles.statIconContainer}>
-                    <Bath size={16} color={COLORS.textSecondary} />
+                    <Toilet size={16} color={COLORS.textSecondary} />
                   </View>
                   <View style={styles.statTextContainer}>
                     <Text style={styles.statValue}>{propertyDetails.banos}</Text>
@@ -298,34 +304,47 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                   </View>
                 </View>
               )}
-              {propertyDetails.estacionamientos > 0 && (
-                <StatItem
-                  icon="car-outline"
-                  label="Estacionamientos"
-                  value={propertyDetails.estacionamientos}
-                />
-              )}
-              {propertyDetails.pisos && (
+              {campos.estacionamientos &&
+                propertyDetails.estacionamientos > 0 && (
+                  <StatItem
+                    icon="car-outline"
+                    label="Estacionamientos"
+                    value={propertyDetails.estacionamientos}
+                  />
+                )}
+              {campos.niveles && propertyDetails.pisos > 0 && (
                 <StatItem
                   icon="business-outline"
                   label="Niveles"
                   value={propertyDetails.pisos}
                 />
               )}
-              {propertyDetails.metros_cuadrados_construccion && (
-                <StatItem
-                  icon="home-outline"
-                  label="Construcción"
-                  value={`${propertyDetails.metros_cuadrados_construccion} m²`}
-                />
-              )}
-              {propertyDetails.metros_cuadrados_terreno && (
-                <StatItem
-                  icon="resize-outline"
-                  label="Terreno"
-                  value={`${propertyDetails.metros_cuadrados_terreno} m²`}
-                />
-              )}
+              {campos.m2Construccion &&
+                propertyDetails.metros_cuadrados_construccion && (
+                  <View style={styles.statItem}>
+                    <View style={styles.statIconContainer}>
+                      <Building2 size={16} color={COLORS.textSecondary} />
+                    </View>
+                    <View style={styles.statTextContainer}>
+                      <Text style={styles.statValue}>
+                        {`${Number(
+                          propertyDetails.metros_cuadrados_construccion,
+                        ).toLocaleString("es-MX")} m²`}
+                      </Text>
+                      <Text style={styles.statLabel}>Construcción</Text>
+                    </View>
+                  </View>
+                )}
+              {campos.m2Terreno &&
+                propertyDetails.metros_cuadrados_terreno && (
+                  <StatItem
+                    icon="resize-outline"
+                    label="Terreno"
+                    value={`${Number(
+                      propertyDetails.metros_cuadrados_terreno,
+                    ).toLocaleString("es-MX")} m²`}
+                  />
+                )}
             </View>
 
             <View style={[styles.statsGrid, { marginTop: 12 }]}>
@@ -354,6 +373,9 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
               )}
             </View>
           </View>
+
+          {/* Características específicas por tipo (agrícola/comercial/industrial) */}
+          <PropertyTypeDetails property={propertyDetails} />
 
           {/* Amenidades */}
           {amenities.length > 0 && propertyDetails.tipo?.toLowerCase() !== "industrial" && propertyDetails.tipo?.toLowerCase() !== "agricola" && (
@@ -413,6 +435,14 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
             <Text style={styles.sectionTitle}>Ubicación</Text>
             <MapDetails property={propertyDetails} />
           </View>
+
+          {/* Datos del propietario — privados, solo visibles para el creador */}
+          <PropertyPrivateOwner
+            isCreator={!!user?.id && user.id === propertyDetails.created_by}
+            nombre={propertyDetails.nombre_propietario}
+            email={propertyDetails.email_propietario}
+            telefono={propertyDetails.telefono_propietario}
+          />
 
           {/* Perfil del Publicador y botón de acción */}
           <PropertyOwnerContact

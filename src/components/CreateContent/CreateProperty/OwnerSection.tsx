@@ -27,7 +27,8 @@ export const OwnerSection = React.memo(function OwnerSection() {
 
       <View>
         <Text style={styles.hint}>
-          Esta información es para tu control interno y no será pública.
+          Solo tú, como creador de la publicación, podrás ver estos datos. No
+          serán públicos ni visibles para otros usuarios.
         </Text>
         <AppInput
           label="Nombre del Propietario"

@@ -24,6 +24,7 @@ export interface PropertyDetailImagesProps {
   feedItemId: string;
   feedItemLikes: number;
   feedItemComments: number;
+  feedItemShares?: number;
   userId?: string;
   propertyId: string;
   shareTitle: string;
@@ -41,6 +42,7 @@ export const PropertyDetailImages: React.FC<PropertyDetailImagesProps> = ({
   feedItemId,
   feedItemLikes,
   feedItemComments,
+  feedItemShares,
   userId,
   propertyId,
   shareTitle,
@@ -77,6 +79,7 @@ export const PropertyDetailImages: React.FC<PropertyDetailImagesProps> = ({
           feedItemType="property"
           initialLikes={feedItemLikes}
           comments={feedItemComments}
+          initialShares={feedItemShares}
           userId={userId}
           onCommentClick={() => {
             onTrackInteraction("comentario");

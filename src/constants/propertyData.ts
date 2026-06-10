@@ -129,9 +129,12 @@ export const esTerreno = (subtipo: string | string[]): boolean => {
 export const esDepartamento = (subtipo: string | string[]): boolean => {
   if (!subtipo) return false;
   if (Array.isArray(subtipo)) {
-    return subtipo.length > 0 && subtipo.every((s) => s === "Departamento");
+    return (
+      subtipo.length > 0 &&
+      subtipo.every((s) => s.toLowerCase() === "departamento")
+    );
   }
-  return subtipo === "Departamento";
+  return subtipo.toLowerCase() === "departamento";
 };
 
 /**
@@ -155,7 +158,7 @@ export const getLabelRecamaras = (tipoPrincipal: TipoPrincipal): string => {
 // ============================================
 export const TIPOS_AGUA = ['Pozo', 'Presa', 'Canal', 'Otro'] as const;
 export const USOS_TERRENO = ['Agrícola', 'Ganadero'] as const;
-export const TIPOS_RIEGO = ['Temporal', 'Sistema de riego', 'Mixto'] as const;
+export const TIPOS_RIEGO = ['Temporal', 'Sistema de riego'] as const;
 export const TIPOS_UBICACION_COMERCIAL = ['Dentro de plaza', 'Fuera de plaza'] as const;
 export const TIPOS_UBICACION_INDUSTRIAL = ['Dentro de parque', 'Fuera de parque'] as const;
 export const ALTURAS_LIBRES = ['4-6m', '6-8m', '8-10m', '10-12m', '+12m'] as const;
@@ -184,9 +187,13 @@ export const getCamposVisibles = (subtipo: string | string[], tipoPrincipal?: Ti
     m2Construccion: !isTerreno,
     m2Terreno: !isDepartamento,
 
+    // Mantenimiento mensual: todas las propiedades excepto agrícola
+    mantenimiento: !isAgricola,
+
     // Características adicionales
     amueblado: !isTerreno && !isIndustrial && !isAgricola,
-    petFriendly: !isTerreno && !isAgricola,
+    // Mascotas es un campo residencial: solo habitacional (no terreno/comercial/industrial/agrícola)
+    petFriendly: !isTerreno && !isIndustrial && !isComercial && !isAgricola,
 
     // Secciones completas
     amenidades: !isTerreno && !isAgricola,

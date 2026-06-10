@@ -32,7 +32,7 @@ export const COLORS = {
   tagPink: "#ec4899",
   tagPurpleLight: "#f3e8ff",
   tagPinkLight: "#fce7f3",
-  openHouse: "#1c3a5c",
+  openHouse: "#45a0a5",
 
   // Textos
   textPrimary: "#1a2e2f",

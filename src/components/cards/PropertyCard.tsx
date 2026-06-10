@@ -10,6 +10,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Pressable,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -22,8 +23,15 @@ import {
 import { DIMENSIONS, COLORS } from "../../constants";
 import { commonStyles } from "../../../styles";
 import { UserHeader, ImageGallery, ReportModal, Avatar } from "../shared";
+import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
+import ConfirmDialog from "../shared/ConfirmDialog";
+import CreateProperty from "../CreateContent/CreateProperty";
+import { supabase } from "../../lib/supabase";
+import { logger } from "@/utils/logger";
 import ActionButtons from "../ActionButtons";
-import { Toilet } from "lucide-react-native";
+
+const log = logger.scoped("PropertyCard");
+import { Toilet, Building2, Truck } from "lucide-react-native";
 import { useUserRecommendations } from "@/hooks/useUserRecommendations";
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
 import { useChatInitiator } from "@/hooks/messaging/useChatInitiator";
@@ -33,6 +41,7 @@ import { useToast } from "@/context/ToastContext";
 import firstUpperCase from "@/utils/firstUpperCase";
 import { formatOperation } from "@/utils/priceFormatter";
 import { formatDateShort } from "@/utils/dateFormatter";
+import { getCamposVisibles } from "@/constants/propertyData";
 
 interface PropertyCardProps {
   item: FeedItem;
@@ -41,6 +50,7 @@ interface PropertyCardProps {
   onCommentClick: () => void;
   showContactButton?: boolean;
   currentUserId?: string;
+  onPropertyUpdated?: () => void;
 }
 
 const PropertyCard: React.FC<PropertyCardProps> = ({
@@ -50,6 +60,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   onCommentClick,
   showContactButton = true,
   currentUserId,
+  onPropertyUpdated,
 }) => {
   const {
     showOptions,
@@ -70,7 +81,147 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
   const property = item.propertyDetails!;
 
+  const isOwner = !!(userId && userId === item.user.id);
+  const [showEditModal, setShowEditModal] = React.useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+
+  const handleDeleteProperty = async () => {
+    try {
+      setDeleting(true);
+      // Soft delete: set deleted_at timestamp (mismo patrón que ProfilePropertyGrid)
+      const { error } = await supabase
+        .from("propiedades")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", property.id);
+      if (error) throw error;
+      showToast("Propiedad eliminada correctamente", "success");
+      setShowDeleteConfirm(false);
+      onPropertyUpdated?.();
+    } catch (error: any) {
+      log.error("Error deleting property:", error);
+      showToast(error.message || "No se pudo eliminar la propiedad", "error");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const ownerMenuOptions: MenuOption[] = [
+    {
+      icon: "pencil-outline",
+      label: "Editar",
+      onPress: () => setShowEditModal(true),
+    },
+    {
+      icon: "trash-outline",
+      label: "Eliminar",
+      onPress: () => setShowDeleteConfirm(true),
+      danger: true,
+    },
+  ];
+
   const images = property.images || [];
+
+  // Qué características mostrar según el tipo/subtipo (evita íconos que no
+  // corresponden, p. ej. recámaras/baños en un rancho o terreno).
+  const campos = getCamposVisibles(property.subtype, property.type);
+
+  // Stats type-aware para el feed. Usa los MISMOS íconos que la pantalla de
+  // detalle (PropertyDetail/PropertyTypeDetails) para mantener consistencia.
+  // Industrial/Comercial ocultan baños/estacionamientos y muestran sus propias
+  // características; la fila hace wrap si no caben en una línea.
+  const isIndustrial = property.type === "industrial";
+  const isComercial = property.type === "comercial";
+  const f = property.features;
+  const fmtM2 = (n: number) => `${n.toLocaleString("es-MX")}m²`;
+
+  const stats: { key: string; icon: React.ReactNode; value: string }[] = [];
+  const ICON_SIZE = 14;
+  const ICON_COLOR = COLORS.textTertiary;
+
+  if (campos.recamaras && f.beds > 0)
+    stats.push({
+      key: "beds",
+      icon: <Ionicons name="bed-outline" size={ICON_SIZE} color={ICON_COLOR} />,
+      value: `${f.beds}`,
+    });
+  if (campos.banos && !isIndustrial && !isComercial && f.baths > 0)
+    stats.push({
+      key: "baths",
+      icon: <Toilet size={12} color={ICON_COLOR} />,
+      value: `${f.baths}`,
+    });
+  if (
+    campos.estacionamientos &&
+    !isIndustrial &&
+    !isComercial &&
+    (f.parking ?? 0) > 0
+  )
+    stats.push({
+      key: "parking",
+      icon: <Ionicons name="car-outline" size={ICON_SIZE} color={ICON_COLOR} />,
+      value: `${f.parking}`,
+    });
+
+  // Construcción (Building2, igual que el detalle) y Terreno
+  if (campos.m2Construccion && f.constructionSqft > 0)
+    stats.push({
+      key: "construccion",
+      icon: <Building2 size={ICON_SIZE} color={ICON_COLOR} />,
+      value: fmtM2(f.constructionSqft),
+    });
+  if (campos.m2Terreno && f.landSqft > 0)
+    stats.push({
+      key: "terreno",
+      icon: <Ionicons name="resize-outline" size={ICON_SIZE} color={ICON_COLOR} />,
+      value: fmtM2(f.landSqft),
+    });
+
+  // Características industriales
+  if (isIndustrial) {
+    if ((f.operationalAreaSqft ?? 0) > 0)
+      stats.push({
+        key: "areaOperativa",
+        icon: <Ionicons name="scan-outline" size={ICON_SIZE} color={ICON_COLOR} />,
+        value: fmtM2(f.operationalAreaSqft!),
+      });
+    if ((f.maneuveringYardSqft ?? 0) > 0)
+      stats.push({
+        key: "patio",
+        icon: <Truck size={ICON_SIZE} color={ICON_COLOR} />,
+        value: fmtM2(f.maneuveringYardSqft!),
+      });
+    if (f.clearHeight)
+      stats.push({
+        key: "alturaLibre",
+        icon: <Ionicons name="resize-outline" size={ICON_SIZE} color={ICON_COLOR} />,
+        value: f.clearHeight,
+      });
+  }
+
+  // Características comerciales
+  if (isComercial) {
+    if (f.commercialLocation)
+      stats.push({
+        key: "ubicacionComercial",
+        icon: (
+          <Ionicons name="storefront-outline" size={ICON_SIZE} color={ICON_COLOR} />
+        ),
+        value: f.commercialLocation,
+      });
+    if ((f.frontMeters ?? 0) > 0)
+      stats.push({
+        key: "frente",
+        icon: <Ionicons name="resize-outline" size={ICON_SIZE} color={ICON_COLOR} />,
+        value: `${f.frontMeters!.toLocaleString("es-MX")}m`,
+      });
+    if ((f.floorLevel ?? 0) > 0)
+      stats.push({
+        key: "nivelPiso",
+        icon: <Ionicons name="layers-outline" size={ICON_SIZE} color={ICON_COLOR} />,
+        value: `${f.floorLevel}`,
+      });
+  }
 
   const { handleContact } = useChatInitiator();
 
@@ -128,22 +279,52 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
   const title = `${firstUpperCase(property.subtype) || firstUpperCase(property.type)} en ${property.location.municipio || property.location.state}`;
 
+  // Comisión real (total) de la primera operación, para mostrar en el feed.
+  // No confundir con porcentaje_comision_compartida (la parte que se comparte).
+  const primeraOperacion = property.operations?.[0];
+  const comisionReal =
+    primeraOperacion?.comision_porcentaje != null
+      ? `${primeraOperacion.comision_porcentaje}%`
+      : primeraOperacion?.comision_meses != null
+        ? `${primeraOperacion.comision_meses} ${
+            primeraOperacion.comision_meses === 1 ? "mes" : "meses"
+          }`
+        : primeraOperacion?.comision_monto_fijo != null
+          ? `$${Number(primeraOperacion.comision_monto_fijo).toLocaleString("es-MX")}`
+          : null;
+
   return (
     <View style={commonStyles.card}>
       {/* Header y recomendaciones clickeables */}
-      <TouchableOpacity activeOpacity={0.9} onPress={onClick}>
-        <UserHeader
-          user={item.user}
-          timestamp={item.timestamp}
-          onUserClick={onUserClick}
-          showOptions={showOptions}
-          setShowOptions={setShowOptions}
-          onReport={() => setShowReportModal(true)}
-          totalRatings={item.user.totalRatings}
-          showRecommendedPreview={false}
-          feedItemType="property"
-        />
-      </TouchableOpacity>
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          style={styles.headerFill}
+          activeOpacity={0.9}
+          onPress={onClick}
+        >
+          <UserHeader
+            user={item.user}
+            timestamp={item.timestamp}
+            onUserClick={onUserClick}
+            showOptions={showOptions}
+            setShowOptions={setShowOptions}
+            onReport={() => setShowReportModal(true)}
+            totalRatings={item.user.totalRatings}
+            showRecommendedPreview={false}
+            feedItemType="property"
+          />
+        </TouchableOpacity>
+        {isOwner && (
+          <View style={styles.headerMenuWrapper}>
+            <ThreeDotsMenu
+              options={ownerMenuOptions}
+              iconColor={COLORS.textSecondary}
+              menuPosition="top-right"
+              buttonStyle={styles.menuButtonTransparent}
+            />
+          </View>
+        )}
+      </View>
 
       {positiveRecommendations > 0 && (
         <TouchableOpacity
@@ -210,6 +391,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             propertyId={property.id}
             shareCode={property.codigo_propiedad || property.code}
             initialViews={item.views}
+            initialShares={item.shares}
           />
         </View>
       </View>
@@ -243,13 +425,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
           <View style={styles.priceRow}>
             <Text style={styles.priceText}>{renderOperationsLabel()}</Text>
-            {property.operations?.[0]?.comparte_comision && (
+            {comisionReal && (
               <View style={styles.commissionBadge}>
-                <Ionicons name="people-outline" size={10} color={COLORS.primary} />
                 <Text style={styles.commissionText}>
-                  {property.operations[0].porcentaje_comision_compartida
-                    ? `${property.operations[0].porcentaje_comision_compartida}% co-op`
-                    : "Co-op"}
+                  {comisionReal} comisión
                 </Text>
               </View>
             )}
@@ -288,58 +467,18 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity activeOpacity={0.9} onPress={onClick}>
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Ionicons
-              name="bed-outline"
-              size={14}
-              color={COLORS.textTertiary}
-            />
-            <Text style={styles.statValue}>{property.features.beds}</Text>
+      {stats.length > 0 && (
+        <TouchableOpacity activeOpacity={0.9} onPress={onClick}>
+          <View style={styles.statsRow}>
+            {stats.map((s) => (
+              <View key={s.key} style={styles.statItem}>
+                {s.icon}
+                <Text style={styles.statValue}>{s.value}</Text>
+              </View>
+            ))}
           </View>
-
-          <View style={styles.statItem}>
-            <Toilet size={12} color={COLORS.textTertiary} />
-            <Text style={styles.statValue}>{property.features.baths}</Text>
-          </View>
-
-          {property.features.parking !== undefined && (
-            <View style={styles.statItem}>
-              <Ionicons
-                name="car-outline"
-                size={14}
-                color={COLORS.textTertiary}
-              />
-              <Text style={styles.statValue}>{property.features.parking}</Text>
-            </View>
-          )}
-
-          <View style={styles.statItem}>
-            <Ionicons
-              name="home-outline"
-              size={14}
-              color={COLORS.textTertiary}
-            />
-            <Text style={styles.statValue}>
-              {property.features.constructionSqft}m²
-            </Text>
-          </View>
-
-          {property.features.landSqft > 0 && (
-            <View style={[styles.statItem, { borderRightWidth: 0 }]}>
-              <Ionicons
-                name="resize-outline"
-                size={14}
-                color={COLORS.textTertiary}
-              />
-              <Text style={styles.statValue}>
-                {property.features.landSqft}m²
-              </Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      )}
 
       <MapModal
         visible={showMap}
@@ -361,11 +500,47 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         users={recommendedList}
         totalCount={positiveRecommendations}
       />
+
+      {/* Edición / eliminación (solo dueño) */}
+      <ConfirmDialog
+        visible={showDeleteConfirm}
+        title="¿Eliminar propiedad?"
+        message="Esta acción no se puede deshacer."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        onConfirm={handleDeleteProperty}
+        onCancel={() => setShowDeleteConfirm(false)}
+        danger
+        loading={deleting}
+      />
+      <Modal visible={showEditModal} animationType="slide">
+        <CreateProperty
+          propertyId={property.id}
+          onBack={() => {
+            setShowEditModal(false);
+            onPropertyUpdated?.();
+          }}
+        />
+      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerFill: {
+    flex: 1,
+  },
+  headerMenuWrapper: {
+    paddingRight: 12,
+    paddingTop: 8,
+  },
+  menuButtonTransparent: {
+    backgroundColor: "transparent",
+  },
   imageContainer: {
     position: "relative",
   },
@@ -457,12 +632,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    backgroundColor: "#eff6ff",
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
   },
   commissionText: {
     fontSize: 10,
@@ -481,10 +650,12 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     backgroundColor: COLORS.white,
     paddingVertical: 10,
     paddingHorizontal: 12,
     gap: 16,
+    rowGap: 8,
   },
   statItem: {
     flexDirection: "row",

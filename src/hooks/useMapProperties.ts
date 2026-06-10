@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
 import { Property, PropertyType, GeoBounds } from "@/types";
 
 /**
@@ -109,8 +110,8 @@ interface SupabaseProperty {
   // Agrícola
   tipo_agua: string[] | null;
   concesion_agua: boolean | null;
-  uso_terreno: string | null;
-  tipo_riego: string | null;
+  uso_terreno: string[] | null;
+  tipo_riego: string[] | null;
   infra_electricidad: boolean | null;
   infra_camino_acceso: boolean | null;
   infra_cercado: boolean | null;
@@ -197,14 +198,27 @@ function hasActiveServerFilters(f: MapServerFilters): boolean {
   );
 }
 
-async function fetchMapProperties(serverFilters?: MapServerFilters): Promise<Property[]> {
+async function fetchMapProperties(
+  serverFilters?: MapServerFilters,
+  currentUserId?: string,
+): Promise<Property[]> {
   const active = serverFilters ? hasActiveServerFilters(serverFilters) : false;
 
   let query = supabase
     .from("propiedades")
-    .select(`*, operaciones_propiedad (*)`)
-    .eq("activo", true)
-    .is("deleted_at", null);
+    .select(`*, operaciones_propiedad (*)`);
+
+  // Las propiedades sin comisión se guardan con activo=false y quedan ocultas a
+  // todos. Excepción: su creador SÍ debe verlas en el mapa y el buscador.
+  if (currentUserId) {
+    query = query.or(
+      `activo.eq.true,and(sin_comision.eq.true,created_by.eq.${currentUserId})`,
+    );
+  } else {
+    query = query.eq("activo", true);
+  }
+
+  query = query.is("deleted_at", null);
 
   if (serverFilters && active) {
     // ── Tipo de propiedad ──
@@ -287,8 +301,8 @@ async function fetchMapProperties(serverFilters?: MapServerFilters): Promise<Pro
       query = query.overlaps("tipo_agua", serverFilters.tiposAgua);
     }
     if (serverFilters.concesionAgua) query = query.eq("concesion_agua", true);
-    if (serverFilters.usoTerreno) query = query.eq("uso_terreno", serverFilters.usoTerreno);
-    if (serverFilters.tipoRiego) query = query.eq("tipo_riego", serverFilters.tipoRiego);
+    if (serverFilters.usoTerreno) query = query.contains("uso_terreno", [serverFilters.usoTerreno]);
+    if (serverFilters.tipoRiego) query = query.contains("tipo_riego", [serverFilters.tipoRiego]);
     if (serverFilters.infraElectricidad) query = query.eq("infra_electricidad", true);
     if (serverFilters.infraCaminoAcceso) query = query.eq("infra_camino_acceso", true);
     if (serverFilters.infraCercado) query = query.eq("infra_cercado", true);
@@ -309,14 +323,17 @@ async function fetchMapProperties(serverFilters?: MapServerFilters): Promise<Pro
 const BASE_KEY = "map-properties";
 
 export function useMapProperties(serverFilters?: MapServerFilters) {
+  const { user } = useAuth();
+  const currentUserId = user?.id;
+
   const filterKey =
     serverFilters && hasActiveServerFilters(serverFilters)
       ? JSON.stringify(serverFilters)
       : "default";
 
   return useQuery({
-    queryKey: [BASE_KEY, filterKey],
-    queryFn: () => fetchMapProperties(serverFilters),
+    queryKey: [BASE_KEY, filterKey, currentUserId ?? "anon"],
+    queryFn: () => fetchMapProperties(serverFilters, currentUserId),
     staleTime: filterKey === "default" ? 5 * 60 * 1000 : 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });

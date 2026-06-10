@@ -27,7 +27,7 @@ const TIPO_CARDS = [
   { value: "habitacional", label: "Habitacional", icon: "home-outline" },
   { value: "comercial", label: "Comercial", icon: "storefront-outline" },
   { value: "industrial", label: "Industrial", icon: "business-outline" },
-  { value: "agricola", label: "Agrícola", icon: "leaf-outline" },
+  { value: "agricola", label: "Agropecuario", icon: "leaf-outline" },
 ] as const;
 
 const SUBTIPO_ICONS: Record<string, string> = {

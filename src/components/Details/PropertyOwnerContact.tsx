@@ -11,6 +11,7 @@ import { router } from "expo-router";
 import { COLORS } from "@/constants";
 import { useModal } from "@/context/ModalContext";
 import { Avatar } from "../shared";
+import { OwnerRecommendations } from "./OwnerRecommendations";
 import { propertyDetailStyles as styles } from "./propertyDetailStyles";
 
 export interface PropertyOwnerContactProps {
@@ -86,6 +87,10 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
         <View style={styles.profileInfo}>
           <Text style={styles.profileName}>{profile.nombre}</Text>
           <Text style={styles.profileRole}>Agente Inmobiliario</Text>
+          <OwnerRecommendations
+            userId={profile.id}
+            ocupacion={profile.ocupacion}
+          />
         </View>
 
         {!isOwnProperty && (

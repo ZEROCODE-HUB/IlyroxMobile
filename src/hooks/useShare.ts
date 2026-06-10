@@ -74,13 +74,14 @@ export function useShare() {
           title,
         });
 
-        // 4. Registrar share en BD (opcional, para analytics)
+        // 4. Registrar share en BD: incrementa compartidos_count vía RPC
+        //    (la función también registra la interacción en feed_visualizaciones
+        //    si hay usuario autenticado). No degradamos la UX si la RPC falla.
         if (result.action === Share.sharedAction) {
-          await supabase.from("feed_visualizaciones").insert({
-            usuario_id: null, // Anónimo si no hay usuario
-            feed_item_id: feedItemId,
-            tipo_interaccion: "share",
+          const { error } = await supabase.rpc("incrementar_compartidos", {
+            p_feed_item_id: feedItemId,
           });
+          if (error) log.warn("No se pudo registrar el compartido:", error);
 
           return true;
         }

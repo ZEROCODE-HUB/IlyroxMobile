@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { useModal } from "@/context/ModalContext";
 import { supabase } from "../../../lib/supabase";
 import { COORDENADAS_ESTADO } from "../../../constants/estadosMexico";
+import { DEFAULT_COUNTRY } from "../../../lib/location/registry";
 import {
   PROPERTY_TYPES,
   TipoPrincipal,
@@ -59,6 +60,7 @@ const INITIAL_STATE: PropertyFormState = {
     ciudad: "",
     municipio: "",
     colonia: "",
+    pais: DEFAULT_COUNTRY,
   },
   calle: "",
   numeroExterior: "",
@@ -104,7 +106,7 @@ const INITIAL_STATE: PropertyFormState = {
   // Gravamen
   tieneGravamen: "No",
   institucionGravamen: [],
-  montoGravamen: "",
+  montosGravamen: {},
 
   // Financiamiento
   aceptaFinanciamiento: "No",
@@ -124,8 +126,8 @@ const INITIAL_STATE: PropertyFormState = {
   // Campos especializados — Agrícola
   tiposAgua: [],
   concesionAgua: false,
-  usoTerreno: '',
-  tipoRiego: '',
+  usoTerreno: [],
+  tipoRiego: [],
   infraElectricidad: false,
   infraCaminoAcceso: false,
   infraCercado: false,
@@ -313,7 +315,7 @@ export function usePropertyForm(
   const setCondicionesComisionRenta = makeSetter("condicionesComisionRenta");
   const setTieneGravamen = makeSetter("tieneGravamen");
   const setInstitucionGravamen = makeSetter("institucionGravamen");
-  const setMontoGravamen = makeSetter("montoGravamen");
+  const setMontosGravamen = makeSetter("montosGravamen");
   const setAceptaFinanciamiento = makeSetter("aceptaFinanciamiento");
   const setNombreCompletoPropietario = makeSetter("nombreCompletoPropietario");
   const setEmailPropietario = makeSetter("emailPropietario");
@@ -323,8 +325,6 @@ export function usePropertyForm(
 
   // Setters especializados — Agrícola
   const setConcesionAgua = makeSetter("concesionAgua");
-  const setUsoTerreno = makeSetter("usoTerreno");
-  const setTipoRiego = makeSetter("tipoRiego");
   const setInfraElectricidad = makeSetter("infraElectricidad");
   const setInfraCaminoAcceso = makeSetter("infraCaminoAcceso");
   const setInfraCercado = makeSetter("infraCercado");
@@ -350,6 +350,24 @@ export function usePropertyForm(
     dispatch({
       type: "UPDATE_FIELD",
       field: "tiposAgua",
+      updater: (prev: string[]) =>
+        prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo],
+    } as unknown as PropertyFormAction);
+  }, []);
+
+  const toggleUsoTerreno = useCallback((tipo: string) => {
+    dispatch({
+      type: "UPDATE_FIELD",
+      field: "usoTerreno",
+      updater: (prev: string[]) =>
+        prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo],
+    } as unknown as PropertyFormAction);
+  }, []);
+
+  const toggleTipoRiego = useCallback((tipo: string) => {
+    dispatch({
+      type: "UPDATE_FIELD",
+      field: "tipoRiego",
       updater: (prev: string[]) =>
         prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo],
     } as unknown as PropertyFormAction);
@@ -472,20 +490,15 @@ export function usePropertyForm(
   useEffect(() => {
     const { latitud, longitud, estado } = state.ubicacionData;
     if (latitud && longitud) {
-      // Centrar el mapa en las coordenadas del lugar seleccionado
+      // Solo centrar el mapa en las coordenadas del lugar seleccionado.
+      // NO auto-colocar el pin: el usuario debe marcar la ubicación exacta
+      // manualmente (long-press/drag), de lo contrario la propiedad quedaría
+      // con una ubicación por defecto y no podría ser encontrada.
       dispatch({
         type: "SET_FIELD",
         field: "mapCenter",
         value: { lat: latitud, lng: longitud },
       });
-      // Auto-colocar el pin si el usuario aún no ha posicionado uno manualmente
-      if (state.location.latitude === 0 && state.location.longitude === 0) {
-        dispatch({
-          type: "SET_FIELD",
-          field: "location",
-          value: { latitude: latitud, longitude: longitud },
-        });
-      }
     } else if (estado && COORDENADAS_ESTADO[estado]) {
       dispatch({
         type: "SET_FIELD",
@@ -622,9 +635,15 @@ export function usePropertyForm(
       payload.m2Terreno = data.metros_cuadrados_terreno
         ? formatThousands(data.metros_cuadrados_terreno.toString())
         : "";
-      payload.anchoTerreno = data.ancho_terreno?.toString() ?? '';
-      payload.largoTerreno = data.largo_terreno?.toString() ?? '';
-      payload.costoMantenimiento = data.costo_mantenimiento?.toString() ?? '';
+      payload.anchoTerreno = data.ancho_terreno != null
+        ? formatThousands(data.ancho_terreno.toString())
+        : '';
+      payload.largoTerreno = data.largo_terreno != null
+        ? formatThousands(data.largo_terreno.toString())
+        : '';
+      payload.costoMantenimiento = data.costo_mantenimiento != null
+        ? formatThousands(data.costo_mantenimiento.toString())
+        : '';
       payload.niveles = data.pisos?.toString() || "1";
       payload.antiguedad = data.antiguedad || "";
       payload.amueblado = (data.amueblado || "No") as AmuebladoType;
@@ -652,7 +671,9 @@ export function usePropertyForm(
 
       // Configurar campos de VENTA
       if (ventaOp) {
-        payload.precioVenta = ventaOp.precio?.toString() || "";
+        payload.precioVenta = ventaOp.precio != null
+          ? formatThousands(ventaOp.precio.toString())
+          : "";
         payload.moneda = ventaOp.moneda || "MXN";
         payload.comparteComision = ventaOp.comparte_comision ? "Sí" : "No";
 
@@ -676,7 +697,9 @@ export function usePropertyForm(
 
       // Configurar campos de RENTA
       if (rentaOp) {
-        payload.precioRenta = rentaOp.precio?.toString() || "";
+        payload.precioRenta = rentaOp.precio != null
+          ? formatThousands(rentaOp.precio.toString())
+          : "";
         if (!ventaOp) payload.moneda = rentaOp.moneda || "MXN";
 
         const isAmbas = !!ventaOp;
@@ -739,7 +762,15 @@ export function usePropertyForm(
         payload.institucionGravamen = data.propiedad_gravamenes.map(
           (grav: any) => grav.catalogo_instituciones_financieras?.nombre || ""
         );
-        payload.montoGravamen = data.propiedad_gravamenes[0].monto?.toString() || "";
+        const montos: Record<string, string> = {};
+        data.propiedad_gravamenes.forEach((grav: any) => {
+          const nombre = grav.catalogo_instituciones_financieras?.nombre;
+          if (nombre) {
+            montos[nombre] =
+              grav.monto != null ? formatThousands(grav.monto.toString()) : "";
+          }
+        });
+        payload.montosGravamen = montos;
       } else {
         payload.tieneGravamen = "No";
         payload.institucionGravamen = [];
@@ -748,8 +779,12 @@ export function usePropertyForm(
       // 9. Campos especializados
       payload.tiposAgua = data.tipo_agua ?? [];
       payload.concesionAgua = data.concesion_agua ?? false;
-      payload.usoTerreno = data.uso_terreno ?? '';
-      payload.tipoRiego = data.tipo_riego ?? '';
+      payload.usoTerreno = Array.isArray(data.uso_terreno)
+        ? data.uso_terreno
+        : (data.uso_terreno ? [data.uso_terreno] : []);
+      payload.tipoRiego = Array.isArray(data.tipo_riego)
+        ? data.tipo_riego
+        : (data.tipo_riego ? [data.tipo_riego] : []);
       payload.infraElectricidad = data.infra_electricidad ?? false;
       payload.infraCaminoAcceso = data.infra_camino_acceso ?? false;
       payload.infraCercado = data.infra_cercado ?? false;
@@ -831,7 +866,8 @@ export function usePropertyForm(
     }
 
     if (state.location.latitude === 0 && state.location.longitude === 0) {
-      newErrors.location = "Debes seleccionar la ubicación en el mapa";
+      newErrors.location =
+        "Marca la ubicación exacta en el mapa. Si no lo haces, tu propiedad no podrá ser encontrada por asesores ni clientes.";
     }
 
     dispatch({ type: "SET_FIELD", field: "errors", value: newErrors });
@@ -962,8 +998,8 @@ export function usePropertyForm(
     setTieneGravamen,
     institucionGravamen: state.institucionGravamen,
     setInstitucionGravamen,
-    montoGravamen: state.montoGravamen,
-    setMontoGravamen,
+    montosGravamen: state.montosGravamen,
+    setMontosGravamen,
 
     // Financiamiento
     aceptaFinanciamiento: state.aceptaFinanciamiento,
@@ -988,9 +1024,9 @@ export function usePropertyForm(
     concesionAgua: state.concesionAgua,
     setConcesionAgua,
     usoTerreno: state.usoTerreno,
-    setUsoTerreno,
+    toggleUsoTerreno,
     tipoRiego: state.tipoRiego,
-    setTipoRiego,
+    toggleTipoRiego,
     infraElectricidad: state.infraElectricidad,
     setInfraElectricidad,
     infraCaminoAcceso: state.infraCaminoAcceso,

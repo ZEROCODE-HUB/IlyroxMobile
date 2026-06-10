@@ -21,6 +21,8 @@ interface Props {
   onClear: () => void;
   /** Distancia desde el tope del mapContainer hasta donde empieza el área libre de la barra superior */
   topOffset?: number;
+  /** Si ya hay zonas dibujadas; cuando es true no se muestra el hint inicial. */
+  hasZones?: boolean;
 }
 
 export default function PolygonDrawingOverlay({
@@ -30,10 +32,15 @@ export default function PolygonDrawingOverlay({
   onUndo,
   onClear,
   topOffset = 0,
+  hasZones = false,
 }: Props) {
   const toolbarAnim = useRef(new Animated.Value(0)).current;
   const instructionAnim = useRef(new Animated.Value(0)).current;
+  const hintAnim = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
+
+  // El hint guía al usuario a dibujar; solo cuando no está dibujando ni hay zonas.
+  const showHint = !drawingMode && !hasZones;
 
   useEffect(() => {
     Animated.spring(toolbarAnim, {
@@ -50,6 +57,19 @@ export default function PolygonDrawingOverlay({
     }).start();
   }, [drawingMode]);
 
+  useEffect(() => {
+    Animated.timing(hintAnim, {
+      toValue: showHint ? 1 : 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [showHint]);
+
+  const hintY = hintAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-60, 0],
+  });
+
   const toolbarY = toolbarAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [100, 0],
@@ -62,6 +82,29 @@ export default function PolygonDrawingOverlay({
 
   return (
     <>
+      {/* ── Hint inicial: cómo empezar a dibujar (cuando no se dibuja ni hay zonas) ── */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.instruction,
+          {
+            top: topOffset + 12,
+            opacity: hintAnim,
+            transform: [{ translateY: hintY }],
+          },
+        ]}
+      >
+        {Platform.OS === "ios" ? (
+          <BlurView intensity={60} tint="dark" style={styles.instructionBlur}>
+            <HintContent />
+          </BlurView>
+        ) : (
+          <View style={styles.instructionAndroid}>
+            <HintContent />
+          </View>
+        )}
+      </Animated.View>
+
       {/* ── Instrucción superior (solo en drawing mode) ── */}
       <Animated.View
         style={[
@@ -120,6 +163,17 @@ export default function PolygonDrawingOverlay({
 }
 
 // ── Sub-componentes ──────────────────────────────────────────────────────────
+
+function HintContent() {
+  return (
+    <View style={styles.instructionRow}>
+      <Ionicons name="create-outline" size={15} color={COLORS.white} />
+      <Text style={styles.instructionText}>
+        Mantén presionado el mapa para dibujar tu zona
+      </Text>
+    </View>
+  );
+}
 
 function InstructionContent({ points, onCancel }: { points: number; onCancel: () => void }) {
   const msg =

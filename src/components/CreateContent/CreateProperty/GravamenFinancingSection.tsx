@@ -24,8 +24,8 @@ export const GravamenFinancingSection = React.memo(
       setTieneGravamen,
       institucionGravamen,
       setInstitucionGravamen,
-      montoGravamen,
-      setMontoGravamen,
+      montosGravamen,
+      setMontosGravamen,
       handleCurrencyChange,
       aceptaFinanciamiento,
       setAceptaFinanciamiento,
@@ -86,6 +86,10 @@ export const GravamenFinancingSection = React.memo(
                           setInstitucionGravamen(
                             institucionGravamen.filter((_, i) => i !== idx)
                           );
+                          setMontosGravamen((prev) => {
+                            const { [inst]: _omit, ...rest } = prev;
+                            return rest;
+                          });
                         }}
                       >
                         <Ionicons
@@ -110,15 +114,20 @@ export const GravamenFinancingSection = React.memo(
                 searchable
               />
 
-              <AppInput
-                label="Monto del Gravamen (opcional)"
-                placeholder="0.00"
-                keyboardType="numeric"
-                value={montoGravamen}
-                onChangeText={(text) =>
-                  handleCurrencyChange(text, setMontoGravamen)
-                }
-              />
+              {institucionGravamen.map((inst) => (
+                <AppInput
+                  key={inst}
+                  label={`Monto — ${inst} (opcional)`}
+                  placeholder="0.00"
+                  keyboardType="numeric"
+                  value={montosGravamen[inst] || ""}
+                  onChangeText={(text) =>
+                    handleCurrencyChange(text, (val) =>
+                      setMontosGravamen((prev) => ({ ...prev, [inst]: val })),
+                    )
+                  }
+                />
+              ))}
             </>
           )}
         </View>

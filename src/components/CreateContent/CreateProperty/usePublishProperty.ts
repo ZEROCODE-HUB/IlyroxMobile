@@ -15,6 +15,7 @@ import {
   PROPERTY_TYPES,
   getCamposVisibles,
 } from "../../../constants/propertyData";
+import { DEFAULT_COUNTRY } from "../../../lib/location/registry";
 
 import type {
   ContractData,
@@ -132,6 +133,22 @@ export function usePublishProperty(
   const handlePublish = useCallback(
     async (contractDataParam?: ContractData | null) => {
       const resolvedContractData = contractDataParam ?? form.contractData;
+
+      // ── Validar ubicación exacta en el mapa ──────────────────────────────
+      // El pin ya no se auto-coloca: si el usuario no marcó la ubicación real,
+      // location sigue en {0,0}. Bloquear con un mensaje claro.
+      if (
+        !form.location ||
+        (form.location.latitude === 0 && form.location.longitude === 0)
+      ) {
+        showModal({
+          title: "Ubicación exacta requerida",
+          message:
+            "Si no marcas la ubicación exacta en el mapa, tu propiedad no podrá ser encontrada ni por asesores ni por clientes. Mantén presionado el mapa para colocar el pin.",
+          confirmText: "Entendido",
+        });
+        return;
+      }
 
       // Validar
       if (!form.validate()) {
@@ -320,7 +337,7 @@ export function usePublishProperty(
         // ============================================
         updateProgress(45, "Preparando datos...");
 
-        const camposVisibles = getCamposVisibles(form.subtipo);
+        const camposVisibles = getCamposVisibles(form.subtipo, form.tipoPrincipal);
 
         const tieneComision = checkComisionPresente(form);
         const sinComision = !tieneComision;
@@ -334,6 +351,7 @@ export function usePublishProperty(
               form.tipoPrincipal as keyof typeof PROPERTY_TYPES
             ]?.[0],
           descripcion: form.descripcion,
+          pais: form.ubicacionData.pais || DEFAULT_COUNTRY,
           ciudad: form.ubicacionData.municipio,
           municipio: form.ubicacionData.municipio,
           estado: form.ubicacionData.estado,
@@ -384,8 +402,8 @@ export function usePublishProperty(
           ...(form.tipoPrincipal === 'agricola' ? {
             tipo_agua: form.tiposAgua.length ? form.tiposAgua : null,
             concesion_agua: form.concesionAgua || null,
-            uso_terreno: form.usoTerreno || null,
-            tipo_riego: form.tipoRiego || null,
+            uso_terreno: form.usoTerreno.length ? form.usoTerreno : null,
+            tipo_riego: form.tipoRiego.length ? form.tipoRiego : null,
             infra_electricidad: form.infraElectricidad || null,
             infra_camino_acceso: form.infraCaminoAcceso || null,
             infra_cercado: form.infraCercado || null,
@@ -435,12 +453,17 @@ export function usePublishProperty(
               : [],
           gravamenes:
             form.tieneGravamen === "Sí" && form.institucionGravamen.length > 0
-              ? form.institucionGravamen.map((institucion) => ({
-                  institucion,
-                  monto: form.montoGravamen
-                    ? parseFloat(form.montoGravamen)
-                    : null,
-                }))
+              ? form.institucionGravamen.map((institucion) => {
+                  const raw = (form.montosGravamen[institucion] || "").replace(
+                    /,/g,
+                    "",
+                  );
+                  const monto = raw ? parseFloat(raw) : null;
+                  return {
+                    institucion,
+                    monto: monto != null && Number.isFinite(monto) ? monto : null,
+                  };
+                })
               : [],
         };
 

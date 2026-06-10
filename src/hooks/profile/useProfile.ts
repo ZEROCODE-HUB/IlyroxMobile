@@ -27,12 +27,17 @@ interface UseProfileReturn {
   recommendedByHasMore: boolean;
   loadingRecommendedBy: boolean;
   recommendedByError: string | null;
+  notRecommendedByUsers: RecommendedByUser[];
+  notRecommendedByHasMore: boolean;
+  loadingNotRecommendedBy: boolean;
+  notRecommendedByError: string | null;
   loading: boolean;
   submittingRecommendation: boolean;
   isMe: boolean;
   fetchProfileData: () => Promise<void>;
   handleRecommendation: (recomienda: boolean) => Promise<void>;
   loadRecommendedByUsers: (options?: { reset?: boolean }) => Promise<void>;
+  loadNotRecommendedByUsers: (options?: { reset?: boolean }) => Promise<void>;
   updateProfilePhoto: (newUrl: string) => void;
 }
 
@@ -79,7 +84,10 @@ export const useProfile = (userId?: string | null): UseProfileReturn => {
           ? profileService.getUserRecommendation(authUser.id, targetUserId)
           : Promise.resolve(null);
 
-      const propertiesPromise = propertyService.propertiesByUser(targetUserId);
+      const propertiesPromise = propertyService.propertiesByUser(
+        targetUserId,
+        isMe,
+      );
       const postsPromise = postsService.postsByUser(targetUserId);
       const reelsPromise = reelService.reelsByUser(targetUserId);
 
@@ -112,34 +120,6 @@ export const useProfile = (userId?: string | null): UseProfileReturn => {
       isFetchingRef.current = false;
     }
   }, [targetUserId, isMe, authProfile, authUser?.id, activeStore]);
-
-  const handleRecommendation = useCallback(async (recomienda: boolean) => {
-    const storeState = activeStore.getState();
-    if (!authUser?.id || !targetUserId || isMe || storeState.submittingRecommendation)
-      return;
-
-    try {
-      storeState.setSubmittingRecommendation(true);
-
-      const newStatus = await profileService.toggleRecommendation(
-        authUser.id,
-        targetUserId,
-        storeState.userRecommendation,
-        recomienda,
-      );
-
-      storeState.setUserRecommendation(newStatus);
-
-      const newStats = await profileService.getReviewStats(targetUserId);
-      if (newStats) {
-        storeState.setReviewStats(newStats);
-      }
-    } catch (error) {
-      log.error("Error updating recommendation:", error);
-    } finally {
-      activeStore.getState().setSubmittingRecommendation(false);
-    }
-  }, [authUser?.id, targetUserId, isMe, activeStore]);
 
   const loadRecommendedByUsers = useCallback(async (options?: { reset?: boolean }) => {
     if (!targetUserId) return;
@@ -179,9 +159,101 @@ export const useProfile = (userId?: string | null): UseProfileReturn => {
         error?.message || "Error al cargar recomendaciones",
       );
     } finally {
-      activeStore.getState().setLoadingRecommendedBy(false);
+      const storeState = activeStore.getState();
+      storeState.setLoadingRecommendedBy(false);
+      // Marcamos que ya se intentó cargar (con éxito o vacío) para evitar
+      // que un useEffect dispare la carga en bucle cuando el resultado es vacío.
+      storeState.setRecommendedByLoaded(true);
     }
   }, [targetUserId, activeStore]);
+
+  const loadNotRecommendedByUsers = useCallback(async (options?: { reset?: boolean }) => {
+    if (!targetUserId) return;
+
+    try {
+      const storeState = activeStore.getState();
+      const reset = options?.reset === true;
+      storeState.setLoadingNotRecommendedBy(true);
+      storeState.setNotRecommendedByError(null);
+
+      const pageSize = 30;
+      const nextPage = reset ? 0 : storeState.notRecommendedByPage;
+      const from = nextPage * pageSize;
+      const to = from + pageSize - 1;
+
+      const results = await profileService.getRecommendedByUsers(
+        targetUserId,
+        from,
+        to,
+        false,
+      );
+
+      const mappedUsers = results as RecommendedByUser[];
+
+      storeState.setNotRecommendedByUsers((prev) =>
+        reset ? mappedUsers : [...prev, ...mappedUsers],
+      );
+
+      storeState.setNotRecommendedByHasMore(mappedUsers.length === pageSize);
+      storeState.setNotRecommendedByPage((p) => (reset ? 1 : p + 1));
+    } catch (error: any) {
+      const storeState = activeStore.getState();
+      if (options?.reset) {
+        storeState.setNotRecommendedByUsers([]);
+      }
+      storeState.setNotRecommendedByHasMore(false);
+      storeState.setNotRecommendedByError(
+        error?.message || "Error al cargar recomendaciones",
+      );
+    } finally {
+      const storeState = activeStore.getState();
+      storeState.setLoadingNotRecommendedBy(false);
+      storeState.setNotRecommendedByLoaded(true);
+    }
+  }, [targetUserId, activeStore]);
+
+  const handleRecommendation = useCallback(async (recomienda: boolean) => {
+    const storeState = activeStore.getState();
+    if (!authUser?.id || !targetUserId || isMe || storeState.submittingRecommendation)
+      return;
+
+    try {
+      storeState.setSubmittingRecommendation(true);
+
+      const newStatus = await profileService.toggleRecommendation(
+        authUser.id,
+        targetUserId,
+        storeState.userRecommendation,
+        recomienda,
+      );
+
+      storeState.setUserRecommendation(newStatus);
+
+      const newStats = await profileService.getReviewStats(targetUserId);
+      if (newStats) {
+        storeState.setReviewStats(newStats);
+      }
+
+      // Refrescamos ambas listas para que el cambio se vea de inmediato:
+      // quien acaba de recomendar (o dejar de hacerlo) aparece/desaparece
+      // y se mueve entre la lista positiva y la negativa según corresponda.
+      await Promise.all([
+        loadRecommendedByUsers({ reset: true }),
+        loadNotRecommendedByUsers({ reset: true }),
+      ]);
+    } catch (error) {
+      log.error("Error updating recommendation:", error);
+    } finally {
+      activeStore.getState().setSubmittingRecommendation(false);
+    }
+  }, [
+    authUser?.id,
+    targetUserId,
+    isMe,
+    activeStore,
+    loadRecommendedByUsers,
+    loadNotRecommendedByUsers,
+  ]);
 
   const updateProfilePhoto = useCallback(
     (newUrl: string) => {
@@ -208,12 +280,17 @@ export const useProfile = (userId?: string | null): UseProfileReturn => {
     recommendedByHasMore: state.recommendedByHasMore,
     loadingRecommendedBy: state.loadingRecommendedBy,
     recommendedByError: state.recommendedByError,
+    notRecommendedByUsers: state.notRecommendedByUsers,
+    notRecommendedByHasMore: state.notRecommendedByHasMore,
+    loadingNotRecommendedBy: state.loadingNotRecommendedBy,
+    notRecommendedByError: state.notRecommendedByError,
     loading: state.loading,
     submittingRecommendation: state.submittingRecommendation,
     isMe,
     fetchProfileData,
     handleRecommendation,
     loadRecommendedByUsers,
+    loadNotRecommendedByUsers,
     updateProfilePhoto,
   };
 };

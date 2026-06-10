@@ -13,7 +13,6 @@ import { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { perfiles } from "../types";
 import { useProfileLoader } from "./auth/useProfileLoader";
 import { useAuthListener } from "./auth/useAuthListener";
-import { useSessionRefresh } from "./auth/useSessionRefresh";
 import { OneSignal } from "react-native-onesignal";
 import { Platform } from "react-native";
 import { router } from "expo-router";
@@ -98,8 +97,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Hook para refrescar sesión cada 50 minutos
-  useSessionRefresh(session);
+  // El refresco de sesión lo gestiona auth-js automáticamente vía
+  // `autoRefreshToken: true` (ver lib/supabase.ts). NO añadir un refresco
+  // manual en paralelo: con la rotación de refresh tokens activa en el
+  // proyecto, dos refrescadores concurrentes reutilizan un token ya rotado,
+  // Supabase lo interpreta como robo y revoca toda la sesión
+  // ("Invalid Refresh Token: Refresh Token Not Found").
 
   // Hook para manejar cambios de autenticación
   useAuthListener({

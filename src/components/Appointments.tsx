@@ -24,6 +24,7 @@ const Appointments: React.FC = () => {
     handlePropertyPress,
     handleUserPress,
     closeRatingModal,
+    rateTarget,
   } = useAppointments();
 
   return (
@@ -58,6 +59,7 @@ const Appointments: React.FC = () => {
         visible={showRateModal}
         onClose={closeRatingModal}
         onSubmit={handleSubmitRating}
+        target={rateTarget}
       />
     </ScreenWrapper>
   );

@@ -20,6 +20,7 @@ import ActionButtons from "../ActionButtons";
 // import { supabase } from "../../lib/supabase";
 import { useUserRecommendations } from "@/hooks/useUserRecommendations";
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
+import { buildRecommendedText } from "./recommendedText";
 import { useApp } from "../../context/AppContext";
 
 interface ReelCardProps {
@@ -51,15 +52,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
 
   const positiveRecommendations = item.user.positiveRecommendations ?? 0;
   const recommendedByPreview = item.user.recommendedByPreview ?? [];
-  const firstRecommender = recommendedByPreview[0];
-  const recommendedText =
-    positiveRecommendations > 0 && firstRecommender
-      ? `${firstRecommender.name}${
-          positiveRecommendations > 1
-            ? ` y ${positiveRecommendations - 1} más`
-            : ""
-        }`
-      : `Recomendado por ${positiveRecommendations} usuarios`;
+  const recommendedText = buildRecommendedText(item.user);
   const [showRecommendedModal, setShowRecommendedModal] = React.useState(false);
 
   const { recommendedList, loadingRecommended, fetchRecommendations } =
@@ -71,6 +64,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
   };
 
   const handleExpand = () => {
+    console.log("[RDBG] ReelCard.handleExpand", { id: item.id });
     setIsMuted(true); // Silenciar globalmente (afecta a las tarjetas del feed)
     onClick();
   };
@@ -166,6 +160,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
           shareDescription={item.content || "Mira este reel"}
           orientation="horizontal"
           contentId={item.reelDetails?.id}
+          initialShares={item.shares}
         />
       </View>
 

@@ -12,6 +12,7 @@ export const mapProfileToUser = (p: perfiles): User => {
     name: p.nombre_completo || name || "Usuario",
     avatar: p.foto,
     role: (p.rol.charAt(0).toUpperCase() + p.rol.slice(1)) as any,
+    ocupacion: p.ocupacion || undefined,
     rating: parseFloat(p.calificacion_promedio || "0"),
     totalRatings: parseInt(p.total_calificaciones || "0"),
     positiveRecommendations: parseInt(p.total_recomendaciones_positivas || "0"),

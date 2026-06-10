@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   rightContainer: {
-    width: 40,
+    minWidth: 40,
     height: 40,
     alignItems: "center",
     justifyContent: "center",

@@ -82,6 +82,15 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
           </View>
         )}
 
+        {isOwnProfile &&
+          !item.sin_comision &&
+          item.comparte_comision === false && (
+            <View style={[styles.statusBadge, styles.privadaBadge, { top: ITEM_SIZE - 24 }]}>
+              <Ionicons name="eye-off" size={10} color="#fff" />
+              <Text style={styles.statusText}> Solo tú</Text>
+            </View>
+          )}
+
         {isOwnProfile && (
           <View style={styles.menuContainer}>
             <ThreeDotsMenu options={menuOptions} />
@@ -217,6 +226,11 @@ const styles = StyleSheet.create({
   },
   sinComisionBadge: {
     backgroundColor: "#C53030cc",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  privadaBadge: {
+    backgroundColor: "#2D3748e6",
     flexDirection: "row",
     alignItems: "center",
   },

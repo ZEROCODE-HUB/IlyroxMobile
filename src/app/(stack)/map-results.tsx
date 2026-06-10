@@ -387,6 +387,16 @@ export default function MapResultsScreen() {
         onPublished={() => {
           setPublishModalVisible(false);
           setPendingPostMetadata(null);
+          // Limpiar los filtros activos: si no, el feed (que oculta posts/reels
+          // cuando hay filtros activos) saldría vacío al volver tras publicar.
+          // Se pasa un locationFilter vacío explícito porque clearFilters() sin
+          // argumento conserva el locationFilter actual.
+          usePropertyFiltersStore.getState().clearFilters({
+            estado: "",
+            ciudad: "",
+            municipio: "",
+            colonia: "",
+          });
           router.replace({
             pathname: "/(tabs)",
             params: { refresh: String(Date.now()) },

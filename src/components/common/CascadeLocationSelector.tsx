@@ -25,6 +25,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 import { searchPlaces, getPlaceDetails, reverseGeocode, type PlaceSuggestion } from "../../lib/geocodingService";
+import { getCountryConfig, DEFAULT_COUNTRY } from "../../lib/location/registry";
+import type { CountryCode } from "../../lib/location/types";
 
 export interface LocationData {
   estado: string;
@@ -32,6 +34,8 @@ export interface LocationData {
   municipio: string;
   colonia: string;
   colonias?: string[];
+  /** Código de país ISO detectado de la ubicación (default: MX). */
+  pais?: CountryCode;
   latitud?: number;
   longitud?: number;
 }
@@ -144,11 +148,12 @@ export default function CascadeLocationSelector({
         const lat = details?.location.lat ?? 0;
         const lng = details?.location.lng ?? 0;
 
-        // Reverse geocoding para extraer estado/municipio/colonia
+        // Reverse geocoding para extraer estado/municipio/colonia y detectar el país
         let estado = "";
         let municipio = "";
         let ciudad = "";
         let colonia = "";
+        let pais: CountryCode = DEFAULT_COUNTRY;
 
         if (lat && lng) {
           const geo = await reverseGeocode(lat, lng);
@@ -157,16 +162,18 @@ export default function CascadeLocationSelector({
             municipio = geo.components.municipio;
             ciudad = geo.components.ciudad;
             colonia = geo.components.colonia;
+            pais = geo.country;
           }
         }
 
         // Fallback: parsear desde la descripción de la sugerencia si Reverse Geocoding falla
         if (!estado) {
-          const parts = suggestion.description
-            .replace(/, México$/, "")
-            .replace(/, Mexico$/, "")
-            .split(", ")
-            .map((s) => s.trim());
+          const config = getCountryConfig(DEFAULT_COUNTRY);
+          let desc = suggestion.description.trim();
+          for (const suffix of config.countrySuffixes) {
+            desc = desc.replace(new RegExp(`,\\s*${suffix}\\s*$`, "i"), "");
+          }
+          const parts = desc.split(",").map((s) => s.trim()).filter(Boolean);
           estado = parts[parts.length - 1] ?? "";
           municipio = parts[parts.length - 2] ?? "";
           colonia = parts[0] ?? "";
@@ -179,6 +186,7 @@ export default function CascadeLocationSelector({
           municipio,
           colonia,
           colonias: colonia ? [colonia] : [],
+          pais,
           latitud: lat || undefined,
           longitud: lng || undefined,
         };

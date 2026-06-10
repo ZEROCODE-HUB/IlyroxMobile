@@ -4,7 +4,15 @@
  *  - Places Autocomplete (búsqueda de zonas)
  *  - Place Details (obtener bounds de un lugar)
  *  - Geocoding / Reverse Geocoding (dirección ↔ lat/lng)
+ *
+ * Parametrizado por país a través de la capa `./location` (default: México).
  */
+
+import {
+  getCountryConfig,
+  detectCountryFromPlace,
+} from "./location/registry";
+import type { CountryCode, GoogleAddressComponent } from "./location/types";
 
 const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 const BASE_AUTOCOMPLETE = "https://maps.googleapis.com/maps/api/place/autocomplete/json";
@@ -48,28 +56,6 @@ export interface AddressComponents {
 }
 
 // ---------------------------------------------------------------------------
-// Normalización de nombres de estados (Google → nomenclatura interna)
-// ---------------------------------------------------------------------------
-const STATE_NORMALIZATION: Record<string, string> = {
-  "Ciudad de México": "CDMX",
-  "Mexico City": "CDMX",
-  "Estado de México": "Estado de México",
-  "State of Mexico": "Estado de México",
-  "Nuevo León": "Nuevo León",
-  "Nuevo Leon": "Nuevo León",
-  "Querétaro": "Querétaro",
-  "Queretaro": "Querétaro",
-  "Yucatán": "Yucatán",
-  "Yucatan": "Yucatán",
-  "Michoacán": "Michoacán",
-  "Michoacan": "Michoacán",
-};
-
-function normalizeState(googleName: string): string {
-  return STATE_NORMALIZATION[googleName] ?? googleName;
-}
-
-// ---------------------------------------------------------------------------
 // Derivar tipo de lugar a partir de los types de Google
 // ---------------------------------------------------------------------------
 export function derivePlaceType(
@@ -90,22 +76,30 @@ export function derivePlaceType(
 // ---------------------------------------------------------------------------
 
 /**
- * Busca sugerencias de lugares en México usando la Places Autocomplete API.
+ * Busca sugerencias de lugares usando la Places Autocomplete API, acotado al país.
  * @param query   Texto de búsqueda (ej. "Polanco", "Guadalajara")
  * @param token   Session token opcional para agrupar llamadas y reducir costos
+ * @param country País al que acotar la búsqueda (default: México)
+ * @param types   Filtro de tipos de Places (ej. "(regions)" para acotar a zonas
+ *                geográficas y excluir negocios/POIs y calles sueltas). Si se omite,
+ *                la API devuelve todo tipo de lugares (direcciones, negocios, zonas).
  */
 export async function searchPlaces(
   query: string,
   token?: string,
+  country?: CountryCode | string | null,
+  types?: string,
 ): Promise<PlaceSuggestion[]> {
   if (!GOOGLE_API_KEY || !query.trim()) return [];
   try {
+    const config = getCountryConfig(country);
     const params = new URLSearchParams({
       input: query,
-      components: "country:mx",
+      components: config.placesComponents,
       language: "es",
       key: GOOGLE_API_KEY,
       ...(token ? { sessiontoken: token } : {}),
+      ...(types ? { types } : {}),
     });
     const res = await fetch(`${BASE_AUTOCOMPLETE}?${params}`);
     const json = await res.json();
@@ -187,22 +181,32 @@ export async function getPlaceDetails(
 export async function reverseGeocode(
   lat: number,
   lng: number,
-): Promise<{ components: AddressComponents; formattedAddress: string } | null> {
+  country?: CountryCode | string | null,
+): Promise<{
+  components: AddressComponents;
+  formattedAddress: string;
+  country: CountryCode;
+} | null> {
   if (!GOOGLE_API_KEY) return null;
   try {
+    const config = getCountryConfig(country);
     const params = new URLSearchParams({
       latlng: `${lat},${lng}`,
       language: "es",
-      region: "mx",
+      region: config.region,
       key: GOOGLE_API_KEY,
     });
     const res = await fetch(`${BASE_GEOCODING}?${params}`);
     const json = await res.json();
     if (json.status !== "OK" || !json.results?.length) return null;
     const result = json.results[0];
+    const comps = (result.address_components ?? []) as GoogleAddressComponent[];
+    // Si no se especifica país, detectarlo de los propios componentes devueltos.
+    const cc = detectCountryFromPlace(comps);
     return {
-      components: parseAddressComponents(result.address_components ?? []),
+      components: parseAddressComponents(comps, country ?? cc),
       formattedAddress: result.formatted_address ?? "",
+      country: cc,
     };
   } catch (e) {
     console.warn("[geocodingService] reverseGeocode error:", e);
@@ -218,15 +222,19 @@ export async function reverseGeocode(
  * Geocodifica un nombre de lugar y retorna su geometría (center + bounds).
  * Ya existe lógica similar en MapSearch.tsx — esta función la centraliza.
  */
-export async function geocodeAddress(address: string): Promise<{
+export async function geocodeAddress(
+  address: string,
+  country?: CountryCode | string | null,
+): Promise<{
   location: { lat: number; lng: number };
   bounds?: GeoBounds;
 } | null> {
   if (!GOOGLE_API_KEY) return null;
   try {
+    const config = getCountryConfig(country);
     const params = new URLSearchParams({
-      address: `${address}, México`,
-      region: "mx",
+      address: `${address}, ${config.name}`,
+      region: config.region,
       language: "es",
       key: GOOGLE_API_KEY,
     });
@@ -257,49 +265,27 @@ export async function geocodeAddress(address: string): Promise<{
 // ---------------------------------------------------------------------------
 
 /**
- * Parsea el array de address_components de Google en un objeto estructurado.
+ * Parsea el array de address_components de Google en un objeto estructurado,
+ * usando el mapeo de niveles administrativos del país indicado (default: México).
  */
 export function parseAddressComponents(
   components: Array<{ types: string[]; long_name: string; short_name: string }>,
+  country?: CountryCode | string | null,
 ): AddressComponents {
-  let estado = "";
-  let ciudad = "";
-  let municipio = "";
-  let colonia = "";
-  let pais = "México";
-  let codigoPostal = "";
+  const config = getCountryConfig(country);
+  const mapped = config.mapGoogleComponents(components as GoogleAddressComponent[]);
 
-  for (const comp of components) {
-    const t = comp.types;
-    if (t.includes("administrative_area_level_1")) {
-      estado = normalizeState(comp.long_name);
-    }
-    if (t.includes("locality")) {
-      ciudad = comp.long_name;
-    }
-    if (t.includes("administrative_area_level_2") && !ciudad) {
-      ciudad = comp.long_name;
-    }
-    if (
-      (t.includes("sublocality_level_1") ||
-        t.includes("sublocality") ||
-        t.includes("neighborhood")) &&
-      !colonia
-    ) {
-      colonia = comp.long_name;
-    }
-    if (t.includes("postal_code")) {
-      codigoPostal = comp.long_name;
-    }
-    if (t.includes("country")) {
-      pais = comp.long_name;
-    }
-  }
+  const countryComp = components.find((c) => c.types.includes("country"));
+  const pais = countryComp?.long_name ?? config.name;
 
-  // municipio = ciudad en la mayoría de los casos de México
-  municipio = ciudad;
-
-  return { estado, municipio, ciudad, colonia, pais, codigoPostal };
+  return {
+    estado: mapped.level1,
+    municipio: mapped.level2,
+    ciudad: mapped.city ?? "",
+    colonia: mapped.level3,
+    pais,
+    codigoPostal: mapped.postalCode ?? "",
+  };
 }
 
 // ---------------------------------------------------------------------------

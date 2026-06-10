@@ -76,6 +76,12 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     longitudeDelta: number;
   } | null>(null);
 
+  // Punto exacto de la ubicación buscada, para mostrar un PIN en el mapa.
+  const [searchedPin, setSearchedPin] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+
   const {
     filteredProperties,
     addPolygon,
@@ -93,6 +99,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   useEffect(() => {
     if (!selectedLocation) {
       setFocusRegion(null);
+      setSearchedPin(null);
       return;
     }
     const geocode = async () => {
@@ -103,6 +110,12 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         const placeId = (selectedLocation as any).placeId;
         if (placeId) {
           const details = await getPlaceDetails(placeId);
+          if (details?.location) {
+            setSearchedPin({
+              latitude: details.location.lat,
+              longitude: details.location.lng,
+            });
+          }
           if (details?.bounds) {
             setFocusRegion(boundsToRegion(details.bounds, selectedLocation.type));
             return;
@@ -128,6 +141,9 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         const result = json.results?.[0];
         if (result?.geometry) {
           const { location, bounds, viewport } = result.geometry;
+          if (location) {
+            setSearchedPin({ latitude: location.lat, longitude: location.lng });
+          }
           const b = bounds || viewport;
           if (b) {
             setFocusRegion(boundsToRegion({
@@ -297,6 +313,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           googleApiKey={googleApiKey}
           highlightedPropertyId={highlightedPropertyId}
           focusRegion={focusRegion}
+          searchedLocationPin={searchedPin}
           drawingMode={drawingMode}
           draftPolygonPoints={draftPoints}
           confirmedPolygons={filters.polygons}
@@ -310,6 +327,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           onUndo={handleUndoPoint}
           onClear={handleClearDraft}
           topOffset={searchBarHeight}
+          hasZones={filters.polygons.length > 0}
         />
       </View>
 
@@ -380,15 +398,12 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
                   style={styles.zoneSearchItemIcon}
                 />
                 <View style={styles.zoneSearchItemText}>
-                  <Text style={styles.zoneSearchItemName}>{item.name}</Text>
-                  {(item.municipio_nombre || item.estado_nombre) && (
+                  <Text style={styles.zoneSearchItemName} numberOfLines={2}>
+                    {item.fullDescription || item.name}
+                  </Text>
+                  {item.propertyCount != null && item.propertyCount > 0 && (
                     <Text style={styles.zoneSearchItemSub}>
-                      {[item.municipio_nombre, item.estado_nombre]
-                        .filter(Boolean)
-                        .join(", ")}
-                      {item.propertyCount != null && item.propertyCount > 0
-                        ? ` · ${item.propertyCount} props`
-                        : ""}
+                      {item.propertyCount} props
                     </Text>
                   )}
                 </View>

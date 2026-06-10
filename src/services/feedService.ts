@@ -34,12 +34,14 @@ const FEED_SELECT = `
   vistas_count,
   likes_count,
   comentarios_count,
+  compartidos_count,
   estado_moderacion,
   perfiles!feed_items_publicado_por_fkey (
     id,
     nombre,
     foto,
-    rol
+    rol,
+    ocupacion
   )
 ` as const;
 
@@ -50,6 +52,7 @@ const PROPERTY_SELECT = `
   codigo_propiedad,
   tipo,
   subtipo,
+  pais,
   ciudad,
   colonia,
   municipio,
@@ -60,6 +63,12 @@ const PROPERTY_SELECT = `
   estacionamientos,
   metros_cuadrados_construccion,
   metros_cuadrados_terreno,
+  area_oficinas_m2,
+  patio_maniobras_m2,
+  altura_libre_m,
+  frente_metros,
+  nivel_piso,
+  tipo_ubicacion_comercial,
   descripcion,
   longitud,
   latitud,
@@ -73,6 +82,17 @@ const PROPERTY_SELECT = `
     porcentaje_comision_compartida
   )
 ` as const;
+
+/**
+ * Aplica la regla de visibilidad por comisión compartida a una query de
+ * `propiedades`: una propiedad solo es visible públicamente (feed/mapa) si
+ * comparte comisión. Su creador siempre la ve, comparta o no.
+ */
+function applyCommissionVisibility(query: any, currentUserId?: string): any {
+  return currentUserId
+    ? query.or(`comparte_comision.eq.true,created_by.eq.${currentUserId}`)
+    : query.eq("comparte_comision", true);
+}
 
 /**
  * Factor de decaimiento temporal para el ranking.
@@ -117,6 +137,7 @@ const buildUser = (perfil: any, stats?: ReviewStatsRow | null): User => ({
   avatar: perfil?.foto || "https://placehold.co/100x100",
   isFollowing: false,
   role: (perfil?.rol === "agente" ? "Agent" : "User") as any,
+  ocupacion: perfil?.ocupacion || undefined,
   rating:
     typeof stats?.calificacion_promedio === "number"
       ? stats.calificacion_promedio
@@ -152,6 +173,7 @@ const mapPostToFeedItem = (
   likes: feedData.likes_count,
   comments: feedData.comentarios_count,
   views: feedData.vistas_count ?? 0,
+  shares: feedData.compartidos_count ?? 0,
   timestamp: formatTimestamp(feedData.publicado_en),
   commentsList: [],
   foto_perfil_usuario: post.foto_perfil,
@@ -176,6 +198,7 @@ const mapReelToFeedItem = (
   videoUrl: reel.video_url,
   likes: feedData.likes_count,
   comments: feedData.comentarios_count,
+  shares: feedData.compartidos_count ?? 0,
   timestamp: formatTimestamp(feedData.publicado_en),
   commentsList: [],
   reelDetails: reel,
@@ -198,6 +221,7 @@ const mapPropertyToFeedItem = (
     likes: feedData.likes_count,
     comments: feedData.comentarios_count,
     views: feedData.vistas_count ?? 0,
+    shares: feedData.compartidos_count ?? 0,
     timestamp: formatTimestamp(feedData.publicado_en),
     commentsList: [],
     propertyDetails: {
@@ -210,6 +234,7 @@ const mapPropertyToFeedItem = (
       price: operation?.precio || 0,
       currency: (operation?.moneda || "MXN") as "USD" | "MXN",
       createdAt: property.created_at,
+      pais: property.pais || undefined,
       location: {
         address: `${property.municipio}, ${property.ciudad}, ${property.estado}`,
         country: "México",
@@ -225,6 +250,14 @@ const mapPropertyToFeedItem = (
         parking: property.estacionamientos,
         constructionSqft: property.metros_cuadrados_construccion || 0,
         landSqft: property.metros_cuadrados_terreno || 0,
+        // Industrial
+        operationalAreaSqft: property.area_oficinas_m2 || 0,
+        maneuveringYardSqft: property.patio_maniobras_m2 || 0,
+        clearHeight: property.altura_libre_m || "",
+        // Comercial
+        frontMeters: property.frente_metros || 0,
+        floorLevel: property.nivel_piso ?? undefined,
+        commercialLocation: property.tipo_ubicacion_comercial || "",
       },
       amenities: [],
       type: (property.tipo || "habitacional").toLowerCase() as PropertyType,
@@ -265,7 +298,11 @@ export const feedService = {
     return ((data || []) as unknown as ReviewStatsRow[]) ?? [];
   },
 
-  async getFeedPage(pageNum: number, pageSize: number): Promise<FeedPage> {
+  async getFeedPage(
+    pageNum: number,
+    pageSize: number,
+    currentUserId?: string,
+  ): Promise<FeedPage> {
     const { data: feedData, error: feedError } = await supabase
       .from("feed_items")
       .select(FEED_SELECT)
@@ -314,12 +351,15 @@ export const feedService = {
             .is("deleted_at", null)
         : Promise.resolve({ data: [], error: null } as any),
       propertyIds.length > 0
-        ? supabase
-            .from("propiedades")
-            .select(PROPERTY_SELECT)
-            .in("id", propertyIds)
-            .eq("activo", true)
-            .is("deleted_at", null)
+        ? applyCommissionVisibility(
+            supabase
+              .from("propiedades")
+              .select(PROPERTY_SELECT)
+              .in("id", propertyIds)
+              .eq("activo", true)
+              .is("deleted_at", null),
+            currentUserId,
+          )
         : Promise.resolve({ data: [], error: null } as any),
       feedService.getReviewStats(perfilIds),
     ]);
@@ -361,7 +401,10 @@ export const feedService = {
     };
   },
 
-  async getPropertiesAsFeedItems(propertyIds: string[]): Promise<FeedItem[]> {
+  async getPropertiesAsFeedItems(
+    propertyIds: string[],
+    currentUserId?: string,
+  ): Promise<FeedItem[]> {
     if (!propertyIds.length) return [];
 
     const { data: feedData, error: feedError } = await supabase
@@ -382,12 +425,15 @@ export const feedService = {
     ) as string[];
 
     const [propertiesRes, statsRows] = await Promise.all([
-      supabase
-        .from("propiedades")
-        .select(PROPERTY_SELECT)
-        .in("id", foundIds)
-        .eq("activo", true)
-        .is("deleted_at", null),
+      applyCommissionVisibility(
+        supabase
+          .from("propiedades")
+          .select(PROPERTY_SELECT)
+          .in("id", foundIds)
+          .eq("activo", true)
+          .is("deleted_at", null),
+        currentUserId,
+      ),
       feedService.getReviewStats(perfilIds),
     ]);
 
@@ -409,7 +455,10 @@ export const feedService = {
       .filter((it): it is FeedItem => it !== null);
   },
 
-  async getFeedItem(feedItemId: string): Promise<FeedItem | null> {
+  async getFeedItem(
+    feedItemId: string,
+    currentUserId?: string,
+  ): Promise<FeedItem | null> {
     const { data: feedData, error: feedError } = await supabase
       .from("feed_items")
       .select(FEED_SELECT)
@@ -440,11 +489,14 @@ export const feedService = {
       return data ? mapReelToFeedItem(feedData, data, user) : null;
     }
     if (tipo_contenido === "propiedad") {
-      const { data } = await supabase
-        .from("propiedades")
-        .select(PROPERTY_SELECT)
-        .eq("id", contenido_id)
-        .single();
+      const { data } = await applyCommissionVisibility(
+        supabase
+          .from("propiedades")
+          .select(PROPERTY_SELECT)
+          .eq("id", contenido_id)
+          .is("deleted_at", null),
+        currentUserId,
+      ).maybeSingle();
       return data ? mapPropertyToFeedItem(feedData, data, user) : null;
     }
     return null;

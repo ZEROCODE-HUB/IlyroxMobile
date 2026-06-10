@@ -32,6 +32,7 @@ interface SharePropertyModalProps {
   feedItemId?: string;
   shareDescription?: string;
   shareImageUrl?: string;
+  onShared?: () => void;
 }
 
 const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
@@ -43,6 +44,7 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
   feedItemId,
   shareDescription,
   shareImageUrl,
+  onShared,
 }) => {
   const [activeTab, setActiveTab] = useState<"con" | "sin">("con");
   const [downloading, setDownloading] = useState(false);
@@ -61,6 +63,7 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
     });
 
     if (success) {
+      onShared?.();
       onClose();
     }
   };
@@ -144,8 +147,8 @@ const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
 
         <Text style={styles.tabDescription}>
           {activeTab === "con"
-            ? "Incluye todos los datos de la propiedad, información del agente y comisiones."
-            : "PDF simplificado sin información de contacto, comisiones ni gravámenes."}
+            ? "Incluye todos los datos de la propiedad e información del agente."
+            : "PDF simplificado sin información de contacto."}
         </Text>
 
         {activeTab === "con" ? (

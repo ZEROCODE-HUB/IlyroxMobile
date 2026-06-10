@@ -10,7 +10,10 @@ import {
     AppointmentItem,
     AppointmentStatus,
     FeatureRatings,
+    RatingTarget,
 } from "../components/Appointments/appointmentTypes";
+import { profileService } from "../services/profileService";
+import { formatPhoneNumber } from "../components/Profile/profileFormatters";
 import { logger } from "@/utils/logger";
 
 const log = logger.scoped("useAppointments");
@@ -45,8 +48,8 @@ export const useAppointments = () => {
                 .select(
                     `
           *,
-          agente:perfiles!agente_id(id, nombre, apellido_paterno, foto, rol),
-          cliente:perfiles!cliente_id(id, nombre, apellido_paterno, foto, rol),
+          agente:perfiles!agente_id(id, nombre, apellido_paterno, foto, rol, prefijo_celular, celular),
+          cliente:perfiles!cliente_id(id, nombre, apellido_paterno, foto, rol, prefijo_celular, celular),
           propiedad:propiedades(id, tipo, subtipo, ciudad, fotos),
           resenas:resenas(id, revisor_id, calificacion_general)
         `,
@@ -171,9 +174,9 @@ export const useAppointments = () => {
     };
 
     const handleSubmitRating = async (
-        overallRating: number,
         featureRatings: FeatureRatings,
         comentario: string,
+        recomienda: boolean | null,
     ) => {
         if (!rateApptId || !profile?.id) return;
 
@@ -186,21 +189,44 @@ export const useAppointments = () => {
                     ? appointment.cliente_id
                     : appointment.agente_id;
 
+            // La calificación general la calcula el sistema (trigger en BD:
+            // promedio simple de las 4 categorías).
             const { error: reviewError } = await supabase.from("resenas").insert({
                 revisor_id: profile.id,
                 profesional_id: profesionalId,
                 cita_id: rateApptId,
-                calificacion_general: overallRating,
-                conocimiento_mercado: featureRatings.conocimiento_mercado,
-                comunicacion: featureRatings.comunicacion,
                 profesionalismo: featureRatings.profesionalismo,
-                disponibilidad: featureRatings.disponibilidad,
+                etica_valores: featureRatings.etica_valores,
+                pago_comisiones: featureRatings.pago_comisiones,
+                comunicacion_servicio: featureRatings.comunicacion_servicio,
                 comentario: comentario.trim() || null,
                 tipo_resena: "detallada",
                 visible: true,
             });
 
             if (reviewError) throw reviewError;
+
+            // La recomendación (¿Trabajarías nuevamente?) usa el mismo mecanismo
+            // que el botón del perfil: tabla recomendaciones_usuarios.
+            if (recomienda !== null && profesionalId) {
+                try {
+                    const current = await profileService.getUserRecommendation(
+                        profile.id,
+                        profesionalId,
+                    );
+                    // Fijar el valor (no alternar): solo insertar/actualizar si cambió.
+                    if (current !== recomienda) {
+                        await profileService.toggleRecommendation(
+                            profile.id,
+                            profesionalId,
+                            current,
+                            recomienda,
+                        );
+                    }
+                } catch (recError) {
+                    log.error("Error guardando recomendación:", recError);
+                }
+            }
 
             if (appointment.estado === "pendiente") {
                 const { error: updateError } = await supabase
@@ -268,12 +294,40 @@ export const useAppointments = () => {
         setRateApptId(null);
     };
 
+    // Datos del asesor a calificar (contraparte de la cita) para la tarjeta del modal.
+    const rateTarget: RatingTarget | null = (() => {
+        if (!rateApptId || !profile?.id) return null;
+        const appt = appointments.find((a) => a.id === rateApptId);
+        if (!appt) return null;
+        const isAgente = appt.agente_id === profile.id;
+        const other = isAgente ? appt.cliente : appt.agente;
+        const otherId = isAgente ? appt.cliente_id : appt.agente_id;
+        if (!other || !otherId) return null;
+        const phone = formatPhoneNumber(
+            other.prefijo_celular ?? null,
+            other.celular ?? null,
+        );
+        return {
+            id: otherId,
+            name:
+                `${other.nombre || ""} ${other.apellido_paterno || ""}`.trim() ||
+                "Asesor",
+            avatar: other.foto ?? null,
+            phone: phone === "No especificado" ? null : phone,
+            location:
+                appt.location && appt.location !== "No especificado"
+                    ? appt.location
+                    : null,
+        };
+    })();
+
     return {
         activeTab,
         setActiveTab,
         appointments,
         loading,
         showRateModal,
+        rateTarget,
         handleMarkComplete,
         handleMarkCancel,
         handleOpenRating,

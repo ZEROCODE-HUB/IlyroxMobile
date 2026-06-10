@@ -4,6 +4,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { OneSignal } from "react-native-onesignal";
+import { useFonts } from "expo-font";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect } from "react";
 import {
   Platform,
@@ -21,6 +23,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import PendingApprovalScreen from "@/screens/PendingApprovalScreen";
 import { InitialLoading } from "@/components/common/InitialLoading";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
+import { useOTAUpdates } from "@/hooks/useOTAUpdates";
 import { VersionUpdateModal } from "@/components/modals/VersionUpdateModal";
 
 // Ignore common warnings that do not affect functionality
@@ -75,7 +78,21 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
 
-  const loading = authLoading || versionLoading;
+  // Precarga las fuentes de íconos (Ionicons + MaterialCommunityIcons) antes de
+  // renderizar la app. Evita que íconos como el de "Agrícola" (tractor, de
+  // MaterialCommunityIcons) parpadeen o no aparezcan al cargar su fuente bajo
+  // demanda al abrir la pantalla de Crear propiedad. Si la carga falla, avanzamos
+  // igual para no bloquear el arranque.
+  const [fontsLoaded, fontError] = useFonts({
+    ...Ionicons.font,
+    ...MaterialCommunityIcons.font,
+  });
+  const fontsReady = fontsLoaded || !!fontError;
+
+  // Verifica/aplica actualizaciones OTA (EAS Update) silenciosamente al iniciar.
+  useOTAUpdates();
+
+  const loading = authLoading || versionLoading || !fontsReady;
 
   // Mostrar notificaciones aunque la app esté en foreground — efecto estable sin dependencias
   useEffect(() => {

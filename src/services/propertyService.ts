@@ -22,8 +22,17 @@ const normalizePropertyStatus = (
 };
 
 export const propertyService = {
-  async propertiesByUser(targetUserId: string): Promise<Property[]> {
-    const { data: propsData, error: propsError } = await supabase
+  /**
+   * @param targetUserId   dueño del perfil cuyas propiedades se listan
+   * @param viewerIsOwner  true si quien mira es el propio creador. Cuando es
+   *   false (visitante), solo se devuelven las propiedades que comparten
+   *   comisión; las que no la comparten quedan ocultas para otros usuarios.
+   */
+  async propertiesByUser(
+    targetUserId: string,
+    viewerIsOwner: boolean = true,
+  ): Promise<Property[]> {
+    let query = supabase
       .from("propiedades")
       .select(
         `
@@ -42,6 +51,7 @@ export const propertyService = {
           activo,
           status,
           sin_comision,
+          comparte_comision,
           es_easybroker,
           codigo_propiedad,
           created_at,
@@ -59,8 +69,16 @@ export const propertyService = {
         `,
       )
       .eq("created_by", targetUserId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false });
+      .is("deleted_at", null);
+
+    if (!viewerIsOwner) {
+      query = query.eq("comparte_comision", true);
+    }
+
+    const { data: propsData, error: propsError } = await query.order(
+      "created_at",
+      { ascending: false },
+    );
 
     if (propsError) {
       log.error("Error fetching properties:", propsError);
@@ -111,6 +129,7 @@ export const propertyService = {
         operation: operation?.tipo_operacion === "venta" ? "Sale" : "Rent",
         status: status,
         sin_comision: p.sin_comision || false,
+        comparte_comision: p.comparte_comision ?? false,
         es_easybroker: p.es_easybroker || false,
         commission,
       };

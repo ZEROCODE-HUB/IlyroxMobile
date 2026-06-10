@@ -165,7 +165,7 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
           activeOpacity={0.8}
         >
           <Ionicons name="search-outline" size={18} color={COLORS.textTertiary} />
-          <Text style={styles.searchButtonText}>Buscar usuarios, posts, reels...</Text>
+          <Text style={styles.searchButtonText}>Busca por zonas para encontrar propiedades</Text>
         </TouchableOpacity>
 
         {showMapButton && !showSuggestions && selectedLocation && (
@@ -206,23 +206,24 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
                   />
                 </View>
                 <View style={[styles.suggestionTextContainer, { flex: 1 }]}>
-                  <Text style={styles.suggestionName}>{item.name}</Text>
-                  <Text style={styles.suggestionType}>Propiedad</Text>
-                  {item.type === "colonia" && (
-                    <Text style={styles.propertyCountText}>
-                      {item.municipio_nombre
-                        ? `${item.municipio_nombre} • `
-                        : ""}
-                      {item.propertyCount || 0}{" "}
-                      {item.propertyCount === 1
-                        ? "propiedad"
-                        : "propiedades"}
-                    </Text>
-                  )}
-                  {item.type === "property_code" && (
-                    <Text style={styles.propertyCountText}>
-                      {item.subtipo} • {item.municipio}
-                    </Text>
+                  {item.type === "property_code" ? (
+                    <>
+                      <Text style={styles.suggestionName}>{item.name}</Text>
+                      <Text style={styles.propertyCountText}>
+                        {item.subtipo} • {item.municipio}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      {/* Descripción completa separada por comas, estilo Google Places. */}
+                      <Text style={styles.suggestionName} numberOfLines={2}>
+                        {item.fullDescription || item.name}
+                      </Text>
+                      <Text style={styles.propertyCountText}>
+                        {item.propertyCount || 0}{" "}
+                        {item.propertyCount === 1 ? "propiedad" : "propiedades"}
+                      </Text>
+                    </>
                   )}
                 </View>
                 {item.type === "property_code" && item.fotos && item.fotos.length > 0 && (

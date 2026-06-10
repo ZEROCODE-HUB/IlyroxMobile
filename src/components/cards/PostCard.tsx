@@ -27,6 +27,7 @@ import RecommendedUsersModal from "../modals/RecommendedUsersModal";
 import { useFeedInteractions, useViewTracking } from "@/hooks";
 import { useUserRecommendations } from "@/hooks/useUserRecommendations";
 import { SpecialPostCard } from "../Feed/SpecialPostCard";
+import { buildRecommendedText } from "./recommendedText";
 
 interface PostCardProps {
   item: FeedItem;
@@ -103,15 +104,7 @@ const PostCard: React.FC<PostCardProps> = ({
   const isShortContent = item.content.length < 100;
   const positiveRecommendations = item.user.positiveRecommendations ?? 0;
   const recommendedByPreview = item.user.recommendedByPreview ?? [];
-  const firstRecommender = recommendedByPreview[0];
-  const recommendedText =
-    positiveRecommendations > 0 && firstRecommender
-      ? `${firstRecommender.name}${
-          positiveRecommendations > 1
-            ? ` y ${positiveRecommendations - 1} más`
-            : ""
-        }`
-      : `Recomendado por ${positiveRecommendations} usuarios`;
+  const recommendedText = buildRecommendedText(item.user);
   const [showRecommendedModal, setShowRecommendedModal] = React.useState(false);
 
   const { recommendedList, loadingRecommended, fetchRecommendations } =
@@ -144,6 +137,7 @@ const PostCard: React.FC<PostCardProps> = ({
                 options={ownerMenuOptions}
                 iconColor={COLORS.textSecondary}
                 menuPosition="top-right"
+                buttonStyle={styles.menuButtonTransparent}
               />
             </View>
           )}
@@ -234,6 +228,7 @@ const PostCard: React.FC<PostCardProps> = ({
             authorId={item.user.id}
             contentId={item.postDetails?.id}
             initialViews={item.views}
+            initialShares={item.shares}
           />
         </View>
 
@@ -297,6 +292,9 @@ const styles = StyleSheet.create({
   headerMenuWrapper: {
     paddingRight: 12,
     paddingTop: 8,
+  },
+  menuButtonTransparent: {
+    backgroundColor: "transparent",
   },
   imageContainer: {
     width: "100%",

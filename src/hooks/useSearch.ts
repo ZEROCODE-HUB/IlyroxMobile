@@ -43,6 +43,10 @@ export interface SearchLocation {
   municipio?: string;
   estado?: string;
   estadoId?: number;
+  /** Descripción completa de Google Places (ej. "Polanco, Miguel Hidalgo, CDMX, México") */
+  fullDescription?: string;
+  /** placeId de Google Places: identifica unívocamente el lugar para centrar el mapa exacto */
+  placeId?: string;
 }
 
 export interface SearchProperty {
@@ -236,7 +240,13 @@ export function useSearch() {
           fetchReels(trimmed),
           fetchProperties(trimmed),
         ]);
-        searchLocations(trimmed);
+        // Buscador general: sin filtro "(regions)" para encontrar TODO (igual que
+        // el buscador de los posts de búsqueda) y sin contar propiedades (ese
+        // contador se quitó de la UI del overlay).
+        searchLocations(trimmed, undefined, {
+          restrictToRegions: false,
+          withCounts: false,
+        });
         setResults({ users, posts, reels, locations: [], properties });
       } finally {
         setLoading(false);
@@ -252,12 +262,16 @@ export function useSearch() {
   useEffect(() => {
     const locations: SearchLocation[] = suggestions.map((s, i) => ({
       id: `${s.type}-${i}`,
-      name: s.municipio_nombre ? `${s.name}, ${s.municipio_nombre}` : s.name,
+      // `name` queda solo con la zona (se usa al seleccionar); la fila muestra
+      // `fullDescription` completa separada por comas, estilo Google.
+      name: s.name,
       count: s.propertyCount ?? 0,
       type: s.type,
       municipio: s.municipio_nombre,
       estado: s.estado_nombre,
       estadoId: s.estado_id,
+      fullDescription: s.fullDescription,
+      placeId: s.placeId,
     }));
     setResults((prev) => ({ ...prev, locations }));
   }, [suggestions]);
@@ -272,6 +286,9 @@ export function useSearch() {
         estado_id: loc.estadoId ?? 0,
         municipio_nombre: loc.municipio,
         estado_nombre: loc.estado,
+        // El placeId centra el mapa en el lugar EXACTO (vía Place Details),
+        // evitando que se geocodifique otra zona con el mismo nombre.
+        placeId: loc.placeId,
       });
       setPendingOpenMap(true);
     },

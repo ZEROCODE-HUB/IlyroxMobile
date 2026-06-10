@@ -31,6 +31,8 @@ interface PropertyMapProps {
   confirmedPolygons?: PolygonCoord[][];
   onMapPress?: (coord: PolygonCoord) => void;
   onLongPressMap?: (coord: PolygonCoord) => void;
+  /** Pin clásico en el punto exacto de la ubicación buscada (centro del foco). */
+  searchedLocationPin?: { latitude: number; longitude: number } | null;
 }
 
 export const PropertyMap: React.FC<PropertyMapProps> = ({
@@ -44,6 +46,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   confirmedPolygons = [],
   onMapPress,
   onLongPressMap,
+  searchedLocationPin,
 }) => {
   const mapRef = useRef<any>(null);
   const nativeMapRef = useRef<MapView>(null);
@@ -589,16 +592,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
         {/* Vértices del borrador */}
         {draftPolygonPoints.map((pt, idx) => (
-          <Marker
-            key={`vertex-${idx}`}
-            coordinate={pt}
-            anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={false}
-          >
-            <View style={vertexStyles.dot}>
-              <View style={vertexStyles.dotInner} />
-            </View>
-          </Marker>
+          <DraftVertex key={`vertex-${idx}`} coord={pt} />
         ))}
         {/* Invisible cluster touch targets */}
         {clusters
@@ -642,6 +636,17 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
               />
             );
           })}
+
+        {/* Pin clásico de la ubicación buscada (color distinto al de las propiedades) */}
+        {searchedLocationPin && (
+          <Marker
+            coordinate={searchedLocationPin}
+            pinColor={COLORS.error}
+            title="Ubicación buscada"
+            zIndex={9999}
+            tracksViewChanges={false}
+          />
+        )}
       </MapView>
 
       {/* Overlay absoluto para los precios (Inmune a los recortes de Android) */}
@@ -871,3 +876,25 @@ const vertexStyles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
 });
+
+/**
+ * Vértice del polígono en borrador.
+ * Inicia con tracksViewChanges activo para que react-native-maps capture el
+ * contenido del marker (si arranca en false, el primer punto queda invisible),
+ * y lo desactiva tras el primer layout para no penalizar el rendimiento.
+ */
+function DraftVertex({ coord }: { coord: PolygonCoord }) {
+  const [track, setTrack] = useState(true);
+  return (
+    <Marker coordinate={coord} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={track}>
+      <View
+        style={vertexStyles.dot}
+        onLayout={() => {
+          if (track) setTrack(false);
+        }}
+      >
+        <View style={vertexStyles.dotInner} />
+      </View>
+    </Marker>
+  );
+}

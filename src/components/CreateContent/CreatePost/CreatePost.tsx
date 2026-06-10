@@ -13,6 +13,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "@/design-system/components/AppInput";
@@ -469,9 +471,14 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
         onBack={onBack}
       />
 
+      <KeyboardAvoidingView
+        style={styles.scrollView}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Contenido — oculto al editar Open House (no tiene campo de texto libre) */}
         {!(isEditing && post?.tipo === "openhouse") && (
@@ -600,6 +607,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             </View>
           )}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Botón Publicar */}
       <View style={styles.footer}>

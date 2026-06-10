@@ -76,6 +76,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     loading,
     fetchProfileData,
     loadRecommendedByUsers,
+    loadNotRecommendedByUsers,
     updateProfilePhoto,
     handleRecommendation,
     userRecommendation,
@@ -142,6 +143,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
   const [showRatingDetails, setShowRatingDetails] = useState(false);
   const [showRecommendedByModal, setShowRecommendedByModal] = useState(false);
+  const [showNotRecommendedByModal, setShowNotRecommendedByModal] =
+    useState(false);
   const [selectedPost, setSelectedPost] = useState<FeedItem | null>(null);
   const [selectedReel, setSelectedReel] = useState<FeedItem | null>(null);
 
@@ -215,10 +218,10 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       negativeRecommendations: reviewStats?.total_no_recomiendan || 0,
       biography: profile?.biografia,
       website: profile?.sitio_web,
-      disponibilidad: reviewStats?.promedio_disponibilidad || 0,
       profesionalismo: reviewStats?.promedio_profesionalismo || 0,
-      comunicacion: reviewStats?.promedio_comunicacion || 0,
-      conocimientoMercado: reviewStats?.promedio_conocimiento_mercado || 0,
+      eticaValores: reviewStats?.promedio_etica_valores || 0,
+      pagoComisiones: reviewStats?.promedio_pago_comisiones || 0,
+      comunicacionServicio: reviewStats?.promedio_comunicacion_servicio || 0,
     }),
     [profile, reviewStats],
   );
@@ -342,13 +345,29 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
   const handleReelPress = useCallback(
     (reel: Reel) => {
-      router.push({
-        pathname: "/(stack)/reel/[id]",
-        params: {
-          id: reel.feed_item_id || reel.id,
-          item: JSON.stringify(mapReelToFeedItem(reel, profile, targetUserId)),
-        },
+      console.log("[RDBG] Profile.handleReelPress", {
+        id: reel.id,
+        feed_item_id: reel.feed_item_id,
       });
+      try {
+        const payload = JSON.stringify(
+          mapReelToFeedItem(reel, profile, targetUserId),
+        );
+        console.log("[RDBG] Profile reel -> router.push", {
+          id: reel.feed_item_id || reel.id,
+          itemLen: payload.length,
+        });
+        router.push({
+          pathname: "/(stack)/reel/[id]",
+          params: {
+            id: reel.feed_item_id || reel.id,
+            item: payload,
+          },
+        });
+        console.log("[RDBG] Profile reel router.push OK");
+      } catch (e) {
+        console.log("[RDBG] Profile reel router.push ERROR", String(e));
+      }
     },
     [profile, targetUserId],
   );
@@ -382,8 +401,11 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         onToggleRatingDetails={() => setShowRatingDetails((v) => !v)}
         showRecommendedByModal={showRecommendedByModal}
         setShowRecommendedByModal={setShowRecommendedByModal}
+        showNotRecommendedByModal={showNotRecommendedByModal}
+        setShowNotRecommendedByModal={setShowNotRecommendedByModal}
         formatRole={formatRole}
         loadRecommendedByUsers={loadRecommendedByUsers}
+        loadNotRecommendedByUsers={loadNotRecommendedByUsers}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         contentCounts={contentCounts}
@@ -402,7 +424,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       handleMessage,
       showRatingDetails,
       showRecommendedByModal,
+      showNotRecommendedByModal,
       loadRecommendedByUsers,
+      loadNotRecommendedByUsers,
       activeTab,
       contentCounts,
       activeFilter,

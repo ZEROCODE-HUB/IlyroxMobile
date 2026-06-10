@@ -2,6 +2,8 @@
 // CreateProperty - Types
 // ============================================
 
+import type { CountryCode } from "@/lib/location/types";
+
 export type TipoOperacion = "venta" | "renta" | "ambas";
 export type MonedaType = "MXN" | "USD";
 export type SiNo = "No" | "Sí";
@@ -19,6 +21,8 @@ export interface UbicacionData {
   ciudad: string;
   municipio: string;
   colonia: string;
+  /** Código de país ISO detectado de la ubicación (default: MX). */
+  pais?: CountryCode;
   latitud?: number;
   longitud?: number;
 }
@@ -124,7 +128,8 @@ export interface PropertyFormState {
   // Gravamen
   tieneGravamen: SiNo;
   institucionGravamen: string[];
-  montoGravamen: string;
+  // Monto opcional por institución: { [nombreInstitucion]: monto formateado }
+  montosGravamen: Record<string, string>;
 
   // Financiamiento
   aceptaFinanciamiento: SiNo;
@@ -144,8 +149,8 @@ export interface PropertyFormState {
   // Campos especializados — Agrícola
   tiposAgua: string[];
   concesionAgua: boolean;
-  usoTerreno: string;
-  tipoRiego: string;
+  usoTerreno: string[];
+  tipoRiego: string[];
   infraElectricidad: boolean;
   infraCaminoAcceso: boolean;
   infraCercado: boolean;

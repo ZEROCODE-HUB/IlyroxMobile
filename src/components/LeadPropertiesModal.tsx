@@ -91,6 +91,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
         onDeleteSearch(busquedaId);
         onClose();
       },
+      onCancel: () => {},
     });
   };
 

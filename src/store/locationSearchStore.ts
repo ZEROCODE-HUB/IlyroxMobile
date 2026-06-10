@@ -9,6 +9,9 @@ import {
   searchLocations,
   type LocationSuggestion,
 } from "../lib/locationService";
+import { getCountryConfig, DEFAULT_COUNTRY } from "../lib/location/registry";
+import type { CountryCode } from "../lib/location/types";
+import { supabase } from "../lib/supabase";
 import { logger } from "@/utils/logger";
 
 const log = logger.scoped("locationSearchStore");
@@ -34,7 +37,11 @@ interface LocationSearchState {
   isLoading: boolean;
   /** Token de sesión para agrupar requests de Places API y reducir costos */
   sessionToken: string;
-  searchLocations: (searchTerm: string) => Promise<void>;
+  searchLocations: (
+    searchTerm: string,
+    country?: CountryCode,
+    opts?: { restrictToRegions?: boolean; withCounts?: boolean },
+  ) => Promise<void>;
   clearSuggestions: () => void;
   refreshSessionToken: () => void;
 }
@@ -43,29 +50,52 @@ function generateToken(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-/** Parsea el texto secundario de Google para extraer municipio/estado para la UI */
-function extractMunicipioEstado(suggestion: LocationSuggestion): {
+/**
+ * Parsea el texto secundario de Google para extraer los dos niveles superiores
+ * (nivel 2 = municipio, nivel 1 = estado) para la UI, según el país.
+ */
+function extractMunicipioEstado(
+  suggestion: LocationSuggestion,
+  country: CountryCode = DEFAULT_COUNTRY,
+): {
   municipio_nombre?: string;
   estado_nombre?: string;
 } {
-  // secondaryText es como "Miguel Hidalgo, CDMX, México" o "Jalisco, México"
-  const parts = suggestion.secondaryText
-    .replace(/, México$/, "")
-    .replace(/, Mexico$/, "")
-    .split(", ")
+  // secondaryText puede tener un número variable de segmentos, p. ej.:
+  //   "Miguel Hidalgo, Ciudad de México, México"            → [municipio, estado]
+  //   "Polanco, Miguel Hidalgo, Ciudad de México, México"   → [colonia, municipio, estado]
+  //   "Jalisco, México"                                      → [estado]
+  // Criterio robusto (igual que el fallback de CascadeLocationSelector):
+  // el estado es SIEMPRE el último componente y el municipio el penúltimo.
+  const config = getCountryConfig(country);
+  let secondary = suggestion.secondaryText.trim();
+  // Quitar el sufijo del país al final (", México", ", Mexico", ...).
+  for (const suffix of config.countrySuffixes) {
+    secondary = secondary.replace(
+      new RegExp(`,\\s*${suffix}\\s*$`, "i"),
+      "",
+    );
+  }
+  const parts = secondary
+    .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  if (suggestion.type === "colonia") {
-    return {
-      municipio_nombre: parts[0],
-      estado_nombre: parts[1] ?? parts[0],
-    };
-  }
+  if (parts.length === 0) return {};
+
+  // Para un nivel 1 (estado), el `name` ya es ese nivel: no se necesita subtítulo.
+  if (suggestion.type === "estado") return {};
+
+  const estado_nombre = parts[parts.length - 1];
+
   if (suggestion.type === "municipio") {
-    return { estado_nombre: parts[0] };
+    return { estado_nombre };
   }
-  return {};
+
+  // colonia (nivel 3)
+  const municipio_nombre =
+    parts.length >= 2 ? parts[parts.length - 2] : undefined;
+  return { municipio_nombre, estado_nombre };
 }
 
 export const useLocationSearchStore = create<LocationSearchState>((set, get) => ({
@@ -77,7 +107,11 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
 
   refreshSessionToken: () => set({ sessionToken: generateToken() }),
 
-  searchLocations: async (searchTerm: string) => {
+  searchLocations: async (
+    searchTerm: string,
+    country: CountryCode = DEFAULT_COUNTRY,
+    opts?: { restrictToRegions?: boolean; withCounts?: boolean },
+  ) => {
     if (!searchTerm.trim()) {
       set({ suggestions: [] });
       return;
@@ -85,16 +119,72 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
 
     set({ isLoading: true });
 
+    // El buscador general pide `restrictToRegions: false` para encontrar todo
+    // (fraccionamientos, POIs…), igual que el buscador de los posts de búsqueda.
+    // El buscador del mapa usa el default ("(regions)") y conserva su contador.
+    const types = opts?.restrictToRegions === false ? undefined : "(regions)";
+    const withCounts = opts?.withCounts !== false;
+
     try {
       const { sessionToken } = get();
-      const results = await searchLocations(searchTerm, 10, sessionToken);
+      const results = await searchLocations(searchTerm, 10, sessionToken, country, types);
 
       const enriched: LocationSuggestionWithCount[] = results.map((loc) => ({
         ...loc,
-        ...extractMunicipioEstado(loc),
+        ...extractMunicipioEstado(loc, country),
       }));
 
-      set({ suggestions: enriched });
+      // Mostrar las sugerencias de inmediato (y quitar el spinner); el conteo
+      // se rellena después sin bloquear la UI.
+      set({ suggestions: enriched, isLoading: false });
+
+      // Conteo de propiedades por zona (diferido, no bloquea la UI).
+      // Se cuenta usando la JERARQUÍA de la sugerencia (nombre + municipio +
+      // estado) para evitar falsos positivos por nombres repetidos en distintas
+      // regiones (p. ej. "Centro" existe en muchas ciudades).
+      // Se omite si el caller no muestra el conteo (p. ej. buscador general).
+      if (withCounts && enriched.length > 0) {
+        const keyOf = (
+          tipo?: string | null,
+          nombre?: string | null,
+          municipio?: string | null,
+          estado?: string | null,
+        ) => `${tipo ?? ""}|${nombre ?? ""}|${municipio ?? ""}|${estado ?? ""}`;
+        try {
+          const zonas = enriched.map((s) => ({
+            tipo: s.type,
+            nombre: s.name,
+            municipio: s.municipio_nombre ?? null,
+            estado: s.estado_nombre ?? null,
+          }));
+          const { data: counts } = await supabase.rpc(
+            "contar_propiedades_zonas",
+            { p_zonas: zonas, p_pais: country },
+          );
+          if (Array.isArray(counts) && counts.length > 0) {
+            const countMap = new Map<string, number>(
+              counts.map((c: {
+                tipo: string;
+                nombre: string;
+                municipio: string | null;
+                estado: string | null;
+                total: number;
+              }) => [keyOf(c.tipo, c.nombre, c.municipio, c.estado), Number(c.total) || 0]),
+            );
+            // Emparejar por (tipo, nombre, municipio, estado); seguro ante concurrencia.
+            set((state) => ({
+              suggestions: state.suggestions.map((s) => {
+                const total = countMap.get(
+                  keyOf(s.type, s.name, s.municipio_nombre, s.estado_nombre),
+                );
+                return total != null ? { ...s, propertyCount: total } : s;
+              }),
+            }));
+          }
+        } catch (e) {
+          log.warn("Error contando propiedades por zona:", e);
+        }
+      }
     } catch (error) {
       log.error("Error fetching location suggestions:", error);
       set({ suggestions: [] });

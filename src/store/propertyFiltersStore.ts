@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { GeoBounds, busquedas_guardadas } from "@/types";
+import type { CountryCode } from "@/lib/location/types";
 
 export interface PolygonCoord {
   latitude: number;
@@ -64,6 +65,8 @@ export interface PropertyFilters {
   precioMax: string;
   moneda: "MXN" | "USD";
   operacion: "venta" | "renta" | "";
+  /** País al que se acota la búsqueda (default: MX). Se persiste en la búsqueda guardada. */
+  pais?: CountryCode;
   locationFilter: {
     estado: string;
     ciudad: string;

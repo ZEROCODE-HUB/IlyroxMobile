@@ -222,7 +222,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
             <TextInput
               ref={inputRef}
               style={styles.input}
-              placeholder="Buscar usuarios, posts, reels..."
+              placeholder="Busca por zonas para encontrar propiedades"
               placeholderTextColor={COLORS.textSecondary}
               value={query}
               onChangeText={setQuery}
@@ -538,7 +538,10 @@ function PropertyFichaCard({ property, onPress }: { property: SearchProperty; on
     : null;
 
   const priceDisplay = property.precio != null ? formatPriceShort(property.precio) : null;
-  const location = property.municipio || property.colonia || property.estado || null;
+  const location =
+    [property.colonia, property.municipio, property.estado]
+      .filter(Boolean)
+      .join(", ") || null;
   const m2 = (property.metros_cuadrados_construccion ?? 0) > 0
     ? property.metros_cuadrados_construccion
     : property.metros_cuadrados_terreno;
@@ -592,14 +595,17 @@ function PropertyFichaCard({ property, onPress }: { property: SearchProperty; on
 }
 
 function LocationRow({ location, onPress }: { location: SearchLocation; onPress: () => void }) {
+  // Descripción completa separada por comas, estilo Google Places.
+  const fullText =
+    location.fullDescription ||
+    [location.name, location.municipio, location.estado].filter(Boolean).join(", ");
   return (
     <TouchableOpacity style={locStyles.row} activeOpacity={0.7} onPress={onPress}>
       <View style={locStyles.iconWrapper}>
         <Ionicons name="location" size={22} color={COLORS.primary} />
       </View>
       <View style={locStyles.info}>
-        <Text style={locStyles.name}>{location.name}</Text>
-        <Text style={locStyles.count}>{location.count} propiedades</Text>
+        <Text style={locStyles.name} numberOfLines={2}>{fullText}</Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={COLORS.cardBorder} />
     </TouchableOpacity>
@@ -849,10 +855,10 @@ const locStyles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.textPrimary,
   },
-  count: {
+  hierarchy: {
     fontSize: 12,
-    color: "#3B82F6",
-    marginTop: 2,
+    color: COLORS.textSecondary,
+    marginTop: 1,
   },
 });
 

@@ -368,14 +368,16 @@ export const PhysicalFeaturesSection = React.memo(
           </View>
         )}
 
-        {/* COSTO DE MANTENIMIENTO MENSUAL (todas las propiedades, opcional) */}
-        <AppInput
-          label="Mantenimiento mensual (opcional)"
-          placeholder="ej. 1,500"
-          keyboardType="decimal-pad"
-          value={costoMantenimiento || ""}
-          onChangeText={(text) => setCostoMantenimiento(formatThousands(text))}
-        />
+        {/* COSTO DE MANTENIMIENTO MENSUAL (todas las propiedades excepto agrícola, opcional) */}
+        {camposVisibles.mantenimiento && (
+          <AppInput
+            label="Mantenimiento mensual (opcional)"
+            placeholder="ej. 1,500"
+            keyboardType="decimal-pad"
+            value={costoMantenimiento || ""}
+            onChangeText={(text) => setCostoMantenimiento(formatThousands(text))}
+          />
+        )}
 
         {/* AMUEBLADO */}
         {camposVisibles.amueblado && (

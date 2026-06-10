@@ -41,8 +41,8 @@ type RawProperty = Property & {
   patio_maniobras_m2?: number | null;
   tipo_agua?: string[] | null;
   concesion_agua?: boolean | null;
-  uso_terreno?: string | null;
-  tipo_riego?: string | null;
+  uso_terreno?: string[] | null;
+  tipo_riego?: string[] | null;
   infra_electricidad?: boolean | null;
   infra_camino_acceso?: boolean | null;
   infra_cercado?: boolean | null;
@@ -415,8 +415,8 @@ export const usePropertyFilters = (
           if (!hasMatch) return false;
         }
         if (ag.concesionAgua && !rawP.concesion_agua) return false;
-        if (ag.usoTerreno && rawP.uso_terreno !== ag.usoTerreno) return false;
-        if (ag.tipoRiego && rawP.tipo_riego !== ag.tipoRiego) return false;
+        if (ag.usoTerreno && !rawP.uso_terreno?.includes(ag.usoTerreno)) return false;
+        if (ag.tipoRiego && !rawP.tipo_riego?.includes(ag.tipoRiego)) return false;
         if (ag.electricidad && !rawP.infra_electricidad) return false;
         if (ag.caminoAcceso && !rawP.infra_camino_acceso) return false;
         if (ag.cercado && !rawP.infra_cercado) return false;

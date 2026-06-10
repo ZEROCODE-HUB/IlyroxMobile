@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border ?? "#E0E0E0",
+    borderBottomColor: COLORS.cardBorder,
   },
   iosPickerTitle: {
     fontSize: 16,

@@ -7,6 +7,7 @@ import {
   FlatList,
   Platform,
   KeyboardAvoidingView,
+  useWindowDimensions,
 } from "react-native";
 import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 import { Ionicons } from "@expo/vector-icons";
@@ -36,6 +37,8 @@ export default function MultiSelectionModal({
   currentValues = [],
   placeholder = "Buscar...",
 }: MultiSelectionModalProps) {
+  const { height: screenHeight } = useWindowDimensions();
+  const modalHeight = screenHeight * 0.9;
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedValues, setSelectedValues] = useState<string[]>(currentValues);
 
@@ -99,11 +102,11 @@ export default function MultiSelectionModal({
 
   return (
     <AppBottomSheet visible={visible} onClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.container}
-      >
-          <View style={styles.modalContent}>
+      <View style={[styles.modalContent, { height: modalHeight }]}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.container}
+        >
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.title}>{title}</Text>
@@ -170,8 +173,8 @@ export default function MultiSelectionModal({
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </AppBottomSheet>
   );
 }
@@ -185,7 +188,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    height: "75%",
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },

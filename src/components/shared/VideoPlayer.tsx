@@ -74,6 +74,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [player, aspectRatio]);
 
   const handlePress = () => {
+    console.log("[RDBG] VideoPlayer.handlePress", {
+      showControls,
+      hasOnPress: !!onPress,
+    });
     if (showControls) {
       togglePlayPause();
     }
@@ -81,39 +85,50 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   return (
-    <Pressable onPress={handlePress} onLongPress={onLongPress}>
-      <View
-        style={[
-          styles.container,
-          { width: "100%", aspectRatio: dynamicAspectRatio },
-        ]}
-      >
-        {player && (
-          <VideoView
-            player={player}
-            style={StyleSheet.absoluteFill}
-            contentFit={"contain"}
-            nativeControls={false}
-          />
-        )}
+    <View
+      style={[
+        styles.container,
+        { width: "100%", aspectRatio: dynamicAspectRatio },
+      ]}
+    >
+      {player && (
+        <VideoView
+          player={player}
+          style={StyleSheet.absoluteFill}
+          contentFit={"contain"}
+          nativeControls={false}
+        />
+      )}
 
-        {/* Timeline de progreso */}
-        {showTimeline && (
-          <View style={styles.timelineContainer}>
-            <ProgressTimeline progress={progress} />
-          </View>
-        )}
+      {/* Capa táctil POR ENCIMA del VideoView.
+          En Android el SurfaceView del VideoView se come los toques cuando el
+          Pressable lo envuelve como padre: el tap "no pasa" hasta que insistes
+          varias veces. Capturando el tap con un Pressable hermano por encima
+          del video (mayor z-order) el toque lo recibe una View JS normal y se
+          vuelve fiable. El timeline y el icono de play van después con
+          pointerEvents="none" para no bloquear el tap. */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={handlePress}
+        onLongPress={onLongPress}
+      />
 
-        {/* Indicador de play/pause */}
-        {showPlayIcon && !isPlaying && (
-          <View style={styles.playIconWrapper}>
-            <View style={styles.playIconContainer}>
-              <View style={styles.playIcon} />
-            </View>
+      {/* Timeline de progreso */}
+      {showTimeline && (
+        <View style={styles.timelineContainer} pointerEvents="none">
+          <ProgressTimeline progress={progress} />
+        </View>
+      )}
+
+      {/* Indicador de play/pause */}
+      {showPlayIcon && !isPlaying && (
+        <View style={styles.playIconWrapper} pointerEvents="none">
+          <View style={styles.playIconContainer}>
+            <View style={styles.playIcon} />
           </View>
-        )}
-      </View>
-    </Pressable>
+        </View>
+      )}
+    </View>
   );
 };
 

@@ -3,6 +3,7 @@
     "name": "ilyrox",
     "slug": "ilyrox",
     "version": "1.0.0",
+    "runtimeVersion": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/Icon-size.png",
     "userInterfaceStyle": "light",
@@ -15,6 +16,10 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "updates": {
+      "url": "https://u.expo.dev/1cff47e7-484f-4918-a037-ec4fa89f7c6e",
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ilyrox.app",

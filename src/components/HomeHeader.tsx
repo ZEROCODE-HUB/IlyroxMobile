@@ -135,6 +135,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
               estado_id: loc.estado_id ?? 0,
               municipio_nombre: loc.municipio_nombre,
               estado_nombre: loc.estado_nombre,
+              placeId: loc.placeId,
             });
             onOpenMap?.();
           }}
@@ -177,8 +178,8 @@ const styles = StyleSheet.create({
     height: 60,
   },
   headerLogo: {
-    width: 120,
-    height: 48,
+    width: 140,
+    height: 56,
   },
   headerIcons: {
     flexDirection: "row",
@@ -187,8 +188,6 @@ const styles = StyleSheet.create({
   iconButton: {
     width: 38,
     height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.15)",
     justifyContent: "center",
     alignItems: "center",
   },
