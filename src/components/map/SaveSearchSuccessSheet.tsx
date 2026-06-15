@@ -4,14 +4,12 @@ import {
   Text,
   Pressable,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
   Platform,
 } from "react-native";
 import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/colors";
-import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 
 interface SaveSearchSuccessSheetProps {
   visible: boolean;
@@ -24,77 +22,63 @@ export const SaveSearchSuccessSheet: React.FC<SaveSearchSuccessSheetProps> = ({
   onPublish,
   onDismiss,
 }) => {
-  const { filters } = usePropertyFiltersStore();
-
-  const pills: string[] = [];
-  if (filters.operacion) {
-    pills.push(filters.operacion.charAt(0).toUpperCase() + filters.operacion.slice(1));
-  }
-  if (filters.tipoPropiedad) {
-    const t = filters.tipoPropiedad.charAt(0).toUpperCase() + filters.tipoPropiedad.slice(1);
-    if (filters.subtipo?.length > 0) {
-      pills.push(`${t}: ${filters.subtipo.join(", ")}`);
-    } else {
-      pills.push(t);
-    }
-  }
-  if (filters.precioMin || filters.precioMax) {
-    const min = filters.precioMin || "0";
-    const max = filters.precioMax || "Sin límite";
-    pills.push(`${filters.moneda ?? "MXN"} ${min} – ${max}`);
-  }
-  const loc = filters.locationFilter;
-  if (loc?.municipio) pills.push(loc.municipio);
-  else if (loc?.ciudad) pills.push(loc.ciudad);
-  else if (loc?.estado) pills.push(loc.estado);
-  if (filters.locationChips?.length > 0) {
-    filters.locationChips.forEach((c: any) => pills.push(c.label));
-  }
-
   return (
     <AppBottomSheet visible={visible} onClose={onDismiss}>
       <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           {/* Handle */}
           <View style={styles.handle} />
 
-          {/* Ícono de éxito */}
-          <View style={styles.iconWrap}>
-            <Ionicons name="checkmark-circle" size={60} color={COLORS.success ?? "#22c55e"} />
+          {/* Hero: megáfono sobre fondo teal claro */}
+          <View style={styles.heroWrap}>
+            <Ionicons
+              name="megaphone"
+              size={50}
+              color={COLORS.primary}
+              style={styles.heroMegaphone}
+            />
+            <Ionicons
+              name="people"
+              size={24}
+              color={COLORS.primary}
+              style={styles.heroPeople}
+            />
           </View>
 
-          <Text style={styles.title}>¡Búsqueda guardada!</Text>
+          {/* Título principal */}
+          <Text style={styles.title}>
+            ILYROX seguirá buscando propiedades automáticamente para ti.
+          </Text>
 
-          {/* Mensaje de notificación */}
-          <View style={styles.noticeRow}>
-            <Ionicons name="notifications-outline" size={18} color={COLORS.primary} />
-            <Text style={styles.noticeText}>
-              Te avisaremos cuando un asesor publique una propiedad que haga match con estos criterios.
-            </Text>
+          {/* Card: otros asesores también pueden ayudar */}
+          <View style={styles.asesoresCard}>
+            <View style={styles.asesoresIconWrap}>
+              <Ionicons name="people-outline" size={22} color={COLORS.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.asesoresTitle}>
+                Otros asesores también pueden ayudarte a encontrar propiedades similares.
+              </Text>
+              <Text style={styles.asesoresSub}>
+                Al compartir tu búsqueda, más asesores podrán enviarte opciones que se ajusten a lo que necesitas.
+              </Text>
+            </View>
           </View>
 
-          {/* Filtros activos */}
-          {pills.length > 0 && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.pillsRow}
-            >
-              {pills.map((pill, i) => (
-                <View key={i} style={styles.pill}>
-                  <Text style={styles.pillText}>{pill}</Text>
-                </View>
-              ))}
-            </ScrollView>
-          )}
-
-          {/* Botones */}
+          {/* Botón principal */}
           <TouchableOpacity style={styles.publishBtn} onPress={onPublish} activeOpacity={0.85}>
             <Ionicons name="share-social-outline" size={20} color={COLORS.white} />
-            <Text style={styles.publishBtnText}>Publicar en el feed</Text>
+            <Text style={styles.publishBtnText}>Publicar lo que estoy buscando</Text>
           </TouchableOpacity>
 
+          {/* Divisor "o" */}
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>o</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
           <TouchableOpacity style={styles.dismissBtn} onPress={onDismiss} activeOpacity={0.7}>
-            <Text style={styles.dismissBtnText}>Listo</Text>
+            <Text style={styles.dismissBtnText}>Solo guardar búsqueda</Text>
           </TouchableOpacity>
       </Pressable>
     </AppBottomSheet>
@@ -127,51 +111,63 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBorder,
     marginBottom: 20,
   },
-  iconWrap: {
-    marginBottom: 12,
+  heroWrap: {
+    width: 112,
+    height: 112,
+    borderRadius: 32,
+    backgroundColor: COLORS.primary + "12",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+    marginBottom: 22,
+  },
+  heroMegaphone: {
+    transform: [{ translateX: -8 }, { translateY: -8 }],
+  },
+  heroPeople: {
+    position: "absolute",
+    bottom: 22,
+    right: 20,
   },
   title: {
-    fontSize: 22,
-    fontWeight: "700",
+    fontSize: 21,
+    fontWeight: "800",
     color: COLORS.textPrimary,
-    marginBottom: 12,
+    lineHeight: 28,
+    marginBottom: 18,
+    paddingHorizontal: 4,
     textAlign: "center",
   },
-  noticeRow: {
+  asesoresCard: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 8,
-    backgroundColor: COLORS.primary + "10",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
+    gap: 12,
     width: "100%",
-  },
-  noticeText: {
-    flex: 1,
-    fontSize: 13,
-    color: COLORS.primary,
-    lineHeight: 18,
-    fontWeight: "500",
-  },
-  pillsRow: {
-    flexDirection: "row",
-    gap: 8,
-    paddingVertical: 4,
+    backgroundColor: COLORS.primary + "0E",
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 20,
   },
-  pill: {
-    backgroundColor: COLORS.background,
-    borderWidth: 1,
-    borderColor: COLORS.primaryLight ?? COLORS.primary + "40",
+  asesoresIconWrap: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    backgroundColor: COLORS.white,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  pillText: {
-    fontSize: 12,
-    fontWeight: "600",
+  asesoresTitle: {
+    fontSize: 14,
+    fontWeight: "700",
     color: COLORS.primary,
+    lineHeight: 19,
+    marginBottom: 5,
+  },
+  asesoresSub: {
+    fontSize: 12.5,
+    fontWeight: "400",
+    color: COLORS.textSecondary,
+    lineHeight: 17,
   },
   publishBtn: {
     flexDirection: "row",
@@ -180,14 +176,31 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: COLORS.primary,
     borderRadius: 14,
-    paddingVertical: 15,
+    paddingVertical: 16,
     width: "100%",
-    marginBottom: 10,
+    marginBottom: 6,
   },
   publishBtnText: {
     fontSize: 16,
     fontWeight: "700",
     color: COLORS.white,
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    width: "100%",
+    marginVertical: 4,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: COLORS.cardBorder,
+  },
+  dividerText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: COLORS.textTertiary,
   },
   dismissBtn: {
     paddingVertical: 12,
@@ -197,6 +210,6 @@ const styles = StyleSheet.create({
   dismissBtnText: {
     fontSize: 15,
     fontWeight: "600",
-    color: COLORS.textSecondary,
+    color: COLORS.primary,
   },
 });

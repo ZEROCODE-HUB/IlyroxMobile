@@ -20,6 +20,7 @@ import {
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import CreatePost from "../CreateContent/CreatePost/CreatePost";
+import { PublishSearchPostModal } from "../map/PublishSearchPostModal";
 import { postsService } from "../../services/postsService";
 import ActionButtons from "../ActionButtons";
 
@@ -268,15 +269,29 @@ const PostCard: React.FC<PostCardProps> = ({
           />
         </View>
       )}
-      <Modal visible={showEditModal} animationType="slide">
-        <CreatePost
-          post={item.postDetails}
-          onBack={() => {
+      {item.postType === "busqueda" && item.postDetails?.busquedas_json ? (
+        <PublishSearchPostModal
+          visible={showEditModal}
+          editPost={item.postDetails}
+          initialMetadata={item.postDetails?.busquedas_json}
+          onClose={() => setShowEditModal(false)}
+          onPublished={() => {
             setShowEditModal(false);
             onPostUpdated?.();
           }}
+          userId={currentUserId}
         />
-      </Modal>
+      ) : (
+        <Modal visible={showEditModal} animationType="slide">
+          <CreatePost
+            post={item.postDetails}
+            onBack={() => {
+              setShowEditModal(false);
+              onPostUpdated?.();
+            }}
+          />
+        </Modal>
+      )}
     </View>
   );
 };

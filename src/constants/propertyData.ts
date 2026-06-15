@@ -41,6 +41,16 @@ export const MEDIOS_BANOS = ["0", "1", "2", "3", "4", "Más"] as const;
 export const ESTACIONAMIENTOS = ["0", "1", "2", "3", "4", "5", "Más"] as const;
 export const NIVELES = ["1", "2", "3", "4", "Más"] as const;
 
+/**
+ * Formatea una opción de niveles para mostrar la unidad solo cuando el valor es 1
+ * (cubre "1" y "1+"), como pista de que se trata de plantas. El valor crudo no
+ * cambia: en BD/estado se sigue guardando solo el número.
+ */
+export const formatNivelLabel = (value: string): string => {
+  const n = parseInt(value, 10);
+  return n === 1 ? `${value} planta` : value;
+};
+
 // ============================================
 // AMENIDADES
 // ============================================
@@ -138,6 +148,24 @@ export const esDepartamento = (subtipo: string | string[]): boolean => {
 };
 
 /**
+ * Verifica si el subtipo es "Rancho / Finca" (agrícola). A diferencia de
+ * "Terreno Rural", una finca tiene casa habitación, por lo que aplica recámaras
+ * y baños. Con array exige que TODOS los subtipos sean rancho/finca (consistente
+ * con esTerreno/esDepartamento). Se usa "rancho" como marcador para no depender
+ * del formato exacto "Rancho / Finca".
+ */
+export const esRanchoFinca = (subtipo: string | string[]): boolean => {
+  if (!subtipo) return false;
+  if (Array.isArray(subtipo)) {
+    return (
+      subtipo.length > 0 &&
+      subtipo.every((s) => s.toLowerCase().includes("rancho"))
+    );
+  }
+  return subtipo.toLowerCase().includes("rancho");
+};
+
+/**
  * Verifica si es propiedad comercial o industrial
  */
 export const esComercialIndustrial = (
@@ -173,11 +201,13 @@ export const getCamposVisibles = (subtipo: string | string[], tipoPrincipal?: Ti
   const isIndustrial = tipoPrincipal === "industrial";
   const isComercial = tipoPrincipal === "comercial";
   const isAgricola = tipoPrincipal === "agricola";
+  // Excepción: una finca/rancho agrícola tiene casa, así que sí aplica recámaras y baños.
+  const isRanchoFinca = isAgricola && esRanchoFinca(subtipo);
 
   return {
     // Características numéricas
-    recamaras: !isTerreno && !isIndustrial && !isComercial && !isAgricola,
-    banos: !isTerreno && !isAgricola,
+    recamaras: (!isTerreno && !isIndustrial && !isComercial && !isAgricola) || isRanchoFinca,
+    banos: (!isTerreno && !isAgricola) || isRanchoFinca,
     mediosBanos: !isTerreno && !isAgricola,
     estacionamientos: !isTerreno && !isAgricola,
     niveles: !isTerreno && !isDepartamento && !isComercial && !isAgricola,

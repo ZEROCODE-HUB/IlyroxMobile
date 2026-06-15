@@ -226,6 +226,20 @@ BEGIN
     END IF;
   END IF;
 
+  -- Dimensiones del terreno (frente/fondo, mínimos) — desde criterios_busqueda JSON.
+  -- Aplica a cualquier terreno (habitacional/comercial/agrícola), por eso va fuera
+  -- de los bloques por tipo. Se comparan contra las columnas ancho_terreno/largo_terreno.
+  IF (v_busq.criterios_busqueda ->> 'ancho_terreno_min') IS NOT NULL
+     AND TRIM(v_busq.criterios_busqueda ->> 'ancho_terreno_min') <> '' THEN
+    IF COALESCE(v_prop.ancho_terreno, 0) < (v_busq.criterios_busqueda ->> 'ancho_terreno_min')::numeric THEN
+      RETURN QUERY SELECT FALSE, NULL::varchar(20), jsonb_build_object('error','ancho_terreno'); RETURN; END IF;
+  END IF;
+  IF (v_busq.criterios_busqueda ->> 'largo_terreno_min') IS NOT NULL
+     AND TRIM(v_busq.criterios_busqueda ->> 'largo_terreno_min') <> '' THEN
+    IF COALESCE(v_prop.largo_terreno, 0) < (v_busq.criterios_busqueda ->> 'largo_terreno_min')::numeric THEN
+      RETURN QUERY SELECT FALSE, NULL::varchar(20), jsonb_build_object('error','largo_terreno'); RETURN; END IF;
+  END IF;
+
   -- Comisión mínima de venta
   IF v_busq.comision_venta_min IS NOT NULL AND v_busq.comision_venta_min > 0
      AND LOWER(TRIM(COALESCE(v_tipo_op, ''))) = 'venta' THEN

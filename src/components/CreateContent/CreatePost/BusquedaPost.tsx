@@ -1,5 +1,10 @@
 import { COLORS } from "@/constants/colors";
-import { PROPERTY_TYPES } from "@/constants/propertyData";
+import {
+  PROPERTY_TYPES,
+  getCamposVisibles,
+  esTerreno,
+  TipoPrincipal,
+} from "@/constants/propertyData";
 import { AppInput } from "@/design-system/components/AppInput";
 import { Post } from "@/types";
 import {
@@ -36,6 +41,10 @@ interface BusquedaPostProps {
   setM2Terreno: (val: string) => void;
   m2Construccion: string;
   setM2Construccion: (val: string) => void;
+  anchoTerreno: string;
+  setAnchoTerreno: (val: string) => void;
+  largoTerreno: string;
+  setLargoTerreno: (val: string) => void;
   ubicaciones: LocationChipItem[];
   setUbicaciones: (next: LocationChipItem[]) => void;
   nota: string;
@@ -84,6 +93,10 @@ export const BusquedaPost = ({
   setM2Terreno,
   m2Construccion,
   setM2Construccion,
+  anchoTerreno,
+  setAnchoTerreno,
+  largoTerreno,
+  setLargoTerreno,
   ubicaciones,
   setUbicaciones,
   nota,
@@ -91,6 +104,17 @@ export const BusquedaPost = ({
 }: BusquedaPostProps) => {
   const subtipoOptions =
     (PROPERTY_TYPES as Record<string, readonly string[]>)[tipoPropiedad ?? ""] ?? [];
+
+  // Visibilidad de campos según tipo/subtipo (misma fuente que publicar propiedad).
+  const camposVisiblesBase = getCamposVisibles(
+    subtipo,
+    (tipoPropiedad || undefined) as TipoPrincipal | undefined,
+  );
+  const camposVisibles = {
+    ...camposVisiblesBase,
+    niveles: camposVisiblesBase.niveles && tipoPropiedad !== "industrial",
+  };
+  const isTerreno = esTerreno(subtipo);
 
   const toggleSubtipo = (val: string) => {
     setSubtipo(
@@ -241,84 +265,131 @@ export const BusquedaPost = ({
       </View>
 
       {/* Características */}
-      <View style={styles.card}>
-        <Text style={styles.label}>Características</Text>
-        <View style={{ marginTop: 12, gap: 10 }}>
-          <View style={{ flexDirection: "row", gap: 12 }}>
-            <View style={{ flex: 1 }}>
-              <AppInput
-                label="Recámaras"
-                placeholder="Ej. 3"
-                keyboardType="numeric"
-                value={habitaciones}
-                onChangeText={setHabitaciones}
-              />
+      {(camposVisibles.recamaras ||
+        camposVisibles.banos ||
+        camposVisibles.estacionamientos ||
+        camposVisibles.niveles ||
+        camposVisibles.antiguedad) && (
+        <View style={styles.card}>
+          <Text style={styles.label}>Características</Text>
+          <View style={{ marginTop: 12, gap: 10 }}>
+            <View style={styles.fieldsWrap}>
+              {camposVisibles.recamaras && (
+                <View style={styles.fieldHalf}>
+                  <AppInput
+                    label="Recámaras"
+                    placeholder="Ej. 3"
+                    keyboardType="numeric"
+                    value={habitaciones}
+                    onChangeText={setHabitaciones}
+                  />
+                </View>
+              )}
+              {camposVisibles.banos && (
+                <View style={styles.fieldHalf}>
+                  <AppInput
+                    label="Baños"
+                    placeholder="Ej. 2"
+                    keyboardType="numeric"
+                    value={banos}
+                    onChangeText={setBanos}
+                  />
+                </View>
+              )}
+              {camposVisibles.estacionamientos && (
+                <View style={styles.fieldHalf}>
+                  <AppInput
+                    label="Estacionamientos"
+                    placeholder="Ej. 2"
+                    keyboardType="numeric"
+                    value={estacionamientos}
+                    onChangeText={setEstacionamientos}
+                  />
+                </View>
+              )}
+              {camposVisibles.niveles && (
+                <View style={styles.fieldHalf}>
+                  <AppInput
+                    label="Plantas"
+                    placeholder="Ej. 2"
+                    keyboardType="numeric"
+                    value={niveles}
+                    onChangeText={setNiveles}
+                    helperText={
+                      Number(niveles) > 0
+                        ? `${niveles} planta${Number(niveles) === 1 ? "" : "s"}`
+                        : undefined
+                    }
+                  />
+                </View>
+              )}
             </View>
-            <View style={{ flex: 1 }}>
-              <AppInput
-                label="Baños"
-                placeholder="Ej. 2"
-                keyboardType="numeric"
-                value={banos}
-                onChangeText={setBanos}
-              />
-            </View>
-          </View>
-          <View style={{ flexDirection: "row", gap: 12 }}>
-            <View style={{ flex: 1 }}>
-              <AppInput
-                label="Estacionamientos"
-                placeholder="Ej. 2"
-                keyboardType="numeric"
-                value={estacionamientos}
-                onChangeText={setEstacionamientos}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <AppInput
-                label="Niveles"
-                placeholder="Ej. 2"
-                keyboardType="numeric"
-                value={niveles}
-                onChangeText={setNiveles}
-              />
-            </View>
-          </View>
-          <View>
-            <AppInput
-              label="Antigüedad"
-              placeholder="Ej. Nueva, 5 años, etc."
-              value={antiguedad}
-              onChangeText={setAntiguedad}
-            />
+            {camposVisibles.antiguedad && (
+              <View>
+                <AppInput
+                  label="Antigüedad"
+                  placeholder="Ej. Nueva, 5 años, etc."
+                  value={antiguedad}
+                  onChangeText={setAntiguedad}
+                />
+              </View>
+            )}
           </View>
         </View>
-      </View>
+      )}
 
       {/* Superficies */}
-      <View style={styles.card}>
-        <Text style={styles.label}>Superficies</Text>
-        <View style={{ flexDirection: "row", gap: 12, marginTop: 12 }}>
-          <View style={{ flex: 1 }}>
-            <AppInput
-              label="m² Terreno (mín.)"
-              placeholder="Ej. 120"
-              keyboardType="numeric"
-              value={m2Terreno}
-              onChangeText={setM2Terreno}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <AppInput
-              label="m² Construcción (mín.)"
-              placeholder="Ej. 80"
-              keyboardType="numeric"
-              value={m2Construccion}
-              onChangeText={setM2Construccion}
-            />
+      {(camposVisibles.m2Terreno || camposVisibles.m2Construccion || isTerreno) && (
+        <View style={styles.card}>
+          <Text style={styles.label}>Superficies</Text>
+          <View style={[styles.fieldsWrap, { marginTop: 12 }]}>
+            {camposVisibles.m2Terreno && (
+              <View style={styles.fieldHalf}>
+                <AppInput
+                  label="m² Terreno (mín.)"
+                  placeholder="Ej. 120"
+                  keyboardType="numeric"
+                  value={m2Terreno}
+                  onChangeText={setM2Terreno}
+                />
+              </View>
+            )}
+            {camposVisibles.m2Construccion && (
+              <View style={styles.fieldHalf}>
+                <AppInput
+                  label="m² Construcción (mín.)"
+                  placeholder="Ej. 80"
+                  keyboardType="numeric"
+                  value={m2Construccion}
+                  onChangeText={setM2Construccion}
+                />
+              </View>
+            )}
+            {isTerreno && (
+              <>
+                <View style={styles.fieldHalf}>
+                  <AppInput
+                    label="Ancho (m) mín."
+                    placeholder="Ej. 10"
+                    keyboardType="numeric"
+                    value={anchoTerreno}
+                    onChangeText={(t) => handleCurrencyChange(t, setAnchoTerreno)}
+                  />
+                </View>
+                <View style={styles.fieldHalf}>
+                  <AppInput
+                    label="Largo (m) mín."
+                    placeholder="Ej. 25"
+                    keyboardType="numeric"
+                    value={largoTerreno}
+                    onChangeText={(t) => handleCurrencyChange(t, setLargoTerreno)}
+                  />
+                </View>
+              </>
+            )}
           </View>
         </View>
-      </View>
+      )}
 
       {/* Nota */}
       <View style={styles.card}>
@@ -349,6 +420,15 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
+  },
+  fieldsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  fieldHalf: {
+    flexGrow: 1,
+    flexBasis: "47%",
   },
   label: {
     fontSize: 13,

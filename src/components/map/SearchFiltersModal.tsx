@@ -3,15 +3,17 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
   Dimensions,
   Platform,
   ActivityIndicator,
 } from "react-native";
+import {
+  KeyboardProvider,
+  KeyboardAwareScrollView,
+} from "react-native-keyboard-controller";
 import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 import { Ionicons } from "@expo/vector-icons";
-import RadioGroupSelector from "../common/RadioGroupSelector";
 import { usePropertyFiltersStore } from "../../store/propertyFiltersStore";
 import { useSaveSearch } from "./filters/useSaveSearch";
 import { useToast } from "../../context/ToastContext";
@@ -24,9 +26,10 @@ import { CommissionFilterSection } from "./filters/CommissionFilterSection";
 import { AgricolaFiltersSection } from "./filters/AgricolaFiltersSection";
 import { ComercialFiltersSection } from "./filters/ComercialFiltersSection";
 import { IndustrialFiltersSection } from "./filters/IndustrialFiltersSection";
+import { AmenitiesFilterSection } from "./filters/AmenitiesFilterSection";
 
 import { COLORS } from "../../constants/colors";
-import { getCamposVisibles } from "../../constants/propertyData";
+import { getCamposVisibles, TipoPrincipal } from "../../constants/propertyData";
 
 const { height } = Dimensions.get("window");
 
@@ -93,8 +96,8 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
     setShowNumberInput(true);
   };
 
-  const camposVisibles = filters.tipoPropiedad
-    ? getCamposVisibles(filters.subtipo)
+  const camposVisiblesBase = filters.tipoPropiedad
+    ? getCamposVisibles(filters.subtipo, filters.tipoPropiedad as TipoPrincipal)
     : {
         recamaras: false,
         banos: false,
@@ -103,7 +106,17 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
         antiguedad: false,
         m2Terreno: false,
         m2Construccion: false,
+        amenidades: false,
       };
+
+  // Reglas propias del post de búsqueda (no afectan el flujo de publicar propiedad):
+  // - Industrial no usa "niveles".
+  // - Amenidades solo aplican a Habitacional.
+  const camposVisibles = {
+    ...camposVisiblesBase,
+    niveles: camposVisiblesBase.niveles && filters.tipoPropiedad !== "industrial",
+    amenidades: camposVisiblesBase.amenidades && filters.tipoPropiedad === "habitacional",
+  };
 
   const handleCurrencyChange = (
     text: string,
@@ -123,7 +136,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
 
   return (
     <AppBottomSheet visible={visible} onClose={onClose}>
-      <>
+      <KeyboardProvider>
       <View style={styles.modalContent}>
           {/* Header */}
           <View style={styles.modalHeader}>
@@ -142,36 +155,55 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView
+          <KeyboardAwareScrollView
             showsVerticalScrollIndicator={false}
             style={styles.modalScroll}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
-            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+            keyboardDismissMode="interactive"
+            bottomOffset={100}
             scrollEnabled={scrollEnabled}
           >
-            {/* 1. TIPO DE OPERACIÓN */}
+            {/* 1. TIPO DE OPERACIÓN (Venta y/o Renta) */}
             <View style={styles.formSection}>
-              <RadioGroupSelector
-                label="Tipo de Operación"
-                options={["Todas", "Venta", "Renta"]}
-                selectedValue={
-                  !filters.operacion
-                    ? "Todas"
-                    : filters.operacion.charAt(0).toUpperCase() +
-                      filters.operacion.slice(1)
-                }
-                onSelect={(val) => {
-                  if (val === "Todas") {
-                    onUpdateFilter("operacion", "");
-                  } else {
-                    onUpdateFilter(
-                      "operacion",
-                      val.toLowerCase() as "venta" | "renta",
-                    );
-                  }
-                }}
-              />
+              <Text style={styles.operacionLabel}>Tipo de Operación</Text>
+              <View style={styles.operacionChipsRow}>
+                {(["venta", "renta"] as const).map((op) => {
+                  // operacion === "" significa "ambas" → ambos chips activos
+                  const active =
+                    filters.operacion === "" || filters.operacion === op;
+                  return (
+                    <TouchableOpacity
+                      key={op}
+                      style={[
+                        styles.operacionChip,
+                        active && styles.operacionChipActive,
+                      ]}
+                      onPress={() => {
+                        // Desde "ambas" (""): seleccionar solo la tocada.
+                        // Tocar la única activa: volver a "ambas". Tocar la otra: cambiar a esa.
+                        onUpdateFilter(
+                          "operacion",
+                          (filters.operacion === op ? "" : op) as
+                            | "venta"
+                            | "renta"
+                            | "",
+                        );
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.operacionChipText,
+                          active && styles.operacionChipTextActive,
+                        ]}
+                      >
+                        {op === "venta" ? "Venta" : "Renta"}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
 
             {/* 2. PRECIO Y DIVISA */}
@@ -216,6 +248,13 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
               setShowNumberInput={setShowNumberInput}
             />
 
+            {/* 5b. AMENIDADES (habitacional/comercial/industrial; no terreno/agrícola) */}
+            {camposVisibles.amenidades && (
+              <View style={styles.formSection}>
+                <AmenitiesFilterSection />
+              </View>
+            )}
+
             {/* 6. FILTROS ESPECIALIZADOS POR TIPO */}
             {filters.tipoPropiedad === 'agricola' && (
               <View style={styles.formSection}>
@@ -234,7 +273,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
             )}
 
             <View style={styles.divider} />
-          </ScrollView>
+          </KeyboardAwareScrollView>
 
           {/* Footer */}
           <View style={styles.modalFooter}>
@@ -273,7 +312,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
         onSave={numberInputConfig.onSave}
         title={numberInputConfig.title}
       />
-      </>
+      </KeyboardProvider>
     </AppBottomSheet>
   );
 };
@@ -320,6 +359,38 @@ const styles = StyleSheet.create({
   },
   formSection: {
     marginBottom: 20,
+  },
+  operacionLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    marginBottom: 12,
+  },
+  operacionChipsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  operacionChip: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: COLORS.cardBorder,
+    backgroundColor: COLORS.background,
+  },
+  operacionChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  operacionChipText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.textSecondary,
+  },
+  operacionChipTextActive: {
+    color: COLORS.white,
   },
   sectionHeader: {
     flexDirection: "row",

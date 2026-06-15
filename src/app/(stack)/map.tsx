@@ -75,11 +75,20 @@ function extractServerFilters(filters: ReturnType<typeof usePropertyFiltersStore
     const n = parseFloat(filters.m2TerrenoMin.replace(/,/g, ""));
     if (!isNaN(n) && n > 0) f.m2TerrenoMin = n;
   }
+  if (filters.anchoTerrenoMin) {
+    const n = parseFloat(filters.anchoTerrenoMin.replace(/,/g, ""));
+    if (!isNaN(n) && n > 0) f.anchoTerrenoMin = n;
+  }
+  if (filters.largoTerrenoMin) {
+    const n = parseFloat(filters.largoTerrenoMin.replace(/,/g, ""));
+    if (!isNaN(n) && n > 0) f.largoTerrenoMin = n;
+  }
 
   // Comercial
   if (filters.tipoPropiedad === "comercial" && filters.comercialFilters) {
     const cf = filters.comercialFilters;
-    if (cf.tipoUbicacion) f.tipoUbicacion = cf.tipoUbicacion;
+    // Solo filtra cuando se eligió exactamente una opción; ambas (o ninguna) = sin filtro
+    if (cf.tipoUbicacion.length === 1) f.tipoUbicacion = cf.tipoUbicacion[0];
     if (cf.frenteMin) {
       const n = parseFloat(cf.frenteMin);
       if (!isNaN(n) && n > 0) f.frenteMin = n;
@@ -93,7 +102,8 @@ function extractServerFilters(filters: ReturnType<typeof usePropertyFiltersStore
   // Industrial
   if (filters.tipoPropiedad === "industrial" && filters.industrialFilters) {
     const inf = filters.industrialFilters;
-    if (inf.ubicacion) f.ubicacionIndustrial = inf.ubicacion;
+    // Solo filtra cuando se eligió exactamente una opción; ambas (o ninguna) = sin filtro
+    if (inf.ubicacion.length === 1) f.ubicacionIndustrial = inf.ubicacion[0];
     if (inf.alturaLibre) f.alturaLibre = inf.alturaLibre;
     if (inf.energiaKva?.length > 0) f.energiaKva = inf.energiaKva;
     if (inf.areaOficinasMin) {
@@ -111,8 +121,8 @@ function extractServerFilters(filters: ReturnType<typeof usePropertyFiltersStore
     const ag = filters.agricolaFilters;
     if (ag.tiposAgua?.length > 0) f.tiposAgua = ag.tiposAgua;
     if (ag.concesionAgua) f.concesionAgua = true;
-    if (ag.usoTerreno) f.usoTerreno = ag.usoTerreno;
-    if (ag.tipoRiego) f.tipoRiego = ag.tipoRiego;
+    if (ag.usoTerreno.length === 1) f.usoTerreno = ag.usoTerreno[0];
+    if (ag.tipoRiego.length === 1) f.tipoRiego = ag.tipoRiego[0];
     if (ag.electricidad) f.infraElectricidad = true;
     if (ag.caminoAcceso) f.infraCaminoAcceso = true;
     if (ag.cercado) f.infraCercado = true;

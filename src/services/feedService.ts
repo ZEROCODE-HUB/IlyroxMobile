@@ -463,6 +463,7 @@ export const feedService = {
       .from("feed_items")
       .select(FEED_SELECT)
       .or(`id.eq.${feedItemId},contenido_id.eq.${feedItemId}`)
+      .limit(1)
       .maybeSingle();
 
     if (feedError) throw feedError;

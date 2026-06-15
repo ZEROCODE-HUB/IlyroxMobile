@@ -36,11 +36,9 @@ type Tab = "todos" | "usuarios" | "posts" | "reels" | "ubicaciones" | "fichas";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "todos", label: "Todos" },
-  { key: "usuarios", label: "Usuarios" },
   { key: "posts", label: "Posts" },
   { key: "reels", label: "Reels" },
   { key: "ubicaciones", label: "Propiedades" },
-  { key: "fichas", label: "Fichas" },
 ];
 
 // ─── Componente principal ───────────────────────────────────────────────────────
@@ -222,7 +220,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
             <TextInput
               ref={inputRef}
               style={styles.input}
-              placeholder="Busca por zonas para encontrar propiedades"
+              placeholder="¿Dónde busca tu cliente?"
               placeholderTextColor={COLORS.textSecondary}
               value={query}
               onChangeText={setQuery}

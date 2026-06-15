@@ -9,6 +9,8 @@ interface SelectionMoreModalProps {
   onSelect: (value: string) => void;
   title: string;
   currentValue?: string;
+  /** Etiqueta de la sección de cantidad (default "Cantidad"); p.ej. "Plantas". */
+  quantityLabel?: string;
 }
 
 export const SelectionMoreModal: React.FC<SelectionMoreModalProps> = ({
@@ -17,6 +19,7 @@ export const SelectionMoreModal: React.FC<SelectionMoreModalProps> = ({
   onSelect,
   title,
   currentValue,
+  quantityLabel = "Cantidad",
 }) => {
   const [selected, setSelected] = useState<string>(
     currentValue || "No indicado",
@@ -95,7 +98,7 @@ export const SelectionMoreModal: React.FC<SelectionMoreModalProps> = ({
             </TouchableOpacity>
 
             {/* Cantidad section */}
-            <Text style={styles.sectionLabel}>Cantidad</Text>
+            <Text style={styles.sectionLabel}>{quantityLabel}</Text>
             <View style={styles.buttonGrid}>
               {["0", "1", "2", "3", "4", "5"].map((num) =>
                 renderButton(num, num),

@@ -12,6 +12,7 @@ import {
   useInfiniteQuery,
   useQuery,
   useQueryClient,
+  type QueryClient,
 } from "@tanstack/react-query";
 import { FeedItem, RecommendedByPreviewUser, User } from "@/types";
 import { useAuth } from "@/context/AuthContext";
@@ -221,6 +222,46 @@ export function useFeed(options: UseFeedOptions = {}) {
     refresh,
     refreshUserStats,
   };
+}
+
+/**
+ * Inserta una publicación recién creada al inicio del feed (prepend optimista),
+ * para que aparezca SIEMPRE en la posición 0 justo tras publicar, ignorando el
+ * engagement_score. El orden por score se reaplica en el siguiente refetch
+ * (pull-to-refresh, cambio de pestaña, auto-refresh o reentrar).
+ *
+ * `contenidoId` es el id del post/reel/propiedad: getFeedItem acepta tanto el id
+ * del feed_item como el contenido_id.
+ */
+export async function prependPublishedFeedItem(
+  queryClient: QueryClient,
+  contenidoId: string,
+  userId?: string,
+) {
+  try {
+    const item = await feedService.getFeedItem(contenidoId, userId);
+    if (!item) return;
+    queryClient.setQueriesData(
+      { queryKey: [...feedKeys.all, "list"] },
+      (prev: any) => {
+        if (!prev?.pages?.length) return prev;
+        const exists = prev.pages.some((pg: any) =>
+          pg.items?.some((it: FeedItem) => it.id === item.id),
+        );
+        if (exists) return prev;
+        const [first, ...rest] = prev.pages;
+        return {
+          ...prev,
+          pages: [
+            { ...first, items: [item, ...(first.items ?? [])] },
+            ...rest,
+          ],
+        };
+      },
+    );
+  } catch (e) {
+    log.warn("prependPublishedFeedItem failed", e);
+  }
 }
 
 // Re-exports para consumidores existentes

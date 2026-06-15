@@ -6,6 +6,47 @@ import { DEFAULT_COUNTRY } from "../../../lib/location/registry";
 import { geocodeAddress } from "../../../lib/geocodingService";
 
 /**
+ * Normaliza los filtros comerciales para persistencia/matching. `tipoUbicacion`
+ * se maneja como array en la UI (selección múltiple), pero el matching (SQL y
+ * cliente) lo lee como texto: una sola opción → ese valor; ambas o ninguna → ""
+ * (= sin filtro de tipo de ubicación).
+ */
+function serializeComercialFilters(cf: any): any {
+  if (!cf) return cf;
+  const tu = cf.tipoUbicacion;
+  const tipoUbicacion = Array.isArray(tu)
+    ? tu.length === 1
+      ? tu[0]
+      : ""
+    : tu ?? "";
+  return { ...cf, tipoUbicacion };
+}
+
+/**
+ * Igual que el comercial: en industrial, `ubicacion` (dentro/fuera de parque) se
+ * maneja como array en la UI (selección múltiple) pero el matching la lee como
+ * texto. Una sola opción → ese valor; ambas o ninguna → "" (= sin filtro).
+ */
+function serializeIndustrialFilters(inf: any): any {
+  if (!inf) return inf;
+  const u = inf.ubicacion;
+  const ubicacion = Array.isArray(u) ? (u.length === 1 ? u[0] : "") : (u ?? "");
+  return { ...inf, ubicacion };
+}
+
+/**
+ * Igual que el comercial: en agrícola, usoTerreno y tipoRiego se manejan como
+ * array en la UI (selección múltiple) pero el matching los lee como texto. Una
+ * sola opción → ese valor; varias o ninguna → "" (= sin filtro).
+ */
+function serializeAgricolaFilters(ag: any): any {
+  if (!ag) return ag;
+  const one = (v: any) =>
+    Array.isArray(v) ? (v.length === 1 ? v[0] : "") : (v ?? "");
+  return { ...ag, usoTerreno: one(ag.usoTerreno), tipoRiego: one(ag.tipoRiego) };
+}
+
+/**
  * Garantiza que `data.bounds` exista para el matching geográfico server-side.
  * Si no hay bounds (p. ej. búsqueda por filtros de texto, sin chip de zona),
  * geocodifica la ubicación más específica (colonia > municipio > estado) para
@@ -112,14 +153,35 @@ export const useSaveSearch = (userId?: string) => {
   };
 
   const buildSearchPostMetadata = (filters: any) => {
-    // Zonas de interés: tomamos los chips de ubicación nombrada (excluye polígonos a propósito)
-    const zonas_interes = Array.isArray(filters.locationChips)
-      ? filters.locationChips.map((c: any) => ({
-          id: c.id,
-          label: c.label,
-          type: c.type,
-          locationFilter: c.locationFilter,
+    // Zonas de interés: SOLO los polígonos dibujados en el mapa.
+    const zonas_interes = Array.isArray(filters.polygons)
+      ? filters.polygons.map((_poly: any, i: number) => ({
+          id: `poly-${i}`,
+          label: `Zona ${i + 1}`,
+          type: "zona",
         }))
+      : [];
+
+    // Ubicaciones (multi-nivel): las zonas nombradas del buscador se muestran en
+    // la sección "Ubicación", no en "Zonas de interés".
+    const ubicaciones = Array.isArray(filters.locationChips)
+      ? filters.locationChips.map((c: any) => {
+          const lf = c.locationFilter || {};
+          const center = c.bounds
+            ? {
+                latitud: (c.bounds.north + c.bounds.south) / 2,
+                longitud: (c.bounds.east + c.bounds.west) / 2,
+              }
+            : {};
+          return {
+            level: c.type === "zona" ? "colonia" : c.type,
+            estado: lf.estado || (c.type === "estado" ? c.label : ""),
+            municipio: lf.municipio || undefined,
+            colonia: lf.colonia || undefined,
+            label: c.label,
+            ...center,
+          };
+        })
       : [];
 
     // Filtros especializados según tipo de propiedad (NO comisión, NO polígonos)
@@ -127,14 +189,24 @@ export const useSaveSearch = (userId?: string) => {
     let industrial: any = undefined;
     let agricola: any = undefined;
     if (filters.tipoPropiedad === "comercial" && filters.comercialFilters) {
-      comercial = filters.comercialFilters;
+      comercial = serializeComercialFilters(filters.comercialFilters);
     }
     if (filters.tipoPropiedad === "industrial" && filters.industrialFilters) {
-      industrial = filters.industrialFilters;
+      industrial = serializeIndustrialFilters(filters.industrialFilters);
     }
     if (filters.tipoPropiedad === "agricola" && filters.agricolaFilters) {
-      agricola = filters.agricolaFilters;
+      agricola = serializeAgricolaFilters(filters.agricolaFilters);
     }
+
+    // Enrutar el precio al campo correcto según la operación, para que al publicar
+    // el rango se muestre en compra o en renta (sin perder el dato).
+    const pMin = filters.precioMin && filters.precioMin !== "0"
+      ? parseFloat(filters.precioMin.toString().replace(/,/g, ""))
+      : 0;
+    const pMax = filters.precioMax && filters.precioMax !== "Sin límite"
+      ? parseFloat(filters.precioMax.toString().replace(/,/g, ""))
+      : null;
+    const esRenta = String(filters.operacion ?? "").toLowerCase() === "renta";
 
     return {
       titulo: "SE BUSCA",
@@ -146,14 +218,10 @@ export const useSaveSearch = (userId?: string) => {
         icon_tipo: "business-outline",
         subtipo: Array.isArray(filters.subtipo) ? filters.subtipo : filters.subtipo ? [filters.subtipo] : [],
         moneda: filters.moneda,
-        precio_min:
-          filters.precioMin && filters.precioMin !== "0"
-            ? parseFloat(filters.precioMin.toString().replace(/,/g, ""))
-            : 0,
-        precio_max:
-          filters.precioMax && filters.precioMax !== "Sin límite"
-            ? parseFloat(filters.precioMax.toString().replace(/,/g, ""))
-            : null,
+        precio_min: esRenta ? 0 : pMin,
+        precio_max: esRenta ? null : pMax,
+        precio_renta_min: esRenta ? pMin : 0,
+        precio_renta_max: esRenta ? pMax : null,
         ubicacion: {
           estado: filters.locationFilter.estado,
           ciudad: filters.locationFilter.ciudad,
@@ -164,6 +232,7 @@ export const useSaveSearch = (userId?: string) => {
           icon: "location-outline",
         },
         zonas_interes,
+        ubicaciones,
         caracteristicas: {
           habitaciones: filters.habitaciones,
           icon_bed: "bed-outline",
@@ -183,8 +252,15 @@ export const useSaveSearch = (userId?: string) => {
           m2_construccion_min: filters.m2ConstruccionMin
             ? parseFloat(filters.m2ConstruccionMin.toString().replace(/,/g, ""))
             : 0,
+          ancho_terreno_min: filters.anchoTerrenoMin
+            ? parseFloat(filters.anchoTerrenoMin.toString().replace(/,/g, ""))
+            : 0,
+          largo_terreno_min: filters.largoTerrenoMin
+            ? parseFloat(filters.largoTerrenoMin.toString().replace(/,/g, ""))
+            : 0,
           icon: "resize-outline",
         },
+        amenidades: Array.isArray(filters.amenidades) ? filters.amenidades : [],
         ...(comercial ? { comercial } : {}),
         ...(industrial ? { industrial } : {}),
         ...(agricola ? { agricola } : {}),
@@ -234,6 +310,14 @@ export const useSaveSearch = (userId?: string) => {
       criterios_busqueda.m2_construccion_min = parseFloat(
         filters.m2ConstruccionMin.toString().replace(/,/g, ""),
       );
+    if (filters.anchoTerrenoMin)
+      criterios_busqueda.ancho_terreno_min = parseFloat(
+        filters.anchoTerrenoMin.toString().replace(/,/g, ""),
+      );
+    if (filters.largoTerrenoMin)
+      criterios_busqueda.largo_terreno_min = parseFloat(
+        filters.largoTerrenoMin.toString().replace(/,/g, ""),
+      );
     if (filters.locationFilter.estado)
       criterios_busqueda.estado = filters.locationFilter.estado;
     if (filters.locationFilter.ciudad)
@@ -280,15 +364,20 @@ export const useSaveSearch = (userId?: string) => {
       criterios_busqueda.comision_renta_min = parseFloat(filters.comisionRentaMin);
     }
 
+    // Amenidades
+    if (Array.isArray(filters.amenidades) && filters.amenidades.length > 0) {
+      criterios_busqueda.amenidades = filters.amenidades;
+    }
+
     // Filtros especializados por tipo
     if (filters.tipoPropiedad === "comercial" && filters.comercialFilters) {
-      criterios_busqueda.comercial = filters.comercialFilters;
+      criterios_busqueda.comercial = serializeComercialFilters(filters.comercialFilters);
     }
     if (filters.tipoPropiedad === "industrial" && filters.industrialFilters) {
-      criterios_busqueda.industrial = filters.industrialFilters;
+      criterios_busqueda.industrial = serializeIndustrialFilters(filters.industrialFilters);
     }
     if (filters.tipoPropiedad === "agricola" && filters.agricolaFilters) {
-      criterios_busqueda.agricola = filters.agricolaFilters;
+      criterios_busqueda.agricola = serializeAgricolaFilters(filters.agricolaFilters);
     }
 
     const insertData: any = {
@@ -466,6 +555,8 @@ export const useSaveSearch = (userId?: string) => {
     if (filters.antiguedad && filters.antiguedad !== "No indicado") criterios_busqueda.antiguedad = filters.antiguedad;
     if (filters.m2TerrenoMin) criterios_busqueda.m2_terreno_min = parseFloat(filters.m2TerrenoMin.toString().replace(/,/g, ""));
     if (filters.m2ConstruccionMin) criterios_busqueda.m2_construccion_min = parseFloat(filters.m2ConstruccionMin.toString().replace(/,/g, ""));
+    if (filters.anchoTerrenoMin) criterios_busqueda.ancho_terreno_min = parseFloat(filters.anchoTerrenoMin.toString().replace(/,/g, ""));
+    if (filters.largoTerrenoMin) criterios_busqueda.largo_terreno_min = parseFloat(filters.largoTerrenoMin.toString().replace(/,/g, ""));
     if (filters.locationFilter.estado) criterios_busqueda.estado = filters.locationFilter.estado;
     if (filters.locationFilter.ciudad) criterios_busqueda.ciudad = filters.locationFilter.ciudad;
     if (filters.locationFilter.municipio) criterios_busqueda.municipio = filters.locationFilter.municipio;
@@ -491,9 +582,10 @@ export const useSaveSearch = (userId?: string) => {
     }
     if (filters.comisionVentaMin) criterios_busqueda.comision_venta_min = parseFloat(filters.comisionVentaMin);
     if (filters.comisionRentaMin) criterios_busqueda.comision_renta_min = parseFloat(filters.comisionRentaMin);
-    if (filters.tipoPropiedad === "comercial" && filters.comercialFilters) criterios_busqueda.comercial = filters.comercialFilters;
-    if (filters.tipoPropiedad === "industrial" && filters.industrialFilters) criterios_busqueda.industrial = filters.industrialFilters;
-    if (filters.tipoPropiedad === "agricola" && filters.agricolaFilters) criterios_busqueda.agricola = filters.agricolaFilters;
+    if (Array.isArray(filters.amenidades) && filters.amenidades.length > 0) criterios_busqueda.amenidades = filters.amenidades;
+    if (filters.tipoPropiedad === "comercial" && filters.comercialFilters) criterios_busqueda.comercial = serializeComercialFilters(filters.comercialFilters);
+    if (filters.tipoPropiedad === "industrial" && filters.industrialFilters) criterios_busqueda.industrial = serializeIndustrialFilters(filters.industrialFilters);
+    if (filters.tipoPropiedad === "agricola" && filters.agricolaFilters) criterios_busqueda.agricola = serializeAgricolaFilters(filters.agricolaFilters);
 
     const updateData: any = {
       criterios_busqueda,
@@ -581,6 +673,8 @@ export const useSaveSearch = (userId?: string) => {
         trim(filters.antiguedad) ||
         trim(filters.m2TerrenoMin) ||
         trim(filters.m2ConstruccionMin) ||
+        trim(filters.anchoTerrenoMin) ||
+        trim(filters.largoTerrenoMin) ||
         parseFloat(filters.comisionVentaMin || "0") > 0 ||
         parseFloat(filters.comisionRentaMin || "0") > 0,
     );

@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "@/design-system/components/AppInput";
 import { SelectionMoreModal } from "@/components/modals/SelectionMoreModal";
 import { COLORS } from "@/constants/colors";
-import { TipoPrincipal, getLabelRecamaras } from "@/constants/propertyData";
+import { TipoPrincipal, getLabelRecamaras, formatNivelLabel, esTerreno } from "@/constants/propertyData";
 import { SelectionModal } from "@/components/modals";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 
@@ -42,6 +42,8 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
   const { filters, updateFilter: onUpdateFilter } = usePropertyFiltersStore();
 
   if (!filters.tipoPropiedad) return null;
+
+  const isTerreno = esTerreno(filters.subtipo);
 
   return (
     <View style={styles.formSection}>
@@ -147,7 +149,7 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
             onPress={() => setShowNivelesModal(true)}
           >
             <Text style={styles.selectorText}>
-              {filters.niveles || "Cualquiera"}
+              {filters.niveles ? formatNivelLabel(filters.niveles) : "Cualquiera"}
             </Text>
             <Ionicons
               name="chevron-down"
@@ -162,6 +164,7 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
               onUpdateFilter("niveles", val);
             }}
             title="Niveles"
+            quantityLabel="Plantas"
             currentValue={filters.niveles}
           />
         </>
@@ -238,6 +241,30 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
           </View>
         )}
       </View>
+
+      {/* Dimensiones del terreno (frente/fondo), solo terrenos */}
+      {isTerreno && (
+        <View style={styles.row}>
+          <View style={styles.halfWidth}>
+            <Text style={styles.label}>Ancho (m) mín.</Text>
+            <AppInput
+              value={filters.anchoTerrenoMin}
+              onChangeText={(val) => onUpdateFilter("anchoTerrenoMin", val)}
+              keyboardType="numeric"
+              placeholder="Mínimo"
+            />
+          </View>
+          <View style={styles.halfWidth}>
+            <Text style={styles.label}>Largo (m) mín.</Text>
+            <AppInput
+              value={filters.largoTerrenoMin}
+              onChangeText={(val) => onUpdateFilter("largoTerrenoMin", val)}
+              keyboardType="numeric"
+              placeholder="Mínimo"
+            />
+          </View>
+        </View>
+      )}
     </View>
   );
 };

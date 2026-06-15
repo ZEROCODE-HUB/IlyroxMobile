@@ -501,6 +501,7 @@ const Matches: React.FC = () => {
       currency={item.currency}
       matchCount={item.matchCount}
       similarCount={item.similarCount}
+      latestMatchDate={item.latestMatchDate}
       onPress={() => setSelectedLeadId(item.leadId)}
     />
   );
@@ -571,6 +572,29 @@ const Matches: React.FC = () => {
               </Text>
             </View>
           )
+        }
+        ListFooterComponent={
+          leadGroups.length > 0 ? (
+            <View style={styles.banner}>
+              <View style={styles.bannerIconCircle}>
+                <Ionicons name="notifications" size={20} color={COLORS.white} />
+              </View>
+              <Text style={styles.bannerText}>
+                <Text style={styles.bannerTextStrong}>
+                  ILYROX busca propiedades 24/7
+                </Text>
+                {" para tus clientes y las clasifica en matches exactos o "}
+                {"similares. Contacta rápido a tus clientes antes que otros "}
+                {"asesores."}
+              </Text>
+              <Ionicons
+                name="people-outline"
+                size={26}
+                color={COLORS.primary}
+                style={styles.bannerPeopleIcon}
+              />
+            </View>
+          ) : null
         }
         initialNumToRender={5}
         maxToRenderPerBatch={5}
@@ -704,6 +728,36 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 15,
     color: COLORS.textPrimary,
+  },
+  banner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.successLight,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 8,
+  },
+  bannerIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  bannerText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: COLORS.textSecondary,
+  },
+  bannerTextStrong: {
+    color: COLORS.primary,
+    fontWeight: "700",
+  },
+  bannerPeopleIcon: {
+    marginLeft: 12,
   },
 });
 

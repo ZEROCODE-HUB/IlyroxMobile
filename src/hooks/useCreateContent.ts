@@ -4,8 +4,10 @@
  */
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import { useImageUpload } from "./useImageUpload";
+import { prependPublishedFeedItem } from "./useFeed";
 import * as Burnt from "burnt";
 import { useModal } from "@/context/ModalContext";
 import { logger } from "@/utils/logger";const log = logger.scoped("useCreateContent");
@@ -18,6 +20,7 @@ export function useCreateContent(userId?: string) {
   } = useImageUpload();
   const [isCreatingInDB, setIsCreatingInDB] = useState(false);
   const { showModal } = useModal();
+  const queryClient = useQueryClient();
 
   const uploading = isUploadingImage || isCreatingInDB;
 
@@ -63,16 +66,14 @@ export function useCreateContent(userId?: string) {
 
       if (postError) throw postError;
 
-      // 3. Crear feed_item
-      const { error: feedError } = await supabase.from("feed_items").insert({
-        tipo_contenido: "post",
-        contenido_id: post.id,
-        publicado_por: userId,
-        visibilidad: "publico",
-        estado_moderacion: "activo",
-      });
+      // 3. El feed_item lo crea automáticamente el trigger `trigger_crear_feed_item`
+      // (AFTER INSERT en posts → crear_feed_item_from_post). NO insertarlo aquí: hacerlo
+      // generaba un feed_item duplicado por cada post (el trigger no lo deduplica con la
+      // inserción manual del cliente).
 
-      if (feedError) throw feedError;
+      // 4. Prepend optimista: que el post aparezca arriba del feed al instante
+      // (ignora el score; el orden por score se reaplica al refrescar/reentrar).
+      await prependPublishedFeedItem(queryClient, post.id, userId);
 
       Burnt.toast({
         title: "Post publicado correctamente!",
@@ -151,6 +152,10 @@ export function useCreateContent(userId?: string) {
       });
 
       if (feedError) throw feedError;
+
+      // 4. Prepend optimista: que el reel aparezca arriba del feed al instante
+      // (ignora el score; el orden por score se reaplica al refrescar/reentrar).
+      await prependPublishedFeedItem(queryClient, reel.id, userId);
 
       Burnt.toast({
         title: "Publicado exitosamente!",

@@ -71,7 +71,9 @@ const Feed: React.FC<FeedProps> = ({
   } = useFeed({
     userId: currentUserId,
     pageSize: 20,
-    enableAutoRefresh: true,
+    // El feed solo se actualiza por acción del usuario (pull-to-refresh, tocar la
+    // pestaña o reentrar). Sin auto-refresh periódico.
+    enableAutoRefresh: false,
   });
 
   useFocusEffect(
@@ -84,12 +86,15 @@ const Feed: React.FC<FeedProps> = ({
   useEffect(() => {
     if (refreshTimestamp && refreshTimestamp !== lastRefreshTimestampRef.current) {
       lastRefreshTimestampRef.current = refreshTimestamp;
-      refresh();
-      // Tras publicar, llevar al usuario al inicio para que vea su publicación
-      // recién creada arriba aunque el feed estuviera scrolleado.
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      // La publicación recién creada ya está arriba en la cache (prepend optimista).
+      // Solo llevamos la vista al inicio. NO refetch aquí: reordenaría por
+      // engagement_score; ese orden se reaplica en pull-to-refresh / cambio de
+      // pestaña / auto-refresh / reentrar.
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      });
     }
-  }, [refreshTimestamp, refresh]);
+  }, [refreshTimestamp]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("tabPress", (e: any) => {
@@ -371,6 +376,12 @@ const Feed: React.FC<FeedProps> = ({
         ListHeaderComponent={ListHeader}
         ListFooterComponent={ListFooter}
         ListEmptyComponent={ListEmpty}
+        // FlashList v2 (New Arch) ancla por defecto la posición del contenido visible
+        // al insertar items arriba (maintainVisibleContentPosition). En un feed eso deja
+        // la publicación recién creada / lo recién refrescado FUERA de vista por arriba
+        // (había que hacer scroll hacia arriba para verlo). Lo desactivamos para que el
+        // contenido nuevo en index 0 se muestre desde el top.
+        maintainVisibleContentPosition={{ disabled: true }}
         contentContainerStyle={[
           styles.listContent,
           { paddingTop: dynamicPaddingTop },

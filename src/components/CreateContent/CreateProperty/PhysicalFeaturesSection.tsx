@@ -16,6 +16,7 @@ import {
   MEDIOS_BANOS,
   ESTACIONAMIENTOS,
   NIVELES,
+  formatNivelLabel,
   OPCIONES_AMUEBLADO,
   OPCIONES_SI_NO,
   getLabelRecamaras,
@@ -243,7 +244,9 @@ export const PhysicalFeaturesSection = React.memo(
               style={styles.selector}
               onPress={() => setShowNivelesModal(true)}
             >
-              <Text style={styles.selectorText}>{niveles || "1"}</Text>
+              <Text style={styles.selectorText}>
+                {formatNivelLabel(niveles || "1")}
+              </Text>
               <Ionicons
                 name="chevron-down"
                 size={20}
@@ -263,7 +266,7 @@ export const PhysicalFeaturesSection = React.memo(
                 }
               }}
               title="Niveles"
-              options={[...NIVELES]}
+              options={NIVELES.map((v) => ({ label: formatNivelLabel(v), value: v }))}
               currentValue={niveles}
             />
           </>

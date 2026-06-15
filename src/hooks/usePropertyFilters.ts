@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { Property } from "@/types";
 import { useExchangeRate } from "./useExchangeRate";
 import { normalizeStr } from "@/utils/stringNormalizer";
@@ -23,6 +23,8 @@ type RawProperty = Property & {
   ciudad?: string | null;
   antiguedad?: number | null;
   niveles?: string | number | null;
+  ancho_terreno?: number | null;
+  largo_terreno?: number | null;
   operaciones_propiedad?: RawOperacion[] | null;
   operaciones?: RawOperacion[] | null;
   operacion?: string | null;
@@ -134,10 +136,8 @@ export const usePropertyFilters = (
     clearFilters,
   } = usePropertyFiltersStore();
 
-  const [filteredProperties, setFilteredProperties] = useState<Property[]>(properties);
-
-  useEffect(() => {
-    const filtered = properties.filter((p) => {
+  const filteredProperties = useMemo(() => {
+    return properties.filter((p) => {
       const rawP = p as RawProperty;
 
       // Status check
@@ -338,6 +338,16 @@ export const usePropertyFilters = (
         if (constr < parseFloat(filters.m2ConstruccionMin.replace(/,/g, ""))) return false;
       }
 
+      // ── Ancho / Largo de terreno (frente/fondo, mínimos) ──
+      if (filters.anchoTerrenoMin) {
+        const ancho = rawP.ancho_terreno ?? 0;
+        if (ancho < parseFloat(filters.anchoTerrenoMin.replace(/,/g, ""))) return false;
+      }
+      if (filters.largoTerrenoMin) {
+        const largo = rawP.largo_terreno ?? 0;
+        if (largo < parseFloat(filters.largoTerrenoMin.replace(/,/g, ""))) return false;
+      }
+
       // ── Niveles ──
       if (filters.niveles && filters.niveles !== "No indicado") {
         const pLevels = parseInt(String(rawP.niveles ?? p.features?.floors ?? "0"));
@@ -350,6 +360,15 @@ export const usePropertyFilters = (
           const nExact = parseInt(filters.niveles);
           if (!isNaN(nExact) && pLevels !== nExact) return false;
         }
+      }
+
+      // ── Amenidades (la propiedad debe tenerlas TODAS) ──
+      if (filters.amenidades && filters.amenidades.length > 0) {
+        const propAmenities = (p.amenities ?? []).map(normalizeStr);
+        const hasAll = filters.amenidades.every((a) =>
+          propAmenities.includes(normalizeStr(a)),
+        );
+        if (!hasAll) return false;
       }
 
       // ── Comisión Venta (%) ──
@@ -383,7 +402,8 @@ export const usePropertyFilters = (
       // ── Filtros comerciales ──
       if (filters.tipoPropiedad === 'comercial') {
         const cf = filters.comercialFilters;
-        if (cf.tipoUbicacion && rawP.tipo_ubicacion_comercial !== cf.tipoUbicacion) return false;
+        // Solo filtra cuando se eligió exactamente una opción; ambas (o ninguna) = sin filtro
+        if (cf.tipoUbicacion.length === 1 && rawP.tipo_ubicacion_comercial !== cf.tipoUbicacion[0]) return false;
         if (cf.frenteMin && (rawP.frente_metros ?? 0) < parseFloat(cf.frenteMin)) return false;
         if (cf.nivel && String(rawP.nivel_piso ?? '') !== cf.nivel) return false;
         if (cf.sobreAvenidaPrincipal && !rawP.sobre_avenida_principal) return false;
@@ -395,7 +415,8 @@ export const usePropertyFilters = (
       // ── Filtros industriales ──
       if (filters.tipoPropiedad === 'industrial') {
         const inf = filters.industrialFilters;
-        if (inf.ubicacion && rawP.ubicacion_industrial !== inf.ubicacion) return false;
+        // Solo filtra cuando se eligió exactamente una opción; ambas (o ninguna) = sin filtro
+        if (inf.ubicacion.length === 1 && rawP.ubicacion_industrial !== inf.ubicacion[0]) return false;
         if (inf.alturaLibre && rawP.altura_libre_m !== inf.alturaLibre) return false;
         if (inf.energiaKva.length > 0) {
           const propEnergy = rawP.tipo_energia_kva ?? [];
@@ -415,8 +436,8 @@ export const usePropertyFilters = (
           if (!hasMatch) return false;
         }
         if (ag.concesionAgua && !rawP.concesion_agua) return false;
-        if (ag.usoTerreno && !rawP.uso_terreno?.includes(ag.usoTerreno)) return false;
-        if (ag.tipoRiego && !rawP.tipo_riego?.includes(ag.tipoRiego)) return false;
+        if (ag.usoTerreno.length === 1 && !rawP.uso_terreno?.includes(ag.usoTerreno[0])) return false;
+        if (ag.tipoRiego.length === 1 && !rawP.tipo_riego?.includes(ag.tipoRiego[0])) return false;
         if (ag.electricidad && !rawP.infra_electricidad) return false;
         if (ag.caminoAcceso && !rawP.infra_camino_acceso) return false;
         if (ag.cercado && !rawP.infra_cercado) return false;
@@ -426,20 +447,18 @@ export const usePropertyFilters = (
 
       return true;
     });
-
-    setFilteredProperties(filtered);
   }, [properties, filters, geofenceBounds]);
 
   const cf = filters.comercialFilters;
   const inf = filters.industrialFilters;
   const ag = filters.agricolaFilters;
   const hasSpecializedFilters =
-    (cf && (cf.tipoUbicacion !== "" || cf.frenteMin !== "" || cf.nivel !== "" ||
+    (cf && (cf.tipoUbicacion.length > 0 || cf.frenteMin !== "" || cf.nivel !== "" ||
       cf.sobreAvenidaPrincipal || cf.enEsquina || cf.altaVisibilidad || cf.altoFlujoVehicular)) ||
-    (inf && (inf.ubicacion !== "" || inf.alturaLibre !== "" || inf.energiaKva?.length > 0 ||
+    (inf && (inf.ubicacion.length > 0 || inf.alturaLibre !== "" || inf.energiaKva?.length > 0 ||
       inf.areaOficinasMin !== "" || inf.patioManiobrasMin !== "")) ||
-    (ag && (ag.tiposAgua?.length > 0 || ag.concesionAgua || ag.usoTerreno !== "" ||
-      ag.tipoRiego !== "" || ag.electricidad || ag.caminoAcceso || ag.cercado ||
+    (ag && (ag.tiposAgua?.length > 0 || ag.concesionAgua || ag.usoTerreno.length > 0 ||
+      ag.tipoRiego.length > 0 || ag.electricidad || ag.caminoAcceso || ag.cercado ||
       ag.pieCarretera || ag.accesCamiones));
 
   const hasActiveFilters =
@@ -456,6 +475,8 @@ export const usePropertyFilters = (
     filters.niveles !== "" ||
     filters.m2TerrenoMin !== "" ||
     filters.m2ConstruccionMin !== "" ||
+    filters.anchoTerrenoMin !== "" ||
+    filters.largoTerrenoMin !== "" ||
     filters.operacion !== "" ||
     parseFloat(filters.comisionVentaMin) > 0 ||
     parseFloat(filters.comisionRentaMin) > 0 ||

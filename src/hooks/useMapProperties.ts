@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { Property, PropertyType, GeoBounds } from "@/types";
@@ -28,6 +28,8 @@ export interface MapServerFilters {
   estacionamientosMin?: number;
   m2ConstruccionMin?: number;
   m2TerrenoMin?: number;
+  anchoTerrenoMin?: number;
+  largoTerrenoMin?: number;
   // Comercial
   tipoUbicacion?: string;
   frenteMin?: number;
@@ -84,7 +86,10 @@ interface SupabaseProperty {
   banos: number | null;
   metros_cuadrados_construccion: number | null;
   metros_cuadrados_terreno: number | null;
-  amenidades: string[] | null;
+  ancho_terreno: number | null;
+  largo_terreno: number | null;
+  /** Relación embebida: propiedad_amenidades → catalogo_amenidades(nombre). */
+  amenidades: { amenidad: { nombre: string } | null }[] | null;
   activo: boolean | null;
   deleted_at: string | null;
   operaciones_propiedad: SupabaseOperacion[] | null;
@@ -153,7 +158,9 @@ function mapProperty(p: SupabaseProperty): Property {
       landSqft: p.metros_cuadrados_terreno || 0,
       floors: p.pisos || undefined,
     },
-    amenities: p.amenidades || [],
+    amenities: (p.amenidades ?? [])
+      .map((a) => a.amenidad?.nombre)
+      .filter((n): n is string => !!n),
     type: (p.tipo || "habitacional").toLowerCase() as PropertyType,
     subtype: (p.subtipo || "").toLowerCase(),
     operation: operacion?.tipo_operacion === "venta" ? "Sale" : "Rent",
@@ -175,6 +182,8 @@ function hasActiveServerFilters(f: MapServerFilters): boolean {
     (f.estacionamientosMin && f.estacionamientosMin > 0) ||
     (f.m2ConstruccionMin && f.m2ConstruccionMin > 0) ||
     (f.m2TerrenoMin && f.m2TerrenoMin > 0) ||
+    (f.anchoTerrenoMin && f.anchoTerrenoMin > 0) ||
+    (f.largoTerrenoMin && f.largoTerrenoMin > 0) ||
     f.tipoUbicacion ||
     (f.frenteMin && f.frenteMin > 0) ||
     f.sobreAvenidaPrincipal ||
@@ -206,7 +215,9 @@ async function fetchMapProperties(
 
   let query = supabase
     .from("propiedades")
-    .select(`*, operaciones_propiedad (*)`);
+    .select(
+      `*, operaciones_propiedad (*), amenidades:propiedad_amenidades(amenidad:catalogo_amenidades(nombre))`,
+    );
 
   // Las propiedades sin comisión se guardan con activo=false y quedan ocultas a
   // todos. Excepción: su creador SÍ debe verlas en el mapa y el buscador.
@@ -225,9 +236,10 @@ async function fetchMapProperties(
     if (serverFilters.tipoPropiedad) {
       query = query.ilike("tipo", serverFilters.tipoPropiedad);
     }
-    if (serverFilters.subtipo && serverFilters.subtipo.length > 0) {
-      query = query.in("subtipo", serverFilters.subtipo);
-    }
+    // El subtipo NO se filtra aquí: `.in()` es case-sensitive y descarta datos con
+    // distinta capitalización (p.ej. "Casa en condominio" vs "Casa en Condominio").
+    // Se filtra en cliente (usePropertyFilters), que compara en minúsculas. El subtipo
+    // sigue contando como filtro activo en hasActiveServerFilters.
 
     // ── Ubicación por bounds (prioridad) ──
     if (serverFilters.bounds) {
@@ -265,6 +277,12 @@ async function fetchMapProperties(
     }
     if (serverFilters.m2TerrenoMin && serverFilters.m2TerrenoMin > 0) {
       query = query.gte("metros_cuadrados_terreno", serverFilters.m2TerrenoMin);
+    }
+    if (serverFilters.anchoTerrenoMin && serverFilters.anchoTerrenoMin > 0) {
+      query = query.gte("ancho_terreno", serverFilters.anchoTerrenoMin);
+    }
+    if (serverFilters.largoTerrenoMin && serverFilters.largoTerrenoMin > 0) {
+      query = query.gte("largo_terreno", serverFilters.largoTerrenoMin);
     }
 
     // ── Comercial ──
@@ -336,6 +354,7 @@ export function useMapProperties(serverFilters?: MapServerFilters) {
     queryFn: () => fetchMapProperties(serverFilters, currentUserId),
     staleTime: filterKey === "default" ? 5 * 60 * 1000 : 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 

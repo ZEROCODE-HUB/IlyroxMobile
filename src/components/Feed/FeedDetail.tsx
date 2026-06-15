@@ -126,7 +126,11 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
         {/* Área de contenido principal */}
         {isSpecialPost ? (
           <View style={styles.specialCardWrapper}>
-            <SpecialPostCard item={item} mode="detail" />
+            <SpecialPostCard
+              item={item}
+              mode="detail"
+              currentUserId={currentUserId}
+            />
           </View>
         ) : null}
 

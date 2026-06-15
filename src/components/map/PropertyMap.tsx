@@ -31,8 +31,8 @@ interface PropertyMapProps {
   confirmedPolygons?: PolygonCoord[][];
   onMapPress?: (coord: PolygonCoord) => void;
   onLongPressMap?: (coord: PolygonCoord) => void;
-  /** Pin clásico en el punto exacto de la ubicación buscada (centro del foco). */
-  searchedLocationPin?: { latitude: number; longitude: number } | null;
+  /** Pins clásicos en el punto exacto de cada ubicación buscada/agregada. */
+  searchedLocationPins?: { key: string; latitude: number; longitude: number }[];
 }
 
 export const PropertyMap: React.FC<PropertyMapProps> = ({
@@ -46,7 +46,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   confirmedPolygons = [],
   onMapPress,
   onLongPressMap,
-  searchedLocationPin,
+  searchedLocationPins,
 }) => {
   const mapRef = useRef<any>(null);
   const nativeMapRef = useRef<MapView>(null);
@@ -637,16 +637,17 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
             );
           })}
 
-        {/* Pin clásico de la ubicación buscada (color distinto al de las propiedades) */}
-        {searchedLocationPin && (
+        {/* Pins clásicos de las ubicaciones buscadas (color distinto al de las propiedades) */}
+        {searchedLocationPins?.map((pin) => (
           <Marker
-            coordinate={searchedLocationPin}
+            key={`searched-pin-${pin.key}`}
+            coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
             pinColor={COLORS.error}
             title="Ubicación buscada"
             zIndex={9999}
             tracksViewChanges={false}
           />
-        )}
+        ))}
       </MapView>
 
       {/* Overlay absoluto para los precios (Inmune a los recortes de Android) */}

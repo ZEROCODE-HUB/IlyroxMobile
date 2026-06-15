@@ -1,17 +1,28 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
   Modal,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
+import {
+  KeyboardProvider,
+  KeyboardAwareScrollView,
+} from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQueryClient } from "@tanstack/react-query";
 import { COLORS } from "@/constants/colors";
-import { PROPERTY_TYPES } from "@/constants/propertyData";
+import { supabase } from "@/lib/supabase";
+import { Post } from "@/types";
+import {
+  PROPERTY_TYPES,
+  getCamposVisibles,
+  esTerreno,
+  TipoPrincipal,
+} from "@/constants/propertyData";
 import { AppInput } from "@/design-system/components/AppInput";
 import { useCreateContent } from "@/hooks/useCreateContent";
 import { useToast } from "@/context/ToastContext";
@@ -19,12 +30,17 @@ import {
   MultiLevelLocationPicker,
   LocationChipItem,
 } from "@/components/common/MultiLevelLocationPicker";
-import type {
-  LocationChip,
+import {
   ComercialFilters,
   IndustrialFilters,
   AgricolaFilters,
+  initialComercialFilters,
+  initialIndustrialFilters,
+  initialAgricolaFilters,
 } from "@/store/propertyFiltersStore";
+import { ComercialFiltersSection } from "./filters/ComercialFiltersSection";
+import { IndustrialFiltersSection } from "./filters/IndustrialFiltersSection";
+import { AgricolaFiltersSection } from "./filters/AgricolaFiltersSection";
 
 interface LocationData {
   estado: string;
@@ -42,6 +58,8 @@ interface PublishSearchPostModalProps {
   onClose: () => void;
   onPublished: () => void;
   userId?: string;
+  /** Si se pasa, el modal opera en modo edición sobre este post existente. */
+  editPost?: Post;
 }
 
 const OPERACION_OPTIONS = ["venta", "renta"] as const;
@@ -71,17 +89,22 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
   onClose,
   onPublished,
   userId,
+  editPost,
 }) => {
   const insets = useSafeAreaInsets();
   const { createPost } = useCreateContent(userId);
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
+  const isEditing = !!editPost;
 
-  const [operacion, setOperacion] = useState("");
+  const [operaciones, setOperaciones] = useState<string[]>([]);
   const [tipoPropiedad, setTipoPropiedad] = useState("");
   const [subtipo, setSubtipo] = useState<string[]>([]);
   const [moneda, setMoneda] = useState("MXN");
   const [precioMin, setPrecioMin] = useState("");
   const [precioMax, setPrecioMax] = useState("");
+  const [precioRentaMin, setPrecioRentaMin] = useState("");
+  const [precioRentaMax, setPrecioRentaMax] = useState("");
 
   // Ubicación legacy: mantenida para retrocompat con metadata anterior
   const [locationData, setLocationData] = useState<LocationData | null>(null);
@@ -99,9 +122,9 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
   // Superficies
   const [m2Terreno, setM2Terreno] = useState("");
   const [m2Construccion, setM2Construccion] = useState("");
-
-  // Zonas de interés (chips de ubicación nombrada, sin polígonos)
-  const [zonasInteres, setZonasInteres] = useState<LocationChip[]>([]);
+  // Dimensiones del terreno (frente/fondo), solo terrenos
+  const [anchoTerreno, setAnchoTerreno] = useState("");
+  const [largoTerreno, setLargoTerreno] = useState("");
 
   // Nota libre del usuario
   const [nota, setNota] = useState("");
@@ -113,10 +136,28 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
 
   const [publishing, setPublishing] = useState(false);
 
+  // Cargar el metadata SOLO una vez por apertura del modal. Evita re-ejecutar
+  // la cascada de ~18 setState en cada render (posible "Maximum update depth").
+  const didInitRef = useRef(false);
   useEffect(() => {
-    if (visible && initialMetadata) {
+    if (!visible) {
+      didInitRef.current = false;
+      return;
+    }
+    if (didInitRef.current) return;
+    if (initialMetadata) {
+      didInitRef.current = true;
       const f = initialMetadata.filtros ?? {};
-      setOperacion(f.operacion ?? "");
+      const incomingOps = Array.isArray(f.operaciones)
+        ? f.operaciones
+        : f.operacion
+          ? [f.operacion]
+          : [];
+      setOperaciones(
+        incomingOps
+          .map((o: any) => String(o).toLowerCase())
+          .filter((o: string) => o === "venta" || o === "renta"),
+      );
       setTipoPropiedad(f.tipo_propiedad ?? "");
       setMoneda(f.moneda ?? "MXN");
 
@@ -125,6 +166,8 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
 
       setPrecioMin(f.precio_min && f.precio_min !== 0 ? formatNumericInput(f.precio_min) : "");
       setPrecioMax(f.precio_max ? formatNumericInput(f.precio_max) : "");
+      setPrecioRentaMin(f.precio_renta_min && f.precio_renta_min !== 0 ? formatNumericInput(f.precio_renta_min) : "");
+      setPrecioRentaMax(f.precio_renta_max ? formatNumericInput(f.precio_renta_max) : "");
 
       const ub = f.ubicacion ?? {};
       const hasLocation = !!(ub.estado || ub.municipio || ub.ciudad);
@@ -149,7 +192,40 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
       const incomingUbicaciones: LocationChipItem[] = Array.isArray(f.ubicaciones)
         ? f.ubicaciones.filter((u: any) => u && u.level && u.estado)
         : [];
-      setUbicaciones(incomingUbicaciones);
+
+      // Retrocompat: posts antiguos sin `ubicaciones[]` traen solo `ubicacion`
+      // (legacy). Derivamos chips desde colonias/municipio/estado para que la
+      // edición no quede sin ubicación y la validación no la bloquee.
+      let finalUbicaciones: LocationChipItem[] = incomingUbicaciones;
+      if (finalUbicaciones.length === 0 && ub.estado) {
+        if (incomingColonias.length > 0) {
+          finalUbicaciones = incomingColonias.map((col) => ({
+            level: "colonia" as const,
+            estado: ub.estado,
+            municipio: ub.municipio,
+            colonia: col,
+            label: [col, ub.municipio, ub.estado].filter(Boolean).join(", "),
+          }));
+        } else if (ub.municipio) {
+          finalUbicaciones = [
+            {
+              level: "municipio",
+              estado: ub.estado,
+              municipio: ub.municipio,
+              label: [ub.municipio, ub.estado].filter(Boolean).join(", "),
+            },
+          ];
+        } else {
+          finalUbicaciones = [
+            {
+              level: "estado",
+              estado: ub.estado,
+              label: ub.estado,
+            },
+          ];
+        }
+      }
+      setUbicaciones(finalUbicaciones);
 
       const car = f.caracteristicas ?? {};
       setHabitaciones(car.habitaciones ? String(car.habitaciones) : "");
@@ -159,10 +235,11 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
       setAntiguedad(car.antiguedad ? String(car.antiguedad) : "");
 
       const sup = f.superficies ?? {};
-      setM2Terreno(sup.m2_terreno_min && sup.m2_terreno_min !== 0 ? String(sup.m2_terreno_min) : "");
-      setM2Construccion(sup.m2_construccion_min && sup.m2_construccion_min !== 0 ? String(sup.m2_construccion_min) : "");
+      setM2Terreno(sup.m2_terreno_min && sup.m2_terreno_min !== 0 ? formatNumericInput(sup.m2_terreno_min) : "");
+      setM2Construccion(sup.m2_construccion_min && sup.m2_construccion_min !== 0 ? formatNumericInput(sup.m2_construccion_min) : "");
+      setAnchoTerreno(sup.ancho_terreno_min && sup.ancho_terreno_min !== 0 ? formatNumericInput(sup.ancho_terreno_min) : "");
+      setLargoTerreno(sup.largo_terreno_min && sup.largo_terreno_min !== 0 ? formatNumericInput(sup.largo_terreno_min) : "");
 
-      setZonasInteres(Array.isArray(f.zonas_interes) ? f.zonas_interes : []);
       setNota(typeof f.nota === "string" ? f.nota : "");
 
       setComercialFilters(f.comercial ?? null);
@@ -183,8 +260,38 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
   const parseNum = (val: string) =>
     val.trim() ? parseFloat(val.replace(/,/g, "")) : null;
 
+  const toggleOperacion = (val: string) => {
+    setOperaciones((prev) =>
+      prev.includes(val) ? prev.filter((o) => o !== val) : [...prev, val],
+    );
+  };
+
+  // Visibilidad de campos por tipo (misma lógica que publicar propiedad):
+  // p.ej. Comercial/Industrial no muestran "Recámaras".
+  const camposVisiblesBase = getCamposVisibles(
+    subtipo,
+    (tipoPropiedad || undefined) as TipoPrincipal | undefined,
+  );
+  // Regla propia del post de búsqueda: Industrial no usa "niveles".
+  const camposVisibles = {
+    ...camposVisiblesBase,
+    niveles: camposVisiblesBase.niveles && tipoPropiedad !== "industrial",
+  };
+  const isTerreno = esTerreno(subtipo);
+
+  // Qué precios mostrar según la(s) operación(es): si no hay operación elegida,
+  // se asume compra (rango único).
+  const mostrarVenta = operaciones.length === 0 || operaciones.includes("venta");
+  const mostrarRenta = operaciones.includes("renta");
+
   const handlePublish = async () => {
     if (!initialMetadata) return;
+
+    // Validación: se requiere al menos una ubicación escrita en el picker
+    if (ubicaciones.length === 0) {
+      showToast("Selecciona al menos una ubicación", "error");
+      return;
+    }
 
     // Derivar ubicacion legacy desde el primer chip multi-nivel (si hay)
     const firstChip = ubicaciones[0];
@@ -221,15 +328,18 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
       ...initialMetadata,
       filtros: {
         ...initialMetadata.filtros,
-        operacion: operacion || initialMetadata.filtros?.operacion,
+        operacion: operaciones.length === 1 ? operaciones[0] : "",
+        operaciones,
         tipo_propiedad: tipoPropiedad || initialMetadata.filtros?.tipo_propiedad,
         subtipo,
         moneda,
         precio_min: parseNum(precioMin) ?? initialMetadata.filtros?.precio_min ?? 0,
         precio_max: parseNum(precioMax) ?? initialMetadata.filtros?.precio_max ?? null,
+        precio_renta_min: parseNum(precioRentaMin) ?? initialMetadata.filtros?.precio_renta_min ?? 0,
+        precio_renta_max: parseNum(precioRentaMax) ?? initialMetadata.filtros?.precio_renta_max ?? null,
         ubicacion: legacyUbicacion,
         ubicaciones,
-        zonas_interes: zonasInteres,
+        zonas_interes: [],
         caracteristicas: {
           ...initialMetadata.filtros?.caracteristicas,
           habitaciones: parseNum(habitaciones) ?? initialMetadata.filtros?.caracteristicas?.habitaciones,
@@ -242,26 +352,40 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
           ...initialMetadata.filtros?.superficies,
           m2_terreno_min: parseNum(m2Terreno) ?? initialMetadata.filtros?.superficies?.m2_terreno_min ?? 0,
           m2_construccion_min: parseNum(m2Construccion) ?? initialMetadata.filtros?.superficies?.m2_construccion_min ?? 0,
+          ancho_terreno_min: parseNum(anchoTerreno) ?? initialMetadata.filtros?.superficies?.ancho_terreno_min ?? 0,
+          largo_terreno_min: parseNum(largoTerreno) ?? initialMetadata.filtros?.superficies?.largo_terreno_min ?? 0,
           icon: "resize-outline",
         },
         nota: nota.trim(),
-        ...(comercialFilters ? { comercial: comercialFilters } : {}),
-        ...(industrialFilters ? { industrial: industrialFilters } : {}),
-        ...(agricolaFilters ? { agricola: agricolaFilters } : {}),
+        ...(tipoPropiedad === "comercial" && comercialFilters ? { comercial: comercialFilters } : {}),
+        ...(tipoPropiedad === "industrial" && industrialFilters ? { industrial: industrialFilters } : {}),
+        ...(tipoPropiedad === "agricola" && agricolaFilters ? { agricola: agricolaFilters } : {}),
       },
     };
 
     setPublishing(true);
     try {
-      const success = await createPost("🔍  BUSCO PROPIEDAD:", [], "busqueda", updatedMetadata);
-      if (success) {
-        showToast("Post publicado en el feed", "success");
+      if (isEditing && editPost) {
+        // Modo edición: actualizar el post existente conservando contenido/status.
+        const { error } = await supabase
+          .from("posts")
+          .update({ busquedas_json: updatedMetadata, updated_at: new Date() })
+          .eq("id", editPost.id);
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ["feed"] });
+        showToast("Búsqueda actualizada", "success");
         onPublished();
       } else {
-        showToast("Error al publicar el post", "error");
+        const success = await createPost("🔍  BUSCO PROPIEDAD:", [], "busqueda", updatedMetadata);
+        if (success) {
+          showToast("Post publicado en el feed", "success");
+          onPublished();
+        } else {
+          showToast("Error al publicar el post", "error");
+        }
       }
     } catch {
-      showToast("Error al publicar el post", "error");
+      showToast(isEditing ? "Error al actualizar la búsqueda" : "Error al publicar el post", "error");
     } finally {
       setPublishing(false);
     }
@@ -274,20 +398,25 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
+      <KeyboardProvider>
       <View style={[styles.container, { paddingTop: insets.top }]}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={8}>
             <Ionicons name="close" size={24} color={COLORS.textSecondary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Publicar búsqueda</Text>
+          <Text style={styles.headerTitle}>
+            {isEditing ? "Editar búsqueda" : "Publicar búsqueda"}
+          </Text>
           <View style={{ width: 38 }} />
         </View>
 
-        <ScrollView
+        <KeyboardAwareScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          bottomOffset={24}
           showsVerticalScrollIndicator={false}
         >
           {/* Prospecto */}
@@ -307,13 +436,13 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
           <SectionCard label="Operación">
             <View style={styles.chipsRow}>
               {OPERACION_OPTIONS.map((op) => {
-                const active = operacion.toLowerCase() === op;
+                const active = operaciones.includes(op);
                 return (
                   <Chip
                     key={op}
                     label={op.charAt(0).toUpperCase() + op.slice(1)}
                     active={active}
-                    onPress={() => setOperacion(active ? "" : op)}
+                    onPress={() => toggleOperacion(op)}
                   />
                 );
               })}
@@ -373,26 +502,58 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
                 />
               ))}
             </View>
-            <View style={[styles.row, { marginTop: 12 }]}>
-              <View style={{ flex: 1 }}>
-                <AppInput
-                  label="Precio mínimo"
-                  placeholder="Ej. 1,000,000"
-                  keyboardType="numeric"
-                  value={precioMin}
-                  onChangeText={(t) => handleCurrencyChange(t, setPrecioMin)}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <AppInput
-                  label="Precio máximo"
-                  placeholder="Sin límite"
-                  keyboardType="numeric"
-                  value={precioMax}
-                  onChangeText={(t) => handleCurrencyChange(t, setPrecioMax)}
-                />
-              </View>
-            </View>
+            {mostrarVenta && (
+              <>
+                <Text style={styles.priceGroupLabel}>
+                  {mostrarRenta ? "Precio de compra" : "Rango de precio"}
+                </Text>
+                <View style={[styles.row, { marginTop: 8 }]}>
+                  <View style={{ flex: 1 }}>
+                    <AppInput
+                      label="Mínimo"
+                      placeholder="Ej. 1,000,000"
+                      keyboardType="numeric"
+                      value={precioMin}
+                      onChangeText={(t) => handleCurrencyChange(t, setPrecioMin)}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <AppInput
+                      label="Máximo"
+                      placeholder="Sin límite"
+                      keyboardType="numeric"
+                      value={precioMax}
+                      onChangeText={(t) => handleCurrencyChange(t, setPrecioMax)}
+                    />
+                  </View>
+                </View>
+              </>
+            )}
+            {mostrarRenta && (
+              <>
+                <Text style={styles.priceGroupLabel}>Precio de renta (mensual)</Text>
+                <View style={[styles.row, { marginTop: 8 }]}>
+                  <View style={{ flex: 1 }}>
+                    <AppInput
+                      label="Mínimo"
+                      placeholder="Ej. 8,000"
+                      keyboardType="numeric"
+                      value={precioRentaMin}
+                      onChangeText={(t) => handleCurrencyChange(t, setPrecioRentaMin)}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <AppInput
+                      label="Máximo"
+                      placeholder="Sin límite"
+                      keyboardType="numeric"
+                      value={precioRentaMax}
+                      onChangeText={(t) => handleCurrencyChange(t, setPrecioRentaMax)}
+                    />
+                  </View>
+                </View>
+              </>
+            )}
           </SectionCard>
 
           {/* ── Ubicación (multi-nivel) ──────────────────── */}
@@ -403,129 +564,177 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
             />
           </SectionCard>
 
-          {/* ── Zonas de interés (chips del mapa) ────────── */}
-          {zonasInteres.length > 0 && (
-            <SectionCard label="Zonas de interés">
-              <View style={styles.chipsRow}>
-                {zonasInteres.map((zona) => (
-                  <View key={zona.id} style={styles.zonaChip}>
-                    <Text style={styles.zonaChipPin}>📍</Text>
-                    <Text style={styles.zonaChipText} numberOfLines={1}>
-                      {zona.label}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() =>
-                        setZonasInteres((prev) => prev.filter((z) => z.id !== zona.id))
-                      }
-                      hitSlop={8}
-                      style={styles.zonaChipRemove}
-                    >
-                      <Ionicons name="close" size={14} color={COLORS.textSecondary} />
-                    </TouchableOpacity>
+          {/* ── Características (según tipo) ───────────────── */}
+          {(camposVisibles.recamaras ||
+            camposVisibles.banos ||
+            camposVisibles.estacionamientos ||
+            camposVisibles.niveles ||
+            camposVisibles.antiguedad) && (
+            <SectionCard label="Características">
+              <View style={styles.fieldsWrap}>
+                {camposVisibles.recamaras && (
+                  <View style={styles.fieldHalf}>
+                    <AppInput
+                      label="Recámaras"
+                      placeholder="Ej. 3"
+                      keyboardType="numeric"
+                      value={habitaciones}
+                      onChangeText={setHabitaciones}
+                    />
                   </View>
-                ))}
+                )}
+                {camposVisibles.banos && (
+                  <View style={styles.fieldHalf}>
+                    <AppInput
+                      label="Baños"
+                      placeholder="Ej. 2"
+                      keyboardType="numeric"
+                      value={banos}
+                      onChangeText={setBanos}
+                    />
+                  </View>
+                )}
+                {camposVisibles.estacionamientos && (
+                  <View style={styles.fieldHalf}>
+                    <AppInput
+                      label="Estacionamientos"
+                      placeholder="Ej. 2"
+                      keyboardType="numeric"
+                      value={estacionamientos}
+                      onChangeText={setEstacionamientos}
+                    />
+                  </View>
+                )}
+                {camposVisibles.niveles && (
+                  <View style={styles.fieldHalf}>
+                    <AppInput
+                      label="Plantas"
+                      placeholder="Ej. 2"
+                      keyboardType="numeric"
+                      value={niveles}
+                      onChangeText={setNiveles}
+                      helperText={
+                        Number(niveles) > 0
+                          ? `${niveles} planta${Number(niveles) === 1 ? "" : "s"}`
+                          : undefined
+                      }
+                    />
+                  </View>
+                )}
+                {camposVisibles.antiguedad && (
+                  <View style={styles.fieldFull}>
+                    <AppInput
+                      label="Antigüedad"
+                      placeholder="Ej. Nueva, 5 años…"
+                      value={antiguedad}
+                      onChangeText={setAntiguedad}
+                    />
+                  </View>
+                )}
               </View>
             </SectionCard>
           )}
 
-          {/* ── Características ───────────────────────────── */}
-          <SectionCard label="Características">
-            <View style={{ gap: 10 }}>
-              <View style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <AppInput
-                    label="Recámaras"
-                    placeholder="Ej. 3"
-                    keyboardType="numeric"
-                    value={habitaciones}
-                    onChangeText={setHabitaciones}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <AppInput
-                    label="Baños"
-                    placeholder="Ej. 2"
-                    keyboardType="numeric"
-                    value={banos}
-                    onChangeText={setBanos}
-                  />
-                </View>
+          {/* ── Superficies (según tipo) ─────────────────── */}
+          {(camposVisibles.m2Terreno || camposVisibles.m2Construccion || isTerreno) && (
+            <SectionCard label="Superficies">
+              <View style={styles.fieldsWrap}>
+                {camposVisibles.m2Terreno && (
+                  <View style={styles.fieldHalf}>
+                    <AppInput
+                      label="m² terreno mín."
+                      placeholder="Ej. 200"
+                      keyboardType="numeric"
+                      value={m2Terreno}
+                      onChangeText={(t) => handleCurrencyChange(t, setM2Terreno)}
+                    />
+                  </View>
+                )}
+                {camposVisibles.m2Construccion && (
+                  <View style={styles.fieldHalf}>
+                    <AppInput
+                      label="m² construcción mín."
+                      placeholder="Ej. 150"
+                      keyboardType="numeric"
+                      value={m2Construccion}
+                      onChangeText={(t) => handleCurrencyChange(t, setM2Construccion)}
+                    />
+                  </View>
+                )}
+                {isTerreno && (
+                  <>
+                    <View style={styles.fieldHalf}>
+                      <AppInput
+                        label="Ancho (m) mín."
+                        placeholder="Ej. 10"
+                        keyboardType="numeric"
+                        value={anchoTerreno}
+                        onChangeText={(t) => handleCurrencyChange(t, setAnchoTerreno)}
+                      />
+                    </View>
+                    <View style={styles.fieldHalf}>
+                      <AppInput
+                        label="Largo (m) mín."
+                        placeholder="Ej. 25"
+                        keyboardType="numeric"
+                        value={largoTerreno}
+                        onChangeText={(t) => handleCurrencyChange(t, setLargoTerreno)}
+                      />
+                    </View>
+                  </>
+                )}
               </View>
-              <View style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <AppInput
-                    label="Estacionamientos"
-                    placeholder="Ej. 2"
-                    keyboardType="numeric"
-                    value={estacionamientos}
-                    onChangeText={setEstacionamientos}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <AppInput
-                    label="Niveles"
-                    placeholder="Ej. 2"
-                    keyboardType="numeric"
-                    value={niveles}
-                    onChangeText={setNiveles}
-                  />
-                </View>
-              </View>
-              <AppInput
-                label="Antigüedad"
-                placeholder="Ej. Nueva, 5 años…"
-                value={antiguedad}
-                onChangeText={setAntiguedad}
+            </SectionCard>
+          )}
+
+          {/* ── Detalles según tipo (comercial/industrial/agrícola) ── */}
+          {tipoPropiedad === "comercial" && (
+            <View style={styles.section}>
+              <ComercialFiltersSection
+                value={comercialFilters ?? initialComercialFilters}
+                onUpdate={(key, val) =>
+                  setComercialFilters(
+                    (prev) =>
+                      ({
+                        ...(prev ?? initialComercialFilters),
+                        [key]: val,
+                      }) as ComercialFilters,
+                  )
+                }
               />
             </View>
-          </SectionCard>
-
-          {/* ── Superficies ───────────────────────────────── */}
-          <SectionCard label="Superficies">
-            <View style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <AppInput
-                  label="m² terreno mín."
-                  placeholder="Ej. 200"
-                  keyboardType="numeric"
-                  value={m2Terreno}
-                  onChangeText={setM2Terreno}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <AppInput
-                  label="m² construcción mín."
-                  placeholder="Ej. 150"
-                  keyboardType="numeric"
-                  value={m2Construccion}
-                  onChangeText={setM2Construccion}
-                />
-              </View>
+          )}
+          {tipoPropiedad === "industrial" && (
+            <View style={styles.section}>
+              <IndustrialFiltersSection
+                value={industrialFilters ?? initialIndustrialFilters}
+                onUpdate={(key, val) =>
+                  setIndustrialFilters(
+                    (prev) =>
+                      ({
+                        ...(prev ?? initialIndustrialFilters),
+                        [key]: val,
+                      }) as IndustrialFilters,
+                  )
+                }
+              />
             </View>
-          </SectionCard>
-
-          {/* ── Detalles adicionales (filtros especializados) ── */}
-          {(comercialFilters || industrialFilters || agricolaFilters) && (
-            <SectionCard label="Detalles adicionales">
-              {comercialFilters && (
-                <SpecializedSummary
-                  title="Comercial"
-                  rows={summarizeComercial(comercialFilters)}
-                />
-              )}
-              {industrialFilters && (
-                <SpecializedSummary
-                  title="Industrial"
-                  rows={summarizeIndustrial(industrialFilters)}
-                />
-              )}
-              {agricolaFilters && (
-                <SpecializedSummary
-                  title="Agrícola"
-                  rows={summarizeAgricola(agricolaFilters)}
-                />
-              )}
-            </SectionCard>
+          )}
+          {tipoPropiedad === "agricola" && (
+            <View style={styles.section}>
+              <AgricolaFiltersSection
+                value={agricolaFilters ?? initialAgricolaFilters}
+                onUpdate={(key, val) =>
+                  setAgricolaFilters(
+                    (prev) =>
+                      ({
+                        ...(prev ?? initialAgricolaFilters),
+                        [key]: val,
+                      }) as AgricolaFilters,
+                  )
+                }
+              />
+            </View>
           )}
 
           {/* ── Nota libre ───────────────────────────────── */}
@@ -542,7 +751,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
               showCounter
             />
           </SectionCard>
-        </ScrollView>
+        </KeyboardAwareScrollView>
 
         {/* Footer */}
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
@@ -561,11 +770,18 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
               <Ionicons name="paper-plane-outline" size={20} color={COLORS.white} />
             )}
             <Text style={styles.publishBtnText}>
-              {publishing ? "Publicando..." : "Publicar"}
+              {publishing
+                ? isEditing
+                  ? "Actualizando..."
+                  : "Publicando..."
+                : isEditing
+                  ? "Actualizar"
+                  : "Publicar"}
             </Text>
           </TouchableOpacity>
         </View>
       </View>
+      </KeyboardProvider>
     </Modal>
   );
 };
@@ -591,67 +807,6 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
     </TouchableOpacity>
   );
-}
-
-function SpecializedSummary({
-  title,
-  rows,
-}: {
-  title: string;
-  rows: Array<[string, string]>;
-}) {
-  if (rows.length === 0) return null;
-  return (
-    <View style={styles.specializedBlock}>
-      <Text style={styles.specializedTitle}>{title}</Text>
-      {rows.map(([key, value]) => (
-        <View key={key} style={styles.specializedRow}>
-          <Text style={styles.specializedKey}>{key}</Text>
-          <Text style={styles.specializedValue}>{value}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function summarizeComercial(f: ComercialFilters): Array<[string, string]> {
-  const out: Array<[string, string]> = [];
-  if (f.tipoUbicacion) out.push(["Ubicación", f.tipoUbicacion]);
-  if (f.frenteMin) out.push(["Frente mín.", `${f.frenteMin} m`]);
-  if (f.nivel) out.push(["Nivel", f.nivel]);
-  const flags: string[] = [];
-  if (f.sobreAvenidaPrincipal) flags.push("Av. principal");
-  if (f.enEsquina) flags.push("En esquina");
-  if (f.altaVisibilidad) flags.push("Alta visibilidad");
-  if (f.altoFlujoVehicular) flags.push("Alto flujo");
-  if (flags.length) out.push(["Características", flags.join(", ")]);
-  return out;
-}
-
-function summarizeIndustrial(f: IndustrialFilters): Array<[string, string]> {
-  const out: Array<[string, string]> = [];
-  if (f.ubicacion) out.push(["Ubicación", f.ubicacion]);
-  if (f.alturaLibre) out.push(["Altura libre", f.alturaLibre]);
-  if (f.energiaKva?.length) out.push(["Energía", f.energiaKva.join(", ")]);
-  if (f.areaOficinasMin) out.push(["Área oficinas mín.", `${f.areaOficinasMin} m²`]);
-  if (f.patioManiobrasMin) out.push(["Patio maniobras mín.", `${f.patioManiobrasMin} m²`]);
-  return out;
-}
-
-function summarizeAgricola(f: AgricolaFilters): Array<[string, string]> {
-  const out: Array<[string, string]> = [];
-  if (f.tiposAgua?.length) out.push(["Tipos de agua", f.tiposAgua.join(", ")]);
-  if (f.concesionAgua) out.push(["Concesión de agua", "Sí"]);
-  if (f.usoTerreno) out.push(["Uso de terreno", f.usoTerreno]);
-  if (f.tipoRiego) out.push(["Tipo de riego", f.tipoRiego]);
-  const flags: string[] = [];
-  if (f.electricidad) flags.push("Electricidad");
-  if (f.caminoAcceso) flags.push("Camino de acceso");
-  if (f.cercado) flags.push("Cercado");
-  if (f.pieCarretera) flags.push("Pie de carretera");
-  if (f.accesCamiones) flags.push("Acceso camiones");
-  if (flags.length) out.push(["Servicios", flags.join(", ")]);
-  return out;
 }
 
 const styles = StyleSheet.create({
@@ -750,6 +905,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
   },
+  fieldsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  fieldHalf: {
+    flexGrow: 1,
+    flexBasis: "47%",
+  },
+  fieldFull: {
+    flexBasis: "100%",
+    width: "100%",
+  },
+  priceGroupLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+    marginTop: 14,
+  },
   locationDisplay: {
     flexDirection: "row",
     alignItems: "center",
@@ -821,31 +995,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     color: COLORS.white,
-  },
-  zonaChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: COLORS.background,
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingLeft: 10,
-    paddingRight: 6,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    maxWidth: "100%",
-  },
-  zonaChipPin: {
-    fontSize: 13,
-  },
-  zonaChipText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-    maxWidth: 180,
-  },
-  zonaChipRemove: {
-    paddingHorizontal: 2,
   },
   notaInput: {
     minHeight: 96,

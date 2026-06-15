@@ -85,10 +85,10 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
     const cf = filters.comercialFilters;
     const inf = filters.industrialFilters;
     const ag = filters.agricolaFilters;
-    if (cf?.tipoUbicacion) parts.push(cf.tipoUbicacion);
-    if (inf?.ubicacion) parts.push(inf.ubicacion);
+    if (cf?.tipoUbicacion?.length) parts.push(cf.tipoUbicacion.join(", "));
+    if (inf?.ubicacion?.length) parts.push(inf.ubicacion.join(", "));
     if (inf?.alturaLibre) parts.push(`Altura: ${inf.alturaLibre}`);
-    if (ag?.usoTerreno) parts.push(`Uso: ${ag.usoTerreno}`);
+    if (ag?.usoTerreno?.length) parts.push(`Uso: ${ag.usoTerreno.join(", ")}`);
 
     return parts.length > 0 ? parts.join(" • ") : "Búsqueda general";
   };
@@ -252,7 +252,7 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
                 color={COLORS.white}
                 style={{ marginRight: 8 }}
               />
-              <Text style={styles.saveButtonText}>Avísame si encuentras algo</Text>
+              <Text style={styles.saveButtonText}>Notifícame</Text>
             </TouchableOpacity>
           </View>
         </Pressable>

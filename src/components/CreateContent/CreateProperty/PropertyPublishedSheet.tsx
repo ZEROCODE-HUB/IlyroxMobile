@@ -26,7 +26,6 @@ interface PropertyPublishedSheetProps {
   /** Si se pasa, se muestra el botón "Crear Open House" */
   onCreateOpenHouse?: () => void;
   onViewProperty: () => void;
-  onGoToFeed: () => void;
   onDismiss: () => void;
 }
 
@@ -36,7 +35,6 @@ export const PropertyPublishedSheet: React.FC<PropertyPublishedSheetProps> = ({
   newPropertyId,
   onCreateOpenHouse,
   onViewProperty,
-  onGoToFeed,
   onDismiss,
 }) => {
   return (
@@ -88,16 +86,17 @@ export const PropertyPublishedSheet: React.FC<PropertyPublishedSheetProps> = ({
             </TouchableOpacity>
           )}
 
-          {/* Botón secundario */}
-          <TouchableOpacity
-            style={styles.secondaryBtn}
-            onPress={isUpdate ? onDismiss : onGoToFeed}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.secondaryBtnText}>
-              {isUpdate ? "Listo" : "Ir al feed"}
-            </Text>
-          </TouchableOpacity>
+          {/* Botón secundario: solo en edición ("Listo"). En publicación nueva,
+              "Ver propiedad" ya lleva al feed con la propiedad hasta arriba. */}
+          {isUpdate && (
+            <TouchableOpacity
+              style={styles.secondaryBtn}
+              onPress={onDismiss}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.secondaryBtnText}>Listo</Text>
+            </TouchableOpacity>
+          )}
       </Pressable>
     </AppBottomSheet>
   );

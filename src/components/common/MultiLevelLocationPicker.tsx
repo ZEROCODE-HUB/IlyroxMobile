@@ -52,21 +52,21 @@ export const MultiLevelLocationPicker: React.FC<MultiLevelLocationPickerProps> =
   // Detect cuando la selección actual tiene al menos un nivel seleccionado
   const hasSelection = !!current && !!current.estado;
 
-  const handleAdd = () => {
-    if (!current || !current.estado) return;
+  const handleAdd = (loc: InternalLocation | null = current) => {
+    if (!loc || !loc.estado) return;
 
     let level: LocationChipItem["level"] = "estado";
-    if (current.colonia) level = "colonia";
-    else if (current.municipio) level = "municipio";
+    if (loc.colonia) level = "colonia";
+    else if (loc.municipio) level = "municipio";
 
     const chip: LocationChipItem = {
       level,
-      estado: current.estado,
-      municipio: current.municipio || undefined,
-      colonia: current.colonia || undefined,
-      label: buildLabel(current),
-      latitud: current.latitud,
-      longitud: current.longitud,
+      estado: loc.estado,
+      municipio: loc.municipio || undefined,
+      colonia: loc.colonia || undefined,
+      label: buildLabel(loc),
+      latitud: loc.latitud,
+      longitud: loc.longitud,
     };
 
     const key = chipKey(chip);
@@ -119,12 +119,19 @@ export const MultiLevelLocationPicker: React.FC<MultiLevelLocationPickerProps> =
         key={resetKey}
         isMandatory={false}
         showColonia={true}
-        onChange={(data) => setCurrent(data)}
+        onChange={(data) => {
+          setCurrent(data);
+          // Auto-agregar al tocar la sugerencia (sin tener que tocar el botón).
+          // Diferido para no re-montar el cascade mientras corre su handler.
+          if (data && data.estado) {
+            setTimeout(() => handleAdd(data), 0);
+          }
+        }}
       />
 
       <TouchableOpacity
         style={[styles.addBtn, !hasSelection && styles.addBtnDisabled]}
-        onPress={handleAdd}
+        onPress={() => handleAdd()}
         disabled={!hasSelection}
         activeOpacity={0.8}
       >

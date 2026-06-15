@@ -5,7 +5,9 @@
 // ============================================
 
 import { useState, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { prependPublishedFeedItem } from "@/hooks/useFeed";
 import { useModal } from "@/context/ModalContext";
 import { useToast } from "@/context/ToastContext";
 import { uploadImage as uploadImageService } from "../../../services/uploadService";
@@ -82,6 +84,7 @@ export function usePublishProperty(
 ) {
   const { user } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { saveProperty } = usePropertyMutation();
   const { showModal } = useModal();
   const { showToast } = useToast();
@@ -509,6 +512,15 @@ export function usePublishProperty(
 
         // Éxito
         const newPropertyId = !propertyId ? (saveResult?.id ?? null) : null;
+
+        // Prepend optimista: que la propiedad aparezca arriba del feed al instante
+        // (ignora el score; el orden por score se reaplica al refrescar/reentrar).
+        if (newPropertyId) {
+          prependPublishedFeedItem(queryClient, newPropertyId, user?.id).catch(
+            () => {},
+          );
+        }
+
         setTimeout(() => {
           setPublishState({
             uploading: false,

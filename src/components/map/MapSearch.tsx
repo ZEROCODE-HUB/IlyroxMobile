@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -27,6 +27,7 @@ import { router } from "expo-router";
 import {
   PolygonCoord,
   LocationChip,
+  usePropertyFiltersStore,
 } from "@/store/propertyFiltersStore";
 import {
   useLocationSearchStore,
@@ -76,11 +77,8 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     longitudeDelta: number;
   } | null>(null);
 
-  // Punto exacto de la ubicación buscada, para mostrar un PIN en el mapa.
-  const [searchedPin, setSearchedPin] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
+  // Evita re-agregar el chip de la ubicación elegida en el buscador de inicio.
+  const addedSelectedChipRef = useRef<string | null>(null);
 
   const {
     filteredProperties,
@@ -93,31 +91,71 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     filters,
   } = usePropertyFilters(properties, null);
 
+  // PINs de las ubicaciones seleccionadas: un marcador en el centro de cada chip
+  // (tanto la del buscador de inicio como las agregadas dentro del mapa).
+  const locationPins = useMemo(() => {
+    const pins: { key: string; latitude: number; longitude: number }[] = [];
+    for (const chip of filters.locationChips) {
+      if (chip.bounds) {
+        pins.push({
+          key: chip.id,
+          latitude: (chip.bounds.north + chip.bounds.south) / 2,
+          longitude: (chip.bounds.east + chip.bounds.west) / 2,
+        });
+      }
+    }
+    return pins;
+  }, [filters.locationChips]);
+
   // ── Geocodificar selectedLocation para navegación inicial del mapa ──
   // selectedLocation viene del contexto (home page). Si tiene placeId, usa Place Details
   // directamente para obtener los bounds. Si no, usa Geocoding API como fallback.
   useEffect(() => {
     if (!selectedLocation) {
       setFocusRegion(null);
-      setSearchedPin(null);
+      addedSelectedChipRef.current = null;
       return;
     }
+
+    const sel = selectedLocation as any;
+    const selKey = `${sel.type}-${sel.name}`;
+
+    // Agrega la ubicación elegida en el buscador de inicio como chip seleccionado
+    // (filtro activo), igual que al elegir una zona dentro del mapa.
+    const addSelectedAsChip = (
+      bounds?: { north: number; south: number; east: number; west: number },
+    ) => {
+      if (addedSelectedChipRef.current === selKey) return;
+      addedSelectedChipRef.current = selKey;
+      const chipId = `selected-${selKey}`;
+      const existing = usePropertyFiltersStore.getState().filters.locationChips;
+      if (existing.some((c) => c.id === chipId)) return;
+      const chip: LocationChip = {
+        id: chipId,
+        label: sel.name,
+        type: (sel.type ?? "colonia") as "estado" | "municipio" | "colonia",
+        bounds,
+        locationFilter: {
+          estado: sel.estado_nombre || (sel.type === "estado" ? sel.name : ""),
+          ciudad: "",
+          municipio: sel.municipio_nombre || (sel.type === "municipio" ? sel.name : ""),
+          colonia: sel.type === "colonia" ? sel.name : "",
+        },
+      };
+      addLocationChip(chip);
+    };
+
     const geocode = async () => {
       try {
         if (!googleApiKey) return;
 
         // Intentar con Place Details si hay placeId
-        const placeId = (selectedLocation as any).placeId;
+        const placeId = sel.placeId;
         if (placeId) {
           const details = await getPlaceDetails(placeId);
-          if (details?.location) {
-            setSearchedPin({
-              latitude: details.location.lat,
-              longitude: details.location.lng,
-            });
-          }
           if (details?.bounds) {
             setFocusRegion(boundsToRegion(details.bounds, selectedLocation.type));
+            addSelectedAsChip(details.bounds);
             return;
           }
           if (details?.location) {
@@ -129,6 +167,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
               latitudeDelta: fallbackDelta,
               longitudeDelta: fallbackDelta,
             });
+            addSelectedAsChip(undefined);
             return;
           }
         }
@@ -141,17 +180,16 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         const result = json.results?.[0];
         if (result?.geometry) {
           const { location, bounds, viewport } = result.geometry;
-          if (location) {
-            setSearchedPin({ latitude: location.lat, longitude: location.lng });
-          }
           const b = bounds || viewport;
           if (b) {
-            setFocusRegion(boundsToRegion({
+            const gb = {
               north: b.northeast.lat,
               south: b.southwest.lat,
               east: b.northeast.lng,
               west: b.southwest.lng,
-            }, selectedLocation.type));
+            };
+            setFocusRegion(boundsToRegion(gb, selectedLocation.type));
+            addSelectedAsChip(gb);
           } else if (location) {
             const type = selectedLocation.type;
             const fallbackDelta = type === "colonia" ? 0.03 : type === "municipio" ? 0.06 : 0.05;
@@ -161,6 +199,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
               latitudeDelta: fallbackDelta,
               longitudeDelta: fallbackDelta,
             });
+            addSelectedAsChip(undefined);
           }
         }
       } catch (e) {
@@ -168,6 +207,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
       }
     };
     geocode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLocation]);
 
   // ── Debounce búsqueda de zonas ──
@@ -175,7 +215,13 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     if (!isZoneSearchOpen) return;
     const timer = setTimeout(() => {
       if (zoneQuery.trim().length >= 2) {
-        searchLocations(zoneQuery.trim());
+        // Mismo comportamiento que el buscador general: sin "(regions)" para
+        // encontrar TODO (fraccionamientos, POIs como "Loretta") y sin contador
+        // de propiedades por zona.
+        searchLocations(zoneQuery.trim(), undefined, {
+          restrictToRegions: false,
+          withCounts: false,
+        });
       } else {
         clearSuggestions();
       }
@@ -313,7 +359,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           googleApiKey={googleApiKey}
           highlightedPropertyId={highlightedPropertyId}
           focusRegion={focusRegion}
-          searchedLocationPin={searchedPin}
+          searchedLocationPins={locationPins}
           drawingMode={drawingMode}
           draftPolygonPoints={draftPoints}
           confirmedPolygons={filters.polygons}
@@ -342,9 +388,13 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           onPress={() => setShowFiltersModal(true)}
           activeOpacity={0.85}
         >
-          <Ionicons name="options-outline" size={18} color={COLORS.white} />
-          <Text style={styles.refineSearchBtnText}>Refinar Búsqueda</Text>
+          <Ionicons name="options-outline" size={22} color={COLORS.primary} />
+          <View style={styles.refineSearchTextWrap}>
+            <Text style={styles.refineSearchTitle}>Agregar filtros</Text>
+            <Text style={styles.refineSearchSubtitle}>Precio y características</Text>
+          </View>
           {hasActiveFilters && <View style={styles.activeFilterDot} />}
+          <Ionicons name="chevron-forward" size={22} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
 
@@ -494,22 +544,29 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 14,
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 12,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.white,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
     position: "relative",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
   },
-  refineSearchBtnText: {
-    color: COLORS.white,
+  refineSearchTextWrap: {
+    flex: 1,
+    alignItems: "flex-start",
+  },
+  refineSearchTitle: {
+    color: COLORS.primary,
     fontSize: 15,
     fontWeight: "700",
+  },
+  refineSearchSubtitle: {
+    color: COLORS.textPrimary,
+    fontSize: 12,
+    fontWeight: "400",
+    marginTop: 1,
   },
   activeFilterDot: {
     position: "absolute",
@@ -520,7 +577,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: COLORS.warning,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.white,
   },
   // Overlay de búsqueda de zonas
   zoneSearchOverlay: {

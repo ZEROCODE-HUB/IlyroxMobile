@@ -111,28 +111,6 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
             </Pressable>
             {onContact && (
               <View style={styles.headerActions}>
-                {activeTab === "upcoming" && (
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => {
-                      const url = buildGoogleCalendarUrl({
-                        date: appointment.fecha,
-                        time: appointment.hora.substring(0, 5),
-                        type: appointment.tipo,
-                        description: appointment.descripcion || "",
-                        propertyTitle: appointment.propertyTitle,
-                        location: appointment.location,
-                        otherUserName: appointment.user.name,
-                      });
-                      Linking.openURL(url);
-                    }}
-                  >
-                    <Image
-                      source={require("../assets/google-calendar-svg.svg")}
-                      style={{ width: 25, height: 25 }}
-                    />
-                  </TouchableOpacity>
-                )}
                 <TouchableOpacity
                   style={styles.actionButton}
                   onPress={() => onContact(appointment.id)}
@@ -167,23 +145,51 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
                   {appointment.propertyTitle.charAt(0).toUpperCase() +
                     appointment.propertyTitle.slice(1)}
                 </Text>
-                {appointment.estado === "cancelada" ? (
-                  <View style={styles.cancelBtn}>
-                    <Text style={styles.completeBtnText}>Cita Cancelada</Text>
-                  </View>
-                ) : activeTab === "past" ? null : (
-                  <TouchableOpacity
-                    onPress={() => onMarkCancel(appointment.id)}
-                    style={styles.cancelBtn}
-                  >
-                    <Ionicons
-                      name="close-circle-outline"
-                      size={16}
-                      color={COLORS.white}
-                    />
-                    <Text style={styles.completeBtnText}>Cancelar Cita</Text>
-                  </TouchableOpacity>
-                )}
+                <View style={styles.appointmentActionsCol}>
+                  {appointment.estado === "cancelada" ? (
+                    <View style={styles.cancelBtn}>
+                      <Text style={styles.completeBtnText}>Cita Cancelada</Text>
+                    </View>
+                  ) : activeTab === "past" ? null : (
+                    <TouchableOpacity
+                      onPress={() => onMarkCancel(appointment.id)}
+                      style={styles.cancelBtn}
+                    >
+                      <Ionicons
+                        name="close-circle-outline"
+                        size={16}
+                        color={COLORS.white}
+                      />
+                      <Text style={styles.completeBtnText}>Cancelar Cita</Text>
+                    </TouchableOpacity>
+                  )}
+                  {activeTab === "upcoming" &&
+                    appointment.estado !== "cancelada" && (
+                      <TouchableOpacity
+                        style={styles.calendarBtn}
+                        onPress={() => {
+                          const url = buildGoogleCalendarUrl({
+                            date: appointment.fecha,
+                            time: appointment.hora.substring(0, 5),
+                            type: appointment.tipo,
+                            description: appointment.descripcion || "",
+                            propertyTitle: appointment.propertyTitle,
+                            location: appointment.location,
+                            otherUserName: appointment.user.name,
+                          });
+                          Linking.openURL(url);
+                        }}
+                      >
+                        <Image
+                          source={require("../assets/google-calendar-svg.svg")}
+                          style={{ width: 16, height: 16 }}
+                        />
+                        <Text style={styles.calendarBtnText}>
+                          Agregar a calendario
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                </View>
               </View>
             )}
           </View>
@@ -262,10 +268,15 @@ const styles = StyleSheet.create({
   },
   propertyContainer: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    flexWrap: "wrap",
     gap: 6,
+  },
+  appointmentActionsCol: {
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: 6,
+    flexShrink: 0,
   },
   dateColumn: {
     backgroundColor: COLORS.primaryTransparent,
@@ -385,6 +396,24 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     gap: 6,
     flexShrink: 0,
+  },
+  calendarBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    gap: 6,
+    flexShrink: 0,
+  },
+  calendarBtnText: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "600",
   },
   completeBtnText: {
     color: COLORS.white,

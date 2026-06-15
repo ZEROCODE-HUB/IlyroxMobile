@@ -504,7 +504,9 @@ const generatePropertyHtml = (
         /* --- STATS ICONS --- */
         .stats-row {
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            gap: 28px;
             padding: 20px 0;
             border-bottom: 1px solid #f0f0f0;
             margin-bottom: 20px;

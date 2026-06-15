@@ -28,16 +28,20 @@ export interface LocationSuggestion {
  * @param limit       Número máximo de resultados (default: 8)
  * @param sessionToken Token de sesión para agrupar llamadas de autocompletado
  * @param country     País al que acotar la búsqueda (default: México)
- * @param types       Filtro de tipos de Places. Default "(regions)" acota a zonas
- *                    geográficas; pasar `undefined` devuelve TODO tipo de lugar
- *                    (fraccionamientos, POIs, etc.), útil para el buscador general.
+ * @param types       Filtro de tipos de Places (p. ej. "(regions)" para acotar a
+ *                    zonas administrativas). Si se omite o es `undefined`, la API
+ *                    devuelve TODO tipo de lugar (fraccionamientos, POIs, etc.),
+ *                    útil para el buscador general. La decisión la toma el caller.
+ *                    OJO: NO poner un valor por defecto aquí — un default haría que
+ *                    el `undefined` explícito del store volviera a "(regions)"
+ *                    (trampa del parámetro por defecto de JS).
  */
 export async function searchLocations(
   searchTerm: string,
   limit: number = 8,
   sessionToken?: string,
   country?: CountryCode | string | null,
-  types: string | undefined = "(regions)",
+  types?: string,
 ): Promise<LocationSuggestion[]> {
   if (!searchTerm.trim()) return [];
 

@@ -29,7 +29,7 @@ export interface LocationChip {
 }
 
 export interface ComercialFilters {
-  tipoUbicacion: string;
+  tipoUbicacion: string[];
   frenteMin: string;
   nivel: string;
   sobreAvenidaPrincipal: boolean;
@@ -39,7 +39,7 @@ export interface ComercialFilters {
 }
 
 export interface IndustrialFilters {
-  ubicacion: string;
+  ubicacion: string[];
   alturaLibre: string;
   energiaKva: string[];
   areaOficinasMin: string;
@@ -49,8 +49,8 @@ export interface IndustrialFilters {
 export interface AgricolaFilters {
   tiposAgua: string[];
   concesionAgua: boolean;
-  usoTerreno: string;
-  tipoRiego: string;
+  usoTerreno: string[];
+  tipoRiego: string[];
   electricidad: boolean;
   caminoAcceso: boolean;
   cercado: boolean;
@@ -80,8 +80,13 @@ export interface PropertyFilters {
   niveles: string;
   m2TerrenoMin: string;
   m2ConstruccionMin: string;
+  /** Dimensiones mínimas del terreno (frente/fondo). Solo aplican a terrenos. */
+  anchoTerrenoMin: string;
+  largoTerrenoMin: string;
   comisionVentaMin: string;
   comisionRentaMin: string;
+  /** Amenidades seleccionadas; la propiedad debe tenerlas TODAS. */
+  amenidades: string[];
   polygons: PolygonCoord[][];
   locationChips: LocationChip[];
   comercialFilters: ComercialFilters;
@@ -119,8 +124,8 @@ interface PropertyFiltersState {
   setPendingOpenMap: (v: boolean) => void;
 }
 
-const initialComercialFilters: ComercialFilters = {
-  tipoUbicacion: "",
+export const initialComercialFilters: ComercialFilters = {
+  tipoUbicacion: [],
   frenteMin: "",
   nivel: "",
   sobreAvenidaPrincipal: false,
@@ -129,19 +134,19 @@ const initialComercialFilters: ComercialFilters = {
   altoFlujoVehicular: false,
 };
 
-const initialIndustrialFilters: IndustrialFilters = {
-  ubicacion: "",
+export const initialIndustrialFilters: IndustrialFilters = {
+  ubicacion: [],
   alturaLibre: "",
   energiaKva: [],
   areaOficinasMin: "",
   patioManiobrasMin: "",
 };
 
-const initialAgricolaFilters: AgricolaFilters = {
+export const initialAgricolaFilters: AgricolaFilters = {
   tiposAgua: [],
   concesionAgua: false,
-  usoTerreno: "",
-  tipoRiego: "",
+  usoTerreno: [],
+  tipoRiego: [],
   electricidad: false,
   caminoAcceso: false,
   cercado: false,
@@ -169,8 +174,11 @@ const initialFilters: PropertyFilters = {
   niveles: "",
   m2TerrenoMin: "",
   m2ConstruccionMin: "",
+  anchoTerrenoMin: "",
+  largoTerrenoMin: "",
   comisionVentaMin: "",
   comisionRentaMin: "",
+  amenidades: [],
   polygons: [],
   locationChips: [],
   comercialFilters: initialComercialFilters,
@@ -313,9 +321,26 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
       let comercialFilters = initialComercialFilters;
       let industrialFilters = initialIndustrialFilters;
       let agricolaFilters = initialAgricolaFilters;
-      if (criterios?.comercial) comercialFilters = { ...initialComercialFilters, ...criterios.comercial };
-      if (criterios?.industrial) industrialFilters = { ...initialIndustrialFilters, ...criterios.industrial };
-      if (criterios?.agricola) agricolaFilters = { ...initialAgricolaFilters, ...criterios.agricola };
+      if (criterios?.comercial) {
+        comercialFilters = { ...initialComercialFilters, ...criterios.comercial };
+        // tipoUbicacion puede venir como string (guardado legacy) o como array
+        const tu = (criterios.comercial as any).tipoUbicacion;
+        comercialFilters.tipoUbicacion = Array.isArray(tu) ? tu : tu ? [tu] : [];
+      }
+      if (criterios?.industrial) {
+        industrialFilters = { ...initialIndustrialFilters, ...criterios.industrial };
+        // ubicacion puede venir como string (guardado legacy) o como array
+        const _u = (criterios.industrial as any).ubicacion;
+        industrialFilters.ubicacion = Array.isArray(_u) ? _u : _u ? [_u] : [];
+      }
+      if (criterios?.agricola) {
+        agricolaFilters = { ...initialAgricolaFilters, ...criterios.agricola };
+        // usoTerreno/tipoRiego pueden venir como string (legacy) o como array
+        const _ut = (criterios.agricola as any).usoTerreno;
+        const _tr = (criterios.agricola as any).tipoRiego;
+        agricolaFilters.usoTerreno = Array.isArray(_ut) ? _ut : _ut ? [_ut] : [];
+        agricolaFilters.tipoRiego = Array.isArray(_tr) ? _tr : _tr ? [_tr] : [];
+      }
 
       set({
         filters: {
@@ -342,8 +367,11 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
           niveles: (search as any).pisos ? String((search as any).pisos) : (criterios?.niveles || ""),
           m2TerrenoMin: search.metros_terreno ? String(search.metros_terreno) : "",
           m2ConstruccionMin: search.metros_construccion ? String(search.metros_construccion) : "",
+          anchoTerrenoMin: criterios?.ancho_terreno_min ? String(criterios.ancho_terreno_min) : "",
+          largoTerrenoMin: criterios?.largo_terreno_min ? String(criterios.largo_terreno_min) : "",
           comisionVentaMin: criterios?.comision_venta_min ? String(criterios.comision_venta_min) : "",
           comisionRentaMin: criterios?.comision_renta_min ? String(criterios.comision_renta_min) : "",
+          amenidades: Array.isArray(criterios?.amenidades) ? criterios.amenidades : [],
           polygons,
           locationChips,
           comercialFilters,
@@ -362,12 +390,12 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
       const inf = filters.industrialFilters;
       const ag = filters.agricolaFilters;
       const hasSpecialized =
-        cf.tipoUbicacion !== "" || cf.frenteMin !== "" || cf.nivel !== "" ||
+        cf.tipoUbicacion.length > 0 || cf.frenteMin !== "" || cf.nivel !== "" ||
         cf.sobreAvenidaPrincipal || cf.enEsquina || cf.altaVisibilidad || cf.altoFlujoVehicular ||
-        inf.ubicacion !== "" || inf.alturaLibre !== "" || inf.energiaKva.length > 0 ||
+        inf.ubicacion.length > 0 || inf.alturaLibre !== "" || inf.energiaKva.length > 0 ||
         inf.areaOficinasMin !== "" || inf.patioManiobrasMin !== "" ||
-        ag.tiposAgua.length > 0 || ag.concesionAgua || ag.usoTerreno !== "" ||
-        ag.tipoRiego !== "" || ag.electricidad || ag.caminoAcceso || ag.cercado ||
+        ag.tiposAgua.length > 0 || ag.concesionAgua || ag.usoTerreno.length > 0 ||
+        ag.tipoRiego.length > 0 || ag.electricidad || ag.caminoAcceso || ag.cercado ||
         ag.pieCarretera || ag.accesCamiones;
       return (
         filters.polygons.length > 0 ||
@@ -383,9 +411,12 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
         filters.niveles !== "" ||
         filters.m2TerrenoMin !== "" ||
         filters.m2ConstruccionMin !== "" ||
+        filters.anchoTerrenoMin !== "" ||
+        filters.largoTerrenoMin !== "" ||
         filters.operacion !== "" ||
         parseFloat(filters.comisionVentaMin) > 0 ||
         parseFloat(filters.comisionRentaMin) > 0 ||
+        filters.amenidades.length > 0 ||
         hasSpecialized ||
         !!(
           filters.locationFilter.estado ||

@@ -54,9 +54,18 @@ function extractServerFilters(
     const n = parseFloat(filters.m2TerrenoMin.replace(/,/g, ""));
     if (!isNaN(n) && n > 0) f.m2TerrenoMin = n;
   }
+  if (filters.anchoTerrenoMin) {
+    const n = parseFloat(filters.anchoTerrenoMin.replace(/,/g, ""));
+    if (!isNaN(n) && n > 0) f.anchoTerrenoMin = n;
+  }
+  if (filters.largoTerrenoMin) {
+    const n = parseFloat(filters.largoTerrenoMin.replace(/,/g, ""));
+    if (!isNaN(n) && n > 0) f.largoTerrenoMin = n;
+  }
   if (filters.tipoPropiedad === "comercial" && filters.comercialFilters) {
     const cf = filters.comercialFilters;
-    if (cf.tipoUbicacion) f.tipoUbicacion = cf.tipoUbicacion;
+    // Solo filtra cuando se eligió exactamente una opción; ambas (o ninguna) = sin filtro
+    if (cf.tipoUbicacion.length === 1) f.tipoUbicacion = cf.tipoUbicacion[0];
     if (cf.frenteMin) { const n = parseFloat(cf.frenteMin); if (!isNaN(n) && n > 0) f.frenteMin = n; }
     if (cf.sobreAvenidaPrincipal) f.sobreAvenidaPrincipal = true;
     if (cf.enEsquina) f.enEsquina = true;
@@ -65,7 +74,7 @@ function extractServerFilters(
   }
   if (filters.tipoPropiedad === "industrial" && filters.industrialFilters) {
     const inf = filters.industrialFilters;
-    if (inf.ubicacion) f.ubicacionIndustrial = inf.ubicacion;
+    if (inf.ubicacion.length === 1) f.ubicacionIndustrial = inf.ubicacion[0];
     if (inf.alturaLibre) f.alturaLibre = inf.alturaLibre;
     if (inf.energiaKva?.length > 0) f.energiaKva = inf.energiaKva;
     if (inf.areaOficinasMin) { const n = parseFloat(inf.areaOficinasMin); if (!isNaN(n) && n > 0) f.areaOficinasMin = n; }
@@ -75,8 +84,8 @@ function extractServerFilters(
     const ag = filters.agricolaFilters;
     if (ag.tiposAgua?.length > 0) f.tiposAgua = ag.tiposAgua;
     if (ag.concesionAgua) f.concesionAgua = true;
-    if (ag.usoTerreno) f.usoTerreno = ag.usoTerreno;
-    if (ag.tipoRiego) f.tipoRiego = ag.tipoRiego;
+    if (ag.usoTerreno.length === 1) f.usoTerreno = ag.usoTerreno[0];
+    if (ag.tipoRiego.length === 1) f.tipoRiego = ag.tipoRiego[0];
     if (ag.electricidad) f.infraElectricidad = true;
     if (ag.caminoAcceso) f.infraCaminoAcceso = true;
     if (ag.cercado) f.infraCercado = true;
@@ -117,6 +126,8 @@ function SearchSummaryBar({ hasActiveFilters }: { hasActiveFilters: boolean }) {
 
   if (filters.m2TerrenoMin) pills.push(`≥ ${filters.m2TerrenoMin} m² terreno`);
   if (filters.m2ConstruccionMin) pills.push(`≥ ${filters.m2ConstruccionMin} m² const.`);
+  if (filters.anchoTerrenoMin) pills.push(`≥ ${filters.anchoTerrenoMin} m ancho`);
+  if (filters.largoTerrenoMin) pills.push(`≥ ${filters.largoTerrenoMin} m largo`);
   if (filters.comisionVentaMin) pills.push(`Comisión venta ≥ ${filters.comisionVentaMin}%`);
   if (filters.comisionRentaMin) pills.push(`Comisión renta ≥ ${filters.comisionRentaMin} mes`);
 
@@ -140,10 +151,10 @@ function SearchSummaryBar({ hasActiveFilters }: { hasActiveFilters: boolean }) {
   const cf = filters.comercialFilters;
   const inf = filters.industrialFilters;
   const ag = filters.agricolaFilters;
-  if (cf?.tipoUbicacion) pills.push(cf.tipoUbicacion);
-  if (inf?.ubicacion) pills.push(inf.ubicacion);
+  if (cf?.tipoUbicacion?.length) pills.push(cf.tipoUbicacion.join(", "));
+  if (inf?.ubicacion?.length) pills.push(inf.ubicacion.join(", "));
   if (inf?.alturaLibre) pills.push(`Altura ${inf.alturaLibre}`);
-  if (ag?.usoTerreno) pills.push(ag.usoTerreno);
+  if (ag?.usoTerreno?.length) pills.push(ag.usoTerreno.join(", "));
 
   if (pills.length === 0 && !hasActiveFilters) return null;
 
@@ -346,11 +357,11 @@ export default function MapResultsScreen() {
         />
       )}
 
-      {/* Botón "Avísame si encuentras algo" — flotante */}
+      {/* Botón "Notifícame" — flotante */}
       <View style={[styles.saveBtnWrapper, { paddingBottom: insets.bottom + 12 }]}>
         <Pressable style={styles.saveBtnBar} onPress={() => setShowSaveSearchModal(true)}>
           <Ionicons name="notifications-outline" size={22} color={COLORS.white} />
-          <Text style={styles.saveBtnBarText}>Avísame si encuentras algo</Text>
+          <Text style={styles.saveBtnBarText}>Notifícame</Text>
         </Pressable>
       </View>
 
@@ -374,8 +385,12 @@ export default function MapResultsScreen() {
       <SaveSearchSuccessSheet
         visible={successSheetVisible}
         onPublish={() => {
+          // Cerrar primero el bottom sheet y abrir el modal de publicar DESPUÉS
+          // de que termine su animación de cierre. Apilar la transición de dos
+          // Modales en el mismo commit provoca un bucle de render
+          // ("Maximum update depth exceeded") al abrir "Publicar búsqueda".
           setSuccessSheetVisible(false);
-          setPublishModalVisible(true);
+          setTimeout(() => setPublishModalVisible(true), 320);
         }}
         onDismiss={() => setSuccessSheetVisible(false)}
       />

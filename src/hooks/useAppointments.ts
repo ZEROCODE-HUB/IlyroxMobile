@@ -158,6 +158,10 @@ export const useAppointments = () => {
             message: "¿Estás seguro de que deseas cancelar esta cita? Esta acción no se puede deshacer.",
             confirmText: "Sí, cancelar",
             cancelText: "Volver",
+            confirmVariant: "danger",
+            // Pasar onCancel hace que el modal pinte el segundo botón ("Volver");
+            // sin él, ConfirmationModal solo muestra el botón de confirmar.
+            onCancel: () => {},
             onConfirm: async () => {
                 const success = await handleCancelAppointment(id);
                 if (success) {

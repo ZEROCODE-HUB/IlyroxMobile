@@ -24,7 +24,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
-import { searchPlaces, getPlaceDetails, reverseGeocode, type PlaceSuggestion } from "../../lib/geocodingService";
+import { searchPlaces, getPlaceDetails, reverseGeocode, derivePlaceType, type PlaceSuggestion } from "../../lib/geocodingService";
 import { getCountryConfig, DEFAULT_COUNTRY } from "../../lib/location/registry";
 import type { CountryCode } from "../../lib/location/types";
 
@@ -178,6 +178,25 @@ export default function CascadeLocationSelector({
           municipio = parts[parts.length - 2] ?? "";
           colonia = parts[0] ?? "";
           ciudad = municipio;
+        }
+
+        // El reverse geocoding parte del centroide y tiende a "sobre-especificar":
+        // para una predicción a nivel estado o municipio devuelve también un
+        // municipio/colonia puntuales, sustituyendo lo que el usuario eligió. Recortamos
+        // la jerarquía al nivel real de la predicción y hacemos prevalecer el nombre
+        // que el usuario vio en la sugerencia (mainText).
+        const placeType = derivePlaceType(suggestion.types);
+        const mainName = suggestion.mainText?.trim() ?? "";
+        if (placeType === "estado") {
+          estado = mainName || estado;
+          municipio = "";
+          ciudad = "";
+          colonia = "";
+        } else if (placeType === "municipio") {
+          municipio = mainName || municipio;
+          colonia = "";
+        } else {
+          colonia = mainName || colonia;
         }
 
         const newData: LocationData = {

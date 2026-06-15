@@ -31,7 +31,7 @@ export function useShare() {
   const generateDeepLink = useCallback(
     (feedItemId: string, type: string, sinDatos?: boolean): string => {
       // URL base
-      const baseUrl = "https://feeds.ilyrox.com/";
+      const baseUrl = "https://ilyrox-posts.vercel.app/";
 
       let url = `${baseUrl}?type=${type}&id=${feedItemId}`;
       if (sinDatos) {

@@ -12,6 +12,8 @@ import { formatPrice } from "@/utils/priceFormatter";
 interface SpecialPostCardProps {
   item: FeedItem;
   mode?: "preview" | "detail" | "grid" | "compact";
+  /** Id del usuario en sesión. Se usa para mostrar datos privados (cliente/lead) solo al creador. */
+  currentUserId?: string;
 }
 
 const SPECIAL_COLORS = {
@@ -24,6 +26,7 @@ const SPECIAL_COLORS = {
 export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
   item,
   mode = "preview",
+  currentUserId,
 }) => {
   const {
     postType: rawPostType,
@@ -31,6 +34,8 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
     images,
     propertyDetails,
   } = item;
+  // Dueño del post: solo a él se le muestran los datos privados del cliente/lead.
+  const isOwner = !!(currentUserId && currentUserId === user.id);
   const postType = normalizePostType(rawPostType);
   const { handleContact } = useChatInitiator();
 
@@ -385,27 +390,54 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
     const isDetail = mode === "detail";
     const f = busquedas_json.filtros ?? {};
 
-    // Operación (venta/renta)
-    const operacion: string =
-      typeof f.operacion === "string" ? f.operacion.toLowerCase() : "";
+    // Datos del cliente/lead asociado: privados, solo visibles para el creador
+    // del post y únicamente en el detalle (nunca en el feed ni a otros usuarios).
+    const prospecto = busquedas_json.prospecto;
+    const showCliente = isDetail && isOwner && !!prospecto?.nombre;
 
-    // Título grande: subtipo principal o tipo_propiedad
-    const subtipoArr: string[] = Array.isArray(f.subtipo) ? f.subtipo : [];
-    const rawTipo = subtipoArr[0] || f.tipo_propiedad || "Propiedad";
+    // Operación (venta/renta). Soporta múltiple (operaciones[]) y legacy (operacion string)
+    const operaciones: string[] = (
+      Array.isArray(f.operaciones) && f.operaciones.length > 0
+        ? f.operaciones
+        : typeof f.operacion === "string" && f.operacion
+          ? [f.operacion]
+          : []
+    )
+      .map((o: any) => String(o).toLowerCase())
+      .filter((o: string) => o === "venta" || o === "renta");
+
+    // Título grande: tipo de propiedad (o primer subtipo si no hay tipo).
+    // Soporta el schema legacy donde `subtipo` venía como string suelto.
+    const subtipoArr: string[] = Array.isArray(f.subtipo)
+      ? f.subtipo.filter(
+          (s: unknown) => typeof s === "string" && (s as string).trim().length > 0,
+        )
+      : typeof f.subtipo === "string" && f.subtipo.trim()
+        ? [f.subtipo]
+        : [];
+    const rawTipo = f.tipo_propiedad || subtipoArr[0] || "Propiedad";
     const titulo = firstUpperCase(rawTipo);
 
-    // Rango de presupuesto
+    // Rango(s) de presupuesto: compra y/o renta
     const moneda = f.moneda || "MXN";
-    const precioMin = typeof f.precio_min === "number" && f.precio_min > 0 ? f.precio_min : null;
-    const precioMax = typeof f.precio_max === "number" && f.precio_max > 0 ? f.precio_max : null;
-    let presupuestoText = "Sin especificar";
-    if (precioMin && precioMax) {
-      presupuestoText = `${formatPrice(precioMin)} – ${formatPrice(precioMax)} ${moneda}`;
-    } else if (precioMin) {
-      presupuestoText = `Desde ${formatPrice(precioMin)} ${moneda}`;
-    } else if (precioMax) {
-      presupuestoText = `Hasta ${formatPrice(precioMax)} ${moneda}`;
-    }
+    const precioNum = (v: unknown): number | null =>
+      typeof v === "number" && v > 0 ? v : null;
+    const fmtRango = (min: number | null, max: number | null): string | null => {
+      if (min && max) return `${formatPrice(min)} – ${formatPrice(max)} ${moneda}`;
+      if (min) return `Desde ${formatPrice(min)} ${moneda}`;
+      if (max) return `Hasta ${formatPrice(max)} ${moneda}`;
+      return null;
+    };
+    const ventaRango = fmtRango(precioNum(f.precio_min), precioNum(f.precio_max));
+    const rentaRango = fmtRango(precioNum(f.precio_renta_min), precioNum(f.precio_renta_max));
+    const hayAmbosPrecios = !!ventaRango && !!rentaRango;
+    const presupuestos: Array<{ label: string; text: string }> = [];
+    if (ventaRango)
+      presupuestos.push({ label: hayAmbosPrecios ? "PRESUPUESTO · COMPRA" : "PRESUPUESTO", text: ventaRango });
+    if (rentaRango)
+      presupuestos.push({ label: hayAmbosPrecios ? "PRESUPUESTO · RENTA" : "PRESUPUESTO", text: rentaRango });
+    if (presupuestos.length === 0)
+      presupuestos.push({ label: "PRESUPUESTO", text: "Sin especificar" });
 
     // Zonas (chips de locationChips)
     const zonas: Array<{ id?: string; label: string }> = Array.isArray(f.zonas_interes)
@@ -439,9 +471,78 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
               .slice(0, 1)
       : [];
 
-    const habitaciones = f.caracteristicas?.habitaciones;
-    const banos = f.caracteristicas?.banos;
+    // Características y superficies: mostramos todo lo que el usuario llenó
+    const num = (v: unknown): number | null =>
+      typeof v === "number" && v > 0 ? v : null;
+    const fmt = (n: number): string =>
+      String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+    const habitaciones = num(f.caracteristicas?.habitaciones);
+    const banos = num(f.caracteristicas?.banos);
+    const estacionamientos = num(f.caracteristicas?.estacionamientos);
+    const niveles = num(f.caracteristicas?.niveles);
+    const antiguedad: string =
+      typeof f.caracteristicas?.antiguedad === "string"
+        ? f.caracteristicas.antiguedad.trim()
+        : "";
+
+    // Superficies mínimas → el post indica que se busca "más de" (+) esa cantidad
+    const m2TerrenoMin = num(f.superficies?.m2_terreno_min);
+    const m2ConstruccionMin = num(f.superficies?.m2_construccion_min);
+
+    const stats: Array<{ key: string; emoji: string; value: string; label: string }> = [];
+    if (habitaciones) stats.push({ key: "rec", emoji: "🛏️", value: String(habitaciones), label: "rec." });
+    if (banos) stats.push({ key: "ban", emoji: "🚽", value: String(banos), label: "baños" });
+    if (estacionamientos) stats.push({ key: "est", emoji: "🚗", value: String(estacionamientos), label: "estac." });
+    if (niveles) stats.push({ key: "niv", emoji: "🏢", value: String(niveles), label: niveles === 1 ? "planta" : "plantas" });
+
     const nota: string = typeof f.nota === "string" ? f.nota : "";
+
+    // Detalles especializados según tipo (comercial / industrial / agrícola)
+    const joinArr = (v: unknown): string =>
+      Array.isArray(v)
+        ? v.filter(Boolean).join(", ")
+        : typeof v === "string"
+          ? v
+          : "";
+    const especializados: Array<{ key: string; value: string }> = [];
+    const detAdd = (key: string, value: string) => {
+      if (value && value.trim()) especializados.push({ key, value });
+    };
+    if (f.comercial) {
+      const c = f.comercial;
+      detAdd("Ubicación", joinArr(c.tipoUbicacion));
+      if (c.frenteMin) detAdd("Frente mín.", `${c.frenteMin} m`);
+      if (c.nivel) detAdd("Nivel", String(c.nivel));
+      const flags: string[] = [];
+      if (c.sobreAvenidaPrincipal) flags.push("Av. principal");
+      if (c.enEsquina) flags.push("En esquina");
+      if (c.altaVisibilidad) flags.push("Alta visibilidad");
+      if (c.altoFlujoVehicular) flags.push("Alto flujo");
+      detAdd("Características", flags.join(", "));
+    }
+    if (f.industrial) {
+      const it = f.industrial;
+      detAdd("Ubicación", joinArr(it.ubicacion));
+      detAdd("Altura libre", joinArr(it.alturaLibre));
+      detAdd("Energía", joinArr(it.energiaKva));
+      if (it.areaOficinasMin) detAdd("Oficinas mín.", `${it.areaOficinasMin} m²`);
+      if (it.patioManiobrasMin) detAdd("Patio maniobras mín.", `${it.patioManiobrasMin} m²`);
+    }
+    if (f.agricola) {
+      const a = f.agricola;
+      detAdd("Agua", joinArr(a.tiposAgua));
+      if (a.concesionAgua) detAdd("Concesión de agua", "Sí");
+      detAdd("Uso de terreno", joinArr(a.usoTerreno));
+      detAdd("Tipo de riego", joinArr(a.tipoRiego));
+      const serv: string[] = [];
+      if (a.electricidad) serv.push("Electricidad");
+      if (a.caminoAcceso) serv.push("Camino de acceso");
+      if (a.cercado) serv.push("Cercado");
+      if (a.pieCarretera) serv.push("Pie de carretera");
+      if (a.accesCamiones) serv.push("Acceso camiones");
+      detAdd("Servicios", serv.join(", "));
+    }
 
     return (
       <View style={[styles.cardContainer, isDetail && styles.detailContainer]}>
@@ -455,23 +556,79 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
           <View style={styles.busquedaTagRow}>
             <Ionicons name="search-outline" size={14} color={COLORS.primary} />
             <Text style={styles.busquedaTagText}>SE BUSCA</Text>
-            {operacion === "venta" || operacion === "renta" ? (
-              <View style={styles.operacionChip}>
+            {operaciones.map((op) => (
+              <View key={op} style={styles.operacionChip}>
                 <Text style={styles.operacionChipText}>
-                  {operacion === "venta" ? "EN VENTA" : "EN RENTA"}
+                  {op === "venta" ? "EN VENTA" : "EN RENTA"}
                 </Text>
               </View>
-            ) : null}
+            ))}
           </View>
+
+          {/* Cliente/lead asociado — privado, solo el creador lo ve en el detalle */}
+          {showCliente && (
+            <View style={styles.clienteCard}>
+              <View style={styles.clienteHeaderRow}>
+                <Ionicons
+                  name="lock-closed"
+                  size={12}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.clienteHeaderText}>
+                  CLIENTE · Solo visible para ti
+                </Text>
+              </View>
+              <Text style={styles.clienteNombre}>{prospecto.nombre}</Text>
+              {prospecto.telefono ? (
+                <View style={styles.clienteContactoRow}>
+                  <Ionicons
+                    name="call-outline"
+                    size={13}
+                    color={COLORS.textSecondary}
+                  />
+                  <Text style={styles.clienteContactoText}>
+                    {prospecto.telefono}
+                  </Text>
+                </View>
+              ) : null}
+              {prospecto.email ? (
+                <View style={styles.clienteContactoRow}>
+                  <Ionicons
+                    name="mail-outline"
+                    size={13}
+                    color={COLORS.textSecondary}
+                  />
+                  <Text style={styles.clienteContactoText}>
+                    {prospecto.email}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          )}
 
           {/* Título grande */}
           <Text style={styles.busquedaTitulo} numberOfLines={2}>
             {titulo}
           </Text>
 
-          {/* Presupuesto */}
-          <Text style={styles.busquedaLabel}>PRESUPUESTO</Text>
-          <Text style={styles.busquedaPresupuesto}>{presupuestoText}</Text>
+          {/* Subtipos seleccionados (todos) */}
+          {subtipoArr.length > 0 && (
+            <View style={styles.busquedaSubtipoRow}>
+              {subtipoArr.map((s, idx) => (
+                <View key={`${s}-${idx}`} style={styles.busquedaSubtipoChip}>
+                  <Text style={styles.busquedaSubtipoText}>{firstUpperCase(s)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Presupuesto(s): compra y/o renta */}
+          {presupuestos.map((p, i) => (
+            <React.Fragment key={i}>
+              <Text style={styles.busquedaLabel}>{p.label}</Text>
+              <Text style={styles.busquedaPresupuesto}>{p.text}</Text>
+            </React.Fragment>
+          ))}
 
           {/* Zonas de interés */}
           {(zonas.length > 0 || ubicacionFallback.length > 0) && (
@@ -499,19 +656,68 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
           )}
 
           {/* Características */}
-          {(habitaciones || banos) && (
-            <View style={styles.busquedaStatsRow}>
-              {habitaciones ? (
-                <Text style={styles.busquedaStat}>
-                  🛏️ <Text style={styles.busquedaStatValue}>{habitaciones}</Text> rec.
-                </Text>
-              ) : null}
-              {banos ? (
-                <Text style={styles.busquedaStat}>
-                  🚽 <Text style={styles.busquedaStatValue}>{banos}</Text> baños
-                </Text>
-              ) : null}
-            </View>
+          {stats.length > 0 && (
+            <>
+              <Text style={styles.busquedaLabel}>CARACTERÍSTICAS</Text>
+              <View style={styles.busquedaStatsRow}>
+                {stats.map((s) => (
+                  <Text key={s.key} style={styles.busquedaStat}>
+                    {s.emoji}{" "}
+                    <Text style={styles.busquedaStatValue}>{s.value}</Text> {s.label}
+                  </Text>
+                ))}
+              </View>
+            </>
+          )}
+
+          {/* Superficie mínima → se busca "más de" (+) esa cantidad */}
+          {(m2TerrenoMin || m2ConstruccionMin) && (
+            <>
+              <Text style={styles.busquedaLabel}>SUPERFICIE</Text>
+              <View style={styles.busquedaStatsRow}>
+                {m2TerrenoMin ? (
+                  <Text style={styles.busquedaStat}>
+                    📐{" "}
+                    <Text style={styles.busquedaStatValue}>
+                      +{fmt(m2TerrenoMin)} m²
+                    </Text>{" "}
+                    terreno
+                  </Text>
+                ) : null}
+                {m2ConstruccionMin ? (
+                  <Text style={styles.busquedaStat}>
+                    🏗️{" "}
+                    <Text style={styles.busquedaStatValue}>
+                      +{fmt(m2ConstruccionMin)} m²
+                    </Text>{" "}
+                    construcción
+                  </Text>
+                ) : null}
+              </View>
+            </>
+          )}
+
+          {/* Antigüedad */}
+          {antiguedad.length > 0 && (
+            <>
+              <Text style={styles.busquedaLabel}>ANTIGÜEDAD</Text>
+              <Text style={styles.busquedaAntiguedad}>{antiguedad}</Text>
+            </>
+          )}
+
+          {/* Detalles especializados (comercial / industrial / agrícola) */}
+          {especializados.length > 0 && (
+            <>
+              <Text style={styles.busquedaLabel}>DETALLES</Text>
+              <View style={styles.busquedaDetalles}>
+                {especializados.map((d, i) => (
+                  <View key={`${d.key}-${i}`} style={styles.busquedaDetalleRow}>
+                    <Text style={styles.busquedaDetalleKey}>{d.key}</Text>
+                    <Text style={styles.busquedaDetalleValue}>{d.value}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
           )}
 
           {/* Nota */}
@@ -840,6 +1046,41 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     letterSpacing: 1.2,
   },
+  clienteCard: {
+    backgroundColor: COLORS.primaryTransparent,
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    gap: 4,
+  },
+  clienteHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 2,
+  },
+  clienteHeaderText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: COLORS.primary,
+    letterSpacing: 0.6,
+  },
+  clienteNombre: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+  },
+  clienteContactoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  clienteContactoText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
   operacionChip: {
     marginLeft: 4,
     paddingHorizontal: 8,
@@ -900,10 +1141,39 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     maxWidth: 180,
   },
+  busquedaSubtipoRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: -8,
+    marginBottom: 16,
+  },
+  busquedaSubtipoChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: COLORS.primaryLight + "30",
+    borderWidth: 1,
+    borderColor: COLORS.primary + "40",
+  },
+  busquedaSubtipoText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.primaryDark,
+  },
   busquedaStatsRow: {
     flexDirection: "row",
-    gap: 20,
+    flexWrap: "wrap",
+    gap: 12,
+    rowGap: 8,
     marginTop: 4,
+    marginBottom: 16,
+  },
+  busquedaAntiguedad: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    marginBottom: 16,
   },
   busquedaStat: {
     fontSize: 14,
@@ -917,6 +1187,28 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: COLORS.cardBorder,
     marginVertical: 14,
+  },
+  busquedaDetalles: {
+    gap: 6,
+    marginBottom: 16,
+  },
+  busquedaDetalleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  busquedaDetalleKey: {
+    fontSize: 13,
+    color: COLORS.textTertiary,
+    flexShrink: 0,
+  },
+  busquedaDetalleValue: {
+    fontSize: 13,
+    color: COLORS.textPrimary,
+    fontWeight: "500",
+    flex: 1,
+    textAlign: "right",
   },
   busquedaNota: {
     fontSize: 14,

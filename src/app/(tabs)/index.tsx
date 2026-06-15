@@ -84,6 +84,18 @@ export default function FeedScreen() {
     }
   }, [pendingOpenMap]);
 
+  // Tras publicar (llega el param `refresh`), mostrar el header aunque estuviera
+  // oculto: el scroll programático al top no dispara onScroll, así que el header
+  // no se resetea solo.
+  const lastRefreshParamRef = useRef<string | null>(null);
+  useEffect(() => {
+    const r = Array.isArray(refresh) ? refresh[0] : refresh;
+    if (r && r !== lastRefreshParamRef.current) {
+      lastRefreshParamRef.current = r;
+      resetHeader();
+    }
+  }, [refresh]);
+
   return (
     <View style={styles.container}>
       <Feed

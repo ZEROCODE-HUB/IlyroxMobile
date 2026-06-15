@@ -2,12 +2,27 @@ import React from "react";
 import { View, Text, Switch, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
 import { COLORS } from "@/constants/colors";
 import { TIPOS_AGUA, USOS_TERRENO, TIPOS_RIEGO } from "@/constants/propertyData";
-import RadioGroupSelector from "@/components/common/RadioGroupSelector";
-import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
+import {
+  usePropertyFiltersStore,
+  type AgricolaFilters,
+} from "@/store/propertyFiltersStore";
 
-export const AgricolaFiltersSection: React.FC = () => {
-  const { filters, updateAgricolaFilter } = usePropertyFiltersStore();
-  const ag = filters.agricolaFilters;
+interface AgricolaFiltersSectionProps {
+  /** Si se pasan, el componente opera sobre este valor en lugar del store global. */
+  value?: AgricolaFilters;
+  onUpdate?: <K extends keyof AgricolaFilters>(
+    key: K,
+    value: AgricolaFilters[K],
+  ) => void;
+}
+
+export const AgricolaFiltersSection: React.FC<AgricolaFiltersSectionProps> = ({
+  value,
+  onUpdate,
+}) => {
+  const store = usePropertyFiltersStore();
+  const ag = value ?? store.filters.agricolaFilters;
+  const updateAgricolaFilter = onUpdate ?? store.updateAgricolaFilter;
 
   const toggleTipoAgua = (tipo: string) => {
     const current = ag.tiposAgua ?? [];
@@ -15,6 +30,22 @@ export const AgricolaFiltersSection: React.FC = () => {
       ? current.filter((t) => t !== tipo)
       : [...current, tipo];
     updateAgricolaFilter("tiposAgua", updated);
+  };
+
+  const toggleUsoTerreno = (uso: string) => {
+    const current = ag.usoTerreno ?? [];
+    updateAgricolaFilter(
+      "usoTerreno",
+      current.includes(uso) ? current.filter((t) => t !== uso) : [...current, uso],
+    );
+  };
+
+  const toggleTipoRiego = (riego: string) => {
+    const current = ag.tipoRiego ?? [];
+    updateAgricolaFilter(
+      "tipoRiego",
+      current.includes(riego) ? current.filter((t) => t !== riego) : [...current, riego],
+    );
   };
 
   return (
@@ -49,21 +80,39 @@ export const AgricolaFiltersSection: React.FC = () => {
         />
       </View>
 
-      {/* USO DEL TERRENO */}
-      <RadioGroupSelector
-        label="Uso del Terreno"
-        options={[...USOS_TERRENO]}
-        selectedValue={ag.usoTerreno}
-        onSelect={(v) => updateAgricolaFilter("usoTerreno", v === ag.usoTerreno ? "" : v)}
-      />
+      {/* USO DEL TERRENO (selección múltiple) */}
+      <Text style={styles.label}>Uso del Terreno</Text>
+      <View style={styles.chipsWrap}>
+        {USOS_TERRENO.map((opt) => {
+          const selected = ag.usoTerreno?.includes(opt);
+          return (
+            <TouchableOpacity
+              key={opt}
+              style={[styles.chip, selected && styles.chipSelected]}
+              onPress={() => toggleUsoTerreno(opt)}
+            >
+              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{opt}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
-      {/* TIPO DE RIEGO */}
-      <RadioGroupSelector
-        label="Tipo de Riego"
-        options={[...TIPOS_RIEGO]}
-        selectedValue={ag.tipoRiego}
-        onSelect={(v) => updateAgricolaFilter("tipoRiego", v === ag.tipoRiego ? "" : v)}
-      />
+      {/* TIPO DE RIEGO (selección múltiple) */}
+      <Text style={styles.label}>Tipo de Riego</Text>
+      <View style={styles.chipsWrap}>
+        {TIPOS_RIEGO.map((opt) => {
+          const selected = ag.tipoRiego?.includes(opt);
+          return (
+            <TouchableOpacity
+              key={opt}
+              style={[styles.chip, selected && styles.chipSelected]}
+              onPress={() => toggleTipoRiego(opt)}
+            >
+              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{opt}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       {/* INFRAESTRUCTURA */}
       <Text style={styles.label}>Infraestructura</Text>
@@ -135,6 +184,12 @@ const styles = StyleSheet.create({
   },
   chipsRow: {
     flexDirection: "row",
+    marginBottom: 16,
+  },
+  chipsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
     marginBottom: 16,
   },
   chip: {

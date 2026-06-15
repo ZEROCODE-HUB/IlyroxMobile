@@ -118,6 +118,24 @@ export default function CreateProperty({
     setShowPublishedSheet(true);
   }, []);
 
+  // Navega al feed reemplazando la pantalla de creación en el stack (igual que los
+  // posts), para que "atrás" no regrese al formulario "Crear propiedad".
+  const goToFeed = useCallback(() => {
+    setShowPublishedSheet(false);
+    router.replace({
+      pathname: "/(tabs)",
+      params: { refresh: String(Date.now()) },
+    });
+  }, [router]);
+
+  // Cierra el modal de Open House y lleva al feed (la propiedad ya se publicó),
+  // para no dejar al usuario de vuelta en el formulario "Crear propiedad".
+  const closeOpenHouseToFeed = useCallback(() => {
+    setShowOpenHouseModal(false);
+    setOpenHousePost(null);
+    goToFeed();
+  }, [goToFeed]);
+
   // 4. Hook de publicación (maneja guardado final y UI de load/error)
   const { publishState, handlePublish, cancelPublish, clearPublishError } = usePublishProperty(
     form,
@@ -344,17 +362,9 @@ export default function CreateProperty({
       visible={showPublishedSheet}
       isUpdate={publishedInfo?.isUpdate ?? false}
       newPropertyId={publishedInfo?.newPropertyId ?? null}
-      onViewProperty={() => {
-        setShowPublishedSheet(false);
-        if (publishedInfo?.newPropertyId) {
-          router.push({
-            pathname: "/(stack)/property/[id]",
-            params: { id: publishedInfo.newPropertyId },
-          });
-        } else {
-          if (onBack) onBack(true);
-        }
-      }}
+      // "Ver propiedad" lleva al feed (reemplazando el formulario en el stack); la
+      // propiedad recién publicada aparece hasta arriba por el prepend optimista.
+      onViewProperty={goToFeed}
       onCreateOpenHouse={
         !propertyId && publishedInfo?.newPropertyId
           ? () => {
@@ -367,17 +377,16 @@ export default function CreateProperty({
             }
           : undefined
       }
-      onGoToFeed={() => {
-        setShowPublishedSheet(false);
-        router.replace({
-          pathname: "/(tabs)",
-          params: { refresh: String(Date.now()) },
-        });
-      }}
       onDismiss={() => {
-        setShowPublishedSheet(false);
-        // Si es edición y cierra el sheet, volver con refresh
-        if (publishedInfo?.isUpdate && onBack) onBack(true);
+        // Edición: cerrar el sheet y volver con refresh (comportamiento previo).
+        // Propiedad nueva: cualquier forma de cerrar el sheet (gesto, tap fuera o
+        // botón atrás) lleva al feed, para no quedar atrapado en "Crear propiedad".
+        if (publishedInfo?.isUpdate) {
+          setShowPublishedSheet(false);
+          if (onBack) onBack(true);
+        } else {
+          goToFeed();
+        }
       }}
     />
 
@@ -386,18 +395,9 @@ export default function CreateProperty({
       <Modal
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => {
-          setShowOpenHouseModal(false);
-          setOpenHousePost(null);
-        }}
+        onRequestClose={closeOpenHouseToFeed}
       >
-        <CreatePost
-          post={openHousePost}
-          onBack={() => {
-            setShowOpenHouseModal(false);
-            setOpenHousePost(null);
-          }}
-        />
+        <CreatePost post={openHousePost} onBack={closeOpenHouseToFeed} />
       </Modal>
     )}
     </>

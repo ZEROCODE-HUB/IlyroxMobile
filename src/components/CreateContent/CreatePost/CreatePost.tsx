@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import {
   View,
@@ -64,6 +65,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   const { showModal } = useModal();
   const { showToast } = useToast();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { createPost, uploading: creatingPost } = useCreateContent(user?.id);
 
   const [content, setContent] = useState("");
@@ -93,6 +95,8 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   const [antiguedad, setAntiguedad] = useState("");
   const [m2Terreno, setM2Terreno] = useState("");
   const [m2Construccion, setM2Construccion] = useState("");
+  const [anchoTerreno, setAnchoTerreno] = useState("");
+  const [largoTerreno, setLargoTerreno] = useState("");
   const [ubicaciones, setUbicaciones] = useState<LocationChipItem[]>([]);
   const [nota, setNota] = useState("");
 
@@ -148,14 +152,15 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
                 ? formatNumericInput(filtros.precio_max)
                 : "",
             );
+            // Check truthy: un valor 0 debe quedar vacío (no "0") en el formulario.
             setHabitaciones(
-              caracteristicas.habitaciones?.toString() || "",
+              caracteristicas.habitaciones ? String(caracteristicas.habitaciones) : "",
             );
-            setBanos(caracteristicas.banos?.toString() || "");
+            setBanos(caracteristicas.banos ? String(caracteristicas.banos) : "");
             setEstacionamientos(
-              caracteristicas.estacionamientos?.toString() || "",
+              caracteristicas.estacionamientos ? String(caracteristicas.estacionamientos) : "",
             );
-            setNiveles(caracteristicas.niveles?.toString() || "");
+            setNiveles(caracteristicas.niveles ? String(caracteristicas.niveles) : "");
             setAntiguedad(
               caracteristicas.antiguedad ? String(caracteristicas.antiguedad) : "",
             );
@@ -167,6 +172,16 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             setM2Construccion(
               typeof superficies.m2_construccion_min === "number" && superficies.m2_construccion_min > 0
                 ? String(superficies.m2_construccion_min)
+                : "",
+            );
+            setAnchoTerreno(
+              typeof superficies.ancho_terreno_min === "number" && superficies.ancho_terreno_min > 0
+                ? String(superficies.ancho_terreno_min)
+                : "",
+            );
+            setLargoTerreno(
+              typeof superficies.largo_terreno_min === "number" && superficies.largo_terreno_min > 0
+                ? String(superficies.largo_terreno_min)
                 : "",
             );
             setMoneda(filtros.moneda || "MXN");
@@ -368,6 +383,8 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
           const nivelesParsed = parseNum(niveles);
           const m2TerrenoParsed = parseNum(m2Terreno);
           const m2ConstruccionParsed = parseNum(m2Construccion);
+          const anchoParsed = parseNum(anchoTerreno);
+          const largoParsed = parseNum(largoTerreno);
 
           updatedData.busquedas_json = {
             ...currentJson,
@@ -411,6 +428,14 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
                   m2ConstruccionParsed !== null
                     ? m2ConstruccionParsed
                     : currentSuperficies.m2_construccion_min,
+                ancho_terreno_min:
+                  anchoParsed !== null
+                    ? anchoParsed
+                    : currentSuperficies.ancho_terreno_min,
+                largo_terreno_min:
+                  largoParsed !== null
+                    ? largoParsed
+                    : currentSuperficies.largo_terreno_min,
                 icon: currentSuperficies.icon || "resize-outline",
               },
               nota: nota.trim(),
@@ -445,6 +470,9 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             params: { refresh: String(Date.now()) },
           });
         } else if (post?.tipo === "busqueda") {
+          // Edición de post de búsqueda: no hay prepend, así que refrescamos el
+          // feed para que el cambio editado se refleje (se reordena por score).
+          queryClient.invalidateQueries({ queryKey: ["feed"] });
           onBack();
           router.replace({
             pathname: "/(tabs)",
@@ -554,6 +582,10 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             setM2Terreno={setM2Terreno}
             m2Construccion={m2Construccion}
             setM2Construccion={setM2Construccion}
+            anchoTerreno={anchoTerreno}
+            setAnchoTerreno={setAnchoTerreno}
+            largoTerreno={largoTerreno}
+            setLargoTerreno={setLargoTerreno}
             ubicaciones={ubicaciones}
             setUbicaciones={setUbicaciones}
             nota={nota}

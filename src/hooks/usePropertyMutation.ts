@@ -37,14 +37,18 @@ export const usePropertyMutation = () => {
         result = { success: true, id: newProp.id, mode: "create" };
       }
 
-      // Invalidar caches de feed y mapa para que reflejen la propiedad
-      // recién creada/actualizada inmediatamente.
-      queryClient.invalidateQueries({ queryKey: ["feed"] });
+      // El mapa siempre se refresca para reflejar la propiedad creada/actualizada.
       queryClient.invalidateQueries({ queryKey: ["map-properties"] });
-      // Invalidar también el detalle de la propiedad si es una edición
+
       if (propertyId) {
+        // UPDATE: refrescar el feed (para reflejar los cambios) y el detalle.
+        queryClient.invalidateQueries({ queryKey: ["feed"] });
         queryClient.invalidateQueries({ queryKey: ["property", propertyId] });
       }
+      // CREATE: NO invalidar el feed. El caller hace un prepend optimista para que
+      // la propiedad aparezca arriba al instante; invalidar aquí dispararía un
+      // refetch que la reordenaría por engagement_score y pisaría ese prepend.
+      // El orden por score se reaplica en el siguiente refresh (igual que los posts).
 
       return result;
     } catch (err) {

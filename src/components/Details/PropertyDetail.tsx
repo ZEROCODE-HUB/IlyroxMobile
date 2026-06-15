@@ -314,7 +314,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                 )}
               {campos.niveles && propertyDetails.pisos > 0 && (
                 <StatItem
-                  icon="business-outline"
+                  icon="layers-outline"
                   label="Niveles"
                   value={propertyDetails.pisos}
                 />
