@@ -11,7 +11,7 @@ import MapView, {
 } from "../shared/MapComponents";
 import { Property } from "@/types";
 import { COLORS } from "@/constants/colors";
-import { Globe, MapIcon } from "lucide-react-native";
+import { Globe, MapIcon, Layers, Mountain, ChevronDown } from "lucide-react-native";
 import { PolygonCoord } from "@/store/propertyFiltersStore";
 import Supercluster from "supercluster";
 
@@ -33,6 +33,9 @@ interface PropertyMapProps {
   onLongPressMap?: (coord: PolygonCoord) => void;
   /** Pins clásicos en el punto exacto de cada ubicación buscada/agregada. */
   searchedLocationPins?: { key: string; latitude: number; longitude: number }[];
+  /** Altura de una barra superior que tape el mapa (p. ej. SearchFiltersBar),
+      para bajar el selector de tipo de mapa y que no quede oculto. */
+  topOffset?: number;
 }
 
 export const PropertyMap: React.FC<PropertyMapProps> = ({
@@ -47,6 +50,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   onMapPress,
   onLongPressMap,
   searchedLocationPins,
+  topOffset = 0,
 }) => {
   const mapRef = useRef<any>(null);
   const nativeMapRef = useRef<MapView>(null);
@@ -60,9 +64,10 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     [key: string]: { x: number; y: number };
   }>({});
 
-  const [mapTypeId, setMapTypeId] = useState<"standard" | "satellite">(
-    "standard",
-  );
+  const [mapTypeId, setMapTypeId] = useState<
+    "standard" | "satellite" | "hybrid" | "terrain"
+  >("satellite");
+  const [mapTypeMenuOpen, setMapTypeMenuOpen] = useState(false);
 
   const [currentRegion, setCurrentRegion] = useState({
     latitude: 25.6866,
@@ -508,24 +513,6 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
   return (
     <View style={styles.container}>
-      <Pressable
-        style={styles.mapTypeButton}
-        onPress={() =>
-          setMapTypeId(mapTypeId === "standard" ? "satellite" : "standard")
-        }
-      >
-        {mapTypeId === "standard" ? (
-          <View style={styles.mapTypeButtonIcon}>
-            <Globe size={10} />
-            <Text style={styles.mapTypeButtonText}>Satélite</Text>
-          </View>
-        ) : (
-          <View style={styles.mapTypeButtonIcon}>
-            <MapIcon size={10} />
-            <Text style={styles.mapTypeButtonText}>Mapa</Text>
-          </View>
-        )}
-      </Pressable>
       <MapView
         ref={nativeMapRef}
         style={styles.mapNative}
@@ -767,9 +754,79 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           <Text style={styles.emptyText}>No hay propiedades para mostrar</Text>
         </View>
       )}
+
+      {/* Selector de tipo de mapa — renderizado AL FINAL (después del MapView)
+          para garantizar visibilidad sobre el MapView nativo en Android */}
+      {(() => {
+        const activeOption =
+          MAP_TYPE_OPTIONS.find((o) => o.id === mapTypeId) ??
+          MAP_TYPE_OPTIONS[0];
+        const ActiveIcon = activeOption.Icon;
+        // Deja libre el hint "Mantén presionado el mapa..." que se muestra
+        // en topOffset + 12; se baja de más para evitar cualquier solape.
+        const buttonTop = topOffset + 96;
+        return (
+          <>
+            {mapTypeMenuOpen && (
+              <Pressable
+                style={styles.mapTypeBackdrop}
+                onPress={() => setMapTypeMenuOpen(false)}
+              />
+            )}
+            <Pressable
+              style={[styles.mapTypeButton, { top: buttonTop }]}
+              onPress={() => setMapTypeMenuOpen((v) => !v)}
+            >
+              <View style={styles.mapTypeButtonIcon}>
+                <ActiveIcon size={10} />
+                <Text style={styles.mapTypeButtonText}>
+                  {activeOption.label}
+                </Text>
+                <ChevronDown size={10} />
+              </View>
+            </Pressable>
+            {mapTypeMenuOpen && (
+              <View style={[styles.mapTypeMenu, { top: buttonTop + 44 }]}>
+                {MAP_TYPE_OPTIONS.filter(
+                  (o) => o.id !== "terrain" || Platform.OS === "android",
+                ).map((option) => {
+                  const OptionIcon = option.Icon;
+                  const isActive = option.id === mapTypeId;
+                  return (
+                    <Pressable
+                      key={option.id}
+                      style={[
+                        styles.mapTypeMenuItem,
+                        isActive && styles.mapTypeMenuItemActive,
+                      ]}
+                      onPress={() => {
+                        setMapTypeId(option.id);
+                        setMapTypeMenuOpen(false);
+                        if (Platform.OS !== "web") Haptics.selectionAsync();
+                      }}
+                    >
+                      <OptionIcon size={14} />
+                      <Text style={styles.mapTypeMenuItemText}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </>
+        );
+      })()}
     </View>
   );
 };
+
+const MAP_TYPE_OPTIONS = [
+  { id: "standard", label: "Mapa", Icon: MapIcon },
+  { id: "satellite", label: "Satélite", Icon: Globe },
+  { id: "hybrid", label: "Híbrido", Icon: Layers },
+  { id: "terrain", label: "Terreno", Icon: Mountain }, // se filtra fuera de Android
+] as const;
 
 const styles = StyleSheet.create({
   container: {
@@ -818,7 +875,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 16,
     right: 16,
-    zIndex: 1,
+    zIndex: 3,
     padding: 8,
     borderRadius: 12,
     backgroundColor: COLORS.white,
@@ -836,6 +893,42 @@ const styles = StyleSheet.create({
   mapTypeButtonText: {
     fontSize: 10,
     fontWeight: "bold",
+  },
+  mapTypeBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 2,
+  },
+  mapTypeMenu: {
+    position: "absolute",
+    top: 56,
+    right: 16,
+    zIndex: 3,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: COLORS.white,
+    elevation: 4,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    minWidth: 130,
+  },
+  mapTypeMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginHorizontal: 4,
+  },
+  mapTypeMenuItemActive: {
+    backgroundColor: COLORS.primary + "22",
+  },
+  mapTypeMenuItemText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
   },
   clusterOuter: {
     alignItems: "center",

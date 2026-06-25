@@ -2,17 +2,16 @@ import React from "react";
 import { View, Text, Switch, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../../constants/colors";
-import { TIPOS_UBICACION_COMERCIAL } from "../../../constants/propertyData";
+import { TIPOS_UBICACION_COMERCIAL, esTerreno } from "../../../constants/propertyData";
 import { AppInput } from "../../../design-system/components/AppInput";
 import RadioGroupSelector from "../../common/RadioGroupSelector";
 import { usePropertyFormContext } from "./PropertyFormContext";
 
 export const ComercialSection = React.memo(function ComercialSection() {
   const {
+    subtipo,
     tipoUbicacionComercial,
     setTipoUbicacionComercial,
-    frenteMetros,
-    setFrenteMetros,
     nivelPiso,
     setNivelPiso,
     sobreAvenidaPrincipal,
@@ -24,6 +23,10 @@ export const ComercialSection = React.memo(function ComercialSection() {
     altoFlujoVehicular,
     setAltoFlujoVehicular,
   } = usePropertyFormContext();
+
+  // El frente/fondo se capturan como "Frente/Fondo" en Características Físicas.
+  // Aquí solo queda el nivel de piso, que no aplica a terrenos.
+  const isTerreno = esTerreno(subtipo);
 
   return (
     <View style={styles.section}>
@@ -40,27 +43,16 @@ export const ComercialSection = React.memo(function ComercialSection() {
         onSelect={setTipoUbicacionComercial}
       />
 
-      {/* FRENTE Y NIVEL */}
-      <View style={styles.row}>
-        <View style={styles.half}>
-          <AppInput
-            label="Frente (metros)"
-            placeholder="ej. 10"
-            keyboardType="decimal-pad"
-            value={frenteMetros}
-            onChangeText={setFrenteMetros}
-          />
-        </View>
-        <View style={styles.half}>
-          <AppInput
-            label="Nivel de piso"
-            placeholder="ej. 1"
-            keyboardType="number-pad"
-            value={nivelPiso}
-            onChangeText={setNivelPiso}
-          />
-        </View>
-      </View>
+      {/* NIVEL DE PISO — no aplica a terrenos (el frente/fondo va en Características Físicas) */}
+      {!isTerreno && (
+        <AppInput
+          label="Nivel de piso"
+          placeholder="ej. 1"
+          keyboardType="number-pad"
+          value={nivelPiso}
+          onChangeText={setNivelPiso}
+        />
+      )}
 
       {/* CARACTERÍSTICAS */}
       <Text style={styles.label}>Características de Ubicación</Text>

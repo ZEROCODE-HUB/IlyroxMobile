@@ -7,6 +7,7 @@ import { COLORS } from "../../../constants/colors";
 import { OPCIONES_SI_NO } from "../../../constants/propertyData";
 import type { SiNo, ComisionValues, ComisionSetters } from "./types";
 import { usePropertyFormContext } from "./PropertyFormContext";
+import { FieldAnchor } from "./fieldAnchors";
 
 const THUMB = 22;
 const TRACK_H = 6;
@@ -322,12 +323,17 @@ export const CommissionSection = React.memo(function CommissionSection({
   const isRenta = tipoOperacion === "renta";
   const isAmbas = tipoOperacion === "ambas";
 
+  const comisionError = form.errors.comision || form.errors.comisionRenta;
+
   return (
-    <View style={styles.section}>
+    <FieldAnchor name="commission">
+    <View style={[styles.section, comisionError && styles.sectionError]}>
       <View style={styles.sectionHeaderBand}>
         <Ionicons name="cash-outline" size={18} color={COLORS.primary} />
         <Text style={styles.sectionTitleBand}>Comisión</Text>
       </View>
+
+      {comisionError && <Text style={styles.errorText}>{comisionError}</Text>}
 
       {!isRenta &&
         renderVentaForm(isAmbas ? "Comisión para Venta" : "", ventaValues, ventaSetters)}
@@ -340,6 +346,7 @@ export const CommissionSection = React.memo(function CommissionSection({
           isAmbas,
         )}
     </View>
+    </FieldAnchor>
   );
 });
 
@@ -358,6 +365,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  sectionError: {
+    borderColor: COLORS.error,
+  },
   sectionHeaderBand: {
     flexDirection: "row",
     alignItems: "center",
@@ -372,6 +382,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     color: COLORS.primary,
+  },
+  errorText: {
+    fontSize: 12,
+    color: COLORS.error,
+    marginTop: -8,
+    marginBottom: 12,
   },
   operationTitle: {
     fontSize: 16,

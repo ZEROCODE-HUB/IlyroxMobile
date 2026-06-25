@@ -20,6 +20,8 @@ interface RadioGroupSelectorProps {
   label?: string;
   style?: ViewStyle;
   fullWidth?: boolean;
+  /** Mensaje de error: resalta el grupo en rojo y lo muestra debajo. */
+  error?: string;
 }
 
 export default function RadioGroupSelector({
@@ -29,12 +31,21 @@ export default function RadioGroupSelector({
   label,
   style,
   fullWidth = false,
+  error,
 }: RadioGroupSelectorProps) {
   return (
     <View style={[styles.container, style]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && (
+        <Text style={[styles.label, !!error && styles.labelError]}>{label}</Text>
+      )}
 
-      <View style={[styles.optionsContainer, fullWidth && styles.fullWidth]}>
+      <View
+        style={[
+          styles.optionsContainer,
+          fullWidth && styles.fullWidth,
+          !!error && styles.optionsContainerError,
+        ]}
+      >
         {options.map((option) => {
           const isSelected = selectedValue === option;
 
@@ -61,6 +72,8 @@ export default function RadioGroupSelector({
           );
         })}
       </View>
+
+      {!!error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 }
@@ -76,9 +89,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: "uppercase",
   },
+  labelError: {
+    color: COLORS.error,
+  },
   optionsContainer: {
     flexDirection: "row",
     gap: 12,
+  },
+  optionsContainerError: {
+    borderWidth: 1,
+    borderColor: COLORS.error,
+    borderRadius: 12,
+    padding: 8,
+  },
+  errorText: {
+    fontSize: 12,
+    color: COLORS.error,
+    marginTop: 6,
   },
   fullWidth: {
     flexDirection: "column",

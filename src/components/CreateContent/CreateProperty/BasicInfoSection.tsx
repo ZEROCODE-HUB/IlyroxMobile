@@ -22,6 +22,7 @@ import {
 } from "../../../constants/propertyData";
 import type { TipoOperacion, MonedaType } from "./types";
 import { usePropertyFormContext } from "./PropertyFormContext";
+import { FieldAnchor } from "./fieldAnchors";
 
 const TIPO_CARDS = [
   { value: "habitacional", label: "Habitacional", icon: "home-outline" },
@@ -143,7 +144,7 @@ export const BasicInfoSection = React.memo(function BasicInfoSection() {
 
       {/* 2. SUBTIPO */}
       {subtiposDisponibles.length > 0 && (
-        <>
+        <FieldAnchor name="subtipo">
           <Text style={styles.label}>Subtipo *</Text>
           {tipoPrincipal === "agricola" && (
             <Text style={styles.subtipoHint}>Elige el que mejor describa tu propiedad.</Text>
@@ -152,7 +153,7 @@ export const BasicInfoSection = React.memo(function BasicInfoSection() {
 
           {/* Industrial y Agropecuario: tarjetas grandes */}
           {(tipoPrincipal === "industrial" || tipoPrincipal === "agricola") ? (
-            <View style={styles.subtipoCardList}>
+            <View style={[styles.subtipoCardList, errors.subtipo && styles.subtipoGroupError]}>
               {subtiposDisponibles.map((sub) => {
                 const selected = subtipo === sub;
                 const key = sub.toLowerCase();
@@ -204,7 +205,7 @@ export const BasicInfoSection = React.memo(function BasicInfoSection() {
             </View>
           ) : (
             /* Habitacional y Comercial: chips compactos */
-            <View style={styles.subtipoGrid}>
+            <View style={[styles.subtipoGrid, errors.subtipo && styles.subtipoGroupError]}>
               {subtiposDisponibles.map((sub) => {
                 const selected = subtipo === sub;
                 const key = sub.toLowerCase();
@@ -233,85 +234,94 @@ export const BasicInfoSection = React.memo(function BasicInfoSection() {
               })}
             </View>
           )}
-        </>
+        </FieldAnchor>
       )}
 
       {/* 3. TIPO DE OPERACIÓN */}
-      <RadioGroupSelector
-        label="Tipo de Operación *"
-        options={["venta", "renta", "ambas"]}
-        selectedValue={tipoOperacion}
-        onSelect={(val) => setTipoOperacion(val as TipoOperacion)}
-      />
+      <FieldAnchor name="tipoOperacion">
+        <RadioGroupSelector
+          label="Tipo de Operación *"
+          options={["venta", "renta", "ambas"]}
+          selectedValue={tipoOperacion}
+          onSelect={(val) => setTipoOperacion(val as TipoOperacion)}
+          error={errors.tipoOperacion}
+        />
+      </FieldAnchor>
 
       {/* 4. PRECIOS */}
       {(tipoOperacion === "venta" || tipoOperacion === "ambas") && (
-        <AppInput
-          label="Precio de Venta *"
-          placeholder="0.00"
-          keyboardType="numeric"
-          value={precioVenta}
-          onChangeText={(text) => handleCurrencyChange(text, setPrecioVenta)}
-          error={errors.precioVenta}
-          leftIcon={
-            <TouchableOpacity
-              style={styles.currencySelector}
-              onPress={() => setShowMonedaModal(true)}
-            >
-              <Text style={styles.selectorText}>{moneda}</Text>
-              <Ionicons
-                name="chevron-down"
-                size={16}
-                color={COLORS.textSecondary}
-              />
-            </TouchableOpacity>
-          }
-        />
+        <FieldAnchor name="precioVenta">
+          <AppInput
+            label="Precio de Venta *"
+            placeholder="0.00"
+            keyboardType="numeric"
+            value={precioVenta}
+            onChangeText={(text) => handleCurrencyChange(text, setPrecioVenta)}
+            error={errors.precioVenta}
+            leftIcon={
+              <TouchableOpacity
+                style={styles.currencySelector}
+                onPress={() => setShowMonedaModal(true)}
+              >
+                <Text style={styles.selectorText}>{moneda}</Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={16}
+                  color={COLORS.textSecondary}
+                />
+              </TouchableOpacity>
+            }
+          />
+        </FieldAnchor>
       )}
 
       {(tipoOperacion === "renta" || tipoOperacion === "ambas") && (
-        <AppInput
-          label="Precio de Renta Mensual *"
-          placeholder="0.00"
-          keyboardType="numeric"
-          value={precioRenta}
-          onChangeText={(text) => handleCurrencyChange(text, setPrecioRenta)}
-          error={errors.precioRenta}
-          leftIcon={
-            <TouchableOpacity
-              style={styles.currencySelector}
-              onPress={() => setShowMonedaModal(true)}
-            >
-              <Text style={styles.selectorText}>{moneda}</Text>
-              <Ionicons
-                name="chevron-down"
-                size={16}
-                color={COLORS.textSecondary}
-              />
-            </TouchableOpacity>
-          }
-        />
+        <FieldAnchor name="precioRenta">
+          <AppInput
+            label="Precio de Renta Mensual *"
+            placeholder="0.00"
+            keyboardType="numeric"
+            value={precioRenta}
+            onChangeText={(text) => handleCurrencyChange(text, setPrecioRenta)}
+            error={errors.precioRenta}
+            leftIcon={
+              <TouchableOpacity
+                style={styles.currencySelector}
+                onPress={() => setShowMonedaModal(true)}
+              >
+                <Text style={styles.selectorText}>{moneda}</Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={16}
+                  color={COLORS.textSecondary}
+                />
+              </TouchableOpacity>
+            }
+          />
+        </FieldAnchor>
       )}
 
       {/* 5. DESCRIPCIÓN */}
-      <AppInput
-        label="Descripción *"
-        placeholder="Describe las características principales..."
-        value={descripcion}
-        onChangeText={(text) => {
-          if (text.length <= 2500) {
-            setDescripcion(text);
-          } else {
-            setDescripcion(text.substring(0, 2500));
-          }
-        }}
-        multiline
-        numberOfLines={10}
-        maxLength={2500}
-        helperText={`${descripcion.length}/2500`}
-        inputStyle={styles.textArea}
-        error={errors.descripcion}
-      />
+      <FieldAnchor name="descripcion">
+        <AppInput
+          label="Descripción *"
+          placeholder="Describe las características principales..."
+          value={descripcion}
+          onChangeText={(text) => {
+            if (text.length <= 2500) {
+              setDescripcion(text);
+            } else {
+              setDescripcion(text.substring(0, 2500));
+            }
+          }}
+          multiline
+          numberOfLines={10}
+          maxLength={2500}
+          helperText={`${descripcion.length}/2500`}
+          inputStyle={styles.textArea}
+          error={errors.descripcion}
+        />
+      </FieldAnchor>
 
       <SelectionModal
         visible={showMonedaModal}
@@ -550,5 +560,11 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     marginTop: 5,
     marginBottom: 12,
+  },
+  subtipoGroupError: {
+    borderWidth: 1,
+    borderColor: COLORS.error,
+    borderRadius: 12,
+    padding: 8,
   },
 });

@@ -21,6 +21,7 @@ import {
   OPCIONES_SI_NO,
   getLabelRecamaras,
   esTerreno,
+  esCasa,
   TipoPrincipal,
 } from "../../../constants/propertyData";
 import { formatThousands } from "../../../utils/numberFormatter";
@@ -30,6 +31,7 @@ import type {
   NumberInputConfig,
 } from "./types";
 import { usePropertyFormContext } from "./PropertyFormContext";
+import { FieldAnchor } from "./fieldAnchors";
 
 export const PhysicalFeaturesSection = React.memo(
   function PhysicalFeaturesSection() {
@@ -99,21 +101,26 @@ export const PhysicalFeaturesSection = React.memo(
 
         {/* RECÁMARAS */}
         {camposVisibles.recamaras && (
-          <>
+          <FieldAnchor name="recamaras">
             <Text style={styles.label}>
               {getLabelRecamaras(tipoPrincipal as TipoPrincipal)}
             </Text>
             <TouchableOpacity
-              style={styles.selector}
+              style={[styles.selector, errors.recamaras && styles.selectorError]}
               onPress={() => setShowRecamarasModal(true)}
             >
-              <Text style={styles.selectorText}>{recamaras || "0"}</Text>
+              <Text style={recamaras ? styles.selectorText : styles.selectorPlaceholder}>
+                {recamaras || "Selecciona..."}
+              </Text>
               <Ionicons
                 name="chevron-down"
                 size={20}
                 color={COLORS.textSecondary}
               />
             </TouchableOpacity>
+            {errors.recamaras && (
+              <Text style={styles.errorText}>{errors.recamaras}</Text>
+            )}
             <SelectionModal
               visible={showRecamarasModal}
               onClose={() => setShowRecamarasModal(false)}
@@ -131,24 +138,29 @@ export const PhysicalFeaturesSection = React.memo(
               options={[...RECAMARAS]}
               currentValue={recamaras}
             />
-          </>
+          </FieldAnchor>
         )}
 
         {/* BAÑOS COMPLETOS */}
         {camposVisibles.banos && (
-          <>
+          <FieldAnchor name="banos">
             <Text style={styles.label}>Baños Completos</Text>
             <TouchableOpacity
-              style={styles.selector}
+              style={[styles.selector, errors.banos && styles.selectorError]}
               onPress={() => setShowBanosModal(true)}
             >
-              <Text style={styles.selectorText}>{banosCompletos || "0"}</Text>
+              <Text style={banosCompletos ? styles.selectorText : styles.selectorPlaceholder}>
+                {banosCompletos || "Selecciona..."}
+              </Text>
               <Ionicons
                 name="chevron-down"
                 size={20}
                 color={COLORS.textSecondary}
               />
             </TouchableOpacity>
+            {errors.banos && (
+              <Text style={styles.errorText}>{errors.banos}</Text>
+            )}
             <SelectionModal
               visible={showBanosModal}
               onClose={() => setShowBanosModal(false)}
@@ -165,24 +177,29 @@ export const PhysicalFeaturesSection = React.memo(
               options={[...BANOS]}
               currentValue={banosCompletos}
             />
-          </>
+          </FieldAnchor>
         )}
 
         {/* MEDIOS BAÑOS */}
         {camposVisibles.mediosBanos && (
-          <>
+          <FieldAnchor name="mediosBanos">
             <Text style={styles.label}>1/2 Baños</Text>
             <TouchableOpacity
-              style={styles.selector}
+              style={[styles.selector, errors.mediosBanos && styles.selectorError]}
               onPress={() => setShowMediosBanosModal(true)}
             >
-              <Text style={styles.selectorText}>{mediosBanos || "0"}</Text>
+              <Text style={mediosBanos ? styles.selectorText : styles.selectorPlaceholder}>
+                {mediosBanos || "Selecciona..."}
+              </Text>
               <Ionicons
                 name="chevron-down"
                 size={20}
                 color={COLORS.textSecondary}
               />
             </TouchableOpacity>
+            {errors.mediosBanos && (
+              <Text style={styles.errorText}>{errors.mediosBanos}</Text>
+            )}
             <SelectionModal
               visible={showMediosBanosModal}
               onClose={() => setShowMediosBanosModal(false)}
@@ -199,24 +216,29 @@ export const PhysicalFeaturesSection = React.memo(
               options={[...MEDIOS_BANOS]}
               currentValue={mediosBanos}
             />
-          </>
+          </FieldAnchor>
         )}
 
         {/* ESTACIONAMIENTOS */}
         {camposVisibles.estacionamientos && (
-          <>
+          <FieldAnchor name="estacionamientos">
             <Text style={styles.label}>Estacionamientos</Text>
             <TouchableOpacity
-              style={styles.selector}
+              style={[styles.selector, errors.estacionamientos && styles.selectorError]}
               onPress={() => setShowEstacionamientosModal(true)}
             >
-              <Text style={styles.selectorText}>{estacionamientos || "0"}</Text>
+              <Text style={estacionamientos ? styles.selectorText : styles.selectorPlaceholder}>
+                {estacionamientos || "Selecciona..."}
+              </Text>
               <Ionicons
                 name="chevron-down"
                 size={20}
                 color={COLORS.textSecondary}
               />
             </TouchableOpacity>
+            {errors.estacionamientos && (
+              <Text style={styles.errorText}>{errors.estacionamientos}</Text>
+            )}
             <SelectionModal
               visible={showEstacionamientosModal}
               onClose={() => setShowEstacionamientosModal(false)}
@@ -233,19 +255,19 @@ export const PhysicalFeaturesSection = React.memo(
               options={[...ESTACIONAMIENTOS]}
               currentValue={estacionamientos}
             />
-          </>
+          </FieldAnchor>
         )}
 
         {/* NIVELES */}
         {camposVisibles.niveles && (
-          <>
+          <FieldAnchor name="niveles">
             <Text style={styles.label}>Niveles</Text>
             <TouchableOpacity
-              style={styles.selector}
+              style={[styles.selector, errors.niveles && styles.selectorError]}
               onPress={() => setShowNivelesModal(true)}
             >
-              <Text style={styles.selectorText}>
-                {formatNivelLabel(niveles || "1")}
+              <Text style={niveles ? styles.selectorText : styles.selectorPlaceholder}>
+                {niveles ? formatNivelLabel(niveles) : "Selecciona..."}
               </Text>
               <Ionicons
                 name="chevron-down"
@@ -253,6 +275,9 @@ export const PhysicalFeaturesSection = React.memo(
                 color={COLORS.textSecondary}
               />
             </TouchableOpacity>
+            {errors.niveles && (
+              <Text style={styles.errorText}>{errors.niveles}</Text>
+            )}
             <SelectionModal
               visible={showNivelesModal}
               onClose={() => setShowNivelesModal(false)}
@@ -269,7 +294,7 @@ export const PhysicalFeaturesSection = React.memo(
               options={NIVELES.map((v) => ({ label: formatNivelLabel(v), value: v }))}
               currentValue={niveles}
             />
-          </>
+          </FieldAnchor>
         )}
 
         {/* ANTIGÜEDAD */}
@@ -307,7 +332,7 @@ export const PhysicalFeaturesSection = React.memo(
 
         {/* M2 CONSTRUCCIÓN + TERRENO — fila de 2 columnas */}
         {(camposVisibles.m2Construccion || camposVisibles.m2Terreno) && (
-          <View style={styles.m2Row}>
+          <FieldAnchor name="m2" style={styles.m2Row}>
             {camposVisibles.m2Construccion && (
               <View style={styles.m2Col}>
                 <AppInput
@@ -344,15 +369,17 @@ export const PhysicalFeaturesSection = React.memo(
                 />
               </View>
             )}
-          </View>
+          </FieldAnchor>
         )}
 
-        {/* ANCHO Y LARGO (solo terrenos, opcionales) */}
-        {esTerreno(subtipo) && (
+        {/* FRENTE Y FONDO (terrenos, casas y comercial, opcionales) */}
+        {(esTerreno(subtipo) ||
+          esCasa(subtipo) ||
+          tipoPrincipal === "comercial") && (
           <View style={styles.m2Row}>
             <View style={styles.m2Col}>
               <AppInput
-                label="Ancho (m)"
+                label="Frente (m)"
                 placeholder="Opcional"
                 keyboardType="decimal-pad"
                 value={anchoTerreno || ""}
@@ -361,7 +388,7 @@ export const PhysicalFeaturesSection = React.memo(
             </View>
             <View style={styles.m2Col}>
               <AppInput
-                label="Largo (m)"
+                label="Fondo (m)"
                 placeholder="Opcional"
                 keyboardType="decimal-pad"
                 value={largoTerreno || ""}
@@ -384,23 +411,29 @@ export const PhysicalFeaturesSection = React.memo(
 
         {/* AMUEBLADO */}
         {camposVisibles.amueblado && (
-          <RadioGroupSelector
-            label="Amueblado"
-            options={[...OPCIONES_AMUEBLADO]}
-            selectedValue={amueblado}
-            onSelect={(val) => setAmueblado(val as AmuebladoType)}
-          />
+          <FieldAnchor name="amueblado">
+            <RadioGroupSelector
+              label="Amueblado"
+              options={[...OPCIONES_AMUEBLADO]}
+              selectedValue={amueblado}
+              onSelect={(val) => setAmueblado(val as AmuebladoType)}
+              error={errors.amueblado}
+            />
+          </FieldAnchor>
         )}
 
         {/* PET FRIENDLY */}
         {tipoOperacion === "renta" || tipoOperacion === "ambas"
           ? camposVisibles.petFriendly && (
-              <RadioGroupSelector
-                label="Mascotas Permitidas"
-                options={[...OPCIONES_SI_NO]}
-                selectedValue={petFriendly}
-                onSelect={(val) => setPetFriendly(val as SiNo)}
-              />
+              <FieldAnchor name="petFriendly">
+                <RadioGroupSelector
+                  label="Mascotas Permitidas"
+                  options={[...OPCIONES_SI_NO]}
+                  selectedValue={petFriendly}
+                  onSelect={(val) => setPetFriendly(val as SiNo)}
+                  error={errors.petFriendly}
+                />
+              </FieldAnchor>
             )
           : null}
 
@@ -473,11 +506,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
+  selectorError: {
+    borderColor: COLORS.error,
+  },
   selectorText: {
     fontSize: 15,
     color: COLORS.textPrimary,
   },
   selectorPlaceholder: {
+    fontSize: 15,
     color: COLORS.textTertiary,
+  },
+  errorText: {
+    fontSize: 12,
+    color: COLORS.error,
+    marginTop: -6,
+    marginBottom: 12,
   },
 });

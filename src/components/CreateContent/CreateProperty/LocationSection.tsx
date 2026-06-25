@@ -9,6 +9,7 @@ import { AppInput } from "../../../design-system/components/AppInput";
 import CascadeLocationSelector from "../../common/CascadeLocationSelector";
 import { COLORS } from "../../../constants/colors";
 import { usePropertyFormContext } from "./PropertyFormContext";
+import { FieldAnchor } from "./fieldAnchors";
 
 export const LocationSection = React.memo(function LocationSection() {
   const {
@@ -34,16 +35,19 @@ export const LocationSection = React.memo(function LocationSection() {
 
       <AppInput label="País" value={pais} editable={false} />
 
-      <CascadeLocationSelector
-        initialData={ubicacionData}
-        onChange={setUbicacionData}
-        showColonia={true}
-        multiColonia={true}
-      />
-      {errors.estado && <Text style={styles.errorText}>{errors.estado}</Text>}
-      {errors.municipio && (
-        <Text style={styles.errorText}>{errors.municipio}</Text>
-      )}
+      <FieldAnchor name="estado">
+        <View
+          style={[styles.cascadeWrap, errors.estado && styles.cascadeWrapError]}
+        >
+          <CascadeLocationSelector
+            initialData={ubicacionData}
+            onChange={setUbicacionData}
+            showColonia={true}
+            multiColonia={true}
+          />
+        </View>
+        {errors.estado && <Text style={styles.errorText}>{errors.estado}</Text>}
+      </FieldAnchor>
 
       <AppInput
         label="Calle"
@@ -124,5 +128,14 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     marginTop: 5,
     marginBottom: 12,
+  },
+  cascadeWrap: {
+    borderWidth: 1,
+    borderColor: "transparent",
+    borderRadius: 12,
+  },
+  cascadeWrapError: {
+    borderColor: COLORS.error,
+    padding: 8,
   },
 });

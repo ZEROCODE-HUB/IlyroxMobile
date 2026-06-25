@@ -148,6 +148,22 @@ export const esDepartamento = (subtipo: string | string[]): boolean => {
 };
 
 /**
+ * Verifica si el subtipo es una "Casa" (cualquier subtipo cuyo nombre empieza
+ * con "casa": Casa Fracc. Abierto, Casa en Condominio, Casa de campo/cabaña, etc.).
+ * Se usa para mostrar las dimensiones Ancho/Largo del terreno también en casas.
+ */
+export const esCasa = (subtipo: string | string[]): boolean => {
+  if (!subtipo) return false;
+  if (Array.isArray(subtipo)) {
+    return (
+      subtipo.length > 0 &&
+      subtipo.every((s) => s.trim().toLowerCase().startsWith("casa"))
+    );
+  }
+  return subtipo.trim().toLowerCase().startsWith("casa");
+};
+
+/**
  * Verifica si el subtipo es "Rancho / Finca" (agrícola). A diferencia de
  * "Terreno Rural", una finca tiene casa habitación, por lo que aplica recámaras
  * y baños. Con array exige que TODOS los subtipos sean rancho/finca (consistente

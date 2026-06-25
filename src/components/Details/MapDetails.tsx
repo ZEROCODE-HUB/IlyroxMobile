@@ -25,7 +25,7 @@ export const MapDetails: React.FC<PropertyMapProps> = ({
   const lng = property.longitud;
 
   const [mapTypeId, setMapTypeId] = useState<"standard" | "satellite">(
-    "standard",
+    "satellite",
   );
   const deferredMapTypeId = useDeferredValue(mapTypeId);
 

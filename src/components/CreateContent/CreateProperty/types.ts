@@ -3,6 +3,7 @@
 // ============================================
 
 import type { CountryCode } from "@/lib/location/types";
+import type { GeoBounds } from "@/lib/geocodingService";
 
 export type TipoOperacion = "venta" | "renta" | "ambas";
 export type MonedaType = "MXN" | "USD";
@@ -25,6 +26,11 @@ export interface UbicacionData {
   pais?: CountryCode;
   latitud?: number;
   longitud?: number;
+  /** Bounds (área) del lugar elegido en Google Places. Se usa para validar que
+   *  el PIN marcado caiga dentro de la zona escrita. */
+  bounds?: GeoBounds;
+  /** Nivel del lugar elegido (estado/municipio/colonia). */
+  placeType?: "estado" | "municipio" | "colonia";
 }
 
 export interface LocationCoords {
@@ -72,7 +78,8 @@ export interface PropertyFormState {
 
   // Información básica
   descripcion: string;
-  tipoOperacion: TipoOperacion;
+  // "" = sin seleccionar todavía (el usuario debe elegir; se valida).
+  tipoOperacion: TipoOperacion | "";
   precioVenta: string;
   precioRenta: string;
   moneda: MonedaType;
@@ -102,8 +109,9 @@ export interface PropertyFormState {
   largoTerreno: string;
   niveles: string;
   antiguedad: string;
-  amueblado: AmuebladoType;
-  petFriendly: SiNo;
+  // "" = sin seleccionar todavía (se valida cuando el campo es visible).
+  amueblado: AmuebladoType | "";
+  petFriendly: SiNo | "";
   costoMantenimiento: string;
 
   // Amenidades
@@ -126,13 +134,13 @@ export interface PropertyFormState {
   condicionesComisionRenta: string;
 
   // Gravamen
-  tieneGravamen: SiNo;
+  tieneGravamen: SiNo | "";
   institucionGravamen: string[];
   // Monto opcional por institución: { [nombreInstitucion]: monto formateado }
   montosGravamen: Record<string, string>;
 
   // Financiamiento
-  aceptaFinanciamiento: SiNo;
+  aceptaFinanciamiento: SiNo | "";
   tiposFinanciamientoSeleccionados: string[];
 
   // Propietario

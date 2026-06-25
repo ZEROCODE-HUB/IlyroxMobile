@@ -16,6 +16,20 @@ import { busquedas_guardadas, FeedItem, User } from "../types";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
 import { CommentsBottomSheet } from "./modals";
 
+/** Tiempo relativo: "hace un momento" / "hace N min" / "hace N h" / "hace N días". */
+const formatRelative = (dateStr?: string): string => {
+  if (!dateStr) return "";
+  const then = new Date(dateStr).getTime();
+  if (isNaN(then)) return "";
+  const min = Math.floor((Date.now() - then) / 60000);
+  if (min < 1) return "hace un momento";
+  if (min < 60) return `hace ${min} min`;
+  const hours = Math.floor(min / 60);
+  if (hours < 24) return `hace ${hours} h`;
+  const days = Math.floor(hours / 24);
+  return `hace ${days} ${days === 1 ? "día" : "días"}`;
+};
+
 interface LeadPropertiesModalProps {
   visible: boolean;
   onClose: () => void;
@@ -312,6 +326,19 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                   >
                     <Text style={styles.cardBadgeText}>{badgeText}</Text>
                   </View>
+                  {/* Tiempo en que Ilyrox encontró el match */}
+                  {property.matchedAt ? (
+                    <View style={styles.foundRow}>
+                      <Ionicons
+                        name="time-outline"
+                        size={12}
+                        color={COLORS.textTertiary}
+                      />
+                      <Text style={styles.foundText}>
+                        Encontrado {formatRelative(property.matchedAt)}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               ))
             )}
@@ -472,6 +499,20 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textTransform: "uppercase",
     letterSpacing: 0.5,
+  },
+  foundRow: {
+    position: "absolute",
+    top: 16,
+    right: 14,
+    zIndex: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  foundText: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: COLORS.textTertiary,
   },
   emptyState: {
     alignItems: "center",

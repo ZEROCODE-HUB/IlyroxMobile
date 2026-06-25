@@ -53,9 +53,10 @@ export const LeadMatchCard: React.FC<LeadMatchCardProps> = ({
   };
 
   const currencyDisplay = currency === "USD" ? "USD" : "MXN";
-  const hasNew = matchCount + similarCount > 0;
+  const total = matchCount + similarCount;
+  const hasNew = total > 0;
   const statusText = hasNew
-    ? `Última coincidencia ${formatRelative(latestMatchDate)}`.trim()
+    ? `Encontrado ${formatRelative(latestMatchDate)}`.trim()
     : "Sin nuevas coincidencias";
 
   return (
@@ -91,7 +92,7 @@ export const LeadMatchCard: React.FC<LeadMatchCardProps> = ({
 
         <View style={styles.statusRow}>
           <Ionicons name="time-outline" size={13} color={COLORS.textTertiary} />
-          <Text style={styles.statusText} numberOfLines={1}>
+          <Text style={styles.statusText} numberOfLines={2}>
             {statusText}
           </Text>
         </View>

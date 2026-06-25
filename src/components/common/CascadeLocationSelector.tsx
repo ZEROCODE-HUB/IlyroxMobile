@@ -24,7 +24,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
-import { searchPlaces, getPlaceDetails, reverseGeocode, derivePlaceType, type PlaceSuggestion } from "../../lib/geocodingService";
+import { searchPlaces, getPlaceDetails, reverseGeocode, derivePlaceType, type PlaceSuggestion, type GeoBounds } from "../../lib/geocodingService";
 import { getCountryConfig, DEFAULT_COUNTRY } from "../../lib/location/registry";
 import type { CountryCode } from "../../lib/location/types";
 
@@ -38,6 +38,10 @@ export interface LocationData {
   pais?: CountryCode;
   latitud?: number;
   longitud?: number;
+  /** Bounds (área) del lugar elegido en Google Places, para validar el PIN. */
+  bounds?: GeoBounds;
+  /** Nivel del lugar elegido (estado/municipio/colonia). */
+  placeType?: "estado" | "municipio" | "colonia";
 }
 
 interface CascadeLocationSelectorProps {
@@ -101,6 +105,8 @@ export default function CascadeLocationSelector({
         colonias: initialData.colonias ?? (initialData.colonia ? [initialData.colonia] : []),
         latitud: initialData.latitud,
         longitud: initialData.longitud,
+        bounds: initialData.bounds,
+        placeType: initialData.placeType,
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -208,6 +214,8 @@ export default function CascadeLocationSelector({
           pais,
           latitud: lat || undefined,
           longitud: lng || undefined,
+          bounds: details?.bounds,
+          placeType,
         };
 
         setCurrentData(newData);

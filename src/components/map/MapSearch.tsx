@@ -365,6 +365,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           confirmedPolygons={filters.polygons}
           onMapPress={handleMapPress}
           onLongPressMap={handleLongPressMap}
+          topOffset={searchBarHeight}
         />
         <PolygonDrawingOverlay
           drawingMode={drawingMode}

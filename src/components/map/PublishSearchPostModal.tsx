@@ -665,7 +665,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
                   <>
                     <View style={styles.fieldHalf}>
                       <AppInput
-                        label="Ancho (m) mín."
+                        label="Frente (m) mín."
                         placeholder="Ej. 10"
                         keyboardType="numeric"
                         value={anchoTerreno}
@@ -674,7 +674,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
                     </View>
                     <View style={styles.fieldHalf}>
                       <AppInput
-                        label="Largo (m) mín."
+                        label="Fondo (m) mín."
                         placeholder="Ej. 25"
                         keyboardType="numeric"
                         value={largoTerreno}

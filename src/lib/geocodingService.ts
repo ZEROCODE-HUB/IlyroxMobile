@@ -72,6 +72,47 @@ export function derivePlaceType(
 }
 
 // ---------------------------------------------------------------------------
+// Validar que un punto (PIN) caiga dentro del área de un lugar
+// ---------------------------------------------------------------------------
+
+/**
+ * Indica si el PIN (lat/lng) cae dentro de los `bounds` del lugar elegido,
+ * expandidos con un buffer de tolerancia. Espeja la lógica de matching del
+ * servidor (`punto_en_area_busqueda`): si el PIN entra aquí, una búsqueda de
+ * esa misma zona encontrará la propiedad.
+ *
+ * El buffer evita falsos positivos cuando Google entrega un área pequeña
+ * (típico de colonias): un PIN al borde de la colonia sigue siendo válido.
+ *
+ * @returns `true` también cuando no hay bounds (no se puede validar ⇒ no se bloquea).
+ */
+export function pinDentroDeZona(
+  lat: number | null | undefined,
+  lng: number | null | undefined,
+  bounds: GeoBounds | null | undefined,
+): boolean {
+  // Sin coordenadas o sin área de referencia: no validamos (no bloquear).
+  if (lat == null || lng == null) return true;
+  if (!bounds) return true;
+
+  const { north, south, east, west } = bounds;
+  if ([north, south, east, west].some((v) => typeof v !== "number")) return true;
+
+  // Buffer por eje: el mayor entre el 50% del tamaño del área y ~0.02° (≈ 2 km).
+  // Áreas chicas (colonias) ⇒ domina el mínimo; áreas grandes (estado) ⇒ el factor.
+  const MIN_PAD = 0.02;
+  const latPad = Math.max((north - south) * 0.5, MIN_PAD);
+  const lngPad = Math.max((east - west) * 0.5, MIN_PAD);
+
+  return (
+    lat >= south - latPad &&
+    lat <= north + latPad &&
+    lng >= west - lngPad &&
+    lng <= east + lngPad
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Places Autocomplete
 // ---------------------------------------------------------------------------
 

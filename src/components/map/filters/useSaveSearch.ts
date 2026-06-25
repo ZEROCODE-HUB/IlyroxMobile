@@ -645,6 +645,23 @@ export const useSaveSearch = (userId?: string) => {
       .eq("usuario_id", userId);
 
     if (error) throw error;
+
+    // Recalcular coincidencias de inmediato (sin esperar al cron, que corre cada
+    // minuto), para que al volver a "Coincidencias" se vean ya las propiedades que
+    // cumplen los nuevos criterios y desaparezcan las que dejaron de cumplir.
+    // El RPC valida que la búsqueda pertenezca al usuario antes de recalcular.
+    const { error: rpcError } = await supabase.rpc(
+      "recalcular_matches_busqueda",
+      { p_busqueda_id: busquedaId },
+    );
+    if (rpcError) {
+      // No es crítico: el job encolado por el trigger lo recalculará igualmente.
+      console.warn(
+        "[useSaveSearch] recalcular_matches_busqueda falló (no crítico):",
+        rpcError.message,
+      );
+    }
+
     return true;
   };
 

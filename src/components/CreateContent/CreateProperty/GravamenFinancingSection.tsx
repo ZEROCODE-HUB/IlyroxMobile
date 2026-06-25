@@ -16,6 +16,7 @@ import {
 } from "../../../constants/propertyData";
 import type { SiNo } from "./types";
 import { usePropertyFormContext } from "./PropertyFormContext";
+import { FieldAnchor } from "./fieldAnchors";
 
 export const GravamenFinancingSection = React.memo(
   function GravamenFinancingSection() {
@@ -31,6 +32,7 @@ export const GravamenFinancingSection = React.memo(
       setAceptaFinanciamiento,
       tiposFinanciamientoSeleccionados,
       toggleFinanciamiento,
+      errors,
     } = usePropertyFormContext();
     const [showInstitucionGravamenModal, setShowInstitucionGravamenModal] =
       useState(false);
@@ -44,12 +46,15 @@ export const GravamenFinancingSection = React.memo(
             <Text style={styles.sectionTitleBand}>Gravamen</Text>
           </View>
 
-          <RadioGroupSelector
-            label="¿Tiene gravamen?"
-            options={[...OPCIONES_SI_NO]}
-            selectedValue={tieneGravamen}
-            onSelect={(val) => setTieneGravamen(val as SiNo)}
-          />
+          <FieldAnchor name="gravamen">
+            <RadioGroupSelector
+              label="¿Tiene gravamen?"
+              options={[...OPCIONES_SI_NO]}
+              selectedValue={tieneGravamen}
+              onSelect={(val) => setTieneGravamen(val as SiNo)}
+              error={errors.gravamen}
+            />
+          </FieldAnchor>
 
           {tieneGravamen === "Sí" && (
             <>
@@ -139,12 +144,15 @@ export const GravamenFinancingSection = React.memo(
             <Text style={styles.sectionTitleBand}>Financiamiento</Text>
           </View>
 
-          <RadioGroupSelector
-            label="¿Acepta financiamiento?"
-            options={[...OPCIONES_SI_NO]}
-            selectedValue={aceptaFinanciamiento}
-            onSelect={(val) => setAceptaFinanciamiento(val as SiNo)}
-          />
+          <FieldAnchor name="financiamiento">
+            <RadioGroupSelector
+              label="¿Acepta financiamiento?"
+              options={[...OPCIONES_SI_NO]}
+              selectedValue={aceptaFinanciamiento}
+              onSelect={(val) => setAceptaFinanciamiento(val as SiNo)}
+              error={errors.financiamiento}
+            />
+          </FieldAnchor>
 
           {aceptaFinanciamiento === "Sí" && (
             <>

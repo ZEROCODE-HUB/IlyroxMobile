@@ -126,8 +126,8 @@ function SearchSummaryBar({ hasActiveFilters }: { hasActiveFilters: boolean }) {
 
   if (filters.m2TerrenoMin) pills.push(`≥ ${filters.m2TerrenoMin} m² terreno`);
   if (filters.m2ConstruccionMin) pills.push(`≥ ${filters.m2ConstruccionMin} m² const.`);
-  if (filters.anchoTerrenoMin) pills.push(`≥ ${filters.anchoTerrenoMin} m ancho`);
-  if (filters.largoTerrenoMin) pills.push(`≥ ${filters.largoTerrenoMin} m largo`);
+  if (filters.anchoTerrenoMin) pills.push(`≥ ${filters.anchoTerrenoMin} m frente`);
+  if (filters.largoTerrenoMin) pills.push(`≥ ${filters.largoTerrenoMin} m fondo`);
   if (filters.comisionVentaMin) pills.push(`Comisión venta ≥ ${filters.comisionVentaMin}%`);
   if (filters.comisionRentaMin) pills.push(`Comisión renta ≥ ${filters.comisionRentaMin} mes`);
 

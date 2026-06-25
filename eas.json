@@ -26,6 +26,23 @@
         "EXPO_PUBLIC_SUPABASE_GEO_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvZnNucGNya2xneHV0anhtY3dqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNDMzOTEsImV4cCI6MjA4ODkxOTM5MX0.wjxtXb9vk4sv620Yv4Rx31D5kXp95tSW83ZC4D0FJiI"
       }
     },
+    "simulator": {
+      "extends": "preview",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "production-aab": {
+      "extends": "production",
+      "credentialsSource": "remote",
+      "android": {
+        "buildType": "app-bundle"
+      }
+    },
+    "production-ios": {
+      "extends": "production",
+      "credentialsSource": "remote"
+    },
     "production": {
       "channel": "production",
       "credentialsSource": "local",

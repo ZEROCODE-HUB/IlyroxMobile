@@ -82,11 +82,17 @@ export const PropertyTypeDetails: React.FC<PropertyTypeDetailsProps> = ({
         label: "Ubicación",
         value: property.tipo_ubicacion_comercial,
       });
-    if (property.frente_metros)
+    if (property.ancho_terreno)
       stats.push({
         icon: "resize-outline",
         label: "Frente",
-        value: `${fmt(property.frente_metros)} m`,
+        value: `${fmt(property.ancho_terreno)} m`,
+      });
+    if (property.largo_terreno)
+      stats.push({
+        icon: "resize-outline",
+        label: "Fondo",
+        value: `${fmt(property.largo_terreno)} m`,
       });
     if (property.nivel_piso)
       stats.push({

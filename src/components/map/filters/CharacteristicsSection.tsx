@@ -246,7 +246,7 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
       {isTerreno && (
         <View style={styles.row}>
           <View style={styles.halfWidth}>
-            <Text style={styles.label}>Ancho (m) mín.</Text>
+            <Text style={styles.label}>Frente (m) mín.</Text>
             <AppInput
               value={filters.anchoTerrenoMin}
               onChangeText={(val) => onUpdateFilter("anchoTerrenoMin", val)}
@@ -255,7 +255,7 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
             />
           </View>
           <View style={styles.halfWidth}>
-            <Text style={styles.label}>Largo (m) mín.</Text>
+            <Text style={styles.label}>Fondo (m) mín.</Text>
             <AppInput
               value={filters.largoTerrenoMin}
               onChangeText={(val) => onUpdateFilter("largoTerrenoMin", val)}

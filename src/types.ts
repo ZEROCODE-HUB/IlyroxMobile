@@ -43,6 +43,8 @@ export type FeedItem = {
   shares?: number;
   commentsList?: Comment[];
   timestamp: string;
+  /** Fecha (ISO) en que se encontró el match. Solo en la pantalla de coincidencias. */
+  matchedAt?: string;
   status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
   codigo_propiedad?: string;
   postType?: "post" | "busqueda" | "openhouse" | "aniversario" | "sold";
@@ -160,9 +162,18 @@ export type Property = {
     operationalAreaSqft?: number;
     maneuveringYardSqft?: number;
     clearHeight?: string;
+    energiaKva?: string[];
+    ubicacionIndustrial?: string;
     // Comercial
     frontMeters?: number;
+    backMeters?: number;
+    enEsquina?: boolean;
+    sobreAvenida?: boolean;
     commercialLocation?: string;
+    // Agrícola
+    tieneAgua?: boolean;
+    electricidad?: boolean;
+    pieCarretera?: boolean;
   };
   amenities: string[];
   type: PropertyType;

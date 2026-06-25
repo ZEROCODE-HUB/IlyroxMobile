@@ -411,6 +411,7 @@ const Matches: React.FC = () => {
         likes: feedData?.likes_count || 0,
         comments: feedData?.comentarios_count || 0,
         timestamp: new Date(match.created_at).toLocaleDateString(),
+        matchedAt: match.created_at,
         propertyDetails: {
           id: prop.id,
           title: `${prop.subtipo} en ${prop.municipio}`,

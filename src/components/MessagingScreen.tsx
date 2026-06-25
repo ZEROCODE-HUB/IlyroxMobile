@@ -20,6 +20,7 @@ import { COLORS } from "../constants";
 import { useStableSafeInsets } from "../context/SafeInsetsContext";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
 import HeaderChat from "./Messaging/HeaderChat";
+import { ChatPropertyBanner } from "./Messaging/ChatPropertyBanner";
 import { router } from "expo-router";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 
@@ -297,6 +298,9 @@ export default function MessagingScreen({
               propertyId={activePropertyId}
               conversationId={activeConversationId!}
             />
+            {activePropertyId ? (
+              <ChatPropertyBanner propertyId={activePropertyId} />
+            ) : null}
           </View>
 
           {/* Contenido del chat */}

@@ -40,7 +40,7 @@ export default function LocationPicker({
   } | null>(null);
 
   const [mapTypeId, setMapTypeId] = useState<"standard" | "satellite">(
-    "standard",
+    "satellite",
   );
 
   const [region, setRegion] = useState<Region>({

@@ -136,8 +136,8 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
 
   return (
     <AppBottomSheet visible={visible} onClose={onClose}>
-      <KeyboardProvider>
       <View style={styles.modalContent}>
+        <KeyboardProvider>
           {/* Header */}
           <View style={styles.modalHeader}>
             <View>
@@ -303,6 +303,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
               </TouchableOpacity>
             )}
           </View>
+        </KeyboardProvider>
       </View>
 
       {/* Number Input Modal */}
@@ -312,7 +313,6 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
         onSave={numberInputConfig.onSave}
         title={numberInputConfig.title}
       />
-      </KeyboardProvider>
     </AppBottomSheet>
   );
 };

@@ -12,7 +12,7 @@ import {
   Pressable,
   Modal,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { FeedItem, User } from "../../types";
 import {
@@ -31,7 +31,7 @@ import { logger } from "@/utils/logger";
 import ActionButtons from "../ActionButtons";
 
 const log = logger.scoped("PropertyCard");
-import { Toilet, Building2, Truck } from "lucide-react-native";
+import { Toilet, Building2, MoveVertical } from "lucide-react-native";
 import { useUserRecommendations } from "@/hooks/useUserRecommendations";
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
 import { useChatInitiator } from "@/hooks/messaging/useChatInitiator";
@@ -41,7 +41,7 @@ import { useToast } from "@/context/ToastContext";
 import firstUpperCase from "@/utils/firstUpperCase";
 import { formatOperation } from "@/utils/priceFormatter";
 import { formatDateShort } from "@/utils/dateFormatter";
-import { getCamposVisibles } from "@/constants/propertyData";
+import { getCamposVisibles, esTerreno } from "@/constants/propertyData";
 
 interface PropertyCardProps {
   item: FeedItem;
@@ -132,95 +132,81 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   // características; la fila hace wrap si no caben en una línea.
   const isIndustrial = property.type === "industrial";
   const isComercial = property.type === "comercial";
+  const isAgricola = property.type === "agricola";
+  const isTerrenoComercial = isComercial && esTerreno(property.subtype);
   const f = property.features;
   const fmtM2 = (n: number) => `${n.toLocaleString("es-MX")}m²`;
+  const fmtM = (n: number) => `${n.toLocaleString("es-MX")}m`;
 
-  const stats: { key: string; icon: React.ReactNode; value: string }[] = [];
+  // Cada stat lleva un `label` de UNA sola palabra que se muestra junto al
+  // ícono y el valor (p. ej. [ícono] Altura 8-10m).
+  const stats: {
+    key: string;
+    icon: React.ReactNode;
+    label: string;
+    value: string;
+  }[] = [];
   const ICON_SIZE = 14;
   const ICON_COLOR = COLORS.textTertiary;
+  const ionIcon = (name: keyof typeof Ionicons.glyphMap) => (
+    <Ionicons name={name} size={ICON_SIZE} color={ICON_COLOR} />
+  );
+  const mcIcon = (name: keyof typeof MaterialCommunityIcons.glyphMap) => (
+    <MaterialCommunityIcons name={name} size={ICON_SIZE} color={ICON_COLOR} />
+  );
+  const toiletIcon = <Toilet size={12} color={ICON_COLOR} />;
+  const buildingIcon = <Building2 size={ICON_SIZE} color={ICON_COLOR} />;
+  // Superficie (m²): cuadrado con esquinas. Altura: flecha vertical (≠ terreno).
+  const superficieIcon = ionIcon("scan-outline");
+  const alturaIcon = <MoveVertical size={ICON_SIZE} color={ICON_COLOR} />;
+  const add = (
+    key: string,
+    icon: React.ReactNode,
+    label: string,
+    value = "",
+  ) => stats.push({ key, icon, label, value });
+  // Energía: muestra el monto (lo que va después de ":"), p. ej. "más de 150 kVA".
+  const energiaMonto = (v: string) =>
+    v.includes(":") ? v.split(":").slice(1).join(":").trim() : v;
 
-  if (campos.recamaras && f.beds > 0)
-    stats.push({
-      key: "beds",
-      icon: <Ionicons name="bed-outline" size={ICON_SIZE} color={ICON_COLOR} />,
-      value: `${f.beds}`,
-    });
-  if (campos.banos && !isIndustrial && !isComercial && f.baths > 0)
-    stats.push({
-      key: "baths",
-      icon: <Toilet size={12} color={ICON_COLOR} />,
-      value: `${f.baths}`,
-    });
-  if (
-    campos.estacionamientos &&
-    !isIndustrial &&
-    !isComercial &&
-    (f.parking ?? 0) > 0
-  )
-    stats.push({
-      key: "parking",
-      icon: <Ionicons name="car-outline" size={ICON_SIZE} color={ICON_COLOR} />,
-      value: `${f.parking}`,
-    });
-
-  // Construcción (Building2, igual que el detalle) y Terreno
-  if (campos.m2Construccion && f.constructionSqft > 0)
-    stats.push({
-      key: "construccion",
-      icon: <Building2 size={ICON_SIZE} color={ICON_COLOR} />,
-      value: fmtM2(f.constructionSqft),
-    });
-  if (campos.m2Terreno && f.landSqft > 0)
-    stats.push({
-      key: "terreno",
-      icon: <Ionicons name="resize-outline" size={ICON_SIZE} color={ICON_COLOR} />,
-      value: fmtM2(f.landSqft),
-    });
-
-  // Características industriales
-  if (isIndustrial) {
-    if ((f.operationalAreaSqft ?? 0) > 0)
-      stats.push({
-        key: "areaOperativa",
-        icon: <Ionicons name="scan-outline" size={ICON_SIZE} color={ICON_COLOR} />,
-        value: fmtM2(f.operationalAreaSqft!),
-      });
-    if ((f.maneuveringYardSqft ?? 0) > 0)
-      stats.push({
-        key: "patio",
-        icon: <Truck size={ICON_SIZE} color={ICON_COLOR} />,
-        value: fmtM2(f.maneuveringYardSqft!),
-      });
-    if (f.clearHeight)
-      stats.push({
-        key: "alturaLibre",
-        icon: <Ionicons name="resize-outline" size={ICON_SIZE} color={ICON_COLOR} />,
-        value: f.clearHeight,
-      });
-  }
-
-  // Características comerciales
-  if (isComercial) {
-    if (f.commercialLocation)
-      stats.push({
-        key: "ubicacionComercial",
-        icon: (
-          <Ionicons name="storefront-outline" size={ICON_SIZE} color={ICON_COLOR} />
-        ),
-        value: f.commercialLocation,
-      });
-    if ((f.frontMeters ?? 0) > 0)
-      stats.push({
-        key: "frente",
-        icon: <Ionicons name="resize-outline" size={ICON_SIZE} color={ICON_COLOR} />,
-        value: `${f.frontMeters!.toLocaleString("es-MX")}m`,
-      });
-    if ((f.floorLevel ?? 0) > 0)
-      stats.push({
-        key: "nivelPiso",
-        icon: <Ionicons name="layers-outline" size={ICON_SIZE} color={ICON_COLOR} />,
-        value: `${f.floorLevel}`,
-      });
+  if (isTerrenoComercial) {
+    // Terreno: la superficie de terreno va primero, luego frente, fondo y plaza.
+    if (f.landSqft > 0) add("terreno", superficieIcon, "Terreno", fmtM2(f.landSqft));
+    if ((f.frontMeters ?? 0) > 0) add("frente", ionIcon("resize-outline"), "Frente", fmtM(f.frontMeters!));
+    if ((f.backMeters ?? 0) > 0) add("fondo", ionIcon("resize-outline"), "Fondo", fmtM(f.backMeters!));
+    if (f.commercialLocation) add("ubicacion", ionIcon("storefront-outline"), "Ubicación", f.commercialLocation);
+    if (f.enEsquina) add("enEsquina", mcIcon("crop"), "Esquina");
+    if (f.sobreAvenida) add("avPrincipal", mcIcon("road-variant"), "Av. Principal");
+  } else if (isComercial) {
+    // Construcción primero, luego frente, fondo, plaza y el resto.
+    if (f.constructionSqft > 0) add("construccion", buildingIcon, "Const.", fmtM2(f.constructionSqft));
+    if ((f.frontMeters ?? 0) > 0) add("frente", ionIcon("resize-outline"), "Frente", fmtM(f.frontMeters!));
+    if ((f.backMeters ?? 0) > 0) add("fondo", ionIcon("resize-outline"), "Fondo", fmtM(f.backMeters!));
+    if (f.commercialLocation) add("ubicacion", ionIcon("storefront-outline"), "Ubicación", f.commercialLocation);
+    if ((f.parking ?? 0) > 0) add("parking", ionIcon("car-outline"), "Estac.", `${f.parking}`);
+    if (f.baths > 0) add("baths", toiletIcon, "Baños", `${f.baths}`);
+    if ((f.halfBaths ?? 0) > 0) add("halfBaths", toiletIcon, "Medios", `${f.halfBaths}`);
+    if ((f.floors ?? 0) > 0) add("floors", ionIcon("layers-outline"), "Niveles", `${f.floors}`);
+    if (f.enEsquina) add("enEsquina", mcIcon("crop"), "Esquina");
+    if (f.sobreAvenida) add("avPrincipal", mcIcon("road-variant"), "Av. Principal");
+  } else if (isIndustrial) {
+    // Construcción primero, luego el resto.
+    if (f.constructionSqft > 0) add("construccion", buildingIcon, "Const.", fmtM2(f.constructionSqft));
+    if (f.landSqft > 0) add("terreno", superficieIcon, "Terreno", fmtM2(f.landSqft));
+    if (f.clearHeight) add("alturaLibre", alturaIcon, "Altura", f.clearHeight);
+    if ((f.energiaKva?.length ?? 0) > 0) add("energia", ionIcon("flash-outline"), "Energía", energiaMonto(f.energiaKva![0]));
+    if (f.ubicacionIndustrial) add("parque", ionIcon("business-outline"), "Ubicación", f.ubicacionIndustrial);
+  } else if (isAgricola) {
+    if (f.tieneAgua) add("agua", ionIcon("water-outline"), "Agua");
+    if (f.electricidad) add("electricidad", ionIcon("flash-outline"), "Electricidad");
+    if (f.pieCarretera) add("pieCarretera", ionIcon("trail-sign-outline"), "Carretera");
+  } else {
+    // Habitacional: construcción primero; en terrenos solo aparece la superficie de terreno.
+    if (campos.m2Construccion && f.constructionSqft > 0) add("construccion", buildingIcon, "Const.", fmtM2(f.constructionSqft));
+    if (campos.recamaras && f.beds > 0) add("beds", ionIcon("bed-outline"), "Rec.", `${f.beds}`);
+    if (campos.banos && f.baths > 0) add("baths", toiletIcon, "Baños", `${f.baths}`);
+    if (campos.estacionamientos && (f.parking ?? 0) > 0) add("parking", ionIcon("car-outline"), "Estac.", `${f.parking}`);
+    if (campos.m2Terreno && f.landSqft > 0) add("terreno", superficieIcon, "Terreno", fmtM2(f.landSqft));
   }
 
   const { handleContact } = useChatInitiator();
@@ -473,7 +459,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             {stats.map((s) => (
               <View key={s.key} style={styles.statItem}>
                 {s.icon}
-                <Text style={styles.statValue}>{s.value}</Text>
+                <Text style={styles.statLabel}>{s.label}</Text>
+                {s.value ? (
+                  <Text style={styles.statValue}>{s.value}</Text>
+                ) : null}
               </View>
             ))}
           </View>
@@ -661,6 +650,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: COLORS.textTertiary,
   },
   statValue: {
     fontSize: 12,

@@ -3,7 +3,7 @@
 // Orquesta todos los sub-componentes y hooks
 // ============================================
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -48,6 +48,38 @@ import { PropertyPublishedSheet } from "./PropertyPublishedSheet";
 
 // Types
 import type { CreatePropertyProps } from "./types";
+
+// Anclas de scroll a nivel de campo
+import { FieldAnchor, FieldAnchorContext } from "./fieldAnchors";
+
+// Cada clave de error apunta al ancla del CAMPO exacto (registrada con
+// <FieldAnchor name="...">), para hacer scroll justo a ese input y no a toda la
+// sección. Varias claves pueden compartir ancla (p. ej. m² o comisión).
+const ERROR_ANCHOR: Record<string, string> = {
+  images: "images",
+  descripcion: "descripcion",
+  subtipo: "subtipo",
+  tipoOperacion: "tipoOperacion",
+  precioVenta: "precioVenta",
+  precioRenta: "precioRenta",
+  estado: "estado",
+  municipio: "estado",
+  m2: "m2",
+  m2Terreno: "m2",
+  m2Construccion: "m2",
+  recamaras: "recamaras",
+  banos: "banos",
+  mediosBanos: "mediosBanos",
+  estacionamientos: "estacionamientos",
+  niveles: "niveles",
+  amueblado: "amueblado",
+  petFriendly: "petFriendly",
+  comision: "commission",
+  comisionRenta: "commission",
+  gravamen: "gravamen",
+  financiamiento: "financiamiento",
+  location: "location",
+};
 
 export default function CreateProperty({
   onBack,
@@ -150,11 +182,75 @@ export default function CreateProperty({
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showSaleContractModal, setShowSaleContractModal] = useState(false);
 
-  // Manejar publicación con detección de modal de contrato
+  // Scroll automático al CAMPO inválido más alto (de arriba hacia abajo). Cada
+  // campo validable se registra con <FieldAnchor name="..."> (guarda su nodo).
+  // Medimos la posición de cada campo con measureInWindow (confiable en ambas
+  // arquitecturas), elegimos el más alto y lo dejamos ~⅓ desde arriba.
+  const scrollRef = useRef<ScrollView>(null);
+  const containerRef = useRef<View>(null);
+  const fieldRefs = useRef<Record<string, unknown>>({});
+  const viewportHeightRef = useRef(0);
+  const scrollYRef = useRef(0);
+  const registerField = useCallback(
+    (key: string) => (node: unknown) => {
+      if (node) fieldRefs.current[key] = node;
+      else delete fieldRefs.current[key];
+    },
+    [],
+  );
+  type Measurable = {
+    measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
+  };
+  const scrollToFirstError = useCallback((errs: Record<string, string>) => {
+    const scroll = scrollRef.current;
+    const container = containerRef.current as unknown as Measurable | null;
+    if (!scroll || !container?.measureInWindow) return;
+
+    const anchorKeys = Array.from(
+      new Set(
+        Object.keys(errs)
+          .map((k) => ERROR_ANCHOR[k])
+          .filter(Boolean),
+      ),
+    );
+    const nodes = anchorKeys
+      .map((k) => fieldRefs.current[k] as Measurable | undefined)
+      .filter((n): n is Required<Measurable> => !!n?.measureInWindow);
+    if (nodes.length === 0) return;
+
+    // Medimos el borde superior del área visible y la posición (en ventana) de
+    // cada campo con error; el delta nos dice cuánto desplazar el scroll para
+    // dejar el campo más alto a ~⅓ desde arriba.
+    container.measureInWindow!((_cx, containerTop) => {
+      const H = viewportHeightRef.current;
+      const offset = H > 0 ? H * 0.33 : 140;
+      const winYs: number[] = [];
+      let pending = nodes.length;
+      const finish = () => {
+        if (winYs.length === 0) return;
+        const minWinY = Math.min(...winYs);
+        const target = Math.max(
+          0,
+          scrollYRef.current + (minWinY - containerTop) - offset,
+        );
+        scroll.scrollTo({ y: target, animated: true });
+      };
+      nodes.forEach((node) => {
+        node.measureInWindow((_x, y) => {
+          winYs.push(y);
+          if (--pending === 0) finish();
+        });
+      });
+    });
+  }, []);
+
+  // Manejar publicación con detección de modal de contrato / errores de validación
   const onPublish = async () => {
     const result = await handlePublish();
     if (result === "SHOW_CONTRACT_MODAL") {
       setShowSaleContractModal(true);
+    } else if (result === "VALIDATION_FAILED") {
+      scrollToFirstError(form.getValidationErrors());
     }
   };
 
@@ -222,15 +318,27 @@ export default function CreateProperty({
         onBack={() => onBack(false)}
       />
 
+      <FieldAnchorContext.Provider value={registerField}>
+      <View ref={containerRef} style={styles.scrollView} collapsable={false}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="always"
         scrollEnabled={scrollEnabled}
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          scrollYRef.current = e.nativeEvent.contentOffset.y;
+        }}
+        onLayout={(e) => {
+          viewportHeightRef.current = e.nativeEvent.layout.height;
+        }}
       >
         {/* 1. GALERÍA DE IMÁGENES */}
-        <ImageGallerySection />
+        <FieldAnchor name="images">
+          <ImageGallerySection />
+        </FieldAnchor>
 
         {/* ESTADO (solo en edición) */}
         {propertyId && (
@@ -290,8 +398,12 @@ export default function CreateProperty({
         <GravamenFinancingSection />
 
         {/* 9. MAPA */}
-        <MapSection />
+        <FieldAnchor name="location">
+          <MapSection />
+        </FieldAnchor>
       </ScrollView>
+      </View>
+      </FieldAnchorContext.Provider>
 
       {/* FOOTER - BOTÓN PUBLICAR */}
       <View style={[styles.footer, { paddingBottom: 50 }]}>

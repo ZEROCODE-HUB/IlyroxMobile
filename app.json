@@ -2,7 +2,7 @@
   "expo": {
     "name": "ilyrox",
     "slug": "ilyrox",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "runtimeVersion": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/Icon-size.png",
@@ -28,7 +28,8 @@
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
         "UIBackgroundModes": [
           "remote-notification"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
         "aps-environment": "production",

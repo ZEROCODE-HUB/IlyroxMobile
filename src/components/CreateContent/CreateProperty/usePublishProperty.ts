@@ -137,69 +137,31 @@ export function usePublishProperty(
     async (contractDataParam?: ContractData | null) => {
       const resolvedContractData = contractDataParam ?? form.contractData;
 
-      // ── Validar ubicación exacta en el mapa ──────────────────────────────
-      // El pin ya no se auto-coloca: si el usuario no marcó la ubicación real,
-      // location sigue en {0,0}. Bloquear con un mensaje claro.
-      if (
-        !form.location ||
-        (form.location.latitude === 0 && form.location.longitude === 0)
-      ) {
-        showModal({
-          title: "Ubicación exacta requerida",
-          message:
-            "Si no marcas la ubicación exacta en el mapa, tu propiedad no podrá ser encontrada ni por asesores ni por clientes. Mantén presionado el mapa para colocar el pin.",
-          confirmText: "Entendido",
-        });
-        return;
-      }
-
-      // Validar
+      // ── Validar (de arriba hacia abajo) ───────────────────────────────────
+      // validate() cubre todos los campos requeridos, incluida la ubicación
+      // exacta en el mapa ({0,0} = sin marcar). Si falla, devolvemos un centinela
+      // para que la pantalla haga scroll al primer campo en rojo.
       if (!form.validate()) {
+        const errs = form.getValidationErrors();
+        const errKeys = Object.keys(errs);
+        const soloComision =
+          errKeys.length > 0 &&
+          errKeys.every((k) => k === "comision" || k === "comisionRenta");
+        const comisionMsg = errs.comision || errs.comisionRenta;
         setTimeout(() => {
           showModal({
-            title: "Faltan datos requeridos",
-            message: "Por favor revisa los campos marcados en rojo",
+            title: soloComision ? "Comisión inválida" : "Faltan datos requeridos",
+            message: soloComision
+              ? comisionMsg
+              : "Por favor revisa los campos marcados en rojo",
             confirmText: "Entendido",
           });
         }, 50);
-        return;
+        return "VALIDATION_FAILED";
       }
 
       if (!user) {
         showModal({ title: "Sesión requerida", message: "Debes iniciar sesión para continuar.", confirmText: "OK" });
-        return;
-      }
-
-      // ── Validar comisión 0% con compartir activado ────────────────────────
-      // No tiene sentido compartir una comisión de 0%: bloquear antes de subir.
-      const comisionVentaNum = parseFloat(form.comisionValor) || 0;
-      const comisionRentaNum = parseFloat(
-        form.tipoOperacion === "ambas" ? form.comisionValorRenta : form.comisionValor
-      ) || 0;
-
-      if (
-        (form.tipoOperacion === "venta" || form.tipoOperacion === "ambas") &&
-        form.comparteComision === "Sí" &&
-        comisionVentaNum === 0
-      ) {
-        showModal({
-          title: "Comisión inválida",
-          message: "No puedes compartir una comisión de 0%. Define un porcentaje mayor antes de publicar.",
-          confirmText: "Corregir",
-        });
-        return;
-      }
-
-      if (
-        (form.tipoOperacion === "renta" || form.tipoOperacion === "ambas") &&
-        (form.tipoOperacion === "ambas" ? form.comparteComisionRenta : form.comparteComision) === "Sí" &&
-        comisionRentaNum === 0
-      ) {
-        showModal({
-          title: "Comisión inválida",
-          message: "No puedes compartir una comisión de 0 meses. Define un valor mayor antes de publicar.",
-          confirmText: "Corregir",
-        });
         return;
       }
 
@@ -385,7 +347,15 @@ export function usePublishProperty(
           costo_mantenimiento: parseFloat(form.costoMantenimiento?.replace(/,/g, "") || "") || null,
           pisos: camposVisibles.niveles ? parseInt(form.niveles) || 1 : null,
           amueblado: camposVisibles.amueblado ? form.amueblado : null,
-          pet_friendly: camposVisibles.petFriendly ? form.petFriendly : "No",
+          // pet_friendly solo aplica/se muestra en renta o ambas; en venta el
+          // campo nunca se renderiza y form.petFriendly queda "" (violaría el
+          // CHECK 'Sí'|'No'|'Parcial'). Enviamos "No" como valor seguro.
+          pet_friendly:
+            camposVisibles.petFriendly &&
+            (form.tipoOperacion === "renta" || form.tipoOperacion === "ambas") &&
+            form.petFriendly
+              ? form.petFriendly
+              : "No",
           antiguedad: camposVisibles.antiguedad ? form.antiguedad : null,
           status: sinComision ? "Suspendida" : form.status,
           activo: form.status === "Publicada" && tieneComision,

@@ -1,10 +1,5 @@
 import React from "react";
-import {
-  Modal,
-  View,
-  StyleSheet,
-  TouchableWithoutFeedback,
-} from "react-native";
+import { Modal, View, Pressable, StyleSheet } from "react-native";
 import { COLORS } from "../../constants";
 
 interface AppBottomSheetProps {
@@ -14,6 +9,17 @@ interface AppBottomSheetProps {
   statusBarTranslucent?: boolean;
 }
 
+/**
+ * Bottom sheet basado en UN SOLO <Modal> nativo.
+ *
+ * Antes se usaban dos <Modal> simultáneos (backdrop con fade + contenido con
+ * slide). En iOS cada Modal es una presentación de UIViewController y presentar
+ * o cerrar dos a la vez provoca la race "Attempt to present ... while a
+ * presentation is in progress", que de forma no determinista dejaba un modal
+ * fantasma transparente capturando los toques y bloqueaba los botones de la
+ * pantalla (p. ej. Iniciar Sesión / Registrarse). Con un único Modal la race
+ * desaparece.
+ */
 export function AppBottomSheet({
   visible,
   onClose,
@@ -21,47 +27,35 @@ export function AppBottomSheet({
   statusBarTranslucent,
 }: AppBottomSheetProps) {
   return (
-    <>
-      {/* Modal 1: backdrop con fade progresivo */}
-      <Modal
-        visible={visible}
-        transparent
-        animationType="fade"
-        statusBarTranslucent={statusBarTranslucent}
-        onRequestClose={onClose}
-      >
-        <View style={styles.backdrop} pointerEvents="none" />
-      </Modal>
-
-      {/* Modal 2: contenido con slide nativo (manejo de teclado correcto) */}
-      <Modal
-        visible={visible}
-        transparent
-        animationType="slide"
-        statusBarTranslucent={statusBarTranslucent}
-        onRequestClose={onClose}
-      >
-        <View style={styles.container}>
-          <TouchableWithoutFeedback onPress={onClose}>
-            <View style={styles.touchArea} />
-          </TouchableWithoutFeedback>
-          {children}
-        </View>
-      </Modal>
-    </>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      statusBarTranslucent={statusBarTranslucent}
+      onRequestClose={onClose}
+    >
+      <View style={styles.container}>
+        {/* Backdrop a pantalla completa, DETRÁS del contenido: los toques sobre
+            el contenido los recibe el contenido; los de la zona vacía cierran. */}
+        <Pressable
+          style={styles.backdrop}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Cerrar"
+        />
+        {children}
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.overlay,
-  },
   container: {
     flex: 1,
     justifyContent: "flex-end",
   },
-  touchArea: {
-    flex: 1,
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: COLORS.overlay,
   },
 });
