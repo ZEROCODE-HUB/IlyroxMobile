@@ -5,7 +5,7 @@
 
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { SubmitButton } from "./SubmitButton";
@@ -44,15 +44,11 @@ export function RegisterStepOne({
 
   return (
     <KeyboardAwareScrollView
-      extraScrollHeight={40}
-      extraHeight={60}
-      enableOnAndroid={true}
-      enableAutomaticScroll={true}
-      keyboardOpeningTime={0}
-      enableResetScrollToCoords={false}
-      keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+      bottomOffset={20}
     >
       <Text style={styles.stepTitle}>Información Básica</Text>
 

@@ -12,7 +12,7 @@ import {
   Modal,
   Platform,
 } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker, {
@@ -105,15 +105,11 @@ export function ExternalAuthForm({
 
   return (
     <KeyboardAwareScrollView
-      extraScrollHeight={100}
-      extraHeight={120}
-      enableOnAndroid={true}
-      enableAutomaticScroll={true}
-      keyboardOpeningTime={0}
-      enableResetScrollToCoords={false}
-      keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+      bottomOffset={20}
     >
       <Text style={styles.stepTitle}>Completa tu Registro</Text>
 

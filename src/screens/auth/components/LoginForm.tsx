@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { SubmitButton } from "./SubmitButton";
 import { BackButton } from "./BackButton";
@@ -30,15 +30,11 @@ export function LoginForm({
   const [showPassword, setShowPassword] = useState(false);
   return (
     <KeyboardAwareScrollView
-      extraScrollHeight={40}
-      extraHeight={60}
-      enableOnAndroid={true}
-      enableAutomaticScroll={true}
-      keyboardOpeningTime={0}
-      enableResetScrollToCoords={false}
-      keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+      bottomOffset={20}
     >
       <View style={styles.form}>
         <AppInput

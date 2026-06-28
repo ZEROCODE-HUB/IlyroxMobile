@@ -13,6 +13,7 @@ import {
   Image,
 } from "react-native";
 import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/colors";
@@ -290,6 +291,7 @@ export default function AuthScreen() {
             { paddingBottom: Math.max(30, bottom) },
           ]}
         >
+          <KeyboardProvider>
             {/* Header del modal */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{getModalTitle()}</Text>
@@ -300,7 +302,8 @@ export default function AuthScreen() {
 
             {/* Contenido del modal */}
             {renderModalContent()}
-          </View>
+          </KeyboardProvider>
+        </View>
       </AppBottomSheet>
     </View>
   );

@@ -12,7 +12,7 @@ import {
   Modal,
   View,
 } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker, {
@@ -122,15 +122,11 @@ export function RegisterStepTwo({
 
   return (
     <KeyboardAwareScrollView
-      extraScrollHeight={40}
-      extraHeight={60}
-      enableOnAndroid={true}
-      enableAutomaticScroll={true}
-      keyboardOpeningTime={0}
-      enableResetScrollToCoords={false}
-      keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+      bottomOffset={20}
     >
       <Text style={styles.stepTitle}>Información Profesional</Text>
 
