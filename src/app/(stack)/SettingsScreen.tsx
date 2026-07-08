@@ -13,6 +13,9 @@ import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
 import EditProfile from "@/components/Profile/EditProfile";
 import { useModal } from "@/context/ModalContext";
+import { supabase } from "@/lib/supabase";
+import * as WebBrowser from "expo-web-browser";
+import { LEGAL_URLS } from "@/constants/legal";
 
 import { router } from "expo-router";
 
@@ -48,6 +51,46 @@ const SettingsScreen: React.FC = () => {
     });
   };
 
+  const openLegal = (url: string) => {
+    WebBrowser.openBrowserAsync(url).catch((error) => {
+      log.error("openLegal error:", error);
+    });
+  };
+
+  const performDeleteAccount = async () => {
+    const { error } = await supabase.functions.invoke("eliminar-cuenta", {
+      method: "POST",
+    });
+    if (error) {
+      log.error("eliminar-cuenta error:", error);
+      // El modal de confirmación se cierra al volver; mostramos el error después.
+      setTimeout(() => {
+        showModal({
+          title: "Error",
+          message:
+            "No se pudo eliminar la cuenta. Revisa tu conexión e inténtalo de nuevo.",
+          confirmText: "OK",
+          type: "alert",
+        });
+      }, 350);
+      return;
+    }
+    // Cuenta eliminada: limpiar sesión local y volver al login.
+    await signOut();
+  };
+
+  const handleDeleteAccount = () => {
+    showModal({
+      title: "Eliminar cuenta",
+      message:
+        "Esta acción es permanente. Se eliminarán tu perfil, propiedades, publicaciones, mensajes y toda tu información. No se puede deshacer.",
+      confirmText: "Eliminar mi cuenta",
+      cancelText: "Cancelar",
+      confirmVariant: "danger",
+      onConfirm: performDeleteAccount,
+    });
+  };
+
   const [showEditProfile, setShowEditProfile] = React.useState(false);
 
   const settingsOptions: { id: string; title: string; icon: IoniconName; onPress: () => void; color?: string; showChevron?: boolean }[] = [
@@ -76,10 +119,30 @@ const SettingsScreen: React.FC = () => {
       },
     },
     {
+      id: "privacy",
+      title: "Política de privacidad",
+      icon: "shield-checkmark-outline",
+      onPress: () => openLegal(LEGAL_URLS.privacy),
+    },
+    {
+      id: "terms",
+      title: "Términos y condiciones",
+      icon: "document-text-outline",
+      onPress: () => openLegal(LEGAL_URLS.terms),
+    },
+    {
       id: "logout",
       title: "Cerrar sesión",
       icon: "log-out-outline",
       onPress: handleLogout,
+      color: COLORS.error,
+      showChevron: false,
+    },
+    {
+      id: "delete_account",
+      title: "Eliminar cuenta",
+      icon: "trash-outline",
+      onPress: handleDeleteAccount,
       color: COLORS.error,
       showChevron: false,
     },
@@ -113,7 +176,7 @@ const SettingsScreen: React.FC = () => {
                 <View
                   style={[
                     styles.iconContainer,
-                    option.id === "logout" && {
+                    option.color === COLORS.error && {
                       backgroundColor: COLORS.errorLight,
                     },
                   ]}
@@ -127,7 +190,7 @@ const SettingsScreen: React.FC = () => {
                 <Text
                   style={[
                     styles.optionTitle,
-                    option.id === "logout" && { color: COLORS.error },
+                    option.color === COLORS.error && { color: COLORS.error },
                   ]}
                 >
                   {option.title}
