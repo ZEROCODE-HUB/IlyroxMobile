@@ -38,9 +38,6 @@
           "group.com.ilyrox.app.onesignal"
         ]
       },
-      "config": {
-        "googleMapsApiKey": "AIzaSyCMns7F3TjXiJ4oswwws0USAgum-GcwM9A"
-      },
       "associatedDomains": [
         "applinks:ilyrox.app",
         "applinks:*.ilyrox.app"
@@ -58,11 +55,6 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.ilyrox.app",
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyB2SD7BpH4ms3h3N4FiXcTv1CZdlElhRGg"
-        }
-      },
       "intentFilters": [
         {
           "action": "VIEW",
