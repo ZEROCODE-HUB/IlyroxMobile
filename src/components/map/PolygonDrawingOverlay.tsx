@@ -178,10 +178,10 @@ function HintContent() {
 function InstructionContent({ points, onCancel }: { points: number; onCancel: () => void }) {
   const msg =
     points <= 1
-      ? "Mantén presionado el mapa para añadir puntos"
+      ? "Toca el mapa para añadir puntos"
       : points < 3
       ? `${points} puntos — mínimo 3 para el área`
-      : `${points} puntos · Presiona el primer punto para cerrar`;
+      : `${points} puntos · Toca el primer punto para cerrar`;
 
   return (
     <View style={styles.instructionRow}>
@@ -277,6 +277,11 @@ const styles = StyleSheet.create({
   instructionBlur: {
     paddingHorizontal: 12,
     paddingVertical: 8,
+    // Mismo motivo que `toolbarBlur`: expo-blur instala el efecto dentro de
+    // draw() con un UIViewPropertyAnimator pausado, y UIKit lo anula bajo un
+    // ancestro con opacity animada nativamente. Sin fondo propio, el texto
+    // blanco quedaba sobre el mapa.
+    backgroundColor: "rgba(15,23,42,0.82)",
   },
   instructionAndroid: {
     backgroundColor: "rgba(15,23,42,0.82)",
@@ -311,6 +316,10 @@ const styles = StyleSheet.create({
   },
   toolbarBlur: {
     borderRadius: 18,
+    // El desenfoque por sí solo deja ver el mapa a través de la barra y los
+    // iconos quedan ilegibles. Android usa un blanco sólido; en iOS se mantiene
+    // el blur pero sobre una base casi opaca.
+    backgroundColor: "rgba(255,255,255,0.88)",
   },
   toolbarAndroid: {
     backgroundColor: COLORS.white,

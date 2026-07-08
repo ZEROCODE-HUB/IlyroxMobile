@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -58,6 +58,9 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   // ── Polígonos (múltiples) ──
   const [drawingMode, setDrawingMode] = useState(false);
   const [draftPoints, setDraftPoints] = useState<PolygonCoord[]>([]);
+  // Vaciado progresivo del borrador (ver `drainDraftPoints`).
+  const [draining, setDraining] = useState(false);
+  const onDrainedRef = useRef<(() => void) | null>(null);
 
   // ── Búsqueda de zonas ──
   const [isZoneSearchOpen, setIsZoneSearchOpen] = useState(false);
@@ -301,7 +304,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   };
 
   const handleMapPress = (coord: PolygonCoord) => {
-    if (!drawingMode) return;
+    if (!drawingMode || draining) return;
 
     // Auto-cerrar polígono si el usuario presiona cerca del primer punto (3+ pts)
     if (draftPoints.length >= 3) {
@@ -320,27 +323,63 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     setDraftPoints((prev) => [...prev, coord]);
   };
 
+  /**
+   * Vacía el borrador quitando un punto por frame, en vez de golpe.
+   *
+   * En iOS, `setDraftPoints([])` desmontaba la Polyline, el Polygon y todos los
+   * Markers en un mismo commit. react-native-maps 1.20 no tiene implementación
+   * Fabric en iOS, así que RN pasa por el shim legacy, que elimina los hijos
+   * *por posición* contra el array que `AIRMap` mantiene a mano: cada borrado lo
+   * encoge y el siguiente índice apunta a otro elemento. De ahí el cierre de la
+   * app al pulsar "Limpiar" (y no al pulsar "Deshacer", que quita un solo hijo).
+   */
+  const drainDraftPoints = useCallback((onDone?: () => void) => {
+    onDrainedRef.current = onDone ?? null;
+    setDraining(true);
+  }, []);
+
+  useEffect(() => {
+    if (!draining) return;
+
+    if (draftPoints.length === 0) {
+      setDraining(false);
+      const done = onDrainedRef.current;
+      onDrainedRef.current = null;
+      done?.();
+      return;
+    }
+
+    const frame = requestAnimationFrame(() =>
+      setDraftPoints((prev) => prev.slice(0, -1)),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [draining, draftPoints.length]);
+
   const handleCancelDrawing = () => {
-    setDrawingMode(false);
-    setDraftPoints([]);
+    drainDraftPoints(() => setDrawingMode(false));
   };
 
   const handleUndoPoint = () => setDraftPoints((prev) => prev.slice(0, -1));
-  const handleClearDraft = () => setDraftPoints([]);
+  const handleClearDraft = () => drainDraftPoints();
 
   const handleConfirmPolygon = () => {
     if (draftPoints.length < 3) return;
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    addPolygon(draftPoints);
-    setDraftPoints([]);
-    setDrawingMode(false);
+    // Se captura el borrador y se confirma solo tras vaciarlo, para no montar el
+    // polígono definitivo en el mismo commit en que se desmontan los vértices.
+    const coords = draftPoints;
+    drainDraftPoints(() => {
+      addPolygon(coords);
+      setDrawingMode(false);
+    });
   };
 
   // ── Limpiar todo ──
   const handleClearAll = () => {
-    clearFilters();
-    setDraftPoints([]);
-    setDrawingMode(false);
+    drainDraftPoints(() => {
+      clearFilters();
+      setDrawingMode(false);
+    });
   };
 
   const locationChips = filters.locationChips;
@@ -365,6 +404,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           confirmedPolygons={filters.polygons}
           onMapPress={handleMapPress}
           onLongPressMap={handleLongPressMap}
+          onCloseDraftPolygon={handleConfirmPolygon}
           topOffset={searchBarHeight}
         />
         <PolygonDrawingOverlay

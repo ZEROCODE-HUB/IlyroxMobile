@@ -15,6 +15,9 @@ import { Globe, MapIcon, Layers, Mountain, ChevronDown } from "lucide-react-nati
 import { PolygonCoord } from "@/store/propertyFiltersStore";
 import Supercluster from "supercluster";
 
+/** Estable: cada nueva referencia reescribe la prop nativa de la Polyline. */
+const DRAFT_DASH_PATTERN = [8, 4];
+
 interface PropertyMapProps {
   properties: Property[];
   onMarkerPress: (propertyId: string, property: Property) => void;
@@ -31,6 +34,8 @@ interface PropertyMapProps {
   confirmedPolygons?: PolygonCoord[][];
   onMapPress?: (coord: PolygonCoord) => void;
   onLongPressMap?: (coord: PolygonCoord) => void;
+  /** Cierra el polígono al tocar su primer vértice. */
+  onCloseDraftPolygon?: () => void;
   /** Pins clásicos en el punto exacto de cada ubicación buscada/agregada. */
   searchedLocationPins?: { key: string; latitude: number; longitude: number }[];
   /** Altura de una barra superior que tape el mapa (p. ej. SearchFiltersBar),
@@ -49,6 +54,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   confirmedPolygons = [],
   onMapPress,
   onLongPressMap,
+  onCloseDraftPolygon,
   searchedLocationPins,
   topOffset = 0,
 }) => {
@@ -141,6 +147,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       latitude: l.geometry.coordinates[1],
       longitude: l.geometry.coordinates[0],
     }));
+    // Con una lista vacía, MapKit calcula un MKMapRect nulo y aborta.
+    if (coords.length === 0) return;
     nativeMapRef.current?.fitToCoordinates(coords, {
       edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
       animated: true,
@@ -532,7 +540,14 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           updateOverlayPositions(region);
           console.log(`[MapDebug] onRegionChangeComplete: latDelta=${region.latitudeDelta.toFixed(3)} center=${region.latitude.toFixed(3)},${region.longitude.toFixed(3)}`);
         }}
-        onPress={undefined}
+        // Dibujando, un toque simple añade punto. Antes solo servía el long
+        // press: en iOS se perdía en cuanto el dedo se movía un poco, y de ahí
+        // la sensación de que "a veces el punto no se marca".
+        onPress={(e) => {
+          if (drawingMode && onMapPress) {
+            onMapPress(e.nativeEvent.coordinate);
+          }
+        }}
         onLongPress={(e) => {
           const coord = e.nativeEvent.coordinate;
           if (drawingMode && onMapPress) {
@@ -565,7 +580,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
             coordinates={draftPolygonPoints}
             strokeColor={COLORS.primary}
             strokeWidth={2.5}
-            lineDashPattern={[8, 4]}
+            lineDashPattern={DRAFT_DASH_PATTERN}
           />
         )}
         {draftPolygonPoints.length >= 3 && (
@@ -577,9 +592,20 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           />
         )}
 
-        {/* Vértices del borrador */}
+        {/* Vértices del borrador. El primero cierra el polígono al tocarlo:
+            en iOS el marker intercepta el toque y nunca llegaba al MapView,
+            así que el "presiona el primer punto para cerrar" no funcionaba. */}
         {draftPolygonPoints.map((pt, idx) => (
-          <DraftVertex key={`vertex-${idx}`} coord={pt} />
+          <DraftVertex
+            key={`vertex-${idx}`}
+            coord={pt}
+            isFirst={idx === 0}
+            onPress={
+              idx === 0 && draftPolygonPoints.length >= 3
+                ? onCloseDraftPolygon
+                : undefined
+            }
+          />
         ))}
         {/* Invisible cluster touch targets */}
         {clusters
@@ -963,6 +989,12 @@ const vertexStyles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 2,
   },
+  dotFirst: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 3,
+  },
   dotInner: {
     width: 6,
     height: 6,
@@ -977,12 +1009,32 @@ const vertexStyles = StyleSheet.create({
  * contenido del marker (si arranca en false, el primer punto queda invisible),
  * y lo desactiva tras el primer layout para no penalizar el rendimiento.
  */
-function DraftVertex({ coord }: { coord: PolygonCoord }) {
+function DraftVertex({
+  coord,
+  isFirst = false,
+  onPress,
+}: {
+  coord: PolygonCoord;
+  isFirst?: boolean;
+  onPress?: () => void;
+}) {
   const [track, setTrack] = useState(true);
   return (
-    <Marker coordinate={coord} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={track}>
+    <Marker
+      coordinate={coord}
+      anchor={{ x: 0.5, y: 0.5 }}
+      tracksViewChanges={track}
+      onPress={onPress}
+      // Sin esto, el toque sobre el vértice también llega al MapView y añade
+      // un punto encima del primero en vez de cerrar el polígono.
+      stopPropagation={Boolean(onPress)}
+    >
+      {/* El primer vértice es siempre mayor: es el objetivo del toque de
+          cierre y necesita área tocable. El estilo no puede depender de
+          `onPress` porque, con tracksViewChanges ya en false, iOS no volvería
+          a pintar el marker al cambiarlo. */}
       <View
-        style={vertexStyles.dot}
+        style={[vertexStyles.dot, isFirst && vertexStyles.dotFirst]}
         onLayout={() => {
           if (track) setTrack(false);
         }}
