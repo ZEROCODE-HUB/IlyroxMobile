@@ -8,20 +8,16 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Platform,
-  Modal,
-  View,
 } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { Avatar } from "../../../components/shared";
 import { SubmitButton } from "./SubmitButton";
 import { BackButton } from "./BackButton";
+import { LegalAcceptanceText } from "./LegalAcceptanceText";
+import { CareerStartDateField } from "./CareerStartDateField";
 import SelectionModal from "../../../components/modals/SelectionModal";
 import { AuthFormState } from "../hooks/useAuthForm";
 import { COLORS } from "../../../constants/colors";
@@ -57,15 +53,6 @@ function getCareerLabel(ocupacion: string): string {
   return CAREER_LABELS[ocupacion] ?? "¿Cuándo iniciaste tu carrera? *";
 }
 
-function formatDate(isoDate: string): string {
-  const d = new Date(isoDate + "T12:00:00");
-  return d.toLocaleDateString("es-MX", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
 export function RegisterStepTwo({
   formState,
   loading,
@@ -75,7 +62,6 @@ export function RegisterStepTwo({
 }: RegisterStepTwoProps) {
   const [showOcupacionModal, setShowOcupacionModal] = useState(false);
   const [showModalidadModal, setShowModalidadModal] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [photoTouched, setPhotoTouched] = useState(false);
 
   const handleSubmit = () => {
@@ -97,36 +83,13 @@ export function RegisterStepTwo({
     }
   };
 
-  const handleDateChange = (
-    event: DateTimePickerEvent,
-    date?: Date,
-  ) => {
-    if (Platform.OS === "android") {
-      setShowDatePicker(false);
-      if (event.type === "set" && date) {
-        const iso = date.toISOString().split("T")[0];
-        onUpdateField("fechaInicioCarrera", iso);
-      }
-    } else {
-      // iOS: actualiza en tiempo real mientras gira el spinner
-      if (date) {
-        const iso = date.toISOString().split("T")[0];
-        onUpdateField("fechaInicioCarrera", iso);
-      }
-    }
-  };
-
-  const pickerDate = formState.fechaInicioCarrera
-    ? new Date(formState.fechaInicioCarrera + "T12:00:00")
-    : new Date(new Date().getFullYear() - 5, 0, 1);
-
   return (
-    <KeyboardAwareScrollView
+    <ScrollView
+      style={styles.scroll}
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
-      bottomOffset={20}
     >
       <Text style={styles.stepTitle}>Información Profesional</Text>
 
@@ -217,64 +180,11 @@ export function RegisterStepTwo({
       )}
 
       {/* Fecha de inicio de carrera */}
-      <TouchableOpacity
-        style={styles.selectButton}
-        onPress={() => setShowDatePicker(true)}
-        activeOpacity={0.7}
-      >
-        <Text
-          style={[
-            styles.selectText,
-            !formState.fechaInicioCarrera && styles.selectPlaceholder,
-          ]}
-        >
-          {formState.fechaInicioCarrera
-            ? formatDate(formState.fechaInicioCarrera)
-            : getCareerLabel(formState.ocupacion)}
-        </Text>
-        <Ionicons name="calendar-outline" size={20} color={COLORS.textSecondary} />
-      </TouchableOpacity>
-
-      {/* DatePicker Android — aparece directamente */}
-      {showDatePicker && Platform.OS === "android" && (
-        <DateTimePicker
-          value={pickerDate}
-          mode="date"
-          display="default"
-          maximumDate={new Date()}
-          onChange={handleDateChange}
-        />
-      )}
-
-      {/* DatePicker iOS — en Modal con botón "Listo" */}
-      {Platform.OS === "ios" && (
-        <Modal
-          transparent
-          animationType="slide"
-          visible={showDatePicker}
-          onRequestClose={() => setShowDatePicker(false)}
-        >
-          <View style={styles.iosOverlay}>
-            <View style={styles.iosPickerContainer}>
-              <View style={styles.iosPickerHeader}>
-                <Text style={styles.iosPickerTitle}>Fecha de inicio</Text>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={styles.iosDoneButton}>Listo</Text>
-                </TouchableOpacity>
-              </View>
-              <DateTimePicker
-                value={pickerDate}
-                mode="date"
-                display="spinner"
-                maximumDate={new Date()}
-                locale="es-MX"
-                onChange={handleDateChange}
-                style={styles.iosPicker}
-              />
-            </View>
-          </View>
-        </Modal>
-      )}
+      <CareerStartDateField
+        value={formState.fechaInicioCarrera}
+        onChange={(iso) => onUpdateField("fechaInicioCarrera", iso)}
+        label={getCareerLabel(formState.ocupacion)}
+      />
 
       <AppInput
         placeholder="Ej: Asesor con 5 años en el sector residencial de Guadalajara, especializado en propiedades de lujo y arrendamiento *"
@@ -290,6 +200,8 @@ export function RegisterStepTwo({
         showCounter
       />
 
+      <LegalAcceptanceText />
+
       <SubmitButton
         loading={loading}
         onPress={handleSubmit}
@@ -297,11 +209,14 @@ export function RegisterStepTwo({
       />
 
       <BackButton onPress={onBack} text="Volver al paso 1" />
-    </KeyboardAwareScrollView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flexShrink: 1,
+  },
   container: {
     flexGrow: 1,
     paddingBottom: 20,
@@ -354,39 +269,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: -12,
     marginBottom: 12,
-  },
-  // iOS DatePicker Modal
-  iosOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
-  iosPickerContainer: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingBottom: 30,
-  },
-  iosPickerHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
-  },
-  iosPickerTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-  },
-  iosDoneButton: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: COLORS.primary,
-  },
-  iosPicker: {
-    height: 200,
   },
 });
