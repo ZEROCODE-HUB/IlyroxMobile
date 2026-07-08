@@ -9,9 +9,12 @@ import {
   ActivityIndicator,
   Modal,
   Image,
-  KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import {
+  KeyboardAvoidingView,
+  KeyboardProvider,
+} from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
 import * as ImagePicker from "expo-image-picker";
@@ -292,6 +295,7 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
   };
 
   return (
+    <KeyboardProvider>
     <ScreenWrapper withHeader={false} style={styles.container}>
       <AppHeader
         title={isEditing ? "Editar Reel" : "Nuevo Reel"}
@@ -299,14 +303,22 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
         onBack={onBack}
       />
 
+      {/* El botón de publicar va DENTRO del KeyboardAvoidingView: antes era
+          `position:absolute` y en iOS el teclado lo tapaba, dejando el reel
+          imposible de publicar sin cerrar el teclado a ciegas.
+          Sin `keyboardVerticalOffset`: el KAV ya empieza bajo el header y llega
+          al fondo. El offset de 90 que había antes era el hueco en blanco que
+          aparecía sobre el teclado. */}
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         <ScrollView
+          style={styles.flex}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          // "on-drag" funciona en iOS y Android; "interactive" es solo iOS.
+          keyboardDismissMode="on-drag"
         >
           <View style={styles.card}>
             <Text style={styles.label}>Video del Reel</Text>
@@ -358,23 +370,23 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
             />
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.publishBtn, uploading && { opacity: 0.7 }]}
-          onPress={handlePublish}
-          disabled={uploading}
-        >
-          {uploading ? (
-            <ActivityIndicator color={COLORS.white} />
-          ) : (
-            <Text style={styles.publishText}>
-              {isEditing ? "Guardar Cambios" : "Publicar Ahora"}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.publishBtn, uploading && { opacity: 0.7 }]}
+            onPress={handlePublish}
+            disabled={uploading}
+          >
+            {uploading ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <Text style={styles.publishText}>
+                {isEditing ? "Guardar Cambios" : "Publicar Ahora"}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
 
       {/* Modal de Progreso */}
       <Modal visible={uploading} transparent>
@@ -413,6 +425,7 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
         </View>
       </Modal>
     </ScreenWrapper>
+    </KeyboardProvider>
   );
 }
 
@@ -452,9 +465,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  flex: {
+    flex: 1,
+  },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100,
+    // El footer ya no flota sobre el scroll, así que no hace falta reservarle sitio.
+    paddingBottom: 24,
   },
   card: {
     backgroundColor: COLORS.white,
@@ -565,12 +582,9 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: COLORS.white,
     padding: 16,
+    paddingBottom: 28,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
     shadowColor: COLORS.black,
@@ -579,7 +593,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 20,
     zIndex: 100,
-    paddingBottom: 50,
   },
   publishBtn: {
     backgroundColor: COLORS.primary,

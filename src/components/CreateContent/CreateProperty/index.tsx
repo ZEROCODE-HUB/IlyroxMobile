@@ -3,7 +3,7 @@
 // Orquesta todos los sub-componentes y hooks
 // ============================================
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,9 +12,13 @@ import {
   StyleSheet,
   ActivityIndicator,
   Modal,
+  BackHandler,
+  Platform,
 } from "react-native";
+import { KeyboardAvoidingView, KeyboardProvider } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../../constants/colors";
+import { useModal } from "@/context/ModalContext";
 import { ScreenWrapper } from "../../../screens/ScreenWrapper";
 import { AppHeader } from "../../AppHeader";
 import { SelectionModal } from "../../modals";
@@ -88,6 +92,37 @@ export default function CreateProperty({
   const { user } = useAuth();
   const router = useRouter();
   const form = usePropertyForm(propertyId, onBack);
+  const { showModal } = useModal();
+
+  // El formulario vive en estado local: salir de la pantalla lo destruye.
+  // Antes se perdía sin avisar, tanto por el botón atrás como por el gesto
+  // del sistema (ya desactivado en src/app/create/_layout.tsx).
+  const confirmDiscard = useCallback(() => {
+    if (!form.isDirty()) {
+      onBack(false);
+      return;
+    }
+    showModal({
+      title: "Descartar cambios",
+      message:
+        "Perderás la información que has llenado. ¿Seguro que quieres salir?",
+      confirmText: "Descartar",
+      cancelText: "Seguir editando",
+      onConfirm: () => onBack(false),
+    });
+  }, [form, onBack, showModal]);
+
+  // Botón atrás de hardware / gesto de sistema en Android.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        confirmDiscard();
+        return true; // Se consume: la navegación la decide el modal.
+      },
+    );
+    return () => subscription.remove();
+  }, [confirmDiscard]);
 
   // Estado para el flujo de Open House post-publicación
   const [showOpenHouseModal, setShowOpenHouseModal] = useState(false);
@@ -311,13 +346,20 @@ export default function CreateProperty({
   return (
     <>
     <PropertyFormProvider value={form}>
+    <KeyboardProvider>
     <ScreenWrapper withHeader={false} style={styles.container}>
       <AppHeader
         title={propertyId ? "Editar Propiedad" : "Crear Propiedad"}
         showBackButton={true}
-        onBack={() => onBack(false)}
+        onBack={confirmDiscard}
       />
 
+      {/* El footer va DENTRO del KeyboardAvoidingView para que suba con el
+          teclado; antes era `position:absolute` y quedaba tapado en iOS. */}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
       <FieldAnchorContext.Provider value={registerField}>
       <View ref={containerRef} style={styles.scrollView} collapsable={false}>
       <ScrollView
@@ -325,7 +367,11 @@ export default function CreateProperty({
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="always"
+        // "always" impedía cerrar el teclado: cualquier toque fuera del input lo
+        // mantenía abierto. Con "handled" los botones siguen respondiendo al
+        // primer toque y tocar el fondo lo cierra; "on-drag" lo baja al scrollear.
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         scrollEnabled={scrollEnabled}
         scrollEventThrottle={16}
         onScroll={(e) => {
@@ -406,7 +452,7 @@ export default function CreateProperty({
       </FieldAnchorContext.Provider>
 
       {/* FOOTER - BOTÓN PUBLICAR */}
-      <View style={[styles.footer, { paddingBottom: 50 }]}>
+      <View style={styles.footer}>
         <TouchableOpacity
           style={[
             styles.publishBtn,
@@ -434,6 +480,7 @@ export default function CreateProperty({
           )}
         </TouchableOpacity>
       </View>
+      </KeyboardAvoidingView>
 
       {/* MODAL DE PROGRESO MEJORADO */}
       <ProgressModal 
@@ -467,6 +514,7 @@ export default function CreateProperty({
         loading={publishState.uploading}
       />
     </ScreenWrapper>
+    </KeyboardProvider>
     </PropertyFormProvider>
 
     {/* BOTTOM SHEET DE ÉXITO POST-PUBLICACIÓN */}
@@ -525,9 +573,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  flex: {
+    flex: 1,
+  },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100,
+    // El footer ya no flota sobre el scroll, así que no hace falta reservarle sitio.
+    paddingBottom: 24,
   },
   section: {
     backgroundColor: COLORS.white,
@@ -573,12 +625,9 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: COLORS.white,
     padding: 16,
+    paddingBottom: 28,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
   },

@@ -40,6 +40,9 @@ export function useConversations(userId?: string) {
     queryFn: () => conversationsService.listConversations(userId!),
     enabled: Boolean(userId),
     staleTime: 30_000,
+    // Red de seguridad: si el canal Realtime cae (CHANNEL_ERROR más abajo), el
+    // contador de no leídos se congelaría hasta reiniciar la app.
+    refetchInterval: 60_000,
   });
 
   const conversations = query.data ?? [];

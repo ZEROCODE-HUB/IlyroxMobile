@@ -241,6 +241,15 @@ type Updater<T> = T | ((prev: T) => T);
 // Hook
 // ============================================
 
+/**
+ * Huella del formulario para detectar cambios sin guardar. Se ignoran los
+ * `errors`: son estado derivado de la validación, no datos del usuario.
+ */
+function serializeForm(state: PropertyFormState): string {
+  const { errors: _errors, ...fields } = state;
+  return JSON.stringify(fields);
+}
+
 export function usePropertyForm(
   propertyId?: string,
   onBack?: (shouldRefresh?: boolean) => void,
@@ -251,6 +260,26 @@ export function usePropertyForm(
   // Loading state — es estado de transacción (no de formulario), se queda como useState
   const [isLoadingProperty, setIsLoadingProperty] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Detección de cambios sin guardar, para poder confirmar antes de descartar.
+  // Se lee vía ref para que `isDirty` no cambie de identidad en cada tecleo.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const baselineRef = useRef(serializeForm(INITIAL_STATE));
+
+  // En edición la línea base es la propiedad ya cargada, no el estado vacío:
+  // `dispatch({type:"LOAD"})` y `setIsLoadingProperty(false)` se agrupan en el
+  // mismo render, así que aquí `stateRef` ya contiene los datos cargados.
+  useEffect(() => {
+    if (propertyId && !isLoadingProperty) {
+      baselineRef.current = serializeForm(stateRef.current);
+    }
+  }, [propertyId, isLoadingProperty]);
+
+  const isDirty = useCallback(
+    () => serializeForm(stateRef.current) !== baselineRef.current,
+    [],
+  );
 
   // ============================================
   // Setter factory — una por campo, memoizado con useCallback
@@ -1237,6 +1266,9 @@ export function usePropertyForm(
     // Validation
     validate,
     getValidationErrors,
+
+    // Cambios sin guardar
+    isDirty,
 
     // Helpers
     handleCurrencyChange,

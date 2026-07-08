@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
+import { useDismissKeyboardWhenVisible } from "../../hooks/useDismissKeyboardWhenVisible";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
 import { COLORS } from "../../constants";
@@ -41,6 +42,8 @@ export default function MultiSelectionModal({
   const modalHeight = screenHeight * 0.9;
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedValues, setSelectedValues] = useState<string[]>(currentValues);
+
+  useDismissKeyboardWhenVisible(visible);
 
   // Sync state when modal becomes visible
   React.useEffect(() => {

@@ -2,7 +2,11 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  focusManager,
+} from "@tanstack/react-query";
 import { OneSignal } from "react-native-onesignal";
 import { useFonts } from "expo-font";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -11,6 +15,8 @@ import {
   Platform,
   StatusBar,
   LogBox,
+  AppState,
+  AppStateStatus,
 } from "react-native";
 
 import { AppProvider } from "@/context/AppContext";
@@ -42,7 +48,27 @@ if (Platform.OS !== "web") {
 
 const queryClient = new QueryClient();
 
+/**
+ * React Query solo cablea `focusManager` a `visibilitychange` del navegador.
+ * En React Native nadie lo hace, así que `refetchOnWindowFocus` nunca dispara
+ * y queries como la de conversaciones (badge de mensajes no leídos) se quedan
+ * obsoletas en el móvil aunque en la web se refresquen solas.
+ */
+function useReactQueryAppStateFocus() {
+  useEffect(() => {
+    const onChange = (status: AppStateStatus) => {
+      if (Platform.OS !== "web") {
+        focusManager.setFocused(status === "active");
+      }
+    };
+    const subscription = AppState.addEventListener("change", onChange);
+    return () => subscription.remove();
+  }, []);
+}
+
 export default function RootLayout() {
+  useReactQueryAppStateFocus();
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundary>
@@ -189,6 +215,21 @@ function RootLayoutNav() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(stack)" />
+        {/* Los formularios de creación guardan todo en estado local: un gesto
+            lateral accidental hacía pop de la ruta y borraba lo llenado sin
+            preguntar. La salida se confirma desde el propio formulario. */}
+        <Stack.Screen
+          name="create/property"
+          options={{ gestureEnabled: false, fullScreenGestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="create/reel"
+          options={{ gestureEnabled: false, fullScreenGestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="create/post"
+          options={{ gestureEnabled: false, fullScreenGestureEnabled: false }}
+        />
       </Stack>
       {updateRequired && versionInfo && (
         <VersionUpdateModal
