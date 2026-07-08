@@ -1,24 +1,121 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  StatusBar,
+  ScrollView,
+  RefreshControl,
+  AppState,
+  AppStateStatus,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useModal } from '../context/ModalContext';
+import { supabase } from '../lib/supabase';
 import { COLORS } from '../constants';
 import { theme } from '../design-system/theme';
 
+/**
+ * Red de seguridad por si el canal realtime se cae o nunca conecta.
+ * El camino normal es la suscripción a `perfiles`.
+ */
+const POLL_INTERVAL_MS = 30_000;
+
 export default function PendingApprovalScreen() {
-  const { profile, signOut } = useAuth();
+  const { profile, user, signOut, refreshProfile } = useAuth();
   const { showModal } = useModal();
+  const [refreshing, setRefreshing] = useState(false);
 
   const recibidas = profile?.aprobaciones_recibidas || 0;
   const requeridas = profile?.aprobaciones_requeridas || 3;
   const faltantes = Math.max(0, requeridas - recibidas);
   const progress = Math.min(100, (recibidas / requeridas) * 100);
 
+  // Evita solapar consultas: el sondeo, el foreground y el pull-to-refresh
+  // pueden dispararse a la vez.
+  const inFlightRef = useRef(false);
+
+  const syncProfile = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    try {
+      // Sin argumentos: invalida la caché y relee de la red.
+      await refreshProfile();
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, [refreshProfile]);
+
+  // El perfil se cachea en memoria y el realtime global de `perfiles` está
+  // desactivado, así que sin esto la pantalla nunca se enteraría de las nuevas
+  // aprobaciones y el usuario tendría que cerrar sesión para verlas.
+  useEffect(() => {
+    syncProfile();
+
+    const interval = setInterval(syncProfile, POLL_INTERVAL_MS);
+
+    const onAppStateChange = (state: AppStateStatus) => {
+      if (state === 'active') syncProfile();
+    };
+    const subscription = AppState.addEventListener('change', onAppStateChange);
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [syncProfile]);
+
+  // Aprobación instantánea: el trigger `update_aprobaciones_count` actualiza
+  // `perfiles`, y este canal lo entrega al momento. Se relee el perfil de la
+  // red en vez de usar `payload.new` porque la fila replicada puede no traer
+  // todas las columnas según el REPLICA IDENTITY de la tabla.
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`pending-approval-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'perfiles',
+          filter: `id=eq.${user.id}`,
+        },
+        () => {
+          syncProfile();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, syncProfile]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await syncProfile();
+    setRefreshing(false);
+  }, [syncProfile]);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
       <View style={styles.content}>
         <View style={styles.iconContainer}>
           <Ionicons name="hourglass-outline" size={60} color={COLORS.primary} />
@@ -49,6 +146,10 @@ export default function PendingApprovalScreen() {
           </Text>
         </View>
 
+        <Text style={styles.refreshHint}>
+          Esta pantalla se actualiza sola. Desliza hacia abajo para comprobarlo ahora.
+        </Text>
+
         <TouchableOpacity
           style={styles.signOutButton}
           onPress={() => {
@@ -65,6 +166,7 @@ export default function PendingApprovalScreen() {
           <Text style={styles.signOutText}>Cerrar Sesión</Text>
         </TouchableOpacity>
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -74,11 +176,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: theme.spacing.xl,
+  },
+  refreshHint: {
+    color: COLORS.textTertiary,
+    fontSize: theme.typography.fontSizes.xs,
+    textAlign: 'center',
+    marginTop: -theme.spacing.xxl,
+    marginBottom: theme.spacing.xxl,
+    paddingHorizontal: theme.spacing.lg,
   },
   iconContainer: {
     width: 120,

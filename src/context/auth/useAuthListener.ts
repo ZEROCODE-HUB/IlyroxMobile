@@ -93,7 +93,11 @@ export const useAuthListener = ({
         // Sin sesión, limpiar todo
         onProfileChange(null);
         if (Platform.OS !== "web") {
-          OneSignal.User.removeAlias("external_id");
+          // Solo logout(): desasocia el external_id de este dispositivo y crea
+          // un usuario anónimo. NO usar removeAlias("external_id") — borra la
+          // identidad del usuario en OneSignal, dejando su external_id sin
+          // suscripciones push (la API responde entonces "All included players
+          // are not subscribed") o directamente sin usuario.
           OneSignal.logout();
         }
         finishLoading();
@@ -112,7 +116,11 @@ export const useAuthListener = ({
           // sin el lock contenido, responde en ms y el backoff solo actúa
           // ante fallos de red reales.
           const profileData = await loadProfile(userId);
-          if (mounted) onProfileChange(profileData);
+          // Solo se propaga un perfil válido. Poner `profile` a null con la
+          // sesión viva hace que RootLayoutNav sustituya el <Stack> por
+          // <InitialLoading>, desmontando la pantalla actual: un TOKEN_REFRESHED
+          // con mala red borraba el formulario que el usuario estaba llenando.
+          if (mounted && profileData) onProfileChange(profileData);
 
           // ✅ REALTIME DESHABILITADO
           // if (["SIGNED_IN", "INITIAL_SESSION"].includes(_event)) {
@@ -120,7 +128,6 @@ export const useAuthListener = ({
           // }
         } catch (profileErr) {
           log.error("Error loading profile:", profileErr);
-          if (mounted) onProfileChange(null);
         } finally {
           finishLoading();
         }

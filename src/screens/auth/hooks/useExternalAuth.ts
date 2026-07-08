@@ -260,7 +260,8 @@ export function useExternalAuth() {
     try {
       await supabase.auth.signOut();
       if (Platform.OS !== "web") {
-        OneSignal.User.removeAlias("external_id");
+        // Ver AuthContext.signOut: removeAlias("external_id") rompe la
+        // identidad en OneSignal y deja al usuario sin push.
         await OneSignal.logout();
       }
     } catch (error) {

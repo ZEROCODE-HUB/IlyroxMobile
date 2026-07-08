@@ -3,7 +3,7 @@
  * Hook para cargar perfiles con cache y reintentos inteligentes
  */
 
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 import { supabase } from "../../lib/supabase";
 import { perfiles } from "../../types";
 import { logger } from "@/utils/logger";
@@ -19,8 +19,12 @@ export const useProfileLoader = () => {
 
   /**
    * Cargar perfil con reintentos inteligentes y cache
+   *
+   * Identidad estable (solo lee refs): los consumidores lo usan como
+   * dependencia de efectos y una nueva referencia en cada render los
+   * reejecutaría en bucle.
    */
-  const loadProfile = async (
+  const loadProfile = useCallback(async (
     userId: string,
     maxRetries = 3,
   ): Promise<perfiles | null> => {
@@ -118,12 +122,12 @@ export const useProfileLoader = () => {
         delete loadingProfileRef.current[userId];
       }, 5000);
     }
-  };
+  }, []);
 
   /**
    * Limpiar cache
    */
-  const clearCache = (userId?: string) => {
+  const clearCache = useCallback((userId?: string) => {
     if (userId) {
       delete profileCacheRef.current[userId];
       delete loadingProfileRef.current[userId];
@@ -131,14 +135,14 @@ export const useProfileLoader = () => {
       profileCacheRef.current = {};
       loadingProfileRef.current = {};
     }
-  };
+  }, []);
 
   /**
    * Actualizar cache directamente
    */
-  const updateCache = (userId: string, profile: perfiles) => {
+  const updateCache = useCallback((userId: string, profile: perfiles) => {
     profileCacheRef.current[userId] = profile;
-  };
+  }, []);
 
   return {
     loadProfile,

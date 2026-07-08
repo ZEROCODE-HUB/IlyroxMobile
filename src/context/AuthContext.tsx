@@ -5,6 +5,7 @@
 
 import React, {
   createContext,
+  useCallback,
   useContext,
   useState,
 } from "react";
@@ -61,28 +62,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   /**
    * Refrescar perfil manualmente o actualizarlo con datos conocidos
+   *
+   * Memoizado: PendingApprovalScreen lo usa como dependencia de un efecto que
+   * monta un intervalo de sondeo. Una referencia nueva por render reiniciaría
+   * el efecto en bucle.
    */
-  const refreshProfile = async (newData?: perfiles) => {
-    if (!user) return;
+  const refreshProfile = useCallback(
+    async (newData?: perfiles) => {
+      if (!user) return;
 
-    if (newData) {
-      // Actualizar localmente sin llamar a la red
-      setProfile(newData);
-      updateCache(user.id, newData);
-    } else {
-      // Forzar carga desde la red
-      clearCache(user.id);
-      const profileData = await loadProfile(user.id);
-      setProfile(profileData);
-    }
-  };
+      if (newData) {
+        // Actualizar localmente sin llamar a la red
+        setProfile(newData);
+        updateCache(user.id, newData);
+      } else {
+        // Forzar carga desde la red
+        clearCache(user.id);
+        const profileData = await loadProfile(user.id);
+        // Un fallo de red devuelve null: conservar el perfil actual. Ponerlo a
+        // null dejaría la app en la pantalla de carga (hay sesión, no hay
+        // perfil) hasta reiniciarla.
+        if (profileData) setProfile(profileData);
+      }
+    },
+    [user, loadProfile, clearCache, updateCache],
+  );
 
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
       if (Platform.OS !== "web") {
+        // logout() basta: removeAlias("external_id") destruye la identidad del
+        // usuario en OneSignal y su external_id se queda sin dispositivos.
         await OneSignal.logout();
-        OneSignal.User.removeAlias("external_id");
       }
     } catch (error) {
       log.error("signOut error:", error);
