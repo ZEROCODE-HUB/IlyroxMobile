@@ -4,21 +4,24 @@
  * Refactorizada para modularidad y mejor UX con teclado
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Image,
+  Keyboard,
+  Platform,
+  useWindowDimensions,
 } from "react-native";
 import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
-import { KeyboardProvider } from "react-native-keyboard-controller";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/colors";
 import { useStableSafeInsets } from "@/context/SafeInsetsContext";
 import { Button } from "@/design-system/components";
+import { router } from "expo-router";
 
 // Hooks
 import { useAuthForm } from "./hooks/useAuthForm";
@@ -54,7 +57,27 @@ export default function AuthScreen() {
       fechaInicioCarrera: "",
     });
 
-  const { bottom } = useStableSafeInsets();
+  const { top, bottom } = useStableSafeInsets();
+  const { height: screenHeight } = useWindowDimensions();
+
+  // Altura real del teclado (0 si está cerrado). Con ella subimos el sheet justo
+  // por encima del teclado y limitamos su alto al espacio disponible, así se
+  // adapta al contenido: login queda compacto y registro hace scroll sin cortarse.
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    const showEvt =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvt =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showSub = Keyboard.addListener(showEvt, (e) =>
+      setKeyboardHeight(e.endCoordinates?.height ?? 0),
+    );
+    const hideSub = Keyboard.addListener(hideEvt, () => setKeyboardHeight(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Hooks de autenticación
   const authForm = useAuthForm();
@@ -157,6 +180,20 @@ export default function AuthScreen() {
     }
   }, [authForm]);
 
+  // "Olvidé mi contraseña": en iOS un Modal nativo presentado tapa la navegación,
+  // así que cerramos primero el bottom sheet y luego navegamos.
+  const handleForgotPassword = useCallback(() => {
+    setModalVisible(false);
+    setAuthMethod("none");
+    authForm.resetForm();
+    const go = () => router.push("/forgot-password");
+    if (Platform.OS === "ios") {
+      setTimeout(go, 350);
+    } else {
+      go();
+    }
+  }, [authForm]);
+
   // Renderizar contenido del modal según el estado
   const renderModalContent = () => {
     // Auth externa - completar perfil
@@ -178,7 +215,10 @@ export default function AuthScreen() {
       return (
         <AuthProviderButtons
           onProviderPress={handleProviderAuth}
-          onEmailPress={() => setAuthMethod("email")}
+          onEmailPress={() => {
+            authForm.clearError();
+            setAuthMethod("email");
+          }}
           loading={externalAuth.loading}
         />
       );
@@ -193,7 +233,11 @@ export default function AuthScreen() {
             loading={authForm.loading}
             onUpdateField={authForm.updateField}
             onSubmit={handleLogin}
-            onBack={() => setAuthMethod("none")}
+            onBack={() => {
+              authForm.clearError();
+              setAuthMethod("none");
+            }}
+            onForgotPassword={handleForgotPassword}
           />
         );
       }
@@ -207,7 +251,10 @@ export default function AuthScreen() {
             onUpdateField={authForm.updateField}
             onValidateField={authForm.validateField}
             onNext={handleNextStep}
-            onBack={() => setAuthMethod("none")}
+            onBack={() => {
+              authForm.clearError();
+              setAuthMethod("none");
+            }}
           />
         );
       }
@@ -272,7 +319,7 @@ export default function AuthScreen() {
           />
 
           <Button
-            label="Registrarse"
+            label="Registrarme"
             onPress={() => handleOpenModal("register")}
             variant="outline"
             size="lg"
@@ -288,21 +335,39 @@ export default function AuthScreen() {
         <View
           style={[
             styles.modalContent,
-            { paddingBottom: Math.max(30, bottom) },
+            keyboardHeight > 0
+              ? {
+                  // Sube el sheet justo por encima del teclado y limita su alto
+                  // al espacio disponible; el contenido scrollea si hace falta.
+                  marginBottom: keyboardHeight,
+                  maxHeight: screenHeight - keyboardHeight - top - 12,
+                  paddingBottom: 16,
+                }
+              : {
+                  minHeight: "40%",
+                  maxHeight: "90%",
+                  paddingBottom: Math.max(30, bottom),
+                },
           ]}
         >
-          <KeyboardProvider>
-            {/* Header del modal */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{getModalTitle()}</Text>
-              <TouchableOpacity onPress={handleCloseModal} activeOpacity={0.7}>
-                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-            </View>
+          {/* Header del modal */}
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{getModalTitle()}</Text>
+            <TouchableOpacity onPress={handleCloseModal} activeOpacity={0.7}>
+              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          </View>
 
-            {/* Contenido del modal */}
-            {renderModalContent()}
-          </KeyboardProvider>
+          {/* Banner de error inline (visible dentro del sheet en iOS y Android) */}
+          {authForm.error ? (
+            <View style={styles.errorBanner}>
+              <Ionicons name="alert-circle" size={18} color={COLORS.errorDark} />
+              <Text style={styles.errorText}>{authForm.error}</Text>
+            </View>
+          ) : null}
+
+          {/* Contenido del modal */}
+          {renderModalContent()}
         </View>
       </AppBottomSheet>
     </View>
@@ -379,10 +444,23 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-
-    minHeight: "40%",
-    maxHeight: "90%",
     width: "100%",
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: COLORS.errorLight,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    flex: 1,
+    color: COLORS.errorDark,
+    fontSize: 14,
+    fontWeight: "500",
   },
   modalHeader: {
     flexDirection: "row",

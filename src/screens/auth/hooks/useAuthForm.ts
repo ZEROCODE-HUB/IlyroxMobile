@@ -9,7 +9,6 @@ import { perfiles } from "@/types";
 
 import { OneSignal } from "react-native-onesignal";
 import { useImageUpload } from "@/hooks";
-import { useModal } from "@/context/ModalContext";
 
 export interface AuthFormState {
   // Credenciales
@@ -77,12 +76,25 @@ export function useAuthForm() {
   const [mode, setMode] = useState<"login" | "register">("login");
 
   const { uploadImage } = useImageUpload();
-  const { showModal } = useModal();
+
+  // Los errores de auth se muestran como banner INLINE dentro del bottom sheet:
+  // en iOS no se puede presentar el ConfirmationModal (Modal nativo) sobre el
+  // AppBottomSheet (otro Modal nativo), así que no aparecería. Reutilizamos la
+  // firma de showModal pero escribimos en este estado en vez de abrir el modal.
+  const [error, setError] = useState<string | null>(null);
+  const showModal = useCallback(
+    (opts: { title?: string; message: string; confirmText?: string }) => {
+      setError(opts.message);
+    },
+    [],
+  );
+  const clearError = useCallback(() => setError(null), []);
 
   // Actualizar campo individual
   const updateField = useCallback(
     <K extends keyof AuthFormState>(field: K, value: AuthFormState[K]) => {
       setFormState((prev) => ({ ...prev, [field]: value }));
+      setError(null);
     },
     [],
   );
@@ -110,6 +122,7 @@ export function useAuthForm() {
   const resetForm = useCallback(() => {
     setFormState(initialFormState);
     setStep(1);
+    setError(null);
   }, []);
 
   // Validación Paso 1 (datos básicos)
@@ -252,6 +265,7 @@ export function useAuthForm() {
 
   // Login con email
   const handleLogin = useCallback(async (): Promise<boolean> => {
+    setError(null);
     if (!validateLogin()) return false;
 
     setLoading(true);
@@ -281,6 +295,7 @@ export function useAuthForm() {
 
   // Registro con email
   const handleRegister = useCallback(async (): Promise<boolean> => {
+    setError(null);
     if (!validateStep1() || !validateProfessionalData()) return false;
 
     setLoading(true);
@@ -397,6 +412,7 @@ export function useAuthForm() {
     loading,
     step,
     mode,
+    error,
     // Setters
     updateField,
     setStep,
@@ -412,5 +428,6 @@ export function useAuthForm() {
     handleLogin,
     handleRegister,
     setLoading,
+    clearError,
   };
 }

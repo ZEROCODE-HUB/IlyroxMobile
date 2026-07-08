@@ -5,7 +5,7 @@
 
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { SubmitButton } from "./SubmitButton";
@@ -43,12 +43,12 @@ export function RegisterStepOne({
   const passwordStrength = getPasswordStrength(formState.password);
 
   return (
-    <KeyboardAwareScrollView
+    <ScrollView
+      style={styles.scroll}
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
-      bottomOffset={20}
     >
       <Text style={styles.stepTitle}>Información Básica</Text>
 
@@ -192,11 +192,14 @@ export function RegisterStepOne({
 
       <SubmitButton loading={false} onPress={onNext} text="Siguiente" />
       <BackButton onPress={onBack} text="Volver a opciones" />
-    </KeyboardAwareScrollView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flexShrink: 1,
+  },
   container: {
     flexGrow: 1,
     paddingBottom: 20,

@@ -1,13 +1,12 @@
 import React, { useState } from "react";
 import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { ScrollView } from "react-native";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { SubmitButton } from "./SubmitButton";
 import { BackButton } from "./BackButton";
 import { AuthFormState } from "../hooks/useAuthForm";
 import { COLORS } from "../../../constants/colors";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 
 interface LoginFormProps {
   formState: AuthFormState;
@@ -18,6 +17,7 @@ interface LoginFormProps {
   ) => void;
   onSubmit: () => void;
   onBack: () => void;
+  onForgotPassword: () => void;
 }
 
 export function LoginForm({
@@ -26,15 +26,16 @@ export function LoginForm({
   onUpdateField,
   onSubmit,
   onBack,
+  onForgotPassword,
 }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   return (
-    <KeyboardAwareScrollView
+    <ScrollView
+      style={styles.scroll}
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
-      bottomOffset={20}
     >
       <View style={styles.form}>
         <AppInput
@@ -65,20 +66,21 @@ export function LoginForm({
         />
         <TouchableOpacity
           style={styles.forgotPasswordLink}
-          onPress={() => {
-            router.push("/forgot-password");
-          }}
+          onPress={onForgotPassword}
         >
           <Text style={styles.forgotPasswordText}>Olvidé mi contraseña</Text>
         </TouchableOpacity>
         <SubmitButton loading={loading} onPress={onSubmit} text="Entrar" />
         <BackButton onPress={onBack} text="Volver a opciones" />
       </View>
-    </KeyboardAwareScrollView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flexShrink: 1,
+  },
   container: {
     flexGrow: 1,
   },
