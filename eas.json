@@ -43,6 +43,12 @@
       "extends": "production",
       "credentialsSource": "remote"
     },
+    "simulator": {
+      "extends": "preview",
+      "ios": {
+        "simulator": true
+      }
+    },
     "production": {
       "channel": "production",
       "credentialsSource": "local",

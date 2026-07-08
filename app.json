@@ -2,7 +2,7 @@
   "expo": {
     "name": "ilyrox",
     "slug": "ilyrox",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "runtimeVersion": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/Icon-size.png",
@@ -29,7 +29,8 @@
         "UIBackgroundModes": [
           "remote-notification"
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Ilyrox necesita acceder a tu galería para que puedas seleccionar fotos y videos al crear publicaciones, reels y propiedades, elegir tu foto de perfil y adjuntar archivos en mensajes."
       },
       "entitlements": {
         "aps-environment": "production",
