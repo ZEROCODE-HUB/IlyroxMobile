@@ -47,6 +47,8 @@ export interface ImageGalleryProps {
   showDots?: boolean;
   showImageCount?: boolean;
   onImagePress?: () => void;
+  /** Notifica el índice de la imagen visible (para badges "1/N" externos). */
+  onIndexChange?: (index: number) => void;
 }
 
 const ImageGallery: React.FC<ImageGalleryProps> = ({
@@ -56,6 +58,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
   showDots = true,
   showImageCount = false,
   onImagePress,
+  onIndexChange,
 }) => {
   const [containerWidth, setContainerWidth] = useState(SCREEN_WIDTH);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -79,11 +82,18 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
     [containerWidth],
   );
 
+  // Se lee vía ref: onViewableItemsChanged debe tener identidad estable
+  // (FlatList no admite cambiarlo), pero el callback puede variar entre renders.
+  const onIndexChangeRef = useRef(onIndexChange);
+  onIndexChangeRef.current = onIndexChange;
+
   // Manejo optimizado del índice actual usando viewabilityConfig
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-        setCurrentIndex(viewableItems[0].index);
+        const idx = viewableItems[0].index;
+        setCurrentIndex(idx);
+        onIndexChangeRef.current?.(idx);
       }
     },
   ).current;
@@ -185,7 +195,10 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: "relative",
-    backgroundColor: COLORS.shimmer,
+    // Fondo oscuro: es lo que se ve como marco lateral (letterbox) en fotos
+    // verticales que no llenan el ancho. En blanco, los iconos blancos de
+    // like/comentario superpuestos se perderían.
+    backgroundColor: COLORS.backgroundDeep,
     overflow: "hidden",
   },
   scroll: {

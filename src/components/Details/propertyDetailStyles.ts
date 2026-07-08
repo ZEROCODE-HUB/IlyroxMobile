@@ -76,6 +76,14 @@ export const propertyDetailStyles = StyleSheet.create({
     zIndex: 10,
     alignItems: "center",
   },
+  actionsScrim: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 84,
+    zIndex: 9,
+  },
   content: {
     paddingTop: Platform.OS === "ios" ? 50 : 30,
     paddingHorizontal: 20,

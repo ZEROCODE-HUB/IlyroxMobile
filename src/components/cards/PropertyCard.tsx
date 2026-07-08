@@ -36,6 +36,7 @@ import { useUserRecommendations } from "@/hooks/useUserRecommendations";
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
 import { useChatInitiator } from "@/hooks/messaging/useChatInitiator";
 import { MapModal } from "../shared/MapModal";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Clipboard from "expo-clipboard";
 import { useToast } from "@/context/ToastContext";
 import firstUpperCase from "@/utils/firstUpperCase";
@@ -352,6 +353,16 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           onImagePress={onClick}
         />
 
+        {/* Velo lateral para que los iconos blancos se lean sobre fotos
+            claras o sobre el marco lateral de fotos verticales. */}
+        <LinearGradient
+          colors={["transparent", "rgba(15,23,42,0.55)"]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          pointerEvents="none"
+          style={styles.actionsScrim}
+        />
+
         {/* Botones de acción flotantes */}
         <View style={styles.floatingActions}>
           <ActionButtons
@@ -541,6 +552,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     zIndex: 10,
     alignItems: "center",
+  },
+  actionsScrim: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 84,
+    zIndex: 9,
   },
   operationBadge: {
     position: "absolute",
