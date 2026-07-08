@@ -14,10 +14,14 @@ import { useEffect, useState } from "react";
 import { Image } from "react-native";
 
 /**
- * Límites al estilo Instagram: una foto muy apaisada o muy vertical ocuparía
- * una franja inservible o una pantalla entera dentro del feed.
+ * Límites: una foto muy apaisada o muy vertical ocuparía una franja inservible
+ * o una pantalla entera dentro del feed.
+ *
+ * El mínimo es 2:3 (alto máx = 1.5× el ancho): las verticales de teléfono
+ * (3:4, 2:3) llenan el ancho sin marco lateral, y solo las más altas que 2:3
+ * (p. ej. 9:16) se topan y muestran el letterbox oscuro a los costados.
  */
-export const MIN_ASPECT_RATIO = 4 / 5; // vertical
+export const MIN_ASPECT_RATIO = 2 / 3; // vertical
 export const MAX_ASPECT_RATIO = 1.91; // horizontal
 
 const ratioCache = new Map<string, number>();
