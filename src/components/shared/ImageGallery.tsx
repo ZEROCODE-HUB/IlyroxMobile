@@ -30,12 +30,20 @@ import { COLORS } from "../../constants";
 
 import LazyImage from "../LazyImage";
 import { commonStyles } from "../../../styles";
+import { useImageAspectRatio } from "../../hooks/useImageAspectRatio";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export interface ImageGalleryProps {
   images: string[];
+  /**
+   * Relación de aspecto usada mientras se mide la primera imagen, o si no se
+   * puede medir. La galería adopta el ratio real de la imagen en cuanto lo
+   * conoce, salvo que se fije `fixedAspectRatio`.
+   */
   aspectRatio?: number; // 1 = cuadrado, 4/3 = horizontal, etc.
+  /** Fuerza `aspectRatio` e ignora las dimensiones reales de la imagen. */
+  fixedAspectRatio?: boolean;
   showDots?: boolean;
   showImageCount?: boolean;
   onImagePress?: () => void;
@@ -44,12 +52,18 @@ export interface ImageGalleryProps {
 const ImageGallery: React.FC<ImageGalleryProps> = ({
   images,
   aspectRatio = 1,
+  fixedAspectRatio = false,
   showDots = true,
   showImageCount = false,
   onImagePress,
 }) => {
   const [containerWidth, setContainerWidth] = useState(SCREEN_WIDTH);
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // La primera imagen marca la forma de la galería; el resto se ajusta dentro
+  // sin recortarse (`contain`), como en Instagram.
+  const measuredRatio = useImageAspectRatio(images?.[0], aspectRatio);
+  const galleryAspectRatio = fixedAspectRatio ? aspectRatio : measuredRatio;
 
   // Referencia al FlatList - Tipado correcto para GH FlatList
   const flatListRef = useRef<FlatList<string>>(null);
@@ -92,6 +106,9 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
         <LazyImage
           source={{ uri: item }}
           style={[styles.image, { width: containerWidth }]}
+          // `contain` respeta la forma original de cada foto en lugar de
+          // recortarla para llenar el contenedor.
+          resizeMode="contain"
         />
       </TouchableOpacity>
     ),
@@ -109,7 +126,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   return (
     <View
-      style={[styles.container, { width: "100%", aspectRatio }]}
+      style={[styles.container, { width: "100%", aspectRatio: galleryAspectRatio }]}
       onLayout={onLayout}
     >
       <FlatList
@@ -177,7 +194,6 @@ const styles = StyleSheet.create({
   },
   image: {
     height: "100%",
-    resizeMode: "cover",
   },
   imageCountBadge: {
     position: "absolute",
