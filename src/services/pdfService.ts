@@ -428,6 +428,10 @@ const generatePropertyHtml = (
             height: 420px; /* Ajuste para que se vea la imagen principal grande */
             background-color: #ddd;
             overflow: hidden;
+            /* Sin esto, el motor de impresión parte la imagen en el salto de página */
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-column-break-inside: avoid;
         }
         .hero-img {
             width: 100%;
@@ -463,6 +467,9 @@ const generatePropertyHtml = (
             padding: 30px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.08);
             margin-bottom: 30px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-column-break-inside: avoid;
         }
 
         .card-header {
@@ -516,6 +523,9 @@ const generatePropertyHtml = (
             display: flex;
             align-items: center;
             gap: 8px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-column-break-inside: avoid;
         }
         
         .stat-icon {
@@ -561,6 +571,9 @@ const generatePropertyHtml = (
             gap: 8px;
             color: #444;
             font-size: 13px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-column-break-inside: avoid;
         }
 
         /* --- DESCRIPTION SECTION (Imagen 2) --- */
@@ -569,6 +582,9 @@ const generatePropertyHtml = (
             padding: 40px;
             margin: 0 40px 30px 40px;
             border-radius: 12px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-column-break-inside: avoid;
         }
         
         .details-section h2 {
@@ -605,14 +621,24 @@ const generatePropertyHtml = (
             gap: 12px; /* Espaciado suave */
         }
         
+        /* La celda de la galería no debe partirse entre páginas (arrastra a su img) */
+        .gallery-item {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-column-break-inside: avoid;
+        }
+
         .gallery-item img {
             width: 100%;
             height: 220px;
             object-fit: cover;
             border-radius: 4px;
             display: block;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-column-break-inside: avoid;
         }
-        
+
         /* Layout para la última imagen si es impar, para que ocupe todo el ancho */
         .gallery-item:last-child:nth-child(odd) {
              grid-column: span 2;
