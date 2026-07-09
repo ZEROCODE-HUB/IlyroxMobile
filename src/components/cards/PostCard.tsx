@@ -189,13 +189,29 @@ const PostCard: React.FC<PostCardProps> = ({
                   item.postType === "busqueda" && commonStyles.cardDetail,
                 ]}
               >
-                <RichText
-                  style={[
-                    isShortContent ? styles.textPostLarge : styles.textPostNormal,
-                    item.postType === "busqueda" && commonStyles.textDetail,
-                  ]}
-                  content={item.content}
-                />
+                {isShortContent ? (
+                  // Post corto (fuente grande): se muestra completo, sin recorte.
+                  <RichText
+                    style={[
+                      styles.textPostLarge,
+                      item.postType === "busqueda" && commonStyles.textDetail,
+                    ]}
+                    content={item.content}
+                  />
+                ) : (
+                  // Post largo: recorta a 2 líneas con "ver más". labelTogglesOnly
+                  // deja que tocar el texto abra el post y solo "ver más" expanda.
+                  <ExpandableText
+                    richContent
+                    labelTogglesOnly
+                    maxLines={2}
+                    text={item.content}
+                    style={[
+                      styles.textPostNormal,
+                      item.postType === "busqueda" && commonStyles.textDetail,
+                    ]}
+                  />
+                )}
               </View>
             </TouchableOpacity>
           ) : (
