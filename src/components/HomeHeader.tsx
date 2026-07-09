@@ -17,6 +17,7 @@ import { useApp } from "../context/AppContext";
 import { LocationSuggestionWithCount } from "../store/locationSearchStore";
 import { usePropertyFiltersStore } from "../store/propertyFiltersStore";
 import { useChatStore } from "../store/chatStore";
+import { useCitasStore } from "../store/citasStore";
 
 const LOGO_SOURCE = require("../assets/Logo.png");
 
@@ -37,6 +38,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   const router = useRouter();
   const { setSelectedLocation } = useApp();
   const unreadCount = useChatStore((state) => state.totalUnreadCount);
+  const pendingCitas = useCitasStore((state) => state.pendingCount);
 
   const handleNavigation = (screen: string) => {
     switch (screen) {
@@ -110,6 +112,13 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
                       {unreadCount > 9 ? "9+" : unreadCount}
+                    </Text>
+                  </View>
+                )}
+                {screen === "Appointments" && pendingCitas > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {pendingCitas > 9 ? "9+" : pendingCitas}
                     </Text>
                   </View>
                 )}
