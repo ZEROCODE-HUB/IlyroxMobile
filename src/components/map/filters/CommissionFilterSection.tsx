@@ -35,6 +35,13 @@ function FilterSlider({ label, value, onChange, max, step, formatValue, onScroll
     onChangeRef.current(Math.round(Math.max(0, Math.min(max, snapped)) * 100) / 100);
   };
 
+  // Solo se agarra el gesto si el toque cae sobre la bolita (con holgura), para
+  // que un scroll vertical que roce la barra no cambie el valor por accidente.
+  const HIT_SLOP = 16;
+  const isOnThumb = (locationX: number) =>
+    locationX >= thumbLeft - HIT_SLOP &&
+    locationX <= thumbLeft + THUMB + HIT_SLOP;
+
   return (
     <View style={styles.sliderContainer}>
       <View style={styles.sliderHeader}>
@@ -53,8 +60,8 @@ function FilterSlider({ label, value, onChange, max, step, formatValue, onScroll
             pageXRef.current = px;
           });
         }}
-        onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => true}
+        onStartShouldSetResponder={(e) => isOnThumb(e.nativeEvent.locationX)}
+        onMoveShouldSetResponder={() => false}
         onResponderTerminationRequest={() => false}
         onResponderGrant={(e) => {
           onScrollLock?.(false);

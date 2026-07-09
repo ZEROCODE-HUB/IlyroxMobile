@@ -44,6 +44,14 @@ function CommissionSlider({ label, value, onChange, min, max, step, formatValue,
     onChangeRef.current(String(Math.round(Math.max(min, Math.min(max, snapped)) * 100) / 100));
   };
 
+  // Solo se agarra el gesto si el toque cae sobre la bolita (con holgura). Así
+  // un scroll vertical que roce la barra no cambia el valor por accidente: el
+  // gesto se lo queda el ScrollView, no el slider.
+  const HIT_SLOP = 16;
+  const isOnThumb = (locationX: number) =>
+    locationX >= thumbLeft - HIT_SLOP &&
+    locationX <= thumbLeft + THUMB + HIT_SLOP;
+
   return (
     <View style={styles.sliderContainer}>
       <View style={styles.sliderHeader}>
@@ -58,8 +66,10 @@ function CommissionSlider({ label, value, onChange, min, max, step, formatValue,
           setTrackWidth(e.nativeEvent.layout.width);
           viewRef.current?.measure((_x, _y, _w, _h, px) => { pageXRef.current = px; });
         }}
-        onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => true}
+        onStartShouldSetResponder={(e) => isOnThumb(e.nativeEvent.locationX)}
+        // No reclamar el gesto en movimiento: si no empezó sobre la bolita, el
+        // arrastre pertenece al scroll del formulario.
+        onMoveShouldSetResponder={() => false}
         onResponderTerminationRequest={() => false}
         onResponderGrant={(e) => {
           onScrollLock?.(false);
