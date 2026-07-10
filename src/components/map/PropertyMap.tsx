@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo, useState } from "react";
+import React, { useRef, useEffect, useMemo, useState, useCallback } from "react";
 import { View, Text, StyleSheet, Platform, Pressable } from "react-native";
 import * as Haptics from "expo-haptics";
 
@@ -63,6 +63,21 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const [mapReady, setMapReady] = useState(false);
+
+  // Cierre del polígono tocando el primer vértice (crítico en iOS): el onPress
+  // se conecta desde que el vértice se crea (longitud 1) y se mantiene ESTABLE,
+  // para que Apple Maps registre el manejador de toque antes de que el marcador
+  // se congele (tracksViewChanges=false). Si se añadiera al llegar a 3 puntos,
+  // el marcador ya estaría congelado y no tomaría el nuevo handler. El handler
+  // no hace nada hasta que hay 3+ puntos; la longitud se lee por ref para no
+  // cambiar la identidad del callback (que recrearía el marcador).
+  const draftLenRef = useRef(draftPolygonPoints.length);
+  draftLenRef.current = draftPolygonPoints.length;
+  const onCloseRef = useRef(onCloseDraftPolygon);
+  onCloseRef.current = onCloseDraftPolygon;
+  const handleFirstVertexPress = useCallback(() => {
+    if (draftLenRef.current >= 3) onCloseRef.current?.();
+  }, []);
   const [overlayPositions, setOverlayPositions] = useState<{
     [key: string]: { x: number; y: number };
   }>({});
@@ -600,11 +615,9 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
             key={`vertex-${idx}`}
             coord={pt}
             isFirst={idx === 0}
-            onPress={
-              idx === 0 && draftPolygonPoints.length >= 3
-                ? onCloseDraftPolygon
-                : undefined
-            }
+            // El primer vértice lleva onPress SIEMPRE (estable) para que iOS lo
+            // registre al crearse; no hace nada hasta que hay 3+ puntos.
+            onPress={idx === 0 ? handleFirstVertexPress : undefined}
           />
         ))}
         {/* Invisible cluster touch targets */}
@@ -995,6 +1008,14 @@ const vertexStyles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 3,
   },
+  // Área tocable transparente alrededor del primer vértice: agranda el objetivo
+  // del toque de cierre sin cambiar el tamaño visible del puntito.
+  firstHitbox: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   dotInner: {
     width: 6,
     height: 6,
@@ -1019,6 +1040,9 @@ function DraftVertex({
   onPress?: () => void;
 }) {
   const [track, setTrack] = useState(true);
+  const handleLayout = () => {
+    if (track) setTrack(false);
+  };
   return (
     <Marker
       coordinate={coord}
@@ -1029,18 +1053,22 @@ function DraftVertex({
       // un punto encima del primero en vez de cerrar el polígono.
       stopPropagation={Boolean(onPress)}
     >
-      {/* El primer vértice es siempre mayor: es el objetivo del toque de
-          cierre y necesita área tocable. El estilo no puede depender de
-          `onPress` porque, con tracksViewChanges ya en false, iOS no volvería
-          a pintar el marker al cambiarlo. */}
-      <View
-        style={[vertexStyles.dot, isFirst && vertexStyles.dotFirst]}
-        onLayout={() => {
-          if (track) setTrack(false);
-        }}
-      >
-        <View style={vertexStyles.dotInner} />
-      </View>
+      {/* El primer vértice es el objetivo del toque de cierre: se le da un área
+          tocable amplia y transparente (44px, mínimo de Apple) alrededor del
+          puntito visible, para poder atinarle con el dedo en iOS. El puntito es
+          siempre mayor que el resto. El aspecto no puede depender de `onPress`
+          porque, con tracksViewChanges ya en false, iOS no repintaría. */}
+      {isFirst ? (
+        <View style={vertexStyles.firstHitbox} onLayout={handleLayout}>
+          <View style={[vertexStyles.dot, vertexStyles.dotFirst]}>
+            <View style={vertexStyles.dotInner} />
+          </View>
+        </View>
+      ) : (
+        <View style={vertexStyles.dot} onLayout={handleLayout}>
+          <View style={vertexStyles.dotInner} />
+        </View>
+      )}
     </Marker>
   );
 }
