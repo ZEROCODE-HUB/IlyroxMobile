@@ -302,17 +302,28 @@ const generatePropertyHtml = (
 
   // --- CONSTRUCCIÓN DE SECCIONES HTML ---
 
-  // Galería de imágenes (Estilo Masonry/Grid ajustado)
+  // Galería de imágenes como TABLA de 2 columnas (no grid). Los motores de
+  // impresión (WebKit en iOS, Chromium en Android) paginan de forma fiable por
+  // filas de tabla y respetan page-break-inside en <tr>, cosa que NO hacen con
+  // los items de un `display: grid` → por eso las fotos se partían entre hojas.
   let galleryHtml = "";
   if (config.showImagenes && galleryPhotos.length > 0) {
-    galleryHtml = galleryPhotos
-      .map(
-        (foto, index) => `
-      <div class="gallery-item">
-        <img src="${foto}" alt="Foto ${index + 2}" onerror="this.style.display='none'" />
-      </div>
-    `,
-      )
+    const rows: string[][] = [];
+    for (let i = 0; i < galleryPhotos.length; i += 2) {
+      rows.push(galleryPhotos.slice(i, i + 2));
+    }
+    galleryHtml = rows
+      .map((row) => {
+        const cells = row
+          .map(
+            (foto) => `
+          <td class="gallery-cell"${row.length === 1 ? ' colspan="2"' : ""}>
+            <img src="${foto}" alt="Foto" onerror="this.style.display='none'" />
+          </td>`,
+          )
+          .join("");
+        return `<tr class="gallery-row">${cells}</tr>`;
+      })
       .join("");
   }
 
@@ -610,38 +621,35 @@ const generatePropertyHtml = (
             text-align: justify;
         }
 
-        /* --- GALLERY GRID --- */
+        /* --- GALLERY (tabla: paginación fiable en impresión) --- */
         .gallery-container {
             margin-top: 30px;
             padding: 20px 40px 40px 40px;
         }
-        .gallery-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px; /* Espaciado suave */
+        .gallery-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
         }
-        
-        /* La celda de la galería no debe partirse entre páginas (arrastra a su img) */
-        .gallery-item {
+        /* La fila entera no se parte: si no cabe, salta completa a la siguiente
+           página. Es lo que WebKit/Chromium sí respetan (a diferencia del grid). */
+        .gallery-row {
             page-break-inside: avoid;
             break-inside: avoid;
-            -webkit-column-break-inside: avoid;
         }
-
-        .gallery-item img {
+        .gallery-cell {
+            width: 50%;
+            padding: 6px;
+            vertical-align: top;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .gallery-cell img {
             width: 100%;
             height: 220px;
             object-fit: cover;
             border-radius: 4px;
             display: block;
-            page-break-inside: avoid;
-            break-inside: avoid;
-            -webkit-column-break-inside: avoid;
-        }
-
-        /* Layout para la última imagen si es impar, para que ocupe todo el ancho */
-        .gallery-item:last-child:nth-child(odd) {
-             grid-column: span 2;
         }
 
         /* --- FOOTER & AGENT --- */
@@ -851,7 +859,7 @@ const generatePropertyHtml = (
          ${descripcionHtml}
       </div>
 
-      ${galleryHtml ? `<div class="gallery-container"><div class="gallery-grid">${galleryHtml}</div></div>` : ""}
+      ${galleryHtml ? `<div class="gallery-container"><table class="gallery-table"><tbody>${galleryHtml}</tbody></table></div>` : ""}
 
       ${creatorHtml}
     </body>
