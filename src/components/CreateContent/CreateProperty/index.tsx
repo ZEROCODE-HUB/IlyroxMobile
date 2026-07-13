@@ -543,7 +543,10 @@ export default function CreateProperty({
         // botón atrás) lleva al feed, para no quedar atrapado en "Crear propiedad".
         if (publishedInfo?.isUpdate) {
           setShowPublishedSheet(false);
-          if (onBack) onBack(true);
+          // Cerrar el <Modal> de edición externo en un tick POSTERIOR: cerrarlo
+          // en el mismo commit que el sheet (dos modales nativos + teardown del
+          // MapView a la vez) provocaba la pantalla negra en iOS.
+          setTimeout(() => onBack?.(true), 350);
         } else {
           goToFeed();
         }

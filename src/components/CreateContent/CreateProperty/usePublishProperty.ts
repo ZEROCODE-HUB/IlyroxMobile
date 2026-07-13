@@ -510,12 +510,19 @@ export function usePublishProperty(
               .filter(Boolean)
               .join(" - ");
 
-            onPublishSuccess({
-              newPropertyId,
-              isUpdate: !!propertyId,
-              firstPhotoUrl: uploadedUrls[0] ?? null,
-              location,
-            });
+            // Presentar el bottom sheet en un tick POSTERIOR: cerrar el
+            // ProgressModal y presentar otro <Modal> nativo en el mismo commit
+            // provoca en iOS la race "present while a presentation is in
+            // progress" (modal fantasma / pantalla negra al editar). Se espera a
+            // que el ProgressModal termine de cerrarse.
+            setTimeout(() => {
+              onPublishSuccess({
+                newPropertyId,
+                isUpdate: !!propertyId,
+                firstPhotoUrl: uploadedUrls[0] ?? null,
+                location,
+              });
+            }, 350);
           } else {
             // Fallback: modal legacy (si se usa el hook sin el nuevo callback)
             showModal({
