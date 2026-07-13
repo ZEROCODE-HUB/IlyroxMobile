@@ -591,18 +591,37 @@ export function usePropertyForm(
   // MAP CENTER BASED ON STATE OR GEO COORDS
   // ============================================
 
+  // Clave (lat,lng) de la última colonia aplicada al pin, para colocar el pin
+  // solo cuando la colonia CAMBIA (no en cada cambio de ubicacionData).
+  const lastColoniaKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
-    const { latitud, longitud, estado } = state.ubicacionData;
+    const { latitud, longitud, estado, colonia } = state.ubicacionData;
     if (latitud && longitud) {
-      // Solo centrar el mapa en las coordenadas del lugar seleccionado.
-      // NO auto-colocar el pin: el usuario debe marcar la ubicación exacta
-      // manualmente (long-press/drag), de lo contrario la propiedad quedaría
-      // con una ubicación por defecto y no podría ser encontrada.
       dispatch({
         type: "SET_FIELD",
         field: "mapCenter",
         value: { lat: latitud, lng: longitud },
       });
+
+      // Al elegir una colonia, colocar el pin en su centro como punto de
+      // partida (el asesor lo arrastra al lugar exacto). Solo cuando la
+      // colonia cambia. En edición NO se pisa un pin ya guardado.
+      if (colonia) {
+        const key = `${latitud},${longitud}`;
+        if (key !== lastColoniaKeyRef.current) {
+          lastColoniaKeyRef.current = key;
+          const hasPin =
+            state.location.latitude !== 0 || state.location.longitude !== 0;
+          if (!propertyId || !hasPin) {
+            dispatch({
+              type: "SET_FIELD",
+              field: "location",
+              value: { latitude: latitud, longitude: longitud },
+            });
+          }
+        }
+      }
     } else if (estado && COORDENADAS_ESTADO[estado]) {
       dispatch({
         type: "SET_FIELD",
