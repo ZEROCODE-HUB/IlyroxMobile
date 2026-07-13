@@ -85,9 +85,11 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     [key: string]: { x: number; y: number };
   }>({});
 
+  // "hybrid" por defecto (satélite + etiquetas de calles/colonias): en
+  // "satellite" puro no había nombres y era difícil orientarse en el mapa.
   const [mapTypeId, setMapTypeId] = useState<
     "standard" | "satellite" | "hybrid" | "terrain"
-  >("satellite");
+  >("hybrid");
   const [mapTypeMenuOpen, setMapTypeMenuOpen] = useState(false);
 
   const [currentRegion, setCurrentRegion] = useState({

@@ -13,8 +13,25 @@ export default function StackLayout() {
         options={{ presentation: "fullScreenModal" }}
       />
       <Stack.Screen name="easy-broker" options={{ presentation: "card" }} />
-      <Stack.Screen name="map" options={{ presentation: "card" }} />
-      <Stack.Screen name="map-results" options={{ presentation: "card" }} />
+      {/* gestureEnabled:false — al panear el mapa a pantalla completa (cerca del
+          borde) el gesto nativo de "volver" de iOS cerraba la pantalla sin
+          querer. Mismo blindaje que las rutas de creación en app/_layout.tsx. */}
+      <Stack.Screen
+        name="map"
+        options={{
+          presentation: "card",
+          gestureEnabled: false,
+          fullScreenGestureEnabled: false,
+        }}
+      />
+      <Stack.Screen
+        name="map-results"
+        options={{
+          presentation: "card",
+          gestureEnabled: false,
+          fullScreenGestureEnabled: false,
+        }}
+      />
       <Stack.Screen name="matches" options={{ presentation: "card" }} />
     </Stack>
   );
