@@ -4,7 +4,7 @@
  * Refactorizada para modularidad y mejor UX con teclado
  */
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -64,15 +64,28 @@ export default function AuthScreen() {
   // por encima del teclado y limitamos su alto al espacio disponible, así se
   // adapta al contenido: login queda compacto y registro hace scroll sin cortarse.
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  // Espejo por ref para no encoger el sheet mientras el teclado sigue abierto.
+  const keyboardHeightRef = useRef(0);
   useEffect(() => {
     const showEvt =
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvt =
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const showSub = Keyboard.addListener(showEvt, (e) =>
-      setKeyboardHeight(e.endCoordinates?.height ?? 0),
-    );
-    const hideSub = Keyboard.addListener(hideEvt, () => setKeyboardHeight(0));
+    const showSub = Keyboard.addListener(showEvt, (e) => {
+      const h = e.endCoordinates?.height ?? 0;
+      // Solo crecer, nunca encoger con el teclado abierto: en Android
+      // `keyboardDidShow` se re-emite con altura distinta al aparecer/ocultar la
+      // barra de sugerencias del teclado, y eso hacía saltar el sheet en cada
+      // tecla ("parpadea de posición"). Con Math.max el layout queda estable.
+      if (h > keyboardHeightRef.current) {
+        keyboardHeightRef.current = h;
+        setKeyboardHeight(h);
+      }
+    });
+    const hideSub = Keyboard.addListener(hideEvt, () => {
+      keyboardHeightRef.current = 0;
+      setKeyboardHeight(0);
+    });
     return () => {
       showSub.remove();
       hideSub.remove();
