@@ -4,16 +4,14 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
   ActivityIndicator,
   Modal,
   Image,
-  Platform,
 } from "react-native";
 import {
-  KeyboardAvoidingView,
   KeyboardProvider,
+  KeyboardAwareScrollView,
 } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
@@ -303,90 +301,78 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
         onBack={onBack}
       />
 
-      {/* El botón de publicar va DENTRO del KeyboardAvoidingView: antes era
-          `position:absolute` y en iOS el teclado lo tapaba, dejando el reel
-          imposible de publicar sin cerrar el teclado a ciegas.
-          Sin `keyboardVerticalOffset`: el KAV ya empieza bajo el header y llega
-          al fondo. El offset de 90 que había antes era el hueco en blanco que
-          aparecía sobre el teclado. */}
-      <KeyboardAvoidingView
+      {/* KeyboardAwareScrollView sube automáticamente el input enfocado por
+          encima del teclado (la descripción es el último y más bajo elemento).
+          El footer va aparte, al fondo; al escribir queda tras el teclado, pero
+          el input siempre se ve. bottomOffset deja aire sobre el teclado. */}
+      <KeyboardAwareScrollView
         style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        bottomOffset={24}
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          style={styles.flex}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          // "on-drag" funciona en iOS y Android; "interactive" es solo iOS.
-          keyboardDismissMode="on-drag"
-        >
-          <View style={styles.card}>
-            <Text style={styles.label}>Video del Reel</Text>
+        <View style={styles.card}>
+          <Text style={styles.label}>Video del Reel</Text>
 
-            {videoUri ? (
-              /* CLAVE: Usamos 'key={videoUri}'. 
-                 Si el usuario cambia de video, React destruye el componente anterior 
-                 y crea uno nuevo, reiniciando el Player de expo-video sin errores de memoria o pantalla gris.
-              */
-              <VideoPreview
-                key={videoUri}
-                uri={videoUri}
-                thumbnail={thumbnailUri}
-                onRemove={() => setVideoUri("")}
-              />
-            ) : (
-              <TouchableOpacity
-                onPress={handlePickVideo}
-                style={[
-                  styles.uploadPlaceholder,
-                  errors.video && { borderColor: COLORS.error },
-                ]}
-              >
-                <Ionicons
-                  name="videocam"
-                  size={48}
-                  color={COLORS.textTertiary}
-                />
-                <Text style={styles.uploadText}>
-                  Presiona para elegir un video
-                </Text>
-              </TouchableOpacity>
-            )}
-            {errors.video && (
-              <Text style={styles.errorText}>{errors.video}</Text>
-            )}
-          </View>
-
-          <View style={styles.card}>
-            <AppInput
-              label="Descripción"
-              placeholder="Escribe algo sobre tu video..."
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              maxLength={2500}
-              numberOfLines={10}
-              helperText={`${description.length}/2500`}
+          {videoUri ? (
+            /* CLAVE: Usamos 'key={videoUri}'.
+               Si el usuario cambia de video, React destruye el componente anterior
+               y crea uno nuevo, reiniciando el Player de expo-video sin errores de memoria o pantalla gris.
+            */
+            <VideoPreview
+              key={videoUri}
+              uri={videoUri}
+              thumbnail={thumbnailUri}
+              onRemove={() => setVideoUri("")}
             />
-          </View>
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.publishBtn, uploading && { opacity: 0.7 }]}
-            onPress={handlePublish}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <ActivityIndicator color={COLORS.white} />
-            ) : (
-              <Text style={styles.publishText}>
-                {isEditing ? "Guardar Cambios" : "Publicar Ahora"}
+          ) : (
+            <TouchableOpacity
+              onPress={handlePickVideo}
+              style={[
+                styles.uploadPlaceholder,
+                errors.video && { borderColor: COLORS.error },
+              ]}
+            >
+              <Ionicons name="videocam" size={48} color={COLORS.textTertiary} />
+              <Text style={styles.uploadText}>
+                Presiona para elegir un video
               </Text>
-            )}
-          </TouchableOpacity>
+            </TouchableOpacity>
+          )}
+          {errors.video && <Text style={styles.errorText}>{errors.video}</Text>}
         </View>
-      </KeyboardAvoidingView>
+
+        <View style={styles.card}>
+          <AppInput
+            label="Descripción"
+            placeholder="Escribe algo sobre tu video..."
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            maxLength={2500}
+            numberOfLines={6}
+            helperText={`${description.length}/2500`}
+          />
+        </View>
+      </KeyboardAwareScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={[styles.publishBtn, uploading && { opacity: 0.7 }]}
+          onPress={handlePublish}
+          disabled={uploading}
+        >
+          {uploading ? (
+            <ActivityIndicator color={COLORS.white} />
+          ) : (
+            <Text style={styles.publishText}>
+              {isEditing ? "Guardar Cambios" : "Publicar Ahora"}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
 
       {/* Modal de Progreso */}
       <Modal visible={uploading} transparent>
