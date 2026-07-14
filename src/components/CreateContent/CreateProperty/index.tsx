@@ -26,6 +26,7 @@ import { ConfirmationModal } from "../../modals/ConfirmationModal";
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
 import CreatePost from "../CreatePost/CreatePost";
 import type { Post } from "@/types";
 
@@ -177,11 +178,26 @@ export default function CreateProperty({
     [user],
   );
 
-  // Callback de éxito: muestra el bottom sheet con las acciones post-publicación
-  const handlePublishSuccess = useCallback((info: PublishSuccessInfo) => {
-    setPublishedInfo(info);
-    setShowPublishedSheet(true);
-  }, []);
+  const { showToast } = useToast();
+
+  // Callback de éxito. En EDICIÓN NO se apila el PropertyPublishedSheet: es un
+  // <Modal> nativo extra sobre el <Modal> de edición y, al desmontar ambos en
+  // cadena en iOS, quedaba un modal fantasma transparente que congelaba la
+  // pantalla al volver (p. ej. a Mi Perfil). Basta un toast y cerrar: un solo
+  // teardown de modal → sin race. En publicación NUEVA sí se muestra el sheet
+  // (ofrece "Ver propiedad" / "Crear Open House").
+  const handlePublishSuccess = useCallback(
+    (info: PublishSuccessInfo) => {
+      if (info.isUpdate) {
+        showToast("Propiedad actualizada", "success");
+        onBack?.(true);
+        return;
+      }
+      setPublishedInfo(info);
+      setShowPublishedSheet(true);
+    },
+    [onBack, showToast],
+  );
 
   // Navega al feed reemplazando la pantalla de creación en el stack (igual que los
   // posts), para que "atrás" no regrese al formulario "Crear propiedad".
