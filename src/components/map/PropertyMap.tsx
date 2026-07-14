@@ -84,6 +84,12 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   const [clusterOverlayPositions, setClusterOverlayPositions] = useState<{
     [key: string]: { x: number; y: number };
   }>({});
+  // Posición en pantalla del primer vértice del borrador (píxeles). Se usa para
+  // dibujar un botón de cierre de RN encima; ver nota en el JSX del overlay.
+  const [firstVertexScreenPos, setFirstVertexScreenPos] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
   // "hybrid" por defecto (satélite + etiquetas de calles/colonias): en
   // "satellite" puro no había nombres y era difícil orientarse en el mapa.
@@ -261,9 +267,26 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       });
       await Promise.all(clusterPromises);
 
+      // ── Posición del primer vértice del borrador (botón de cierre) ──
+      let firstVertexPos: { x: number; y: number } | null = null;
+      if (
+        drawingMode &&
+        draftPolygonPoints.length >= 3 &&
+        nativeMapRef.current
+      ) {
+        try {
+          const fp = await nativeMapRef.current.pointForCoordinate({
+            latitude: draftPolygonPoints[0].latitude,
+            longitude: draftPolygonPoints[0].longitude,
+          });
+          firstVertexPos = { x: fp.x, y: fp.y };
+        } catch (e) { /* ignore */ }
+      }
+
       requestAnimationFrame(() => {
         setOverlayPositions(newPositions);
         setClusterOverlayPositions(newClusterPositions);
+        setFirstVertexScreenPos(firstVertexPos);
       });
     } finally {
       isCalculatingRef.current = false;
@@ -275,6 +298,13 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       updateOverlayPositions();
     }
   }, [properties.length, mapReady, currentRegion]);
+
+  // Recalcular la posición del primer vértice al añadir/quitar puntos o al
+  // entrar/salir del modo dibujo (esas acciones no disparan onRegionChange).
+  useEffect(() => {
+    if (mapReady) updateOverlayPositions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftPolygonPoints.length, drawingMode, mapReady]);
 
   const formatPrice = (
     price: number,
@@ -790,6 +820,40 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         </View>
       )}
 
+      {/* Botón de cierre del polígono: overlay REAL de RN sobre el primer
+          vértice. En iOS el onPress del Marker nativo exigía doble toque (la
+          anotación de Apple Maps se "selecciona" en el primer toque y solo
+          dispara el onPress en el segundo). Un Pressable de RN por encima del
+          mapa captura el toque de forma fiable al primer intento en ambas
+          plataformas; su posición se calcula con pointForCoordinate. El anillo
+          resaltado indica "toca aquí para cerrar". */}
+      {Platform.OS !== "web" &&
+        drawingMode &&
+        firstVertexScreenPos &&
+        draftPolygonPoints.length >= 3 && (
+          <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+            <Pressable
+              onPress={() => {
+                if (Platform.OS !== "web")
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                onCloseDraftPolygon?.();
+              }}
+              hitSlop={10}
+              style={{
+                position: "absolute",
+                left: firstVertexScreenPos.x - 26,
+                top: firstVertexScreenPos.y - 26,
+                width: 52,
+                height: 52,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <View style={vertexStyles.closeRing} />
+            </Pressable>
+          </View>
+        )}
+
       {properties.length === 0 && (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>No hay propiedades para mostrar</Text>
@@ -1017,6 +1081,15 @@ const vertexStyles = StyleSheet.create({
     height: 44,
     alignItems: "center",
     justifyContent: "center",
+  },
+  // Anillo resaltado del botón de cierre (overlay de RN sobre el primer vértice).
+  closeRing: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: COLORS.primary,
+    backgroundColor: "rgba(69,160,165,0.22)",
   },
   dotInner: {
     width: 6,
