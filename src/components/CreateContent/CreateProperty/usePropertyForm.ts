@@ -242,11 +242,14 @@ type Updater<T> = T | ((prev: T) => T);
 // ============================================
 
 /**
- * Huella del formulario para detectar cambios sin guardar. Se ignoran los
- * `errors`: son estado derivado de la validación, no datos del usuario.
+ * Huella del formulario para detectar cambios sin guardar. Se ignoran:
+ * - `errors`: estado derivado de la validación, no datos del usuario.
+ * - `mapCenter`: valor derivado de la ubicación; un efecto lo re-calcula tras
+ *   cargar la propiedad en edición, lo que marcaba el formulario como "sucio"
+ *   sin que el usuario tocara nada (rompía el botón Atrás al editar).
  */
 function serializeForm(state: PropertyFormState): string {
-  const { errors: _errors, ...fields } = state;
+  const { errors: _errors, mapCenter: _mapCenter, ...fields } = state;
   return JSON.stringify(fields);
 }
 

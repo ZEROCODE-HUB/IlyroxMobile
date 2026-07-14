@@ -18,11 +18,11 @@ import {
 import { KeyboardAvoidingView, KeyboardProvider } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../../constants/colors";
-import { useModal } from "@/context/ModalContext";
 import { ScreenWrapper } from "../../../screens/ScreenWrapper";
 import { AppHeader } from "../../AppHeader";
 import { SelectionModal } from "../../modals";
 import { SaleContractModal } from "../../modals/SaleContractModal";
+import { ConfirmationModal } from "../../modals/ConfirmationModal";
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
@@ -92,7 +92,12 @@ export default function CreateProperty({
   const { user } = useAuth();
   const router = useRouter();
   const form = usePropertyForm(propertyId, onBack);
-  const { showModal } = useModal();
+
+  // Confirmación de descarte: modal LOCAL (no el global de ModalContext). En
+  // edición, CreateProperty vive dentro de un <Modal> nativo; el modal global
+  // se monta en la raíz y en iOS no puede presentarse sobre un modal ya
+  // presentado → quedaba invisible y el botón Atrás parecía no hacer nada.
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
 
   // El formulario vive en estado local: salir de la pantalla lo destruye.
   // Antes se perdía sin avisar, tanto por el botón atrás como por el gesto
@@ -102,15 +107,8 @@ export default function CreateProperty({
       onBack(false);
       return;
     }
-    showModal({
-      title: "Descartar cambios",
-      message:
-        "Perderás la información que has llenado. ¿Seguro que quieres salir?",
-      confirmText: "Descartar",
-      cancelText: "Seguir editando",
-      onConfirm: () => onBack(false),
-    });
-  }, [form, onBack, showModal]);
+    setShowDiscardModal(true);
+  }, [form, onBack]);
 
   // Botón atrás de hardware / gesto de sistema en Android.
   useEffect(() => {
@@ -516,6 +514,24 @@ export default function CreateProperty({
     </ScreenWrapper>
     </KeyboardProvider>
     </PropertyFormProvider>
+
+    {/* CONFIRMACIÓN DE DESCARTE — local, para verse encima del <Modal> de
+        edición en iOS. Al confirmar se cierra primero esta y, en un tick
+        posterior, se ejecuta onBack (que cierra el <Modal> externo): dos
+        transiciones de modal separadas evitan la race/pantalla negra de iOS. */}
+    <ConfirmationModal
+      visible={showDiscardModal}
+      title="Descartar cambios"
+      message="Perderás la información que has llenado. ¿Seguro que quieres salir?"
+      confirmText="Descartar"
+      cancelText="Seguir editando"
+      confirmVariant="danger"
+      onConfirm={() => {
+        setShowDiscardModal(false);
+        setTimeout(() => onBack(false), 250);
+      }}
+      onCancel={() => setShowDiscardModal(false)}
+    />
 
     {/* BOTTOM SHEET DE ÉXITO POST-PUBLICACIÓN */}
     <PropertyPublishedSheet
