@@ -433,7 +433,12 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Ubicación</Text>
-            <MapDetails property={propertyDetails} />
+            {/* Margen negativo: el mapa se extiende un poco hacia los costados
+                (el contenedor de detalle tiene paddingHorizontal: 20). */}
+            <MapDetails
+              property={propertyDetails}
+              containerStyle={{ marginHorizontal: -12 }}
+            />
           </View>
 
           {/* Datos del propietario — privados, solo visibles para el creador */}

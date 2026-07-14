@@ -24,8 +24,10 @@ export const MapDetails: React.FC<PropertyMapProps> = ({
   const lat = property.latitud;
   const lng = property.longitud;
 
-  const [mapTypeId, setMapTypeId] = useState<"standard" | "satellite">(
-    "satellite",
+  // "hybrid" = satélite CON nombres de calles/colonias (mejor para ubicarse que
+  // el satélite puro). Se alterna con "standard" (mapa normal).
+  const [mapTypeId, setMapTypeId] = useState<"standard" | "hybrid">(
+    "hybrid",
   );
   const deferredMapTypeId = useDeferredValue(mapTypeId);
 
@@ -88,7 +90,7 @@ export const MapDetails: React.FC<PropertyMapProps> = ({
         style={styles.mapTypeButton}
         onPress={() =>
           setMapTypeId(
-            mapTypeId === "standard" ? "satellite" : "standard",
+            mapTypeId === "standard" ? "hybrid" : "standard",
           )
         }
       >
