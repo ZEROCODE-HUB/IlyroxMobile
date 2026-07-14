@@ -43,6 +43,9 @@ interface PropertyDetailProps {
   onContact?: (ownerId: string, propertyId: string) => void;
   onRefresh?: () => void;
   sinDatos?: boolean;
+  /** Cerrar la pantalla cuando se abre dentro de un <Modal> (Perfil, Matches):
+      ahí `router.back()` no cierra el modal. Si no se pasa, cae a router.back(). */
+  onClose?: () => void;
 }
 
 
@@ -51,7 +54,9 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   onContact,
   onRefresh,
   sinDatos,
+  onClose,
 }) => {
+  const handleClose = onClose ?? (() => router.back());
   const { user } = useAuth();
   const { currentUser } = useApp();
   const { propertyDetails, loading, refetch } = usePropertyDetails(
@@ -113,7 +118,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
       <View style={styles.errorContainer}>
         <Text>No se encontró la propiedad</Text>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={handleClose}
           style={styles.backButton}
         >
           <Text style={styles.backButtonText}>Regresar</Text>
@@ -173,7 +178,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           images={images}
           currentImageIndex={currentImageIndex}
           onImageIndexChange={setCurrentImageIndex}
-          onBack={() => router.back()}
+          onBack={handleClose}
           feedItemId={propertyDetails.feed_items.id}
           feedItemLikes={propertyDetails.feed_items.likes_count || 0}
           feedItemComments={propertyDetails.feed_items.comentarios_count || 0}

@@ -647,9 +647,14 @@ const Matches: React.FC = () => {
 
       {/* Modal de detalle de propiedad */}
       {selectedPropertyId && (
-        <Modal visible={!!selectedPropertyId} animationType="slide">
+        <Modal
+          visible={!!selectedPropertyId}
+          animationType="slide"
+          onRequestClose={() => setSelectedPropertyId(null)}
+        >
           <PropertyDetail
             propertyId={selectedPropertyId}
+            onClose={() => setSelectedPropertyId(null)}
           />
         </Modal>
       )}
