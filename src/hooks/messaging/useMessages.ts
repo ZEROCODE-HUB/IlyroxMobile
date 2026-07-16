@@ -14,7 +14,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/utils/logger";
 import { RealtimeChannel } from "@supabase/supabase-js";
-import { Platform } from "react-native";
+import { Image as RNImage, Platform } from "react-native";
+import * as ImageManipulator from "expo-image-manipulator";
+
+/** Ancho máximo de una foto enviada por chat. Ver `compressImage`. */
+const MAX_IMAGE_WIDTH = 1600;
 
 const log = logger.scoped("useMessages");
 import { useModal } from "@/context/ModalContext";
@@ -107,6 +111,44 @@ export function useMessages(conversationId: string | null, userId?: string) {
   };
 
   /**
+   * Comprimir una foto antes de subirla al chat.
+   *
+   * La cámara del teléfono entrega originales de 2-4 MB (y en iPhone, HEIC, que
+   * Android ni siquiera sabe pintar). A ese peso la burbuja tardaba una eternidad
+   * o se quedaba en gris para siempre. 1600px de ancho con calidad 0.7 deja
+   * ~200-400 KB y salida JPEG garantizada.
+   *
+   * Solo aplica a fotos: los videos van por la misma carpeta `images` y el
+   * manipulador no los toca. Si la compresión falla, se sube el original.
+   */
+  const compressImage = async (fileUri: string): Promise<string> => {
+    if (/\.(mp4|mov|avi|mkv|m4v|webm)(\?|#|$)/i.test(fileUri)) return fileUri;
+
+    try {
+      // Solo se reescala si excede el ancho objetivo; sin esto, `resize` también
+      // AMPLÍA las imágenes pequeñas y acaban pesando más que el original.
+      const width = await new Promise<number>((resolve) =>
+        RNImage.getSize(
+          fileUri,
+          (w) => resolve(w),
+          () => resolve(0),
+        ),
+      );
+      const actions =
+        width > MAX_IMAGE_WIDTH ? [{ resize: { width: MAX_IMAGE_WIDTH } }] : [];
+
+      const result = await ImageManipulator.manipulateAsync(fileUri, actions, {
+        compress: 0.7,
+        format: ImageManipulator.SaveFormat.JPEG,
+      });
+      return result.uri;
+    } catch (err) {
+      log.warn("No se pudo comprimir la imagen, se sube el original:", err);
+      return fileUri;
+    }
+  };
+
+  /**
    * Subir archivo a Supabase Storage
    */
   const uploadFile = async (
@@ -117,6 +159,10 @@ export function useMessages(conversationId: string | null, userId?: string) {
       let fileContent: string | Blob | ArrayBuffer;
       let contentType: string | undefined;
       let uploadPath: string;
+
+      if (folder === "images") {
+        fileUri = await compressImage(fileUri);
+      }
 
       if (Platform.OS === "web") {
         const response = await fetch(fileUri);
