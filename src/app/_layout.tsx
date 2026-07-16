@@ -13,9 +13,12 @@ import {
   focusManager,
 } from "@tanstack/react-query";
 import { OneSignal } from "react-native-onesignal";
+// TEMPORAL: diagnóstico del arranque por notificación (ver utils/pushDebug.ts).
+import { plog } from "@/utils/pushDebug";
+import { PushDebugOverlay } from "@/components/shared/PushDebugOverlay";
 import { useFonts } from "expo-font";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Platform,
   StatusBar,
@@ -128,9 +131,11 @@ const notificationClickListeners = new Set<(data: any) => void>();
 /** Entrega el toque a quien escuche; si aún no hay nadie, lo guarda. */
 function emitNotificationClick(data: any) {
   if (notificationClickListeners.size === 0) {
+    plog("  -> nadie escuchaba todavía: guardado como pendiente");
     pendingNotificationData = data;
     return;
   }
+  plog("  -> entregado a la app (ya estaba montada)");
   notificationClickListeners.forEach((fn) => fn(data));
 }
 
@@ -145,8 +150,10 @@ function takePendingNotificationClick() {
 if (Platform.OS !== "web") {
   OneSignal.initialize(process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID!);
   OneSignal.Notifications.requestPermission(true);
+  plog("OneSignal inicializado, listener 'click' registrado");
   OneSignal.Notifications.addEventListener("click", (event: any) => {
     const data = event?.notification?.additionalData;
+    plog("EVENTO click recibido. additionalData =", data ?? "(vacío)");
     if (data) emitNotificationClick(data);
   });
 }
@@ -211,6 +218,9 @@ function RootLayoutNav() {
 
   // Toque en una push pendiente de navegar.
   const [notificationClick, setNotificationClick] = useState<any>(null);
+  // Ruta actual siempre fresca, para la traza diferida (TEMPORAL, ver pushDebug).
+  const segmentsRef = useRef<string[]>([]);
+  segmentsRef.current = segments as string[];
 
   // Precarga las fuentes de íconos (Ionicons + MaterialCommunityIcons) antes de
   // renderizar la app. Evita que íconos como el de "Agrícola" (tractor, de
@@ -245,6 +255,11 @@ function RootLayoutNav() {
     const onClick = (data: any) => setNotificationClick(data);
     notificationClickListeners.add(onClick);
     const pending = takePendingNotificationClick();
+    plog(
+      pending
+        ? "RootLayout montado: recoge el click pendiente"
+        : "RootLayout montado: no había click pendiente",
+    );
     if (pending) setNotificationClick(pending);
     return () => {
       notificationClickListeners.delete(onClick);
@@ -303,13 +318,27 @@ function RootLayoutNav() {
       !!profile &&
       !!rootNavigationState?.key &&
       segments[0] !== "(auth)";
+
+    plog(
+      `¿listo para navegar? ${ready ? "SÍ" : "NO"} ·` +
+        ` loading=${loading} sesión=${!!session} perfil=${!!profile}` +
+        ` navKey=${!!rootNavigationState?.key} ruta=[${segments.join("/")}]`,
+    );
     if (!ready) return;
 
     const go = buildNotificationNavigation(notificationClick, router);
+    plog(
+      `destino decidido: ${go ? "hay ruta" : "NINGUNA"} para screen=${notificationClick?.screen}`,
+    );
     setNotificationClick(null);
     if (!go) return;
 
-    const timer = setTimeout(go, 300);
+    const timer = setTimeout(() => {
+      plog("ejecutando navegación…");
+      go();
+      // Dónde acabamos de verdad: si algo pisa la navegación, se ve aquí.
+      setTimeout(() => plog("ruta 1,5s después =", segmentsRef.current), 1500);
+    }, 300);
     return () => clearTimeout(timer);
   }, [
     notificationClick,
@@ -371,6 +400,9 @@ function RootLayoutNav() {
           storeUrl={versionInfo.store_url}
         />
       )}
+      {/* TEMPORAL: diagnóstico del arranque por notificación. Quitar junto con
+          utils/pushDebug.ts cuando el bug esté resuelto. */}
+      <PushDebugOverlay />
     </>
   );
 }
