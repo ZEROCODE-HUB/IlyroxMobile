@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import { GoogleCalendarIcon } from "./shared/GoogleCalendarIcon";
 import { COLORS } from "../constants/colors";
 
 type AppointmentStatus = "pending" | "completed" | "cancelled" | "rated";
@@ -180,10 +181,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
                           Linking.openURL(url);
                         }}
                       >
-                        <Image
-                          source={require("../assets/google-calendar-svg.svg")}
-                          style={{ width: 16, height: 16 }}
-                        />
+                        <GoogleCalendarIcon size={16} />
                         <Text style={styles.calendarBtnText}>
                           Agregar a calendario
                         </Text>
