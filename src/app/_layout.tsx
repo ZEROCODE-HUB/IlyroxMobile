@@ -13,12 +13,9 @@ import {
   focusManager,
 } from "@tanstack/react-query";
 import { OneSignal } from "react-native-onesignal";
-// TEMPORAL: diagnóstico del arranque por notificación (ver utils/pushDebug.ts).
-import { plog } from "@/utils/pushDebug";
-import { PushDebugOverlay } from "@/components/shared/PushDebugOverlay";
 import { useFonts } from "expo-font";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Platform,
   StatusBar,
@@ -131,11 +128,9 @@ const notificationClickListeners = new Set<(data: any) => void>();
 /** Entrega el toque a quien escuche; si aún no hay nadie, lo guarda. */
 function emitNotificationClick(data: any) {
   if (notificationClickListeners.size === 0) {
-    plog("  -> nadie escuchaba todavía: guardado como pendiente");
     pendingNotificationData = data;
     return;
   }
-  plog("  -> entregado a la app (ya estaba montada)");
   notificationClickListeners.forEach((fn) => fn(data));
 }
 
@@ -150,10 +145,8 @@ function takePendingNotificationClick() {
 if (Platform.OS !== "web") {
   OneSignal.initialize(process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID!);
   OneSignal.Notifications.requestPermission(true);
-  plog("OneSignal inicializado, listener 'click' registrado");
   OneSignal.Notifications.addEventListener("click", (event: any) => {
     const data = event?.notification?.additionalData;
-    plog("EVENTO click recibido. additionalData =", data ?? "(vacío)");
     if (data) emitNotificationClick(data);
   });
 }
@@ -218,9 +211,6 @@ function RootLayoutNav() {
 
   // Toque en una push pendiente de navegar.
   const [notificationClick, setNotificationClick] = useState<any>(null);
-  // Ruta actual siempre fresca, para la traza diferida (TEMPORAL, ver pushDebug).
-  const segmentsRef = useRef<string[]>([]);
-  segmentsRef.current = segments as string[];
 
   // Precarga las fuentes de íconos (Ionicons + MaterialCommunityIcons) antes de
   // renderizar la app. Evita que íconos como el de "Agrícola" (tractor, de
@@ -255,11 +245,6 @@ function RootLayoutNav() {
     const onClick = (data: any) => setNotificationClick(data);
     notificationClickListeners.add(onClick);
     const pending = takePendingNotificationClick();
-    plog(
-      pending
-        ? "RootLayout montado: recoge el click pendiente"
-        : "RootLayout montado: no había click pendiente",
-    );
     if (pending) setNotificationClick(pending);
     return () => {
       notificationClickListeners.delete(onClick);
@@ -295,17 +280,17 @@ function RootLayoutNav() {
   /**
    * Ejecuta la navegación de una push tocada antes de que la app pudiera navegar.
    *
-   * Abrir desde una push con la app cerrada tiene tres trampas, y hay que
-   * esperar a las tres o el usuario acaba en el feed en vez del chat:
+   * Medido en dispositivo con la app cerrada: el click llega a los ~35 ms, este
+   * componente lo recoge a los ~64 ms y `perfil` no está hasta los ~525 ms. Por
+   * eso hay que esperar en vez de navegar de golpe:
    *
-   * 1. `rootNavigationState.key`: hasta que existe, el navegador raíz no está
-   *    montado y `router.push` se descarta EN SILENCIO. Es la trampa principal:
-   *    el Stack se monta en el mismo commit en que `loading` pasa a false, así
-   *    que navegar en ese efecto llega demasiado pronto y se pierde.
-   * 2. Salir de `(auth)`: si la sesión tarda, la app pasa por /login y el efecto
-   *    de sesión de arriba hace `router.replace("/(tabs)")`, que nos pisaría.
-   * 3. El tick final: el `replace` del guard se procesa en el frame siguiente,
-   *    así que la navegación se encola detrás de él.
+   * - `loading`/`session`/`profile`: mientras cargan, el árbol devuelve
+   *   <InitialLoading/> y el <Stack> ni siquiera está montado.
+   * - `rootNavigationState.key`: sin navegador raíz montado, `router.push` se
+   *   descarta EN SILENCIO (no lanza, no avisa).
+   * - `segments[0] !== "(auth)"`: si la sesión tarda, la app pasa por /login y
+   *   el efecto de sesión de arriba hace `router.replace("/(tabs)")`, que nos
+   *   pisaría. Esperando a salir de (auth), ese replace ya ocurrió.
    */
   const rootNavigationState = useRootNavigationState();
 
@@ -318,18 +303,9 @@ function RootLayoutNav() {
       !!profile &&
       !!rootNavigationState?.key &&
       segments[0] !== "(auth)";
-
-    plog(
-      `¿listo para navegar? ${ready ? "SÍ" : "NO"} ·` +
-        ` loading=${loading} sesión=${!!session} perfil=${!!profile}` +
-        ` navKey=${!!rootNavigationState?.key} ruta=[${segments.join("/")}]`,
-    );
     if (!ready) return;
 
     const go = buildNotificationNavigation(notificationClick, router);
-    plog(
-      `destino decidido: ${go ? "hay ruta" : "NINGUNA"} para screen=${notificationClick?.screen}`,
-    );
     setNotificationClick(null);
     if (!go) return;
 
@@ -338,12 +314,7 @@ function RootLayoutNav() {
     // efecto, y un `return () => clearTimeout(timer)` mataba la navegación
     // antes de que llegara a ejecutarse. Ya no hace falta cancelarlo: el click
     // se consume justo arriba, así que solo se programa una vez.
-    setTimeout(() => {
-      plog("ejecutando navegación…");
-      go();
-      // Dónde acabamos de verdad: si algo pisa la navegación, se ve aquí.
-      setTimeout(() => plog("ruta 1,5s después =", segmentsRef.current), 1500);
-    }, 300);
+    setTimeout(go, 300);
   }, [
     notificationClick,
     loading,
@@ -404,9 +375,6 @@ function RootLayoutNav() {
           storeUrl={versionInfo.store_url}
         />
       )}
-      {/* TEMPORAL: diagnóstico del arranque por notificación. Quitar junto con
-          utils/pushDebug.ts cuando el bug esté resuelto. */}
-      <PushDebugOverlay />
     </>
   );
 }
