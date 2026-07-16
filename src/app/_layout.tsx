@@ -10,7 +10,7 @@ import {
 import { OneSignal } from "react-native-onesignal";
 import { useFonts } from "expo-font";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   Platform,
   StatusBar,
@@ -39,6 +39,70 @@ LogBox.ignoreLogs([
   "TNodeChildrenRenderer",
   "TRenderEngineProvider",
 ]);
+
+/**
+ * Decide a dónde navegar cuando el usuario toca una notificación push.
+ * Devuelve la navegación a ejecutar, o null si no hay destino conocido.
+ *
+ * El destino se decide por `screen`, que es lo que realmente manda el servidor:
+ * la Edge Function `enviar_notificacion_push` arma el payload como
+ * `{ screen, type: additionalData.type ?? "notification", ...additionalData }`.
+ *
+ * Antes esto se decidía por `type` con valores en inglés ("new_message",
+ * "new_match"…) que el backend NUNCA envía: en los mensajes `type` ni siquiera
+ * existe (la función lo rellena con "notification") y en los matches viene en
+ * español ("nuevo_match"). Además se navegaba a /(stack)/chat/[id] y
+ * /(stack)/profile/[id], rutas que no existen. Resultado: ningún toque navegaba
+ * y la app solo se traía al frente en la pantalla anterior.
+ *
+ * Las claves de los ids también son en español: conversacion_id, emisor_id,
+ * propiedad_id, profesional_id.
+ */
+function buildNotificationNavigation(
+  data: any,
+  router: ReturnType<typeof useRouter>,
+): (() => void) | null {
+  if (!data) return null;
+
+  switch (data.screen) {
+    case "ChatDetail":
+      // Se pasa el emisor (no la conversación): MessagingScreen resuelve con él
+      // la conversación de esa propiedad y los datos del otro usuario (nombre y
+      // foto del encabezado). Con solo conversationId se queda en la lista.
+      if (!data.emisor_id) return () => router.push("/(stack)/messages");
+      return () =>
+        router.push({
+          pathname: "/(stack)/messages",
+          params: {
+            initialUser: JSON.stringify({ id: data.emisor_id }),
+            initialPropertyId: data.propiedad_id ?? "",
+          },
+        });
+
+    case "matches":
+    case "MatchDetail":
+      return () => router.push("/(stack)/matches");
+
+    case "AppointmentDetail":
+      return () => router.push("/(stack)/appointments");
+
+    case "PropertyDetail":
+      if (!data.propiedad_id) return null;
+      return () =>
+        router.push({
+          pathname: "/(stack)/property/[id]",
+          params: { id: data.propiedad_id },
+        });
+
+    case "ProfileReviews":
+      // La reseña es sobre uno mismo → perfil propio.
+      return () => router.push("/(tabs)/profile");
+
+    default:
+      if (data.type === "recordar_filtros") return () => router.push("/(stack)/map");
+      return null;
+  }
+}
 
 // OneSignal init
 if (Platform.OS !== "web") {
@@ -104,6 +168,10 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
 
+  // Navegación pendiente de una push tocada antes de que la app estuviera lista.
+  const pendingNavRef = useRef<(() => void) | null>(null);
+  const navReadyRef = useRef(false);
+
   // Precarga las fuentes de íconos (Ionicons + MaterialCommunityIcons) antes de
   // renderizar la app. Evita que íconos como el de "Agrícola" (tractor, de
   // MaterialCommunityIcons) parpadeen o no aparezcan al cargar su fuente bajo
@@ -134,32 +202,32 @@ function RootLayoutNav() {
   useEffect(() => {
     if (Platform.OS === "web") return;
     const handleNotificationClick = (event: any) => {
-      const data = event?.notification?.additionalData;
-      if (!data?.type) return;
-      if (data.type === "new_match") {
-        router.push("/(stack)/matches");
-      } else if (data.type === "recordar_filtros") {
-        router.push("/(stack)/map");
-      } else if (
-        (data.type === "new_recommendation" ||
-          data.type === "new_rating" ||
-          data.type === "new_follower") &&
-        data.sender_id
-      ) {
-        router.push({
-          pathname: "/(stack)/profile/[id]",
-          params: { id: data.sender_id },
-        });
-      } else if (data.type === "new_message" && data.conversation_id) {
-        router.push({
-          pathname: "/(stack)/chat/[id]",
-          params: { id: data.conversation_id },
-        });
+      const go = buildNotificationNavigation(
+        event?.notification?.additionalData,
+        router,
+      );
+      if (!go) return;
+      // En arranque en frío el Stack todavía no está montado (se muestra
+      // InitialLoading): navegar ahí se pierde. Se guarda y se ejecuta en cuanto
+      // la app esté lista (ver efecto de abajo).
+      if (!navReadyRef.current) {
+        pendingNavRef.current = go;
+        return;
       }
+      go();
     };
     OneSignal.Notifications.addEventListener("click", handleNotificationClick);
     return () => OneSignal.Notifications.removeEventListener("click", handleNotificationClick);
   }, [router]);
+
+  // Ejecuta la navegación de una push que llegó antes de que la app estuviera lista.
+  useEffect(() => {
+    navReadyRef.current = !loading && !!session && !!profile;
+    if (!navReadyRef.current || !pendingNavRef.current) return;
+    const go = pendingNavRef.current;
+    pendingNavRef.current = null;
+    go();
+  }, [loading, session, profile]);
 
   // Global StatusBar setup
   useEffect(() => {
