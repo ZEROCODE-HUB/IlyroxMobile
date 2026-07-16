@@ -328,6 +328,19 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                   </View>
                 </View>
               )}
+              {campos.mediosBanos && propertyDetails.medios_banos > 0 && (
+                <View style={styles.statItem}>
+                  <View style={styles.statIconContainer}>
+                    <Toilet size={16} color={COLORS.textSecondary} />
+                  </View>
+                  <View style={styles.statTextContainer}>
+                    <Text style={styles.statValue}>
+                      {propertyDetails.medios_banos}
+                    </Text>
+                    <Text style={styles.statLabel}>Medios baños</Text>
+                  </View>
+                </View>
+              )}
               {campos.estacionamientos &&
                 propertyDetails.estacionamientos > 0 && (
                   <StatItem
