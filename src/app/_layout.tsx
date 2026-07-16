@@ -1,4 +1,9 @@
-import { Stack, useRouter, useSegments } from "expo-router";
+import {
+  Stack,
+  useRootNavigationState,
+  useRouter,
+  useSegments,
+} from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
@@ -249,21 +254,34 @@ function RootLayoutNav() {
   /**
    * Ejecuta la navegación de una push tocada antes de que la app pudiera navegar.
    *
-   * Va DESPUÉS del efecto de sesión de arriba y exige estar ya fuera de `(auth)`.
-   * Al abrir desde una push con la app cerrada, la sesión tarda un instante: la
-   * app pasa por /login y, en cuanto la sesión llega, ese efecto hace
-   * `router.replace("/(tabs)")`. Si navegamos antes, ese replace nos pisa y el
-   * usuario acaba en el feed en vez del chat. Esperando a salir de `(auth)` el
-   * replace ya ocurrió y nuestra navegación queda encima.
+   * Abrir desde una push con la app cerrada tiene tres trampas, y hay que
+   * esperar a las tres o el usuario acaba en el feed en vez del chat:
+   *
+   * 1. `rootNavigationState.key`: hasta que existe, el navegador raíz no está
+   *    montado y `router.push` se descarta EN SILENCIO. Es la trampa principal:
+   *    el Stack se monta en el mismo commit en que `loading` pasa a false, así
+   *    que navegar en ese efecto llega demasiado pronto y se pierde.
+   * 2. Salir de `(auth)`: si la sesión tarda, la app pasa por /login y el efecto
+   *    de sesión de arriba hace `router.replace("/(tabs)")`, que nos pisaría.
+   * 3. El tick final: el `replace` del guard se procesa en el frame siguiente,
+   *    así que la navegación se encola detrás de él.
    */
+  const rootNavigationState = useRootNavigationState();
+
   useEffect(() => {
     navReadyRef.current =
-      !loading && !!session && !!profile && segments[0] !== "(auth)";
+      !loading &&
+      !!session &&
+      !!profile &&
+      !!rootNavigationState?.key &&
+      segments[0] !== "(auth)";
+
     if (!navReadyRef.current || !pendingNavRef.current) return;
     const go = pendingNavRef.current;
     pendingNavRef.current = null;
-    go();
-  }, [loading, session, profile, segments]);
+    const timer = setTimeout(go, 300);
+    return () => clearTimeout(timer);
+  }, [loading, session, profile, segments, rootNavigationState?.key]);
 
   if (loading) {
     return <InitialLoading />;
