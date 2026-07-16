@@ -15,7 +15,6 @@ import {
   ReportModal,
   Avatar,
   RichText,
-  ExpandableText,
 } from "../shared";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
@@ -168,9 +167,7 @@ const PostCard: React.FC<PostCardProps> = ({
                 </View>
               ))}
             </View>
-            <Text style={styles.recommendedText} numberOfLines={1}>
-              {recommendedText}
-            </Text>
+            <Text style={styles.recommendedText}>{recommendedText}</Text>
           </TouchableOpacity>
         )}
 
@@ -189,29 +186,18 @@ const PostCard: React.FC<PostCardProps> = ({
                   item.postType === "busqueda" && commonStyles.cardDetail,
                 ]}
               >
-                {isShortContent ? (
-                  // Post corto (fuente grande): se muestra completo, sin recorte.
-                  <RichText
-                    style={[
-                      styles.textPostLarge,
-                      item.postType === "busqueda" && commonStyles.textDetail,
-                    ]}
-                    content={item.content}
-                  />
-                ) : (
-                  // Post largo: recorta a 2 líneas con "ver más". labelTogglesOnly
-                  // deja que tocar el texto abra el post y solo "ver más" expanda.
-                  <ExpandableText
-                    richContent
-                    labelTogglesOnly
-                    maxLines={2}
-                    text={item.content}
-                    style={[
-                      styles.textPostNormal,
-                      item.postType === "busqueda" && commonStyles.textDetail,
-                    ]}
-                  />
-                )}
+                {/* La descripción se muestra COMPLETA, corta o larga: antes el
+                    post largo se recortaba a 2 líneas con "ver más" y las frases
+                    quedaban a medias. Solo cambia el tamaño de fuente. */}
+                <RichText
+                  style={[
+                    isShortContent
+                      ? styles.textPostLarge
+                      : styles.textPostNormal,
+                    item.postType === "busqueda" && commonStyles.textDetail,
+                  ]}
+                  content={item.content}
+                />
               </View>
             </TouchableOpacity>
           ) : (
@@ -277,12 +263,13 @@ const PostCard: React.FC<PostCardProps> = ({
       </View>
       {hasImages && (
         <View style={styles.captionContainer}>
-          <ExpandableText
-            text={item.content}
-            userName={item.user.nombre || item.user.name}
-            maxLines={2}
-            style={styles.captionText}
-          />
+          {/* Pie completo, sin recorte ni "ver más". */}
+          <Text style={styles.captionText}>
+            <Text style={styles.captionUser}>
+              {item.user.nombre || item.user.name}{" "}
+            </Text>
+            {item.content}
+          </Text>
         </View>
       )}
       {item.postType === "busqueda" && item.postDetails?.busquedas_json ? (

@@ -165,7 +165,7 @@ const UserHeader: React.FC<UserHeaderProps> = ({
                   </View>
                 ))}
               </View>
-              <Text style={styles.recommendedText} numberOfLines={1}>
+              <Text style={styles.recommendedText}>
                 {recommendedText}
               </Text>
             </TouchableOpacity>

@@ -71,9 +71,7 @@ export const OwnerRecommendations: React.FC<OwnerRecommendationsProps> = ({
             </View>
           ))}
         </View>
-        <Text style={styles.text} numberOfLines={1}>
-          {text}
-        </Text>
+        <Text style={styles.text}>{text}</Text>
       </TouchableOpacity>
 
       <Modal

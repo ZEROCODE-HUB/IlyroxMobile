@@ -15,7 +15,7 @@ import { FeedItem, User } from "../../types";
 import { useFeedInteractions, useViewTracking } from "@/hooks";
 import { DIMENSIONS, COLORS } from "../../constants";
 import { commonStyles } from "../../../styles";
-import { UserHeader, VideoPlayer, Avatar, ExpandableText } from "../shared";
+import { UserHeader, VideoPlayer, Avatar } from "../shared";
 import ActionButtons from "../ActionButtons";
 // import { supabase } from "../../lib/supabase";
 import { useUserRecommendations } from "@/hooks/useUserRecommendations";
@@ -103,7 +103,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
               </View>
             ))}
           </View>
-          <Text style={styles.recommendedText} numberOfLines={1}>
+          <Text style={styles.recommendedText}>
             {recommendedText}
           </Text>
         </Pressable>
@@ -167,12 +167,13 @@ const ReelCard: React.FC<ReelCardProps> = ({
       {/* Descripción del reel - Estilo Instagram */}
       {item.content && (
         <View style={styles.captionContainer}>
-          <ExpandableText
-            text={item.content}
-            userName={item.user.nombre || item.user.name}
-            maxLines={2}
-            style={styles.captionText}
-          />
+          {/* Pie completo, sin recorte ni "ver más". */}
+          <Text style={styles.captionText}>
+            <Text style={styles.captionUser}>
+              {item.user.nombre || item.user.name}{" "}
+            </Text>
+            {item.content}
+          </Text>
         </View>
       )}
       <RecommendedUsersModal

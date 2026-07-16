@@ -337,7 +337,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               </View>
             ))}
           </View>
-          <Text style={styles.recommendedText} numberOfLines={1}>
+          <Text style={styles.recommendedText}>
             {recommendedText}
           </Text>
         </TouchableOpacity>
@@ -441,9 +441,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           <View style={styles.descriptionRow}>
             <View style={styles.textContainer}>
               {item.content ? (
-                <Text style={commonStyles.description} numberOfLines={2}>
-                  {item.content}
-                </Text>
+                <Text style={commonStyles.description}>{item.content}</Text>
               ) : null}
             </View>
 

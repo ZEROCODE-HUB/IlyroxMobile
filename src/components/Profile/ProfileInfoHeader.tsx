@@ -2,7 +2,6 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/colors";
-import { ExpandableText } from "../shared";
 import { ProfileHeader } from "./ProfileHeader";
 import ProfileAvatarPicker from "./ProfileAvatarPicker";
 import ProfileTabs from "./ProfileTabs";
@@ -110,12 +109,10 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = ({
 
           <View style={styles.infoRight}>
             <Text style={styles.name}>{profileData.name}</Text>
+            {/* Descripción completa, sin recorte ni "ver más": es una sola por
+                pantalla y el asesor necesita que se lea entera. */}
             {profileData.biography && (
-              <ExpandableText
-                text={profileData.biography}
-                maxLines={2}
-                style={styles.biography}
-              />
+              <Text style={styles.biography}>{profileData.biography}</Text>
             )}
             {profileData.role && (
               <View style={styles.roleBadge}>
