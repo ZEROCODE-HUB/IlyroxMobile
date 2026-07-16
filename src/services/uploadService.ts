@@ -2,8 +2,7 @@ import { logger } from "@/utils/logger";
 
 const log = logger.scoped("uploadService");
 
-const VIDEO_API_URL =
-  "https://celebrated-celebration-production.up.railway.app";
+const VIDEO_API_URL = "https://video.109.205.178.162.sslip.io";
 
 export async function uploadImage(
   uri: string,
