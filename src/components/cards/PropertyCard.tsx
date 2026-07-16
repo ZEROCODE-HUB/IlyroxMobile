@@ -34,6 +34,7 @@ const log = logger.scoped("PropertyCard");
 import { Toilet, Building2, MoveVertical } from "lucide-react-native";
 import { useUserRecommendations } from "@/hooks/useUserRecommendations";
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
+import { buildRecommendedText } from "./recommendedText";
 import { useChatInitiator } from "@/hooks/messaging/useChatInitiator";
 import { MapModal } from "../shared/MapModal";
 import { LinearGradient } from "expo-linear-gradient";
@@ -227,15 +228,9 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
   const positiveRecommendations = item.user.positiveRecommendations ?? 0;
   const recommendedByPreview = item.user.recommendedByPreview ?? [];
-  const firstRecommender = recommendedByPreview[0];
-  const recommendedText =
-    positiveRecommendations > 0 && firstRecommender
-      ? `${firstRecommender.name}${
-          positiveRecommendations > 1
-            ? ` y ${positiveRecommendations - 1} más`
-            : ""
-        }`
-      : `Recomendado por ${positiveRecommendations} usuarios`;
+  // Mismo texto que PostCard/ReelCard ("X recomienda a este {ocupacion}"). Antes
+  // esta tarjeta lo armaba aparte y solo mostraba los nombres, sin la frase.
+  const recommendedText = buildRecommendedText(item.user);
   const [showRecommendedModal, setShowRecommendedModal] = React.useState(false);
 
   const { recommendedList, loadingRecommended, fetchRecommendations } =

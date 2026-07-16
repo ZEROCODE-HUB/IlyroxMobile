@@ -14,6 +14,7 @@ import { COLORS } from "../constants/colors";
 import { formatDateShort, formatTime } from "../utils/dateFormatter";
 import { EmptyState } from "@/design-system/components";
 import { supabase } from "../lib/supabase";
+import { buildRecommendedText } from "./cards/recommendedText";
 
 interface UserHeaderProps {
   user: User;
@@ -46,15 +47,9 @@ const UserHeader: React.FC<UserHeaderProps> = ({
   const displayCount = ratingsCount;
   const positiveRecommendations = user.positiveRecommendations ?? 0;
   const recommendedByPreview = user.recommendedByPreview ?? [];
-  const firstRecommender = recommendedByPreview[0];
-  const recommendedText =
-    positiveRecommendations > 0 && firstRecommender
-      ? `${firstRecommender.name}${
-          positiveRecommendations > 1
-            ? ` y ${positiveRecommendations - 1} más`
-            : ""
-        }`
-      : `Recomendado por ${positiveRecommendations} usuarios`;
+  // Mismo texto que las tarjetas del feed ("X recomienda a este {ocupacion}").
+  // Antes se armaba aparte y solo salían los nombres, sin la frase.
+  const recommendedText = buildRecommendedText(user);
   const [showRecommendedModal, setShowRecommendedModal] = React.useState(false);
   const [recommendedList, setRecommendedList] = React.useState<
     {
