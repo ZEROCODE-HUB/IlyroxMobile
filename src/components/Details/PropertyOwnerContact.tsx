@@ -23,6 +23,9 @@ export interface PropertyOwnerContactProps {
   onContactExternal?: (ownerId: string, propertyId: string) => void;
   onContactInternal: (profile: any) => void;
   onEditProperty: () => void;
+  /** Ejecuta una navegación cerrando antes el <Modal> contenedor, si lo hay.
+      Ver `navigateAway` en PropertyDetail. Sin él se navega directo. */
+  onNavigateAway?: (go: () => void) => void;
 }
 
 export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
@@ -34,8 +37,10 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
   onContactExternal,
   onContactInternal,
   onEditProperty,
+  onNavigateAway,
 }) => {
   const { showModal } = useModal();
+  const navigate = onNavigateAway ?? ((go: () => void) => go());
 
   if (sinDatos || !profile) return null;
 
@@ -51,10 +56,12 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
 
   const handleProfilePress = () => {
     if (!profile?.id) return;
-    router.push({
-      pathname: "/(stack)/user/[id]",
-      params: { id: profile.id },
-    });
+    navigate(() =>
+      router.push({
+        pathname: "/(stack)/user/[id]",
+        params: { id: profile.id },
+      }),
+    );
   };
 
   const handleCall = () => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -57,6 +57,25 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   onClose,
 }) => {
   const handleClose = onClose ?? (() => router.back());
+
+  /**
+   * Navegar a otra pantalla desde aquí. Cuando el detalle se abre dentro de un
+   * <Modal> (Perfil, Matches), `router.push` empuja la ruta DETRÁS del modal:
+   * la navegación ocurre pero no se ve nada y el botón parece muerto. Por eso
+   * primero se cierra el modal y se navega cuando la transición terminó.
+   * Como ruta normal (sin `onClose`) se navega directo.
+   */
+  const navigateAway = useCallback(
+    (go: () => void) => {
+      if (!onClose) {
+        go();
+        return;
+      }
+      onClose();
+      setTimeout(go, 350);
+    },
+    [onClose],
+  );
   const { user } = useAuth();
   const { currentUser } = useApp();
   const { propertyDetails, loading, refetch } = usePropertyDetails(
@@ -462,13 +481,16 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
             sinDatos={sinDatos}
             loadingEdit={loadingEdit}
             onContactExternal={onContact}
+            onNavigateAway={navigateAway}
             onContactInternal={(p) =>
-              handleContact(p.id, propertyDetails.id, {
-                id: p.id,
-                nombre: p.nombre,
-                foto: p.foto,
-                apellido_paterno: p.apellido_paterno || "",
-              })
+              navigateAway(() =>
+                handleContact(p.id, propertyDetails.id, {
+                  id: p.id,
+                  nombre: p.nombre,
+                  foto: p.foto,
+                  apellido_paterno: p.apellido_paterno || "",
+                }),
+              )
             }
             onEditProperty={() => {
               setLoadingEdit(true);
