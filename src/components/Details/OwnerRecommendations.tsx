@@ -112,8 +112,11 @@ export const OwnerRecommendations: React.FC<OwnerRecommendationsProps> = ({
                       <Text style={styles.modalName} numberOfLines={1}>
                         {item.name}
                       </Text>
+                      {/* La etiqueta es la OCUPACIÓN, no `rol`: `rol` es el
+                          permiso en la app (cliente/admin/web) y nadie lo tiene
+                          en "agente", así que a todos les salía "Cliente". */}
                       <Text style={styles.modalRole} numberOfLines={1}>
-                        {item.role === "agente" ? "Agente" : "Cliente"}
+                        {item.ocupacion?.trim() || "Cliente"}
                       </Text>
                     </View>
                   </View>

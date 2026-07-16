@@ -57,7 +57,13 @@ const UserHeader: React.FC<UserHeaderProps> = ({
       : `Recomendado por ${positiveRecommendations} usuarios`;
   const [showRecommendedModal, setShowRecommendedModal] = React.useState(false);
   const [recommendedList, setRecommendedList] = React.useState<
-    { id: string; name: string; role?: string; avatar?: string | null }[]
+    {
+      id: string;
+      name: string;
+      role?: string;
+      ocupacion?: string | null;
+      avatar?: string | null;
+    }[]
   >([]);
   const [loadingRecommended, setLoadingRecommended] = React.useState(false);
 
@@ -78,7 +84,8 @@ const UserHeader: React.FC<UserHeaderProps> = ({
             apellido_paterno,
             apellido_materno,
             foto,
-            rol
+            rol,
+            ocupacion
         )
       `,
       )
@@ -98,6 +105,7 @@ const UserHeader: React.FC<UserHeaderProps> = ({
         id: p?.id,
         name: name || "Usuario",
         role: p?.rol,
+        ocupacion: p?.ocupacion ?? null,
         avatar: p?.foto ?? null,
       };
     });
@@ -204,11 +212,14 @@ const UserHeader: React.FC<UserHeaderProps> = ({
                         >
                           {item.name}
                         </Text>
+                        {/* La etiqueta es la OCUPACIÓN, no `rol`: `rol` es el
+                            permiso en la app (cliente/admin/web) y nadie lo
+                            tiene en "agente" → a todos les salía "Cliente". */}
                         <Text
                           style={styles.recommendedModalRole}
                           numberOfLines={1}
                         >
-                          {item.role === "agente" ? "Agente" : "Cliente"}
+                          {item.ocupacion?.trim() || "Cliente"}
                         </Text>
                       </View>
                     </View>

@@ -62,7 +62,7 @@ export const profileService = {
 
     const { data: profilesData, error: profilesError } = await supabase
       .from("perfiles")
-      .select("id,nombre,apellido_paterno,apellido_materno,foto,rol")
+      .select("id,nombre,apellido_paterno,apellido_materno,foto,rol,ocupacion")
       .in("id", recommendedByIds);
 
     if (profilesError) throw profilesError;
