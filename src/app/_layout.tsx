@@ -220,15 +220,6 @@ function RootLayoutNav() {
     return () => OneSignal.Notifications.removeEventListener("click", handleNotificationClick);
   }, [router]);
 
-  // Ejecuta la navegación de una push que llegó antes de que la app estuviera lista.
-  useEffect(() => {
-    navReadyRef.current = !loading && !!session && !!profile;
-    if (!navReadyRef.current || !pendingNavRef.current) return;
-    const go = pendingNavRef.current;
-    pendingNavRef.current = null;
-    go();
-  }, [loading, session, profile]);
-
   // Global StatusBar setup
   useEffect(() => {
     StatusBar.setHidden(false);
@@ -254,6 +245,25 @@ function RootLayoutNav() {
       router.replace("/(tabs)");
     }
   }, [session, loading, segments]);
+
+  /**
+   * Ejecuta la navegación de una push tocada antes de que la app pudiera navegar.
+   *
+   * Va DESPUÉS del efecto de sesión de arriba y exige estar ya fuera de `(auth)`.
+   * Al abrir desde una push con la app cerrada, la sesión tarda un instante: la
+   * app pasa por /login y, en cuanto la sesión llega, ese efecto hace
+   * `router.replace("/(tabs)")`. Si navegamos antes, ese replace nos pisa y el
+   * usuario acaba en el feed en vez del chat. Esperando a salir de `(auth)` el
+   * replace ya ocurrió y nuestra navegación queda encima.
+   */
+  useEffect(() => {
+    navReadyRef.current =
+      !loading && !!session && !!profile && segments[0] !== "(auth)";
+    if (!navReadyRef.current || !pendingNavRef.current) return;
+    const go = pendingNavRef.current;
+    pendingNavRef.current = null;
+    go();
+  }, [loading, session, profile, segments]);
 
   if (loading) {
     return <InitialLoading />;
