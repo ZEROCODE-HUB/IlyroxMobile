@@ -15,7 +15,7 @@ import {
 import { OneSignal } from "react-native-onesignal";
 import { useFonts } from "expo-font";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import {
   Platform,
   StatusBar,
@@ -109,10 +109,46 @@ function buildNotificationNavigation(
   }
 }
 
+/**
+ * Captura del toque en una push, a nivel de MÓDULO.
+ *
+ * Con la app cerrada, OneSignal emite el evento "click" en cuanto se inicializa
+ * —aquí mismo, al evaluarse este archivo—, muchísimo antes de que RootLayout
+ * monte y registre un listener en un `useEffect` (hay que esperar a fuentes,
+ * providers y sesión). El SDK no reemite ese evento a listeners tardíos: se
+ * perdía y la app arrancaba en el feed. Con la app abierta o minimizada el
+ * listener ya existía, y por eso ese caso sí funcionaba.
+ *
+ * Registrando el listener aquí —lo más temprano que hay JS— el dato queda
+ * guardado hasta que la app esté en condiciones de navegar.
+ */
+let pendingNotificationData: any = null;
+const notificationClickListeners = new Set<(data: any) => void>();
+
+/** Entrega el toque a quien escuche; si aún no hay nadie, lo guarda. */
+function emitNotificationClick(data: any) {
+  if (notificationClickListeners.size === 0) {
+    pendingNotificationData = data;
+    return;
+  }
+  notificationClickListeners.forEach((fn) => fn(data));
+}
+
+/** Devuelve el toque guardado (y lo consume) o null. */
+function takePendingNotificationClick() {
+  const data = pendingNotificationData;
+  pendingNotificationData = null;
+  return data;
+}
+
 // OneSignal init
 if (Platform.OS !== "web") {
   OneSignal.initialize(process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID!);
   OneSignal.Notifications.requestPermission(true);
+  OneSignal.Notifications.addEventListener("click", (event: any) => {
+    const data = event?.notification?.additionalData;
+    if (data) emitNotificationClick(data);
+  });
 }
 
 const queryClient = new QueryClient();
@@ -173,9 +209,8 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
 
-  // Navegación pendiente de una push tocada antes de que la app estuviera lista.
-  const pendingNavRef = useRef<(() => void) | null>(null);
-  const navReadyRef = useRef(false);
+  // Toque en una push pendiente de navegar.
+  const [notificationClick, setNotificationClick] = useState<any>(null);
 
   // Precarga las fuentes de íconos (Ionicons + MaterialCommunityIcons) antes de
   // renderizar la app. Evita que íconos como el de "Agrícola" (tractor, de
@@ -203,27 +238,18 @@ function RootLayoutNav() {
     return () => OneSignal.Notifications.removeEventListener("foregroundWillDisplay", handleForegroundDisplay);
   }, []);
 
-  // Handler de tap en notificaciones push — depende de router para navegación correcta
+  // Recoge el toque en una push: el que llegó antes de montar (arranque en frío,
+  // guardado a nivel de módulo) y los que lleguen con la app ya viva.
   useEffect(() => {
     if (Platform.OS === "web") return;
-    const handleNotificationClick = (event: any) => {
-      const go = buildNotificationNavigation(
-        event?.notification?.additionalData,
-        router,
-      );
-      if (!go) return;
-      // En arranque en frío el Stack todavía no está montado (se muestra
-      // InitialLoading): navegar ahí se pierde. Se guarda y se ejecuta en cuanto
-      // la app esté lista (ver efecto de abajo).
-      if (!navReadyRef.current) {
-        pendingNavRef.current = go;
-        return;
-      }
-      go();
+    const onClick = (data: any) => setNotificationClick(data);
+    notificationClickListeners.add(onClick);
+    const pending = takePendingNotificationClick();
+    if (pending) setNotificationClick(pending);
+    return () => {
+      notificationClickListeners.delete(onClick);
     };
-    OneSignal.Notifications.addEventListener("click", handleNotificationClick);
-    return () => OneSignal.Notifications.removeEventListener("click", handleNotificationClick);
-  }, [router]);
+  }, []);
 
   // Global StatusBar setup
   useEffect(() => {
@@ -269,19 +295,31 @@ function RootLayoutNav() {
   const rootNavigationState = useRootNavigationState();
 
   useEffect(() => {
-    navReadyRef.current =
+    if (!notificationClick) return;
+
+    const ready =
       !loading &&
       !!session &&
       !!profile &&
       !!rootNavigationState?.key &&
       segments[0] !== "(auth)";
+    if (!ready) return;
 
-    if (!navReadyRef.current || !pendingNavRef.current) return;
-    const go = pendingNavRef.current;
-    pendingNavRef.current = null;
+    const go = buildNotificationNavigation(notificationClick, router);
+    setNotificationClick(null);
+    if (!go) return;
+
     const timer = setTimeout(go, 300);
     return () => clearTimeout(timer);
-  }, [loading, session, profile, segments, rootNavigationState?.key]);
+  }, [
+    notificationClick,
+    loading,
+    session,
+    profile,
+    segments,
+    rootNavigationState?.key,
+    router,
+  ]);
 
   if (loading) {
     return <InitialLoading />;
