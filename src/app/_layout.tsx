@@ -333,13 +333,17 @@ function RootLayoutNav() {
     setNotificationClick(null);
     if (!go) return;
 
-    const timer = setTimeout(() => {
+    // OJO: este temporizador NO se cancela en la limpieza del efecto. El
+    // `setNotificationClick(null)` de arriba vuelve a disparar este mismo
+    // efecto, y un `return () => clearTimeout(timer)` mataba la navegación
+    // antes de que llegara a ejecutarse. Ya no hace falta cancelarlo: el click
+    // se consume justo arriba, así que solo se programa una vez.
+    setTimeout(() => {
       plog("ejecutando navegación…");
       go();
       // Dónde acabamos de verdad: si algo pisa la navegación, se ve aquí.
       setTimeout(() => plog("ruta 1,5s después =", segmentsRef.current), 1500);
     }, 300);
-    return () => clearTimeout(timer);
   }, [
     notificationClick,
     loading,
