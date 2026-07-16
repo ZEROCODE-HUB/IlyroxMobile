@@ -29,10 +29,17 @@ import { notifyMatchingUsers } from "@/hooks/useMatchNotifier";
 
 const log = logger.scoped("usePublishProperty");
 
-// Timeout para la operación completa de publicación (2 minutos)
-const PUBLISH_TIMEOUT_MS = 120_000;
-// Timeout individual por imagen (30 segundos)
-const IMAGE_UPLOAD_TIMEOUT_MS = 30_000;
+// Timeout individual por imagen. Eran 30 s: con las fotos sin comprimir de la
+// cámara (2-4 MB) y una subida móvil lenta, CADA imagen se pasaba y fallaban
+// todas. Ya se suben comprimidas (ver uploadService), pero se deja margen.
+const IMAGE_UPLOAD_TIMEOUT_MS = 60_000;
+// Red de seguridad de la publicación completa. Era fija en 2 min, así que con
+// 5-15 fotos el reloj global mataba la subida aunque cada imagen fuera bien.
+// Ahora crece con el número de fotos y nunca queda por debajo de la suma de los
+// timeouts individuales.
+const PUBLISH_BASE_TIMEOUT_MS = 60_000;
+const publishTimeoutFor = (imageCount: number) =>
+  PUBLISH_BASE_TIMEOUT_MS + imageCount * IMAGE_UPLOAD_TIMEOUT_MS;
 
 /**
  * Sube una imagen con timeout individual
@@ -235,7 +242,7 @@ export function usePublishProperty(
             onCancel: () => {},
           });
         }
-      }, PUBLISH_TIMEOUT_MS);
+      }, publishTimeoutFor(form.images.length));
 
       try {
         // ============================================
