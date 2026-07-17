@@ -18,6 +18,7 @@ import { LocationSuggestionWithCount } from "../store/locationSearchStore";
 import { usePropertyFiltersStore } from "../store/propertyFiltersStore";
 import { useChatStore } from "../store/chatStore";
 import { useCitasStore } from "../store/citasStore";
+import { useMatchesStore } from "../store/matchesStore";
 
 const LOGO_SOURCE = require("../assets/Logo.png");
 
@@ -39,6 +40,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   const { setSelectedLocation } = useApp();
   const unreadCount = useChatStore((state) => state.totalUnreadCount);
   const pendingCitas = useCitasStore((state) => state.pendingCount);
+  const unseenMatches = useMatchesStore((state) => state.unseenCount);
 
   const handleNavigation = (screen: string) => {
     switch (screen) {
@@ -107,6 +109,13 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
                     size={22}
                     color={COLORS.white}
                   />
+                )}
+                {screen === "Matches" && unseenMatches > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {unseenMatches > 9 ? "9+" : unseenMatches}
+                    </Text>
+                  </View>
                 )}
                 {screen === "Messages" && unreadCount > 0 && (
                   <View style={styles.badge}>

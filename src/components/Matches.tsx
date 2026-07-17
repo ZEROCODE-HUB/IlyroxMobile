@@ -78,6 +78,7 @@ import { usePropertyFeedItems } from "../hooks/usePropertyFeedItems";
 import { LeadMatchCard } from "./LeadMatchCard";
 import { SearchFiltersModal } from "./map/SearchFiltersModal";
 import { usePropertyFiltersStore } from "../store/propertyFiltersStore";
+import { useMatchesStore } from "../store/matchesStore";
 import { logger } from "@/utils/logger";
 
 const log = logger.scoped("Matches");
@@ -198,6 +199,22 @@ const Matches: React.FC = () => {
 
   useEffect(() => {
     fetchMatches();
+  }, [user]);
+
+  // Al abrir la pantalla, marcar los matches sin ver como vistos: limpia el
+  // badge del header (useMatchesStore) espejo del contador useUnseenMatchesCount.
+  useEffect(() => {
+    if (!user) return;
+    // Vacía el badge al instante; el UPDATE persiste el visto_en en segundo plano.
+    useMatchesStore.getState().setUnseenCount(0);
+    supabase
+      .from("matches")
+      .update({ visto_en: new Date().toISOString() })
+      .eq("usuario_id", user.id)
+      .is("visto_en", null)
+      .then(({ error }) => {
+        if (error) log.error("No se pudieron marcar los matches como vistos:", error);
+      });
   }, [user]);
 
   const handleDeleteSearch = async (busquedaId: string) => {
@@ -626,7 +643,15 @@ const Matches: React.FC = () => {
           currentUserId={user?.id}
           onEditSearch={
             selectedLead.busquedaObject
-              ? () => handleEditSearch(selectedLead.busquedaObject)
+              ? () => {
+                  // SearchFiltersModal es otro <Modal> nativo. En iOS no se
+                  // puede presentar sobre el del lead (ambos desde la raíz):
+                  // falla en silencio. Cerramos primero el del lead y en un
+                  // tick posterior abrimos el de edición.
+                  const busqueda = selectedLead.busquedaObject;
+                  setSelectedLeadId(null);
+                  setTimeout(() => handleEditSearch(busqueda), 350);
+                }
               : undefined
           }
         />

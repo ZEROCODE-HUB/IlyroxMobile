@@ -8,13 +8,13 @@ import {
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useModal } from "../context/ModalContext";
 import PropertyCard from "./cards/PropertyCard";
 import { AppHeader } from "./AppHeader";
 import { COLORS } from "../constants";
 import { busquedas_guardadas, FeedItem, User } from "../types";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
 import { CommentsBottomSheet } from "./modals";
+import { ConfirmationModal } from "./modals/ConfirmationModal";
 
 /** Tiempo relativo: "hace un momento" / "hace N min" / "hace N h" / "hace N días". */
 const formatRelative = (dateStr?: string): string => {
@@ -85,7 +85,6 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
   busqueda,
   onEditSearch,
 }) => {
-  const { showModal } = useModal();
   const [activeTab, setActiveTab] = useState<"coincidencia" | "similar">(
     "coincidencia",
   );
@@ -93,20 +92,16 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
     null,
   );
   const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const handleDeleteSearchInternal = () => {
-    showModal({
-      title: "Eliminar búsqueda",
-      message:
-        "¿Estás seguro de que deseas eliminar esta búsqueda guardada? Se eliminarán todos los matches asociados.",
-      confirmText: "Eliminar",
-      cancelText: "Cancelar",
-      onConfirm: () => {
-        onDeleteSearch(busquedaId);
-        onClose();
-      },
-      onCancel: () => {},
-    });
+  // El ConfirmationModal global de ModalContext se renderiza en la raíz de la
+  // app y queda invisible detrás de este <Modal> nativo (bug modal-dentro-de-
+  // modal en iOS). Usamos un ConfirmationModal LOCAL, hijo de este modal, que sí
+  // se presenta encima. Ver reference_ilyrox_modal_dentro_de_modal.
+  const handleConfirmDelete = () => {
+    setShowDeleteConfirm(false);
+    onDeleteSearch(busquedaId);
+    onClose();
   };
 
   const handleCommentClick = (feedItemId: string) => {
@@ -169,7 +164,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity
-                    onPress={handleDeleteSearchInternal}
+                    onPress={() => setShowDeleteConfirm(true)}
                     style={styles.headerBtn}
                   >
                     <Ionicons
@@ -356,6 +351,19 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
               currentUserId={currentUserId}
             />
           )}
+
+          {/* Confirmación de borrado — local, para que se presente encima del
+              <Modal> nativo y no detrás (ver handleConfirmDelete). */}
+          <ConfirmationModal
+            visible={showDeleteConfirm}
+            title="Eliminar búsqueda"
+            message="¿Estás seguro de que deseas eliminar esta búsqueda guardada? Se eliminarán todos los matches asociados."
+            confirmText="Eliminar"
+            cancelText="Cancelar"
+            confirmVariant="danger"
+            onConfirm={handleConfirmDelete}
+            onCancel={() => setShowDeleteConfirm(false)}
+          />
         </View>
       </ScreenWrapper>
     </Modal>
