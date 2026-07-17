@@ -106,12 +106,15 @@ export default React.forwardRef<TextInput, MessageInputProps>(
           // Validate File Size
           const fileSize = asset.fileSize || 0;
           const isVideo = asset.type === "video";
-          const limit = isVideo ? 40 * 1024 * 1024 : 5 * 1024 * 1024; // 40MB video, 5MB image
+          // El bucket `fotos` hereda el tope global del proyecto (50MB, plan
+          // free). Dejamos margen: 48MB video / 25MB imagen (además la imagen se
+          // recomprime antes de subir, así que este tope es sobre el original).
+          const limit = isVideo ? 48 * 1024 * 1024 : 25 * 1024 * 1024;
 
           if (fileSize > limit) {
             showModal({
               title: "Archivo muy grande",
-              message: `El ${isVideo ? "video" : "imagen"} excede el límite de ${isVideo ? "40MB" : "5MB"}.`,
+              message: `El ${isVideo ? "video" : "imagen"} excede el límite de ${isVideo ? "48MB" : "25MB"}.`,
               confirmText: "OK",
             });
             return;
@@ -152,10 +155,10 @@ export default React.forwardRef<TextInput, MessageInputProps>(
 
           // Validate File Size
           const fileSize = file.size || 0;
-          const limit = 20 * 1024 * 1024; // 20MB for files
+          const limit = 45 * 1024 * 1024; // 45MB (bajo el tope global de 50MB)
 
           if (fileSize > limit) {
-            showModal({ title: "Archivo muy grande", message: "El documento excede el límite de 20MB.", confirmText: "OK" });
+            showModal({ title: "Archivo muy grande", message: "El documento excede el límite de 45MB.", confirmText: "OK" });
             return;
           }
 

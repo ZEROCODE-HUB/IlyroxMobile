@@ -98,8 +98,9 @@ export function ViewImage({
           <TouchableOpacity
             style={[styles.closeButton, { top: insets.top + 10 }]}
             onPress={handleClose}
+            hitSlop={12}
           >
-            <Ionicons name="close-circle" size={32} color="#fff" />
+            <Ionicons name="close" size={26} color="#fff" />
           </TouchableOpacity>
 
           <View style={styles.imageWrapper}>
@@ -159,6 +160,15 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 20,
     zIndex: 10,
-    padding: 10, // Área de toque más grande (UX)
+    // Círculo oscuro para que el botón se vea SIEMPRE, también sobre imágenes
+    // claras (antes era un icono blanco que desaparecía sobre fondos claros).
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
   },
 });

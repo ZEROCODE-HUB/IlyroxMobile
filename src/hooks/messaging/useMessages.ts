@@ -213,14 +213,16 @@ export function useMessages(conversationId: string | null, userId?: string) {
         contentType?.startsWith("image/") ||
         fileUri.match(/\.(jpg|jpeg|png|gif|webp)$/i);
 
-      let limit = 20 * 1024 * 1024; // Default: 20MB (Files)
+      // Topes alineados con MessageInput y bajo el límite global de 50MB del
+      // bucket `fotos` (plan free). La imagen ya llega recomprimida aquí.
+      let limit = 45 * 1024 * 1024; // Default: 45MB (archivos)
       let typeLabel = "archivo";
 
       if (isVideo) {
-        limit = 40 * 1024 * 1024; // 40MB
+        limit = 48 * 1024 * 1024; // 48MB
         typeLabel = "video";
       } else if (isImage) {
-        limit = 5 * 1024 * 1024; // 5MB
+        limit = 25 * 1024 * 1024; // 25MB
         typeLabel = "imagen";
       }
 

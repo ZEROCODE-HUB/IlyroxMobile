@@ -52,12 +52,34 @@ export default function ConversationsList({
   const [longPressedGrouping, setLongPressedGrouping] = useState<any>(null);
   const [longPressedConvTags, setLongPressedConvTags] = useState<any[]>([]);
   const [showTagsAssignModal, setShowTagsAssignModal] = useState(false);
+  // Override optimista de etiquetas por agrupación: la fila muestra la etiqueta
+  // al instante sin esperar el refetch completo de la lista (3 consultas). Se
+  // limpia cuando `refresh()` reconcilia con la data real.
+  const [optimisticTags, setOptimisticTags] = useState<Record<string, any[]>>({});
 
   const { tags, createTag, deleteTag, updateTag, assignTag, removeTag, getConversationTags } = useTags(userId);
 
+  // Aplica el refetch en segundo plano y, al terminar, suelta el override
+  // optimista de esa agrupación (la data real ya trae la etiqueta).
+  const reconcileTagsFor = (groupingId: string) => {
+    Promise.resolve((refresh as any)()).finally(() => {
+      setOptimisticTags((prev) => {
+        if (!(groupingId in prev)) return prev;
+        const next = { ...prev };
+        delete next[groupingId];
+        return next;
+      });
+    });
+  };
+
   // Filtrar conversaciones por búsqueda y etiquetas
   const filteredConversations = React.useMemo(() => {
-    let result = conversations;
+    // Aplicar overrides optimistas antes de filtrar/renderizar.
+    let result = conversations.map((conv) =>
+      optimisticTags[conv.id]
+        ? { ...conv, etiquetas: optimisticTags[conv.id] }
+        : conv,
+    );
 
     // Filtro de búsqueda
     if (searchQuery.trim()) {
@@ -86,7 +108,7 @@ export default function ConversationsList({
     }
 
     return result;
-  }, [conversations, searchQuery, selectedTagIds]);
+  }, [conversations, searchQuery, selectedTagIds, optimisticTags]);
 
   const handleGroupingPress = async (grouping: any) => {
     const otherUserId = grouping.other_user?.id;
@@ -345,25 +367,37 @@ export default function ConversationsList({
         availableTags={tags}
         assignedTags={longPressedConvTags}
         onAssignTag={async (tagId) => {
-          const recentConvId = longPressedGrouping?.conversacion_mas_reciente_id;
+          const grouping = longPressedGrouping;
+          const recentConvId = grouping?.conversacion_mas_reciente_id;
           if (!recentConvId) return false;
           const ok = await assignTag(recentConvId, tagId);
           if (ok) {
-            setLongPressedConvTags((prev) => [
-              ...prev,
-              tags.find((t) => t.id === tagId)!,
-            ]);
-            refresh();
+            const newTag = tags.find((t) => t.id === tagId)!;
+            setLongPressedConvTags((prev) => [...prev, newTag]);
+            // Fila actualizada al instante.
+            setOptimisticTags((prev) => {
+              const base = prev[grouping.id] ?? grouping.etiquetas ?? [];
+              return { ...prev, [grouping.id]: [...base, newTag] };
+            });
+            reconcileTagsFor(grouping.id);
           }
           return ok;
         }}
         onRemoveTag={async (tagId) => {
-          const recentConvId = longPressedGrouping?.conversacion_mas_reciente_id;
+          const grouping = longPressedGrouping;
+          const recentConvId = grouping?.conversacion_mas_reciente_id;
           if (!recentConvId) return false;
           const ok = await removeTag(recentConvId, tagId);
           if (ok) {
             setLongPressedConvTags((prev) => prev.filter((t) => t.id !== tagId));
-            refresh();
+            setOptimisticTags((prev) => {
+              const base = prev[grouping.id] ?? grouping.etiquetas ?? [];
+              return {
+                ...prev,
+                [grouping.id]: base.filter((t: any) => t.id !== tagId),
+              };
+            });
+            reconcileTagsFor(grouping.id);
           }
           return ok;
         }}
