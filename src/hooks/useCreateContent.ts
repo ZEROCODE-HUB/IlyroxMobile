@@ -78,7 +78,8 @@ export function useCreateContent(userId?: string) {
       Burnt.toast({
         title: "Post publicado correctamente!",
         preset: "done",
-        duration: 2500,
+        // Burnt mide la duración en SEGUNDOS, no en ms.
+        duration: 2.5,
       });
 
       return true;
