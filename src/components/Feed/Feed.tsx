@@ -267,6 +267,7 @@ const Feed: React.FC<FeedProps> = ({
               onCommentClick={() => handleOpenComments(item)}
               isVisible={isVisible}
               currentUserId={currentUserId}
+              onReelUpdated={refresh}
             />
           );
         case "property":

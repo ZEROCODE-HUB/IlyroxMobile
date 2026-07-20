@@ -35,7 +35,7 @@ interface UseProfileReturn {
   submittingRecommendation: boolean;
   isMe: boolean;
   fetchProfileData: () => Promise<void>;
-  handleRecommendation: (recomienda: boolean) => Promise<void>;
+  handleRecommendation: (recomienda: boolean) => Promise<boolean | null | void>;
   loadRecommendedByUsers: (options?: { reset?: boolean }) => Promise<void>;
   loadNotRecommendedByUsers: (options?: { reset?: boolean }) => Promise<void>;
   updateProfilePhoto: (newUrl: string) => void;
@@ -212,18 +212,24 @@ export const useProfile = (userId?: string | null): UseProfileReturn => {
     }
   }, [targetUserId, activeStore]);
 
-  const handleRecommendation = useCallback(async (recomienda: boolean) => {
+  const handleRecommendation = useCallback(async (recomienda: boolean): Promise<boolean | null | void> => {
     const storeState = activeStore.getState();
     if (!authUser?.id || !targetUserId || isMe || storeState.submittingRecommendation)
       return;
 
+    const prev = storeState.userRecommendation;
+    // Optimista: el botón refleja el voto AL INSTANTE (sin esperar a la red).
+    // Si se repite el mismo voto se alterna (toggle off). Se revierte si falla.
+    const optimistic = prev === recomienda ? null : recomienda;
+
     try {
       storeState.setSubmittingRecommendation(true);
+      storeState.setUserRecommendation(optimistic);
 
       const newStatus = await profileService.toggleRecommendation(
         authUser.id,
         targetUserId,
-        storeState.userRecommendation,
+        prev,
         recomienda,
       );
 
@@ -241,8 +247,12 @@ export const useProfile = (userId?: string | null): UseProfileReturn => {
         loadRecommendedByUsers({ reset: true }),
         loadNotRecommendedByUsers({ reset: true }),
       ]);
+
+      return newStatus;
     } catch (error) {
       log.error("Error updating recommendation:", error);
+      // Revertir el optimista si la red falló.
+      activeStore.getState().setUserRecommendation(prev);
     } finally {
       activeStore.getState().setSubmittingRecommendation(false);
     }

@@ -9,6 +9,7 @@ import {
   Text,
   StyleSheet,
   Pressable,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FeedItem, User } from "../../types";
@@ -17,7 +18,11 @@ import { DIMENSIONS, COLORS } from "../../constants";
 import { commonStyles } from "../../../styles";
 import { UserHeader, VideoPlayer, Avatar } from "../shared";
 import ActionButtons from "../ActionButtons";
-// import { supabase } from "../../lib/supabase";
+import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
+import ConfirmDialog from "../shared/ConfirmDialog";
+import CreateReel from "../CreateContent/CreateReel";
+import { supabase } from "../../lib/supabase";
+import { useToast } from "../../context/ToastContext";
 import { useUserRecommendations } from "@/hooks/useUserRecommendations";
 import RecommendedUsersModal from "../modals/RecommendedUsersModal";
 import { buildRecommendedText } from "./recommendedText";
@@ -30,6 +35,7 @@ interface ReelCardProps {
   onCommentClick: () => void;
   isVisible?: boolean;
   currentUserId?: string;
+  onReelUpdated?: () => void;
 }
 
 const ReelCard: React.FC<ReelCardProps> = ({
@@ -39,9 +45,51 @@ const ReelCard: React.FC<ReelCardProps> = ({
   onCommentClick,
   isVisible = false,
   currentUserId,
+  onReelUpdated,
 }) => {
   const { showOptions, setShowOptions, setShowReportModal } =
     useFeedInteractions();
+  const { showToast } = useToast();
+
+  // Menú de dueño (editar/eliminar) — solo para quien publicó el reel.
+  const isOwner = !!(currentUserId && currentUserId === item.user.id);
+  const reelId = item.reelDetails?.id;
+  const [showEditModal, setShowEditModal] = React.useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+
+  const handleDelete = async () => {
+    if (!reelId) return;
+    try {
+      setDeleting(true);
+      const { error } = await supabase
+        .from("reels")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", reelId);
+      if (error) throw error;
+      setShowDeleteConfirm(false);
+      showToast("Reel eliminado correctamente", "success");
+      onReelUpdated?.();
+    } catch {
+      showToast("No se pudo eliminar el reel", "error");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const ownerMenuOptions: MenuOption[] = [
+    {
+      icon: "pencil-outline",
+      label: "Editar",
+      onPress: () => setShowEditModal(true),
+    },
+    {
+      icon: "trash-outline",
+      label: "Eliminar",
+      onPress: () => setShowDeleteConfirm(true),
+      danger: true,
+    },
+  ];
   // Hook de view tracking
   const { trackInteraction } = useViewTracking({
     feedItemId: item.id,
@@ -72,16 +120,28 @@ const ReelCard: React.FC<ReelCardProps> = ({
   return (
     <View style={commonStyles.card}>
       <View style={styles.userRow}>
-        <UserHeader
-          user={item.user}
-          timestamp={item.timestamp}
-          onUserClick={onUserClick}
-          showOptions={showOptions}
-          setShowOptions={setShowOptions}
-          onReport={() => setShowReportModal(true)}
-          totalRatings={item.user.totalRatings}
-          showRecommendedPreview={false}
-        />
+        <View style={styles.headerFill}>
+          <UserHeader
+            user={item.user}
+            timestamp={item.timestamp}
+            onUserClick={onUserClick}
+            showOptions={showOptions}
+            setShowOptions={setShowOptions}
+            onReport={() => setShowReportModal(true)}
+            totalRatings={item.user.totalRatings}
+            showRecommendedPreview={false}
+          />
+        </View>
+        {isOwner && (
+          <View style={styles.headerMenuWrapper}>
+            <ThreeDotsMenu
+              options={ownerMenuOptions}
+              iconColor={COLORS.textSecondary}
+              menuPosition="top-right"
+              buttonStyle={styles.menuButtonTransparent}
+            />
+          </View>
+        )}
       </View>
       {positiveRecommendations > 0 && (
         <Pressable style={styles.recommendedRow} onPress={openRecommendedModal}>
@@ -183,6 +243,32 @@ const ReelCard: React.FC<ReelCardProps> = ({
         users={recommendedList}
         totalCount={positiveRecommendations}
       />
+
+      {/* Confirmación de borrado (solo dueño) */}
+      <ConfirmDialog
+        visible={showDeleteConfirm}
+        title="¿Eliminar reel?"
+        message="Esta acción no se puede deshacer."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+        danger
+        loading={deleting}
+      />
+
+      {/* Edición del reel (solo dueño) */}
+      {showEditModal && (
+        <Modal visible={showEditModal} animationType="slide">
+          <CreateReel
+            reelId={reelId}
+            onBack={() => {
+              setShowEditModal(false);
+              onReelUpdated?.();
+            }}
+          />
+        </Modal>
+      )}
     </View>
   );
 };
@@ -212,6 +298,16 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
     flexDirection: "row",
     alignItems: "center",
+  },
+  headerFill: {
+    flex: 1,
+  },
+  headerMenuWrapper: {
+    paddingRight: 12,
+    paddingTop: 8,
+  },
+  menuButtonTransparent: {
+    backgroundColor: "transparent",
   },
   recommendedRow: {
     paddingHorizontal: 12,

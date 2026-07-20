@@ -423,7 +423,21 @@ const generatePropertyHtml = (
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* Forzar impresion de colores de fondo. En iPhone el motor de PDF
+           (WebKit) descarta los backgrounds al imprimir por defecto, asi el
+           fondo verde del logo (y otros) desaparecia y el logo quedaba flotando.
+           Con esto el fondo se respeta en iOS igual que en Android. */
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        html, body {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
         body {
           font-family: 'Inter', sans-serif;
           background-color: #f3f4f6;

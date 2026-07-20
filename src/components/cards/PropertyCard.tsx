@@ -87,6 +87,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   const [showEditModal, setShowEditModal] = React.useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  // "Ver más / Ver menos" para descripciones largas (típico en fichas de
+  // EasyBroker), que si no ocupan toda la pantalla en el feed.
+  const [descExpanded, setDescExpanded] = React.useState(false);
+  const isLongDesc = (item.content?.length ?? 0) > 160;
 
   const handleDeleteProperty = async () => {
     try {
@@ -436,7 +440,25 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           <View style={styles.descriptionRow}>
             <View style={styles.textContainer}>
               {item.content ? (
-                <Text style={commonStyles.description}>{item.content}</Text>
+                <>
+                  <Text
+                    style={commonStyles.description}
+                    numberOfLines={!descExpanded && isLongDesc ? 4 : undefined}
+                  >
+                    {item.content}
+                  </Text>
+                  {isLongDesc && (
+                    <TouchableOpacity
+                      onPress={() => setDescExpanded((v) => !v)}
+                      hitSlop={8}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.verMasText}>
+                        {descExpanded ? "Ver menos" : "Ver más"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </>
               ) : null}
             </View>
 
@@ -607,6 +629,12 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontWeight: "600",
     maxWidth: 220,
+  },
+  verMasText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.primary,
+    marginTop: 4,
   },
   descriptionRow: {
     flexDirection: "row",

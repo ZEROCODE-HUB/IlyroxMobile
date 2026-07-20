@@ -35,6 +35,7 @@ import ProfileReelItem from "./ProfileReelItem";
 import ProfilePostItem from "./ProfilePostItem";
 import ProfilePropertyItem from "./ProfilePropertyItem";
 import ConfirmDialog from "../shared/ConfirmDialog";
+import { ConfirmationModal } from "../modals/ConfirmationModal";
 import { supabase } from "../../lib/supabase";
 import { logger } from "@/utils/logger";
 
@@ -142,6 +143,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   const [openHousePropertyIds, setOpenHousePropertyIds] = useState<Set<string>>(new Set());
 
   const [showRatingDetails, setShowRatingDetails] = useState(false);
+  // Confirmación tras recomendar / no recomendar a otro asesor.
+  const [showThanksModal, setShowThanksModal] = useState(false);
   const [showRecommendedByModal, setShowRecommendedByModal] = useState(false);
   const [showNotRecommendedByModal, setShowNotRecommendedByModal] =
     useState(false);
@@ -382,6 +385,19 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     });
   }, [handleContact, targetUserId, profile]);
 
+  // Recomendar/No recomendar: el botón ya reacciona al instante (optimista en
+  // useProfile). Al registrarse el voto, mostramos la confirmación de gracias.
+  // Si el usuario alterna y quita su voto (resultado null), no se muestra.
+  const handleRecommendWithThanks = useCallback(
+    async (recomienda: boolean) => {
+      const result = await handleRecommendation(recomienda);
+      if (result === true || result === false) {
+        setShowThanksModal(true);
+      }
+    },
+    [handleRecommendation],
+  );
+
   const renderHeader = useCallback(
     () => (
       <ProfileInfoHeader
@@ -394,7 +410,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         onSettings={() => router.push("/settings")}
         onUpdatePhoto={updateProfilePhoto}
         onMessage={handleMessage}
-        onRecommend={handleRecommendation}
+        onRecommend={handleRecommendWithThanks}
         isRecommended={userRecommendation}
         submittingRecommendation={submittingRecommendation}
         showRatingDetails={showRatingDetails}
@@ -433,6 +449,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       filteredProperties.length,
       userRecommendation,
       submittingRecommendation,
+      handleRecommendWithThanks,
     ],
   );
 
@@ -632,6 +649,16 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         onCancel={() => setItemToDelete(null)}
         danger
         loading={deleting}
+      />
+
+      {/* Confirmación tras recomendar / no recomendar (solo botón Aceptar) */}
+      <ConfirmationModal
+        visible={showThanksModal}
+        title="¡Gracias!"
+        message="Gracias por tu contribución, esta información será visible en todos los perfiles."
+        confirmText="Aceptar"
+        confirmVariant="primary"
+        onConfirm={() => setShowThanksModal(false)}
       />
     </ScreenWrapper>
   );

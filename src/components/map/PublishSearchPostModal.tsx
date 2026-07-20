@@ -136,6 +136,10 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
   const [agricolaFilters, setAgricolaFilters] = useState<AgricolaFilters | null>(null);
 
   const [publishing, setPublishing] = useState(false);
+  // Marca el campo Ubicación en rojo cuando se intenta publicar sin una
+  // ubicación con nombre. Una zona dibujada en el mapa NO cuenta aquí: la
+  // búsqueda necesita al menos una colonia/municipio/estado con nombre.
+  const [ubicacionError, setUbicacionError] = useState(false);
 
   // Cargar el metadata SOLO una vez por apertura del modal. Evita re-ejecutar
   // la cascada de ~18 setState en cada render (posible "Maximum update depth").
@@ -288,9 +292,15 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
   const handlePublish = async () => {
     if (!initialMetadata) return;
 
-    // Validación: se requiere al menos una ubicación escrita en el picker
+    // Validación: se requiere al menos una ubicación CON NOMBRE en el picker.
+    // Ojo: una zona dibujada en el mapa no llega hasta aquí como ubicación, por
+    // eso el mensaje es explícito (el usuario cree que ya eligió una zona).
     if (ubicaciones.length === 0) {
-      showToast("Selecciona al menos una ubicación", "error");
+      setUbicacionError(true);
+      showToast(
+        "Falta la ubicación: escribe y selecciona una colonia o zona en el campo Ubicación.",
+        "error",
+      );
       return;
     }
 
@@ -564,8 +574,23 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
           <SectionCard label="Ubicación">
             <MultiLevelLocationPicker
               value={ubicaciones}
-              onChange={setUbicaciones}
+              onChange={(next) => {
+                setUbicaciones(next);
+                if (next.length > 0) setUbicacionError(false);
+              }}
             />
+            {ubicacionError ? (
+              <Text style={styles.ubicacionError}>
+                Agrega al menos una ubicación: escribe una colonia o zona y
+                selecciónala de la lista. Dibujar una zona en el mapa no basta
+                para publicar la búsqueda.
+              </Text>
+            ) : ubicaciones.length === 0 ? (
+              <Text style={styles.ubicacionHint}>
+                Escribe una colonia o zona y selecciónala de la lista para
+                agregarla.
+              </Text>
+            ) : null}
           </SectionCard>
 
           {/* ── Características (según tipo) ───────────────── */}
@@ -932,6 +957,19 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.textSecondary,
     marginTop: 14,
+  },
+  ubicacionHint: {
+    fontSize: 12,
+    color: COLORS.textTertiary,
+    marginTop: 10,
+    lineHeight: 16,
+  },
+  ubicacionError: {
+    fontSize: 12,
+    color: COLORS.error,
+    fontWeight: "600",
+    marginTop: 10,
+    lineHeight: 16,
   },
   locationDisplay: {
     flexDirection: "row",
