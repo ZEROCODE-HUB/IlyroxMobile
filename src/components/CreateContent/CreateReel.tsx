@@ -20,7 +20,7 @@ import * as VideoThumbnails from "expo-video-thumbnails";
 import { useVideoPlayer, VideoView } from "expo-video"; // Asegúrate de tener expo-video instalado
 
 import { useAuth } from "../../context/AuthContext";
-import { useModal } from "@/context/ModalContext";
+import { useLocalModal } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
 import { COLORS } from "../../constants/colors";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
@@ -108,7 +108,7 @@ const VideoPreview = ({
 
 export default function CreateReel({ onBack, reelId }: CreateReelProps) {
   const { user } = useAuth();
-  const { showModal } = useModal();
+  const { showModal, modalElement } = useLocalModal();
   const { showToast } = useToast();
   const router = useRouter();
   const isEditing = !!reelId;
@@ -410,6 +410,7 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
           </View>
         </View>
       </Modal>
+      {modalElement}
     </ScreenWrapper>
     </KeyboardProvider>
   );

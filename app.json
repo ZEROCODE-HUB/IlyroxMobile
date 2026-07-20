@@ -107,7 +107,8 @@
       "@react-native-community/datetimepicker",
       "expo-web-browser",
       "expo-router",
-      "expo-font"
+      "expo-font",
+      "react-native-compressor"
     ],
     "extra": {
       "eas": {

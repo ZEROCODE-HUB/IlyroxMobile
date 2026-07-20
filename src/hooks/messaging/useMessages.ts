@@ -149,6 +149,36 @@ export function useMessages(conversationId: string | null, userId?: string) {
   };
 
   /**
+   * Comprime un video ANTES de enviarlo por chat. Los videos de la galería
+   * llegan crudos (varios MB, hasta 48 MB) y saturan la subida móvil;
+   * react-native-compressor los transcodifica en el dispositivo (modo "auto":
+   * ~720p con bitrate razonable) y devuelve un `.mp4`, así que la detección de
+   * video por extensión (MessageBubble/MessageInput) sigue funcionando.
+   *
+   * Se carga con `require` PEREZOSO + try/catch: la compresión añade un módulo
+   * nativo (build nuevo). Un binario viejo que reciba este mismo bundle por OTA
+   * no lo tiene; en ese caso —o ante cualquier fallo— se sube el ORIGINAL.
+   * Comprimir nunca debe impedir enviar.
+   */
+  const compressVideo = async (fileUri: string): Promise<string> => {
+    if (!/\.(mp4|mov|avi|mkv|m4v|webm)(\?|#|$)/i.test(fileUri)) return fileUri;
+
+    try {
+      const { Video } = require("react-native-compressor");
+      const compressed = await Video.compress(fileUri, {
+        compressionMethod: "auto",
+        // Sin esto el modo "auto" limita el lado mayor a 640px (calidad pobre
+        // para video). 1280 = ~720p: buena calidad y aún muy por debajo de 48MB.
+        maxSize: 1280,
+      });
+      return compressed || fileUri;
+    } catch (err) {
+      log.warn("No se pudo comprimir el video, se sube el original:", err);
+      return fileUri;
+    }
+  };
+
+  /**
    * Subir archivo a Supabase Storage
    */
   const uploadFile = async (
@@ -161,7 +191,11 @@ export function useMessages(conversationId: string | null, userId?: string) {
       let uploadPath: string;
 
       if (folder === "images") {
-        fileUri = await compressImage(fileUri);
+        // La carpeta "images" transporta fotos Y videos del chat. Las fotos van
+        // por el manipulador (1600px/JPEG); los videos por el compresor nativo.
+        fileUri = /\.(mp4|mov|avi|mkv|m4v|webm)(\?|#|$)/i.test(fileUri)
+          ? await compressVideo(fileUri)
+          : await compressImage(fileUri);
       }
 
       if (Platform.OS === "web") {

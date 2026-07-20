@@ -4,7 +4,18 @@ export default function StackLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="user/[id]" options={{ presentation: "card" }} />
-      <Stack.Screen name="property/[id]" options={{ presentation: "card" }} />
+      {/* gestureEnabled:false — el mapa de la ficha (MapDetails) es interactivo
+          (scroll/zoom) y llega hasta los bordes; panearlo cerca del borde
+          izquierdo disparaba el gesto nativo de "volver" de iOS y cerraba la
+          ficha. Se cierra con el botón Atrás del header. */}
+      <Stack.Screen
+        name="property/[id]"
+        options={{
+          presentation: "card",
+          gestureEnabled: false,
+          fullScreenGestureEnabled: false,
+        }}
+      />
       <Stack.Screen name="messages" options={{ presentation: "card" }} />
       <Stack.Screen name="settings" options={{ presentation: "card" }} />
       <Stack.Screen name="post/[id]" options={{ presentation: "card" }} />

@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { prependPublishedFeedItem } from "@/hooks/useFeed";
 import { useModal } from "@/context/ModalContext";
+import type { LocalModalOptions } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
 import { uploadImage as uploadImageService } from "../../../services/uploadService";
 import { usePropertyMutation } from "@/hooks/usePropertyMutation";
@@ -88,12 +89,18 @@ export function usePublishProperty(
   onBack?: (shouldRefresh?: boolean) => void,
   onOpenHousePrompt?: (prefill: OpenHousePrefill) => void,
   onPublishSuccess?: (info: PublishSuccessInfo) => void,
+  // En edición, CreateProperty vive dentro de un <Modal> nativo; el modal global
+  // (ModalContext, en la raíz) queda invisible detrás en iOS. El caller inyecta
+  // un showModal LOCAL (useLocalModal) para que los avisos se vean. Si no se
+  // pasa, cae al global (mismo comportamiento previo).
+  showModalOverride?: (options: LocalModalOptions) => void,
 ) {
   const { user } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { saveProperty } = usePropertyMutation();
-  const { showModal } = useModal();
+  const { showModal: globalShowModal } = useModal();
+  const showModal = showModalOverride ?? globalShowModal;
   const { showToast } = useToast();
 
   const [publishState, setPublishState] = useState<PublishState>({

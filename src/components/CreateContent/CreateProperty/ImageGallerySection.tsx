@@ -4,7 +4,7 @@
 
 import React, { useCallback } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { useModal } from "@/context/ModalContext";
+import { useLocalModal } from "@/hooks/useLocalModal";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -15,7 +15,7 @@ import { usePropertyFormContext } from "./PropertyFormContext";
 export const ImageGallerySection = React.memo(function ImageGallerySection() {
   const { images, setImages, errors } = usePropertyFormContext();
   const error = errors.images;
-  const { showModal } = useModal();
+  const { showModal, modalElement } = useLocalModal();
   const handlePickImages = useCallback(async () => {
     if (images.length >= 15) {
       showModal({ title: "Límite alcanzado", message: "Puedes subir máximo 15 imágenes", confirmText: "OK" });
@@ -80,6 +80,7 @@ export const ImageGallerySection = React.memo(function ImageGallerySection() {
         </TouchableOpacity>
       )}
       {error && <Text style={styles.errorText}>{error}</Text>}
+      {modalElement}
     </View>
   );
 });

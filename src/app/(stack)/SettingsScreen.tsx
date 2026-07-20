@@ -218,6 +218,9 @@ const SettingsScreen: React.FC = () => {
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setShowEditProfile(false)}
+        // iOS: el swipe-down del pageSheet no dispara onRequestClose; onDismiss
+        // mantiene el estado sincronizado para que el modal pueda reabrirse.
+        onDismiss={() => setShowEditProfile(false)}
       >
         <EditProfile onBack={() => setShowEditProfile(false)} />
       </Modal>

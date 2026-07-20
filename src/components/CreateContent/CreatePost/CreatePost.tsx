@@ -22,7 +22,7 @@ import { AppInput } from "@/design-system/components/AppInput";
 import * as ImagePicker from "expo-image-picker";
 
 import { useAuth } from "@/context/AuthContext";
-import { useModal } from "@/context/ModalContext";
+import { useLocalModal } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
 import { COLORS } from "@/constants/colors";
 import { ScreenWrapper } from "@/screens/ScreenWrapper";
@@ -62,7 +62,7 @@ interface CreatePostProps {
 
 export default function CreatePost({ post, onBack }: CreatePostProps) {
   const { user } = useAuth();
-  const { showModal } = useModal();
+  const { showModal, modalElement } = useLocalModal();
   const { showToast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -685,6 +685,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
           </View>
         </View>
       </Modal>
+      {modalElement}
     </ScreenWrapper>
   );
 }

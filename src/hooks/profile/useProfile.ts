@@ -42,7 +42,7 @@ interface UseProfileReturn {
 }
 
 export const useProfile = (userId?: string | null): UseProfileReturn => {
-  const { user: authUser, profile: authProfile } = useAuth();
+  const { user: authUser, profile: authProfile, refreshProfile } = useAuth();
   const targetUserId = userId || authUser?.id;
   const isMe = !userId || targetUserId === authUser?.id;
 
@@ -261,8 +261,17 @@ export const useProfile = (userId?: string | null): UseProfileReturn => {
       activeStore.getState().setProfile(
         currentProfile ? { ...currentProfile, foto: newUrl } : null,
       );
+
+      // Sincronizar también el perfil cacheado del AuthContext. Sin esto, el
+      // store queda con la foto nueva pero `authProfile` con la vieja; como
+      // `fetchProfileData` para el perfil propio (isMe) devuelve `authProfile`,
+      // el siguiente refetch (pull-to-refresh, navegar, borrar un item)
+      // reescribe la foto VIEJA encima de la nueva y parece que no se guardó.
+      if (isMe && authProfile) {
+        refreshProfile({ ...authProfile, foto: newUrl });
+      }
     },
-    [activeStore],
+    [activeStore, isMe, authProfile, refreshProfile],
   );
 
   useEffect(() => {

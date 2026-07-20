@@ -27,6 +27,7 @@ import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
+import { useLocalModal } from "@/hooks/useLocalModal";
 import CreatePost from "../CreatePost/CreatePost";
 import type { Post } from "@/types";
 
@@ -92,7 +93,13 @@ export default function CreateProperty({
 }: CreatePropertyProps) {
   const { user } = useAuth();
   const router = useRouter();
-  const form = usePropertyForm(propertyId, onBack);
+
+  // Avisos (validación, sesión, comisión, timeout, éxito/error) como modal
+  // LOCAL: en edición esta pantalla vive dentro de un <Modal> nativo y el modal
+  // global de ModalContext quedaría invisible en iOS. Se inyecta a los hooks.
+  const { showModal: showLocalAlert, modalElement: localAlertModal } =
+    useLocalModal();
+  const form = usePropertyForm(propertyId, onBack, showLocalAlert);
 
   // Confirmación de descarte: modal LOCAL (no el global de ModalContext). En
   // edición, CreateProperty vive dentro de un <Modal> nativo; el modal global
@@ -225,6 +232,7 @@ export default function CreateProperty({
     // Solo pasar el callback cuando es una propiedad nueva (no edición)
     !propertyId ? handleOpenHousePrompt : undefined,
     handlePublishSuccess,
+    showLocalAlert,
   );
 
   const [scrollEnabled, setScrollEnabled] = useState(true);
@@ -548,6 +556,9 @@ export default function CreateProperty({
       }}
       onCancel={() => setShowDiscardModal(false)}
     />
+
+    {/* Avisos locales de los hooks (validación, comisión, timeout, error…) */}
+    {localAlertModal}
 
     {/* BOTTOM SHEET DE ÉXITO POST-PUBLICACIÓN */}
     <PropertyPublishedSheet

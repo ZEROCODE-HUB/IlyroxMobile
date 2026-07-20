@@ -10,7 +10,7 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from "react-native";
-import { useModal } from "@/context/ModalContext";
+import { useLocalModal } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
@@ -37,7 +37,7 @@ const EditProfile: React.FC<EditProfileProps> = ({
   onProfileUpdate,
 }) => {
   const { user, profile: authProfile, refreshProfile } = useAuth();
-  const { showModal } = useModal();
+  const { showModal, modalElement } = useLocalModal();
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [, setUploading] = useState(false);
@@ -339,6 +339,7 @@ const EditProfile: React.FC<EditProfileProps> = ({
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      {modalElement}
     </ScreenWrapper>
   );
 };

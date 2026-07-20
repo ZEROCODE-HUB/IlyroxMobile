@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { COLORS } from "../../../constants/colors";
-import { useModal } from "@/context/ModalContext";
+import { useLocalModal } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
 import { Post } from "@/types";
 import { Image } from "expo-image";
@@ -50,7 +50,7 @@ export const OpenHousePost = ({
   statusPost,
   setStatusPost,
 }: OpenHousePostProps) => {
-  const { showModal } = useModal();
+  const { showModal, modalElement } = useLocalModal();
   const { showToast } = useToast();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -328,6 +328,7 @@ export const OpenHousePost = ({
           </Pressable>
         </View>
       </View>
+      {modalElement}
     </View>
   );
 };

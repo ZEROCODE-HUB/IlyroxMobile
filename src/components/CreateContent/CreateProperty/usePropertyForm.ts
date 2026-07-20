@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useModal } from "@/context/ModalContext";
+import type { LocalModalOptions } from "@/hooks/useLocalModal";
 import { supabase } from "../../../lib/supabase";
 import { COORDENADAS_ESTADO } from "../../../constants/estadosMexico";
 import { DEFAULT_COUNTRY } from "../../../lib/location/registry";
@@ -256,9 +257,13 @@ function serializeForm(state: PropertyFormState): string {
 export function usePropertyForm(
   propertyId?: string,
   onBack?: (shouldRefresh?: boolean) => void,
+  // Ver nota en usePublishProperty: en edición se inyecta un showModal LOCAL
+  // para que el aviso se vea sobre el <Modal> nativo en iOS.
+  showModalOverride?: (options: LocalModalOptions) => void,
 ) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
-  const { showModal } = useModal();
+  const { showModal: globalShowModal } = useModal();
+  const showModal = showModalOverride ?? globalShowModal;
 
   // Loading state — es estado de transacción (no de formulario), se queda como useState
   const [isLoadingProperty, setIsLoadingProperty] = useState(false);
