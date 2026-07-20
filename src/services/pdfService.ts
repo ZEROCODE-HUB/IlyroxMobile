@@ -377,7 +377,6 @@ const generatePropertyHtml = (
                   return `<div class="agent-rating"><span class="agent-stars">${stars}</span><span class="agent-reviews">${rating.toFixed(1)} (${reviews} reseñas)</span></div>`;
                 })()}
                 ${config.showInmobiliariaCreador && data.perfil.nombre_inmobiliaria ? `<div class="agent-company">${safeText(data.perfil.nombre_inmobiliaria)}</div>` : ""}
-                ${config.showInmobiliariaCreador && data.perfil.nombre_inmobiliaria && data.perfil.celular ? `<div class="agent-company">${safeText(data.perfil.nombre_inmobiliaria)}    ${safeText(data.perfil.celular)}</div>` : ""}
                 <div class="agent-contact">
                     ${config.showTelefonoCreador ? `<span>${safeText(getCreatorPhone(data.perfil))}</span>` : ""}
                 </div>

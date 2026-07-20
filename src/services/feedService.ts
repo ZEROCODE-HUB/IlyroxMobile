@@ -90,6 +90,8 @@ const PROPERTY_SELECT = `
     moneda,
     comision_tipo,
     comision_porcentaje,
+    comision_meses,
+    comision_monto_fijo,
     comparte_comision,
     porcentaje_comision_compartida
   )

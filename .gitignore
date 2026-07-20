@@ -28,6 +28,8 @@ android
 build-prod.ps1
 build-debug-log.txt
 .env
+.env.backup.txt
+.env.backup
 check_profile.ps1
 functionSQLGeo.sql
 .bolt

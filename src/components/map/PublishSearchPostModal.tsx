@@ -10,6 +10,7 @@ import {
 import {
   KeyboardProvider,
   KeyboardAwareScrollView,
+  KeyboardStickyView,
 } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -416,7 +417,10 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
-          bottomOffset={24}
+          // Reserva el alto del footer (que ahora sube con el teclado) para que
+          // el campo enfocado —sobre todo la "Nota" multilínea al final— no quede
+          // tapado por el botón Publicar.
+          bottomOffset={88}
           showsVerticalScrollIndicator={false}
         >
           {/* Prospecto */}
@@ -753,33 +757,38 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
           </SectionCard>
         </KeyboardAwareScrollView>
 
-        {/* Footer */}
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-          <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.7}>
-            <Text style={styles.cancelBtnText}>Cancelar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.publishBtn, publishing && styles.publishBtnDisabled]}
-            onPress={handlePublish}
-            disabled={publishing}
-            activeOpacity={0.85}
-          >
-            {publishing ? (
-              <ActivityIndicator color={COLORS.white} size="small" />
-            ) : (
-              <Ionicons name="paper-plane-outline" size={20} color={COLORS.white} />
-            )}
-            <Text style={styles.publishBtnText}>
-              {publishing
-                ? isEditing
-                  ? "Actualizando..."
-                  : "Publicando..."
-                : isEditing
-                  ? "Actualizar"
-                  : "Publicar"}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* Footer — pegado al teclado: sube con él para que "Publicar" quede
+            siempre visible (antes el teclado lo tapaba al escribir en la Nota y
+            había que tocar afuera). offset.opened compensa el safe-area inferior
+            que no hace falta cuando el teclado está arriba. */}
+        <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
+          <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.7}>
+              <Text style={styles.cancelBtnText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.publishBtn, publishing && styles.publishBtnDisabled]}
+              onPress={handlePublish}
+              disabled={publishing}
+              activeOpacity={0.85}
+            >
+              {publishing ? (
+                <ActivityIndicator color={COLORS.white} size="small" />
+              ) : (
+                <Ionicons name="paper-plane-outline" size={20} color={COLORS.white} />
+              )}
+              <Text style={styles.publishBtnText}>
+                {publishing
+                  ? isEditing
+                    ? "Actualizando..."
+                    : "Publicando..."
+                  : isEditing
+                    ? "Actualizar"
+                    : "Publicar"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardStickyView>
       </View>
       </KeyboardProvider>
     </Modal>
