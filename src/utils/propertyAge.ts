@@ -12,9 +12,11 @@
  * actualiza sola cada año (guardar "5 años" quedaría desactualizado).
  */
 export function formatPropertyAge(antiguedad?: string | number | null): string {
-  if (antiguedad === null || antiguedad === undefined) return "Nueva";
+  // Vacío/sin dato = "No indicado" (NO "Nueva"): en EasyBroker un age vacío
+  // significa "no indicado", y confundirlo con "Nueva" era incorrecto.
+  if (antiguedad === null || antiguedad === undefined) return "No indicado";
   const raw = String(antiguedad).trim();
-  if (raw === "") return "Nueva";
+  if (raw === "") return "No indicado";
 
   // Enums de EasyBroker (llegan en inglés) → texto en español.
   const lower = raw.toLowerCase();
