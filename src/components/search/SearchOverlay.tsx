@@ -92,10 +92,26 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
 
   const renderTabTodos = () => (
     <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      {/* Usuarios PRIMERO: al buscar un nombre, lo que se busca casi siempre es
+          una persona. Antes las Ubicaciones (hasta 5) empujaban a los usuarios
+          fuera de pantalla y no se encontraban. */}
+      {results.users.length > 0 && (
+        <>
+          <SectionHeader title="Usuarios" />
+          {results.users.slice(0, 3).map((u) => (
+            <UserRow key={u.id} user={u} onPress={() => handleNavigate(() => navigateToUser(u.id))} />
+          ))}
+        </>
+      )}
+
       {results.locations.length > 0 && (
         <>
-          <SectionHeader title="Ubicaciones" />
-          {results.locations.slice(0, 5).map((l, i) => (
+          <SectionHeader
+            title="Ubicaciones"
+            style={results.users.length > 0 ? { marginTop: 20 } : undefined}
+          />
+          {/* Solo 2 en "Todos": las de más se ven en la pestaña Propiedades. */}
+          {results.locations.slice(0, 2).map((l, i) => (
             <LocationRow key={`${l.id}-${i}`} location={l} onPress={() => handleNavigate(() => selectLocation(l))} />
           ))}
         </>
@@ -108,15 +124,6 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
             items={results.properties.slice(0, 4)}
             onPress={(id) => handleNavigate(() => navigateToProperty(id))}
           />
-        </>
-      )}
-
-      {results.users.length > 0 && (
-        <>
-          <SectionHeader title="Usuarios" style={{ marginTop: 20 }} />
-          {results.users.slice(0, 3).map((u) => (
-            <UserRow key={u.id} user={u} onPress={() => handleNavigate(() => navigateToUser(u.id))} />
-          ))}
         </>
       )}
 

@@ -454,6 +454,13 @@ export function useMessages(conversationId: string | null, userId?: string) {
           .eq("id", finalConversationId);
       }
 
+      // Reordenar la lista de conversaciones AL INSTANTE (que la conversación
+      // suba hasta arriba al volver a la lista) sin esperar al realtime/refetch,
+      // que puede tardar 30-60s.
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
+      }
+
       return data?.[0] || true;
     } catch (err: any) {
       log.error("Error sending message:", err);
@@ -560,6 +567,10 @@ export function useMessages(conversationId: string | null, userId?: string) {
           .eq("id", finalConversationId);
       }
 
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
+      }
+
       return true;
     } catch (err: any) {
       log.error("Error sending image:", err);
@@ -662,6 +673,10 @@ export function useMessages(conversationId: string | null, userId?: string) {
             ultimo_mensaje_en: new Date().toISOString(),
           })
           .eq("id", finalConversationId);
+      }
+
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
       }
 
       return true;
@@ -778,6 +793,10 @@ export function useMessages(conversationId: string | null, userId?: string) {
             ultimo_mensaje_en: new Date().toISOString(),
           })
           .eq("id", finalConversationId);
+      }
+
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
       }
 
       return true;

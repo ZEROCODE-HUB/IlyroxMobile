@@ -1,17 +1,3 @@
--- ============================================================================
--- insertar_propiedad_easybroker — mapeo de una propiedad de EasyBroker a la BD.
---
--- FIX (2026-07): dos bugs de la sincronización EasyBroker.
---   1) COMISIÓN: antes se guardaba `operations[0].commission.value` SIEMPRE en
---      `comision_porcentaje`, sin mirar el `type`. Si EasyBroker mandaba la
---      comisión en MESES (renta: 1 mes, 0.5 meses) salía "1%"/"0.5%", y si la
---      mandaba como MONTO fijo (p. ej. 100000) salía "100000%". Ahora se enruta
---      por `type`: percentage→comision_porcentaje, months→comision_meses,
---      resto(monto)→comision_monto_fijo.
---   2) MEDIOS BAÑOS: antes se SUMABAN `bathrooms + half_bathrooms` en `banos` y
---      nunca se llenaba `medios_banos`. Ahora `banos` = baños completos y
---      `medios_banos` = medios baños, por separado.
--- ============================================================================
 CREATE OR REPLACE FUNCTION public.insertar_propiedad_easybroker(p_usuario_id uuid, p_easybroker_data jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -112,10 +98,32 @@ BEGIN
   v_descripcion := COALESCE(p_easybroker_data->>'description', p_easybroker_data->>'title');
 
   -- Enrutar el valor de comisión a su columna según el TIPO que manda EasyBroker.
-  -- Evita que meses (renta) o montos fijos se pinten como porcentaje.
-  v_comision_porcentaje := CASE WHEN LOWER(COALESCE(v_commission_type,'')) IN ('percentage','porcentaje','percent') THEN v_commission_value ELSE NULL END;
-  v_comision_meses      := CASE WHEN LOWER(COALESCE(v_commission_type,'')) IN ('months','month','meses','mes') THEN v_commission_value ELSE NULL END;
-  v_comision_monto      := CASE WHEN LOWER(COALESCE(v_commission_type,'')) IN ('amount','net_amount','gross_amount','fixed','monto','monto_fijo') THEN v_commission_value ELSE NULL END;
+  -- CASO ESPECIAL DE RENTA: EasyBroker captura la comisión de renta como
+  -- PORCENTAJE DE UN MES, así que "50%" en renta = medio mes. Se convierte a
+  -- meses (valor/100) para que se lea "0.5 meses" y no "50% comisión" (confuso
+  -- y alarmante). En VENTA el % sí es del precio, se deja como porcentaje.
+  IF LOWER(COALESCE(v_commission_type,'')) IN ('percentage','porcentaje','percent') THEN
+    IF v_operation_type IN ('rental', 'rent', 'temporary_rental') THEN
+      v_comision_meses      := v_commission_value / 100.0;
+      v_comision_porcentaje := NULL;
+    ELSE
+      v_comision_porcentaje := v_commission_value;
+      v_comision_meses      := NULL;
+    END IF;
+    v_comision_monto := NULL;
+  ELSIF LOWER(COALESCE(v_commission_type,'')) IN ('months','month','meses','mes') THEN
+    v_comision_meses      := v_commission_value;
+    v_comision_porcentaje := NULL;
+    v_comision_monto      := NULL;
+  ELSIF LOWER(COALESCE(v_commission_type,'')) IN ('amount','net_amount','gross_amount','fixed','monto','monto_fijo') THEN
+    v_comision_monto      := v_commission_value;
+    v_comision_porcentaje := NULL;
+    v_comision_meses      := NULL;
+  ELSE
+    v_comision_porcentaje := NULL;
+    v_comision_meses      := NULL;
+    v_comision_monto      := NULL;
+  END IF;
 
   -- sin_comision: true si no hay comisión definida de ningún tipo.
   v_sin_comision := (v_commission_value IS NULL OR v_commission_value = 0);
@@ -268,4 +276,5 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RETURN json_build_object('success', FALSE, 'message', 'Error: ' || SQLERRM, 'easybroker_id', p_easybroker_data->>'public_id', 'detail', SQLSTATE);
 END;
-$function$;
+$function$
+

@@ -181,17 +181,21 @@ export const usePropertyFilters = (
 
         if (hasChips && !geoMatch) {
           geoMatch = filters.locationChips.some((chip) => {
-            // Prioridad: filtrado por bounds geográficos (nuevo sistema)
+            // 1) Dentro del recuadro geográfico (sistema por bounds).
             if (chip.bounds && hasCoords) {
               const b = chip.bounds;
-              return (
+              const inBounds =
                 propLat! >= b.south &&
                 propLat! <= b.north &&
                 propLng! >= b.west &&
-                propLng! <= b.east
-              );
+                propLng! <= b.east;
+              if (inBounds) return true;
             }
-            // Fallback: filtrado por strings (chips legacy sin bounds)
+            // 2) O por texto (colonia/municipio/estado). Recupera propiedades
+            //    con la ubicación CORRECTA aunque su pin caiga fuera del
+            //    recuadro: las coordenadas de EasyBroker suelen ser imprecisas
+            //    (a veces el centro de la ciudad), y sin esto una propiedad de
+            //    la colonia buscada desaparecía de la búsqueda y de los matches.
             return matchesLocationFilter(p, rawP, chip.locationFilter);
           });
         }

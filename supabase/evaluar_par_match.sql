@@ -1,19 +1,7 @@
--- ============================================================================
--- evaluar_par_match — ÚNICA FUENTE DE VERDAD del matching de un par (prop, busq)
--- ----------------------------------------------------------------------------
--- Antes había lógica divergente en evaluate_property_matches (camino propiedad)
--- y evaluate_search_matches (camino búsqueda), y otra distinta en evaluar_match.
--- Ahora ambos caminos delegan AQUÍ, garantizando el MISMO resultado para el
--- mismo par. Incluye: país + ubicación (geográfica por área / texto normalizado)
--- + tipo/subtipo + operación + filtros comercial/industrial/agrícola + comisión
--- + precio/características (coincidencia exacta / similar ±15%, lógica de prod.).
--- Requiere: geo_matching_functions.sql (normalizar_ubicacion, punto_en_area_busqueda).
--- ============================================================================
-
 CREATE OR REPLACE FUNCTION public.evaluar_par_match(p_prop_id uuid, p_busq_id uuid)
-RETURNS TABLE(es_match boolean, tipo_match character varying, detalle jsonb)
-LANGUAGE plpgsql
-STABLE
+ RETURNS TABLE(es_match boolean, tipo_match character varying, detalle jsonb)
+ LANGUAGE plpgsql
+ STABLE
 AS $function$
 DECLARE
   v_prop RECORD;
@@ -24,6 +12,7 @@ DECLARE
   v_comision_porcentaje numeric;
   v_comision_meses numeric;
   v_tiene_area boolean := FALSE;
+  v_texto_match boolean := FALSE;
   v_match_type text := NULL;
   v_pmin numeric;
   v_pmax numeric;
@@ -87,9 +76,37 @@ BEGIN
     END IF;
   END IF;
 
-  -- Ubicación: GEOGRÁFICA si hay área; si no, texto NORMALIZADO
+  -- Ubicación: coincide por ÁREA geográfica O por TEXTO (colonia/municipio/
+  -- estado/ciudad). El texto recupera propiedades con la ubicación CORRECTA
+  -- aunque su pin caiga fuera del área: las coordenadas de EasyBroker suelen
+  -- ser imprecisas (a veces el centro de la ciudad), y sin esto una propiedad
+  -- de la colonia buscada se perdía del match.
+
+  -- ¿Coincide por texto? Solo si la búsqueda tiene ALGÚN criterio de texto de
+  -- ubicación Y todos los presentes coinciden con la propiedad.
+  v_texto_match := (
+    (v_busq.estado IS NOT NULL AND array_length(v_busq.estado, 1) > 0)
+    OR (v_busq.municipio IS NOT NULL AND array_length(v_busq.municipio, 1) > 0)
+    OR (v_busq.colonias IS NOT NULL AND array_length(v_busq.colonias, 1) > 0)
+    OR (v_busq.ciudad IS NOT NULL AND TRIM(v_busq.ciudad) <> '')
+  )
+  AND (v_busq.estado IS NULL OR array_length(v_busq.estado, 1) IS NULL
+       OR EXISTS (SELECT 1 FROM unnest(v_busq.estado) e
+                  WHERE normalizar_ubicacion(e) = normalizar_ubicacion(v_prop.estado)))
+  AND (v_busq.ciudad IS NULL OR TRIM(v_busq.ciudad) = ''
+       OR normalizar_ubicacion(v_prop.ciudad) = normalizar_ubicacion(v_busq.ciudad))
+  AND (v_busq.municipio IS NULL OR array_length(v_busq.municipio, 1) IS NULL
+       OR EXISTS (SELECT 1 FROM unnest(v_busq.municipio) m
+                  WHERE normalizar_ubicacion(m) = normalizar_ubicacion(v_prop.municipio)))
+  AND (v_busq.colonias IS NULL OR array_length(v_busq.colonias, 1) IS NULL
+       OR EXISTS (SELECT 1 FROM unnest(v_busq.colonias) c
+                  WHERE normalizar_ubicacion(c) = normalizar_ubicacion(v_prop.colonia::text)));
+
   IF v_tiene_area THEN
-    IF NOT punto_en_area_busqueda(v_prop.latitud, v_prop.longitud, v_busq.bounds, v_busq.polygon_coords) THEN
+    -- Con área: pasa si el pin cae DENTRO, O si coincide por texto (colonia/
+    -- municipio). Una búsqueda de zona DIBUJADA (sin texto) mantiene el rechazo.
+    IF NOT punto_en_area_busqueda(v_prop.latitud, v_prop.longitud, v_busq.bounds, v_busq.polygon_coords)
+       AND NOT v_texto_match THEN
       RETURN QUERY SELECT FALSE, NULL::varchar(20), jsonb_build_object('error','fuera_de_area'); RETURN;
     END IF;
   ELSE
@@ -294,4 +311,5 @@ BEGIN
 
   RETURN QUERY SELECT FALSE, NULL::varchar(20), jsonb_build_object('error','no_cumple_precio_caracteristicas');
 END;
-$function$;
+$function$
+

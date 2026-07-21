@@ -27,8 +27,6 @@ interface SliderProps {
 
 function CommissionSlider({ label, value, onChange, min, max, step, formatValue, hint, onScrollLock }: SliderProps) {
   const [trackWidth, setTrackWidth] = useState(0);
-  const viewRef = useRef<View>(null);
-  const pageXRef = useRef(0);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -36,21 +34,15 @@ function CommissionSlider({ label, value, onChange, min, max, step, formatValue,
   const usable = Math.max(1, trackWidth - THUMB);
   const thumbLeft = ((numVal - min) / (max - min)) * usable;
 
-  const resolve = (px: number) => {
-    const localX = px - pageXRef.current;
+  // Usa locationX (posición del toque RELATIVA a la barra), no pageX+measure():
+  // dentro de un <Modal> nativo en iOS `measure()` devuelve coordenadas
+  // incorrectas, y por eso el slider "no se movía" al EDITAR (que abre en Modal).
+  const resolve = (localX: number) => {
     const ratio = Math.max(0, Math.min(1, (localX - THUMB / 2) / usable));
     const raw = min + ratio * (max - min);
     const snapped = Math.round(raw / step) * step;
     onChangeRef.current(String(Math.round(Math.max(min, Math.min(max, snapped)) * 100) / 100));
   };
-
-  // Solo se agarra el gesto si el toque cae sobre la bolita (con holgura). Así
-  // un scroll vertical que roce la barra no cambia el valor por accidente: el
-  // gesto se lo queda el ScrollView, no el slider.
-  const HIT_SLOP = 16;
-  const isOnThumb = (locationX: number) =>
-    locationX >= thumbLeft - HIT_SLOP &&
-    locationX <= thumbLeft + THUMB + HIT_SLOP;
 
   return (
     <View style={styles.sliderContainer}>
@@ -60,23 +52,22 @@ function CommissionSlider({ label, value, onChange, min, max, step, formatValue,
       </View>
 
       <View
-        ref={viewRef}
         style={styles.touchZone}
-        onLayout={(e) => {
-          setTrackWidth(e.nativeEvent.layout.width);
-          viewRef.current?.measure((_x, _y, _w, _h, px) => { pageXRef.current = px; });
-        }}
-        onStartShouldSetResponder={(e) => isOnThumb(e.nativeEvent.locationX)}
-        // No reclamar el gesto en movimiento: si no empezó sobre la bolita, el
-        // arrastre pertenece al scroll del formulario.
+        onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+        // Agarra cualquier toque que EMPIECE sobre la barra (no solo la bolita):
+        // más tolerante y funciona aunque la bolita esté en un extremo.
+        onStartShouldSetResponder={() => true}
+        // No reclamar en movimiento: un scroll que empezó FUERA de la barra sigue
+        // perteneciendo al formulario.
         onMoveShouldSetResponder={() => false}
         onResponderTerminationRequest={() => false}
         onResponderGrant={(e) => {
           onScrollLock?.(false);
-          viewRef.current?.measure((_x, _y, _w, _h, px) => { pageXRef.current = px; });
-          resolve(e.nativeEvent.pageX);
+          resolve(e.nativeEvent.locationX);
         }}
-        onResponderMove={(e) => resolve(e.nativeEvent.pageX)}
+        onResponderMove={(e) => resolve(e.nativeEvent.locationX)}
+        // Restaurar SIEMPRE el scroll al soltar/cancelar (si no, el formulario y
+        // el perfil quedaban "congelados" con el scroll bloqueado).
         onResponderRelease={() => onScrollLock?.(true)}
         onResponderTerminate={() => onScrollLock?.(true)}
       >
