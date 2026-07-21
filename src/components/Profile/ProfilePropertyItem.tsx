@@ -105,7 +105,11 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
             <Text style={styles.propertyCurrency}>{item.currency}</Text>
           </View>
           <Text style={styles.propertyLocation} numberOfLines={1}>
-            {item.location.city}
+            {/* Colonia (la ubicación específica), no el municipio. Fallback a
+                municipio/ciudad si la propiedad no tiene colonia. */}
+            {item.location.colony ||
+              item.location.municipio ||
+              item.location.city}
           </Text>
 
           <View style={styles.propertyFeatures}>
