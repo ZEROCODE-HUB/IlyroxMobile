@@ -3,6 +3,7 @@ import { perfiles, EstadisticasResenas, Property, Post, Reel } from "@/types";
 
 export type RecommendedByUser = {
   id: string;
+  ocupacion: string | null;
   nombre: string;
   apellido_paterno: string;
   apellido_materno: string;

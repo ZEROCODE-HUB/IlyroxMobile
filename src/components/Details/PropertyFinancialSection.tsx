@@ -23,6 +23,7 @@ export const PropertyFinancialSection: React.FC<PropertyFinancialSectionProps> =
     !!op?.comparte_comision &&
     (op.comision_porcentaje != null ||
       op.comision_monto_fijo != null ||
+      op.comision_meses != null ||
       op.porcentaje_comision_compartida != null ||
       op.monto_comision_compartida != null);
 
@@ -98,7 +99,9 @@ export const PropertyFinancialSection: React.FC<PropertyFinancialSectionProps> =
           <Text style={styles.sectionTitle}>Esquema de Comisión</Text>
           {validOps.map((op, i) => {
             const hasComision =
-              op.comision_porcentaje != null || op.comision_monto_fijo != null;
+              op.comision_porcentaje != null ||
+              op.comision_monto_fijo != null ||
+              op.comision_meses != null;
             const hasComparte =
               op.porcentaje_comision_compartida != null ||
               op.monto_comision_compartida != null;
@@ -112,9 +115,11 @@ export const PropertyFinancialSection: React.FC<PropertyFinancialSectionProps> =
                   <View style={styles.commissionRow}>
                     <Text style={styles.commissionLabel}>Comisión:</Text>
                     <Text style={styles.commissionValue}>
-                      {op.comision_porcentaje != null
-                        ? `${op.comision_porcentaje}%`
-                        : `$${Number(op.comision_monto_fijo).toLocaleString("es-MX")}`}
+                      {op.comision_meses != null
+                        ? `${Number(op.comision_meses)} ${Number(op.comision_meses) === 1 ? "mes" : "meses"}`
+                        : op.comision_porcentaje != null
+                          ? `${Number(op.comision_porcentaje)}%`
+                          : `$${Number(op.comision_monto_fijo).toLocaleString("es-MX")}`}
                     </Text>
                   </View>
                 )}

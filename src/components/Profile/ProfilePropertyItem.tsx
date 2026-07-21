@@ -182,11 +182,15 @@ const formatCommission = (commission?: {
   condition?: string;
 }): string | null => {
   if (!commission) return null;
-  if (commission.months) {
-    return `${commission.months} mes${commission.months !== 1 ? "es" : ""}`;
+  // Postgres devuelve NUMERIC como texto ("1.0"), así que normalizamos a número
+  // para mostrar "1 mes" y no "1.0 meses".
+  const meses = Number(commission.months);
+  if (meses) {
+    return `${meses} mes${meses !== 1 ? "es" : ""}`;
   }
-  if (commission.percentage) {
-    return `${commission.percentage}%`;
+  const pct = Number(commission.percentage);
+  if (pct) {
+    return `${pct}%`;
   }
   return null;
 };

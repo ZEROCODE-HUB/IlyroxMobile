@@ -72,7 +72,11 @@ export const propertyService = {
       .is("deleted_at", null);
 
     if (!viewerIsOwner) {
-      query = query.eq("comparte_comision", true);
+      // Otros asesores solo ven propiedades que realmente OFRECEN comisión
+      // compartida: deben compartir comisión Y tener una comisión definida.
+      // Las "Sin comisión" (aunque tengan comparte_comision=true) solo las ve
+      // su creador.
+      query = query.eq("comparte_comision", true).eq("sin_comision", false);
     }
 
     const { data: propsData, error: propsError } = await query.order(

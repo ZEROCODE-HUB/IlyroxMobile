@@ -267,16 +267,19 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
   // Comisión real (total) de la primera operación, para mostrar en el feed.
   // No confundir con porcentaje_comision_compartida (la parte que se comparte).
+  // Postgres devuelve NUMERIC como texto: normalizamos a número para el formato
+  // (que salga "1 mes", no "1.0 meses") y para el orden porcentaje→meses→monto.
   const primeraOperacion = property.operations?.[0];
+  const comPct = Number(primeraOperacion?.comision_porcentaje) || 0;
+  const comMeses = Number(primeraOperacion?.comision_meses) || 0;
+  const comMonto = Number(primeraOperacion?.comision_monto_fijo) || 0;
   const comisionReal =
-    primeraOperacion?.comision_porcentaje != null
-      ? `${primeraOperacion.comision_porcentaje}%`
-      : primeraOperacion?.comision_meses != null
-        ? `${primeraOperacion.comision_meses} ${
-            primeraOperacion.comision_meses === 1 ? "mes" : "meses"
-          }`
-        : primeraOperacion?.comision_monto_fijo != null
-          ? `$${Number(primeraOperacion.comision_monto_fijo).toLocaleString("es-MX")}`
+    comPct
+      ? `${comPct}%`
+      : comMeses
+        ? `${comMeses} ${comMeses === 1 ? "mes" : "meses"}`
+        : comMonto
+          ? `$${comMonto.toLocaleString("es-MX")}`
           : null;
 
   return (

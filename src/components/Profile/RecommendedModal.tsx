@@ -63,7 +63,12 @@ export const RecommendedModal = ({
     <Modal
       visible={showModal}
       animationType="slide"
+      // pageSheet: en iOS permite cerrar deslizando hacia abajo (escape
+      // garantizado, además del chevron), y onDismiss sincroniza el estado para
+      // que no quede "atascado" abierto si el botón no respondiera.
+      presentationStyle="pageSheet"
       onRequestClose={() => setShowModal(false)}
+      onDismiss={() => setShowModal(false)}
     >
       <SafeAreaView
         style={stylesRecommendedSection.recommendedByModalContainer}
@@ -148,11 +153,15 @@ export const RecommendedModal = ({
                     >
                       {fullName || "Usuario"}
                     </Text>
+                    {/* La etiqueta es la OCUPACIÓN con la que se dio de alta
+                        (p. ej. "Asesor Inmobiliario"), NO `rol` (permiso de la
+                        app: cliente/admin/agente), que hacía que a todos les
+                        saliera "Cliente". */}
                     <Text
                       style={stylesRecommendedSection.recommendedByRole}
                       numberOfLines={1}
                     >
-                      {formatRole(u.rol)}
+                      {u.ocupacion?.trim() || formatRole(u.rol)}
                     </Text>
                   </View>
                 </TouchableOpacity>

@@ -26,6 +26,7 @@ import { useChatInitiator } from "@/hooks/messaging/useChatInitiator";
 import { logger } from "@/utils/logger";
 import { parseImages } from "@/utils/imageParser";
 import { formatDateShort } from "@/utils/dateFormatter";
+import { formatPropertyAge } from "@/utils/propertyAge";
 import { router } from "expo-router";
 
 import { PropertyDetailImages } from "./PropertyDetailImages";
@@ -259,9 +260,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                   <Text
                     style={[styles.typeTagText, { color: COLORS.textSecondary }]}
                   >
-                    {propertyDetails.antiguedad
-                      ? `${propertyDetails.antiguedad} años`
-                      : "Nueva"}
+                    {formatPropertyAge(propertyDetails.antiguedad)}
                   </Text>
                 </View>
               )}
