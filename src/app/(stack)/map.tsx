@@ -16,19 +16,34 @@ function extractServerFilters(filters: ReturnType<typeof usePropertyFiltersStore
   // El filtrado preciso por múltiples bounds se hace client-side en usePropertyFilters.
   const chipWithBounds = filters.locationChips?.find((c) => c.bounds);
   if (chipWithBounds?.bounds) {
-    // Si hay múltiples chips, expandir los bounds para abarcar todos
-    let north = chipWithBounds.bounds.north;
-    let south = chipWithBounds.bounds.south;
-    let east = chipWithBounds.bounds.east;
-    let west = chipWithBounds.bounds.west;
-    for (const chip of filters.locationChips) {
-      if (!chip.bounds) continue;
-      north = Math.max(north, chip.bounds.north);
-      south = Math.min(south, chip.bounds.south);
-      east = Math.max(east, chip.bounds.east);
-      west = Math.min(west, chip.bounds.west);
+    // Si TODOS los chips con bounds son de COLONIA, NO filtramos por bounds en el
+    // servidor: las coordenadas de EasyBroker suelen estar corridas (a veces el
+    // centro de la ciudad) y la propiedad de esa colonia caería fuera del
+    // recuadro y se perdería. En su lugar traemos por municipio (texto) y el
+    // cliente (usePropertyFilters) hace el match preciso por colonia, que es
+    // bidireccional ("La Perla" coincide con "La Perla Norte").
+    const boundsChips = filters.locationChips.filter((c) => c.bounds);
+    const soloColonias = boundsChips.every((c) => c.type === "colonia");
+
+    if (soloColonias) {
+      const mun = chipWithBounds.locationFilter.municipio;
+      if (mun && typeof mun === "string") f.municipio = mun;
+      // sin f.bounds → el cliente filtra por colonia (bounds O texto)
+    } else {
+      // municipio / estado / zona dibujada: el recuadro SÍ es el área correcta.
+      let north = chipWithBounds.bounds.north;
+      let south = chipWithBounds.bounds.south;
+      let east = chipWithBounds.bounds.east;
+      let west = chipWithBounds.bounds.west;
+      for (const chip of filters.locationChips) {
+        if (!chip.bounds) continue;
+        north = Math.max(north, chip.bounds.north);
+        south = Math.min(south, chip.bounds.south);
+        east = Math.max(east, chip.bounds.east);
+        west = Math.min(west, chip.bounds.west);
+      }
+      f.bounds = { north, south, east, west };
     }
-    f.bounds = { north, south, east, west };
   }
 
   // Prioridad 2: locationFilter base (texto) — fallback si no hay chips con bounds
