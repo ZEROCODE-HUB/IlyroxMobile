@@ -6,6 +6,7 @@ import {
   usePropertyFiltersStore,
   PropertyFilters,
   PolygonCoord,
+  LocationChip,
 } from "@/store/propertyFiltersStore";
 
 type RawOperacion = {
@@ -117,6 +118,40 @@ const matchesLocationFilter = (
   return true;
 };
 
+/**
+ * Match por TEXTO según el nivel del chip (colonia/municipio/estado), tolerante.
+ * A diferencia de `matchesLocationFilter`, NO exige que coincidan los tres
+ * campos: compara solo el del nivel buscado. Así una propiedad de la colonia
+ * correcta coincide aunque Google haya abreviado el estado ("Ags.") o el pin
+ * esté corrido. La "zona" (polígono dibujado) no tiene texto → solo bounds.
+ */
+const includesEither = (a: string, b: string) =>
+  !!a && !!b && (a.includes(b) || b.includes(a));
+
+function chipTextMatch(
+  p: Property,
+  rawP: RawProperty,
+  chip: LocationChip,
+): boolean {
+  const lf = chip.locationFilter;
+  if (chip.type === "colonia") {
+    const c = Array.isArray(lf.colonia) ? lf.colonia[0] : lf.colonia;
+    const pColonia = normalizeStr(p.colonia || p.location?.colony || "");
+    return includesEither(pColonia, normalizeStr(c || ""));
+  }
+  if (chip.type === "municipio") {
+    const f = normalizeStr(lf.municipio || "");
+    const pMunicipio = normalizeStr(p.municipio || p.location?.municipio || "");
+    const pCiudad = normalizeStr(rawP.ciudad || p.location?.city || "");
+    return includesEither(pMunicipio, f) || includesEither(pCiudad, f);
+  }
+  if (chip.type === "estado") {
+    const pEstado = normalizeStr(p.location?.state || rawP.estado || "");
+    return includesEither(pEstado, normalizeStr(lf.estado || ""));
+  }
+  return false;
+}
+
 export const usePropertyFilters = (
   properties: Property[],
   geofenceBounds?: GeofenceBounds | null,
@@ -191,12 +226,14 @@ export const usePropertyFilters = (
                 propLng! <= b.east;
               if (inBounds) return true;
             }
-            // 2) O por texto (colonia/municipio/estado). Recupera propiedades
-            //    con la ubicación CORRECTA aunque su pin caiga fuera del
-            //    recuadro: las coordenadas de EasyBroker suelen ser imprecisas
-            //    (a veces el centro de la ciudad), y sin esto una propiedad de
-            //    la colonia buscada desaparecía de la búsqueda y de los matches.
-            return matchesLocationFilter(p, rawP, chip.locationFilter);
+            // 2) O por texto, SEGÚN EL NIVEL del chip. Recupera propiedades con
+            //    la ubicación correcta aunque su pin (impreciso en EasyBroker)
+            //    caiga fuera del recuadro. Se compara SOLO el campo del nivel
+            //    (colonia/municipio/estado), no los tres a la vez: Google
+            //    abrevia el estado ("Ags." vs "Aguascalientes") y exigir que
+            //    coincidieran todos rompía el match aunque la colonia fuera la
+            //    correcta.
+            return chipTextMatch(p, rawP, chip);
           });
         }
 
