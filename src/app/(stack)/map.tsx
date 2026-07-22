@@ -26,21 +26,8 @@ function extractServerFilters(filters: ReturnType<typeof usePropertyFiltersStore
     const soloColonias = boundsChips.every((c) => c.type === "colonia");
 
     if (soloColonias) {
-      // Traer por ESTADO, no por municipio. Una colonia puede estar registrada en
-      // un municipio distinto al que Google le asignó al chip: p.ej. "La Perla
-      // Norte" existe en Jesús María, pero el chip la geocodifica en Aguascalientes.
-      // Acotar por municipio descartaba justo la propiedad de colonia exacta —
-      // aparecía en la lista (map-results filtra por estado) pero no en el mapa:
-      // el descuadre "5 en la lista, 4 en el mapa". Con estado el servidor trae
-      // ambos municipios y el cliente (usePropertyFilters) hace el match fino por
-      // colonia (bounds O texto, bidireccional). Así map y map-results coinciden.
-      // Fallback a municipio si no hay estado. Se usa el estado del locationFilter
-      // BASE (misma fuente que map-results) para que ambas pantallas traigan el
-      // mismo conjunto y el conteo coincida exactamente.
-      const est = filters.locationFilter?.estado || chipWithBounds.locationFilter.estado;
       const mun = chipWithBounds.locationFilter.municipio;
-      if (est && typeof est === "string") f.estado = est;
-      else if (mun && typeof mun === "string") f.municipio = mun;
+      if (mun && typeof mun === "string") f.municipio = mun;
       // sin f.bounds → el cliente filtra por colonia (bounds O texto)
     } else {
       // municipio / estado / zona dibujada: el recuadro SÍ es el área correcta.
