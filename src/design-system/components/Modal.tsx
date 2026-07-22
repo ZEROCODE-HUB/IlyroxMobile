@@ -2,6 +2,8 @@ import React from "react";
 import {
   Modal as RNModal,
   ModalProps as RNModalProps,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -46,6 +48,45 @@ export const Modal: React.FC<ModalProps> = ({
     ? Object.assign({}, ...contentStyle)
     : contentStyle;
 
+  const body = (
+    <Pressable
+      style={[styles.backdrop, styles[variant]]}
+      onPress={dismissOnBackdropPress ? onClose : undefined}
+    >
+      <Pressable
+        onPress={(e) => e.stopPropagation()}
+        style={[styles.content, styles[`${variant}Content`], contentFlat]}
+      >
+        {(title || showCloseButton || headerRight) && (
+          <View style={styles.header}>
+            {title ? (
+              <Text style={styles.title} numberOfLines={1}>
+                {title}
+              </Text>
+            ) : (
+              <View style={{ flex: 1 }} />
+            )}
+            <View style={styles.headerActions}>
+              {headerRight}
+              {showCloseButton && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Cerrar"
+                  onPress={onClose}
+                  hitSlop={8}
+                  style={styles.closeButton}
+                >
+                  <X size={20} color={COLORS.textSecondary} />
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
+        {children}
+      </Pressable>
+    </Pressable>
+  );
+
   return (
     <RNModal
       visible={visible}
@@ -55,47 +96,29 @@ export const Modal: React.FC<ModalProps> = ({
       onRequestClose={onClose}
       {...rest}
     >
-      <Pressable
-        style={[styles.backdrop, styles[variant]]}
-        onPress={dismissOnBackdropPress ? onClose : undefined}
-      >
-        <Pressable
-          onPress={(e) => e.stopPropagation()}
-          style={[styles.content, styles[`${variant}Content`], contentFlat]}
+      {/* La variante `center` lleva su contenido (input + botones) centrado
+          verticalmente; sin avoidance, el teclado tapa el pie del modal (los
+          botones Cancelar/Guardar quedan cortados). El KeyboardAvoidingView
+          empuja el modal hacia arriba al abrir el teclado. Solo se aplica a
+          `center`: `bottom`/`fullscreen` gestionan el teclado por su cuenta. */}
+      {variant === "center" ? (
+        <KeyboardAvoidingView
+          style={styles.avoider}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          {(title || showCloseButton || headerRight) && (
-            <View style={styles.header}>
-              {title ? (
-                <Text style={styles.title} numberOfLines={1}>
-                  {title}
-                </Text>
-              ) : (
-                <View style={{ flex: 1 }} />
-              )}
-              <View style={styles.headerActions}>
-                {headerRight}
-                {showCloseButton && (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Cerrar"
-                    onPress={onClose}
-                    hitSlop={8}
-                    style={styles.closeButton}
-                  >
-                    <X size={20} color={COLORS.textSecondary} />
-                  </Pressable>
-                )}
-              </View>
-            </View>
-          )}
-          {children}
-        </Pressable>
-      </Pressable>
+          {body}
+        </KeyboardAvoidingView>
+      ) : (
+        body
+      )}
     </RNModal>
   );
 };
 
 const styles = StyleSheet.create({
+  avoider: {
+    flex: 1,
+  },
   backdrop: {
     flex: 1,
     backgroundColor: COLORS.overlay,
