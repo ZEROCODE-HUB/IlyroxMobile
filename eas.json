@@ -4,11 +4,6 @@
     "appVersionSource": "remote"
   },
   "build": {
-    "prodic": {
-      "developmentClient": true,
-      "distribution": "internal",
-      "channel": "development"
-    },
     "preview": {
       "channel": "preview",
       "distribution": "internal",
@@ -17,30 +12,13 @@
         "buildType": "apk"
       }
     },
-    "simulator": {
-      "extends": "preview",
-      "ios": {
-        "simulator": true
-      }
-    },
-    "production-aab": {
-      "extends": "production",
-      "credentialsSource": "remote",
-      "android": {
-        "buildType": "app-bundle"
-      }
-    },
-    "production-ios": {
-      "extends": "production",
-      "credentialsSource": "remote"
-    },
     "production": {
       "channel": "production",
-      "credentialsSource": "local",
+      "credentialsSource": "remote",
       "autoIncrement": true,
       "environment": "production",
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
       }
     }
   },
@@ -48,10 +26,7 @@
     "production": {
       "ios": {
         "ascAppId": "6756507569",
-        "appleTeamId": "9BWTN3CAXU",
-        "ascApiKeyPath": "./secrets/AuthKey_7TB389LN84.p8",
-        "ascApiKeyIssuerId": "05ec12f7-b988-4093-8849-a3ed039d8705",
-        "ascApiKeyId": "7TB389LN84"
+        "appleTeamId": "9BWTN3CAXU"
       }
     }
   }
