@@ -5,7 +5,7 @@ import {
   Modal,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import PropertyCard from "./cards/PropertyCard";
@@ -281,13 +281,54 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Properties List */}
-          <ScrollView
+          {/* Properties List — FlatList VIRTUALIZADO.
+              Antes era un ScrollView con activeList.map(): instanciaba TODAS las
+              tarjetas (con sus imágenes) de una sola vez. Con muchos matches
+              (p.ej. 184) eso congelaba la UI ~15s en Android y más en iPhone.
+              El FlatList solo monta las visibles (+ un margen), así que abre al
+              instante sin importar el total. */}
+          <FlatList
+            data={activeList}
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
-          >
-            {activeList.length === 0 ? (
+            keyExtractor={(item, index) => item.id || String(index)}
+            initialNumToRender={4}
+            maxToRenderPerBatch={4}
+            windowSize={7}
+            renderItem={({ item: property }) => (
+              <View style={styles.propertyCardWrapper}>
+                <PropertyCard
+                  onUserClick={(user) => onUserClick(user)}
+                  item={property}
+                  onClick={() =>
+                    onPropertyClick(property.propertyDetails?.id || property.id)
+                  }
+                  onCommentClick={() => handleCommentClick(property.id)}
+                  currentUserId={currentUserId}
+                />
+                {/* Badge Overlay */}
+                <View
+                  style={[styles.cardBadge, { backgroundColor: badgeColor }]}
+                >
+                  <Text style={styles.cardBadgeText}>{badgeText}</Text>
+                </View>
+                {/* Tiempo en que Ilyrox encontró el match */}
+                {property.matchedAt ? (
+                  <View style={styles.foundRow}>
+                    <Ionicons
+                      name="time-outline"
+                      size={12}
+                      color={COLORS.textTertiary}
+                    />
+                    <Text style={styles.foundText}>
+                      Encontrado {formatRelative(property.matchedAt)}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
+            ListEmptyComponent={
               <View style={styles.emptyState}>
                 <Ionicons
                   name="search-outline"
@@ -298,46 +339,8 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                   No hay propiedades en esta sección
                 </Text>
               </View>
-            ) : (
-              activeList.map((property, index) => (
-                <View
-                  key={property.id || index}
-                  style={styles.propertyCardWrapper}
-                >
-                  <PropertyCard
-                    onUserClick={(user) => onUserClick(user)}
-                    item={property}
-                    onClick={() =>
-                      onPropertyClick(
-                        property.propertyDetails?.id || property.id,
-                      )
-                    }
-                    onCommentClick={() => handleCommentClick(property.id)}
-                    currentUserId={currentUserId}
-                  />
-                  {/* Badge Overlay */}
-                  <View
-                    style={[styles.cardBadge, { backgroundColor: badgeColor }]}
-                  >
-                    <Text style={styles.cardBadgeText}>{badgeText}</Text>
-                  </View>
-                  {/* Tiempo en que Ilyrox encontró el match */}
-                  {property.matchedAt ? (
-                    <View style={styles.foundRow}>
-                      <Ionicons
-                        name="time-outline"
-                        size={12}
-                        color={COLORS.textTertiary}
-                      />
-                      <Text style={styles.foundText}>
-                        Encontrado {formatRelative(property.matchedAt)}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              ))
-            )}
-          </ScrollView>
+            }
+          />
 
           {/* Comments Modal */}
           {selectedFeedItemId && (
