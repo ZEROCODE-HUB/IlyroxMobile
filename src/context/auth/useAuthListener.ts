@@ -109,7 +109,18 @@ export const useAuthListener = ({
       setTimeout(async () => {
         if (!mounted) return;
 
-        if (Platform.OS !== "web") OneSignal.login(userId);
+        if (Platform.OS !== "web") {
+          OneSignal.login(userId);
+          // login() SOLO asocia el external_id a este dispositivo; NO reactiva la
+          // suscripción push. Si quedó en opt-out (un logout previo la apagó, o el
+          // dispositivo estaba "muerto": token vacío / enabled:false), las push
+          // dejan de llegar aunque el usuario vuelva a entrar. optIn() la vuelve a
+          // encender. Es idempotente y NO pide permiso (eso es requestPermission),
+          // así que no puede robar el foco ni pisar una preferencia del usuario:
+          // si el permiso del SO sigue concedido, revive la suscripción; si el
+          // usuario denegó en Ajustes, es un no-op (no hay token que activar).
+          OneSignal.User.pushSubscription.optIn();
+        }
 
         try {
           // loadProfile ya tiene reintentos con backoff y cache propios;

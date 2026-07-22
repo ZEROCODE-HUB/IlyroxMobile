@@ -13,6 +13,7 @@ import { User } from "../../types";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 import { COLORS } from "../../constants/colors";
+import PushPermissionBanner from "../../components/PushPermissionBanner";
 
 export default function FeedScreen() {
   const router = useRouter();
@@ -140,6 +141,7 @@ export default function FeedScreen() {
         />
       </Animated.View>
 
+      <PushPermissionBanner />
     </View>
   );
 }
