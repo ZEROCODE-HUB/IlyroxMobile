@@ -18,6 +18,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { SearchFiltersBar } from "./SearchFiltersBar";
 import { PropertyMap } from "./PropertyMap";
+import { CoincidentPropertiesSheet } from "./CoincidentPropertiesSheet";
 import { SearchFiltersModal } from "./SearchFiltersModal";
 import PolygonDrawingOverlay from "./PolygonDrawingOverlay";
 import {
@@ -51,6 +52,8 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
 
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [highlightedPropertyId, setHighlightedPropertyId] = useState<string | null>(null);
+  // Propiedades que comparten una misma coordenada (selector de "N en este punto").
+  const [stackPropertyIds, setStackPropertyIds] = useState<string[] | null>(null);
 
   // Altura de la SearchFiltersBar para posicionar la instrucción de polígonos debajo de ella
   const [searchBarHeight, setSearchBarHeight] = useState(64);
@@ -290,6 +293,24 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     }, 1000);
   };
 
+  // Varias propiedades en la misma coordenada: abrir el selector para elegir.
+  const handleStackPress = (propertyIds: string[]) => {
+    if (propertyIds.length === 1) {
+      handleMarkerPress(propertyIds[0], undefined as any);
+      return;
+    }
+    setStackPropertyIds(propertyIds);
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+  };
+
+  const stackProperties = useMemo(() => {
+    if (!stackPropertyIds) return null;
+    const byId = new Map(properties.map((p) => [p.id, p]));
+    return stackPropertyIds
+      .map((id) => byId.get(id))
+      .filter((p): p is Property => !!p);
+  }, [stackPropertyIds, properties]);
+
   // ── Handlers de polígono ──
 
   // Umbral de proximidad para cerrar el polígono tocando cerca del primer punto.
@@ -395,6 +416,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         <PropertyMap
           properties={filteredProperties}
           onMarkerPress={drawingMode ? () => {} : handleMarkerPress}
+          onStackPress={drawingMode ? undefined : handleStackPress}
           googleApiKey={googleApiKey}
           highlightedPropertyId={highlightedPropertyId}
           focusRegion={focusRegion}
@@ -417,6 +439,16 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           hasZones={filters.polygons.length > 0}
         />
       </View>
+
+      {/* Selector cuando un pin agrupa varias propiedades en la misma coordenada */}
+      <CoincidentPropertiesSheet
+        properties={stackProperties}
+        onClose={() => setStackPropertyIds(null)}
+        onSelect={(p) => {
+          setStackPropertyIds(null);
+          router.push({ pathname: "/property/[id]", params: { id: p.id } });
+        }}
+      />
 
       {/* Barra inferior — SIEMPRE en el DOM para evitar que el mapa cambie de tamaño.
           En modo dibujo se oculta visualmente pero mantiene su espacio en el layout. */}

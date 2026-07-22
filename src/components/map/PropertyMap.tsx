@@ -21,6 +21,10 @@ const DRAFT_DASH_PATTERN = [8, 4];
 interface PropertyMapProps {
   properties: Property[];
   onMarkerPress: (propertyId: string, property: Property) => void;
+  /** Se dispara cuando un pin/clúster representa VARIAS propiedades en la misma
+      coordenada (que el zoom no puede separar). Recibe todos sus ids para que
+      la pantalla ofrezca un selector; sin esto solo se abriría una de ellas. */
+  onStackPress?: (propertyIds: string[]) => void;
   googleApiKey?: string;
   highlightedPropertyId?: string | null;
   focusRegion?: {
@@ -46,6 +50,7 @@ interface PropertyMapProps {
 export const PropertyMap: React.FC<PropertyMapProps> = ({
   properties,
   onMarkerPress,
+  onStackPress,
   googleApiKey,
   highlightedPropertyId,
   focusRegion,
@@ -112,6 +117,27 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     return map;
   }, [properties]);
 
+  // Clave de coincidencia por coordenada (~1 m con 5 decimales). Varias
+  // propiedades pueden compartir exactamente la misma coordenada (p. ej.
+  // EasyBroker asigna a menudo el centro de la colonia, no la casa concreta):
+  // sus marcadores quedan encimados y, sin agrupar, solo se abriría una.
+  const coincidenceKey = (lat: number, lng: number) =>
+    `${lat.toFixed(5)},${lng.toFixed(5)}`;
+
+  const coincidentGroups = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    properties.forEach((p) => {
+      const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
+      const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
+      if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return;
+      const key = coincidenceKey(lat, lng);
+      const arr = groups.get(key);
+      if (arr) arr.push(p.id);
+      else groups.set(key, [p.id]);
+    });
+    return groups;
+  }, [properties]);
+
   const superclusterRef = useRef<Supercluster | null>(null);
 
   const superclusterIndex = useMemo(() => {
@@ -166,12 +192,24 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
   const handleClusterPress = (clusterId: number) => {
     const leaves = superclusterIndex.getLeaves(clusterId, Infinity);
+    // Con una lista vacía, MapKit calcula un MKMapRect nulo y aborta.
+    if (leaves.length === 0) return;
     const coords = leaves.map((l: any) => ({
       latitude: l.geometry.coordinates[1],
       longitude: l.geometry.coordinates[0],
     }));
-    // Con una lista vacía, MapKit calcula un MKMapRect nulo y aborta.
-    if (coords.length === 0) return;
+    // Si TODAS las hojas están (casi) en el mismo punto, el zoom nunca separará
+    // el clúster: ofrecemos un selector con todas las propiedades en su lugar.
+    const first = coords[0];
+    const allSamePoint = coords.every(
+      (c) =>
+        Math.abs(c.latitude - first.latitude) < 1e-5 &&
+        Math.abs(c.longitude - first.longitude) < 1e-5,
+    );
+    if (allSamePoint && onStackPress) {
+      onStackPress(leaves.map((l: any) => l.properties.propertyId as string));
+      return;
+    }
     nativeMapRef.current?.fitToCoordinates(coords, {
       edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
       animated: true,
@@ -684,6 +722,16 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
                 key={p.id}
                 coordinate={{ latitude: Number(lat), longitude: Number(lng) }}
                 onPress={() => {
+                  // Si en esta misma coordenada hay varias propiedades (zoom
+                  // cercano, sin agrupar), abrir el selector en vez de una sola.
+                  const group = coincidentGroups.get(
+                    coincidenceKey(Number(lat), Number(lng)),
+                  );
+                  if (group && group.length > 1 && onStackPress) {
+                    if (Platform.OS !== "web") Haptics.selectionAsync();
+                    onStackPress(group);
+                    return;
+                  }
                   const r = makeFocusRegion(Number(lat), Number(lng));
                   nativeMapRef.current?.animateToRegion(r, 600);
                   if (Platform.OS !== "web") Haptics.selectionAsync();

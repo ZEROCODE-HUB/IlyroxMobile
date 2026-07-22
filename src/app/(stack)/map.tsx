@@ -16,19 +16,27 @@ function extractServerFilters(filters: ReturnType<typeof usePropertyFiltersStore
   // El filtrado preciso por múltiples bounds se hace client-side en usePropertyFilters.
   const chipWithBounds = filters.locationChips?.find((c) => c.bounds);
   if (chipWithBounds?.bounds) {
-    // Si TODOS los chips con bounds son de COLONIA, NO filtramos por bounds en el
-    // servidor: las coordenadas de EasyBroker suelen estar corridas (a veces el
-    // centro de la ciudad) y la propiedad de esa colonia caería fuera del
-    // recuadro y se perdería. En su lugar traemos por municipio (texto) y el
-    // cliente (usePropertyFilters) hace el match preciso por colonia, que es
-    // bidireccional ("La Perla" coincide con "La Perla Norte").
+    // Si TODOS los chips con bounds son de COLONIA, NO filtramos la UBICACIÓN en
+    // el servidor: la dejamos por completo al cliente (usePropertyFilters), que
+    // hace el match por colonia de forma bidireccional ("La Perla" coincide con
+    // "La Perla Norte") y tolerante.
+    //
+    // Por qué NO acotamos por municipio ni por estado en el servidor:
+    //  - Por municipio: una misma colonia puede caer en varios municipios
+    //    (p. ej. "La Perla Norte" está en Aguascalientes y en Jesús María); al
+    //    acotar por uno, las de esa colonia en el otro municipio se perdían.
+    //  - Por estado: el texto de Google abrevia el estado ("Ags." en vez de
+    //    "Aguascalientes"), así que `ilike estado '%Ags.%'` no matchea nada y
+    //    devolvía 0 resultados.
+    // Sin filtro de ubicación en servidor traemos amplio (como la LISTA, que ya
+    // muestra el conteo correcto) y el cliente afina por colonia. Así mapa y
+    // lista coinciden.
     const boundsChips = filters.locationChips.filter((c) => c.bounds);
     const soloColonias = boundsChips.every((c) => c.type === "colonia");
 
     if (soloColonias) {
-      const mun = chipWithBounds.locationFilter.municipio;
-      if (mun && typeof mun === "string") f.municipio = mun;
-      // sin f.bounds → el cliente filtra por colonia (bounds O texto)
+      // Intencionalmente sin f.bounds / f.municipio / f.estado:
+      // el cliente filtra por colonia (bounds O texto).
     } else {
       // municipio / estado / zona dibujada: el recuadro SÍ es el área correcta.
       let north = chipWithBounds.bounds.north;
