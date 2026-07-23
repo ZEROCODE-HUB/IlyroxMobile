@@ -2,7 +2,7 @@
   "expo": {
     "name": "ilyrox",
     "slug": "ilyrox",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "runtimeVersion": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/Icon-size.png",
