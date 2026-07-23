@@ -53,6 +53,13 @@ interface PropertyCardProps {
   showContactButton?: boolean;
   currentUserId?: string;
   onPropertyUpdated?: () => void;
+  /**
+   * Se ejecuta (y se espera) ANTES de navegar a "Contactar". Se usa cuando la
+   * tarjeta vive dentro de un <Modal> nativo (p. ej. Coincidencias): hay que
+   * cerrar ese modal primero, si no la pantalla de mensajes se abre por detrás
+   * en iOS y parece que "no funciona".
+   */
+  onBeforeNavigate?: () => void | Promise<void>;
 }
 
 const PropertyCard: React.FC<PropertyCardProps> = ({
@@ -63,6 +70,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   showContactButton = true,
   currentUserId,
   onPropertyUpdated,
+  onBeforeNavigate,
 }) => {
   const {
     showOptions,
@@ -211,6 +219,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     if (campos.m2Construccion && f.constructionSqft > 0) add("construccion", buildingIcon, "Const.", fmtM2(f.constructionSqft));
     if (campos.recamaras && f.beds > 0) add("beds", ionIcon("bed-outline"), "Rec.", `${f.beds}`);
     if (campos.banos && f.baths > 0) add("baths", toiletIcon, "Baños", `${f.baths}`);
+    if (campos.banos && (f.halfBaths ?? 0) > 0) add("halfBaths", toiletIcon, "Medios", `${f.halfBaths}`);
     if (campos.estacionamientos && (f.parking ?? 0) > 0) add("parking", ionIcon("car-outline"), "Estac.", `${f.parking}`);
     if (campos.m2Terreno && f.landSqft > 0) add("terreno", superficieIcon, "Terreno", fmtM2(f.landSqft));
   }
@@ -219,8 +228,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
   const [showMap, setShowMap] = React.useState(false);
 
-  const handleContactPress = () => {
+  const handleContactPress = async () => {
     if (!userId) return;
+
+    // Si la tarjeta está dentro de un modal nativo, cerrarlo antes de navegar.
+    if (onBeforeNavigate) await onBeforeNavigate();
 
     handleContact(item.user.id, property.id, {
       id: item.user.id,

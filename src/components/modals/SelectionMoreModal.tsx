@@ -11,6 +11,11 @@ interface SelectionMoreModalProps {
   currentValue?: string;
   /** Etiqueta de la sección de cantidad (default "Cantidad"); p.ej. "Plantas". */
   quantityLabel?: string;
+  /**
+   * Valor mínimo de la grilla de cantidad (default 0). Para "Niveles/Plantas"
+   * se pasa 1: una construcción no puede tener 0 plantas.
+   */
+  minQuantity?: number;
 }
 
 export const SelectionMoreModal: React.FC<SelectionMoreModalProps> = ({
@@ -20,6 +25,7 @@ export const SelectionMoreModal: React.FC<SelectionMoreModalProps> = ({
   title,
   currentValue,
   quantityLabel = "Cantidad",
+  minQuantity = 0,
 }) => {
   const [selected, setSelected] = useState<string>(
     currentValue || "No indicado",
@@ -100,9 +106,9 @@ export const SelectionMoreModal: React.FC<SelectionMoreModalProps> = ({
             {/* Cantidad section */}
             <Text style={styles.sectionLabel}>{quantityLabel}</Text>
             <View style={styles.buttonGrid}>
-              {["0", "1", "2", "3", "4", "5"].map((num) =>
-                renderButton(num, num),
-              )}
+              {["0", "1", "2", "3", "4", "5"]
+                .filter((num) => Number(num) >= minQuantity)
+                .map((num) => renderButton(num, num))}
             </View>
 
             {/* Buscar desde section */}

@@ -13,6 +13,7 @@ import { OneSignal } from "react-native-onesignal";
 import { Platform } from "react-native";
 import { useModal } from "@/context/ModalContext";
 import { logger } from "@/utils/logger";
+import { collapseSpaces } from "@/utils/stringNormalizer";
 
 const log = logger.scoped("useExternalAuth");
 
@@ -202,9 +203,9 @@ export function useExternalAuth() {
         const newProfile: perfiles = {
           id: pendingUser.id,
           email: pendingUser.email,
-          nombre: formData.name || pendingUser.fullName || "Usuario",
-          apellido_paterno: formData.lastNamePaterno,
-          apellido_materno: formData.lastNameMaterno,
+          nombre: collapseSpaces(formData.name || pendingUser.fullName || "Usuario"),
+          apellido_paterno: collapseSpaces(formData.lastNamePaterno),
+          apellido_materno: collapseSpaces(formData.lastNameMaterno),
           celular: formData.phone || "",
           prefijo_celular: undefined,
           rol: "cliente",
@@ -220,8 +221,9 @@ export function useExternalAuth() {
           modalidad: formData.modalidad || undefined,
           nombre_inmobiliaria: formData.nombreInmobiliaria || undefined,
           curso_certificacion: undefined,
-          nombre_completo:
-            `${formData.name} ${formData.lastNamePaterno} ${formData.lastNameMaterno}`.trim(),
+          nombre_completo: collapseSpaces(
+            `${formData.name} ${formData.lastNamePaterno} ${formData.lastNameMaterno}`,
+          ),
           activado_en: undefined,
           deleted_at: undefined,
           biografia: undefined,

@@ -81,7 +81,10 @@ export default function FeedScreen() {
   useEffect(() => {
     if (pendingOpenMap) {
       setPendingOpenMap(false);
-      router.push("/(stack)/map");
+      // navigate (no push): si el mapa ya está en el stack, vuelve a esa
+      // instancia en vez de apilar otra. Evita que el mapa quede duplicado y que
+      // "Atrás" (en iPhone) te devuelva a un segundo mapa recargándose.
+      router.navigate("/(stack)/map");
     }
   }, [pendingOpenMap]);
 
@@ -137,7 +140,7 @@ export default function FeedScreen() {
           style={{ height: TOTAL_HEADER_HEIGHT }}
           onSearchingChange={setIsSearching}
           isHeaderVisible={headerShown}
-          onOpenMap={() => router.push("/(stack)/map")}
+          onOpenMap={() => router.navigate("/(stack)/map")}
         />
       </Animated.View>
 

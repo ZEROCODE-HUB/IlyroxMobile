@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  Modal,
   TextInput,
   FlatList,
 } from "react-native";
@@ -16,7 +15,6 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { FeedItem, User } from "../types";
-import PropertyDetail from "./Details/PropertyDetail";
 
 import { LeadPropertiesModal } from "./LeadPropertiesModal";
 import { AppHeader } from "./AppHeader";
@@ -91,7 +89,6 @@ const Matches: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [savedSearches, setSavedSearches] = useState<any[]>([]);
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   // Estado para edición de búsqueda
@@ -443,10 +440,18 @@ const Matches: React.FC = () => {
             colony: prop.colonia,
             municipio: prop.municipio,
           },
+          // Coordenadas: sin ellas el MapModal mostraba "Mapa No Disponible".
+          latitud: prop.latitud != null ? Number(prop.latitud) : undefined,
+          longitud: prop.longitud != null ? Number(prop.longitud) : undefined,
+          coordinates:
+            prop.latitud != null && prop.longitud != null
+              ? { lat: Number(prop.latitud), lng: Number(prop.longitud) }
+              : undefined,
           images: propertyImages,
           features: {
             beds: prop.habitaciones,
             baths: prop.banos,
+            halfBaths: prop.medios_banos || 0,
             parking: prop.estacionamientos,
             constructionSqft: prop.metros_cuadrados_construccion,
             landSqft: prop.metros_cuadrados_terreno,
@@ -634,10 +639,26 @@ const Matches: React.FC = () => {
           similars={selectedLead.similars}
           searchCriteria={selectedLead.searchCriteria}
           onPropertyClick={(propertyId) => {
-            setSelectedPropertyId(propertyId);
+            // El detalle es una pantalla de stack. Si la abrimos con el modal
+            // del lead presentado, en iOS queda por detrás (no abre nada).
+            // Cerramos el modal y navegamos en el siguiente tick.
+            setSelectedLeadId(null);
+            setTimeout(
+              () =>
+                router.push({
+                  pathname: "/property/[id]",
+                  params: { id: propertyId },
+                }),
+              350,
+            );
           }}
           onUserClick={(user) => {
-            router.push({ pathname: "/user/[id]", params: { id: user.id } });
+            setSelectedLeadId(null);
+            setTimeout(
+              () =>
+                router.push({ pathname: "/user/[id]", params: { id: user.id } }),
+              350,
+            );
           }}
           onDeleteSearch={handleDeleteSearch}
           currentUserId={user?.id}
@@ -670,19 +691,6 @@ const Matches: React.FC = () => {
         userId={user?.id}
       />
 
-      {/* Modal de detalle de propiedad */}
-      {selectedPropertyId && (
-        <Modal
-          visible={!!selectedPropertyId}
-          animationType="slide"
-          onRequestClose={() => setSelectedPropertyId(null)}
-        >
-          <PropertyDetail
-            propertyId={selectedPropertyId}
-            onClose={() => setSelectedPropertyId(null)}
-          />
-        </Modal>
-      )}
     </ScreenWrapper>
   );
 };

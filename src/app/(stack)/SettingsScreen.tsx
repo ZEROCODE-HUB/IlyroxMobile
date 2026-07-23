@@ -6,8 +6,12 @@ import {
   TouchableOpacity,
   ScrollView,
   Modal,
+  Switch,
+  Platform,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { OneSignal } from "react-native-onesignal";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
@@ -93,6 +97,74 @@ const SettingsScreen: React.FC = () => {
 
   const [showEditProfile, setShowEditProfile] = React.useState(false);
 
+  // ── Switch de notificaciones push (por dispositivo) ──
+  // optIn/optOut de OneSignal es a nivel de ESTE dispositivo y el SDK lo
+  // persiste entre sesiones. getOptedInAsync() es true cuando hay permiso del
+  // sistema y no se hizo optOut. Escuchamos 'change' para reflejar cambios
+  // (p. ej. si el usuario toca el permiso desde ajustes del sistema).
+  const [pushEnabled, setPushEnabled] = React.useState(false);
+  const [pushBusy, setPushBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    if (Platform.OS === "web") return;
+    let mounted = true;
+    OneSignal.User.pushSubscription
+      .getOptedInAsync()
+      .then((v) => mounted && setPushEnabled(!!v))
+      .catch(() => {});
+    const onChange = () => {
+      OneSignal.User.pushSubscription
+        .getOptedInAsync()
+        .then((v) => mounted && setPushEnabled(!!v))
+        .catch(() => {});
+    };
+    OneSignal.User.pushSubscription.addEventListener("change", onChange);
+    return () => {
+      mounted = false;
+      OneSignal.User.pushSubscription.removeEventListener("change", onChange);
+    };
+  }, []);
+
+  const handleTogglePush = async (next: boolean) => {
+    if (Platform.OS === "web" || pushBusy) return;
+    setPushBusy(true);
+    // Optimista: refleja la intención al instante; el listener 'change' corrige
+    // si el permiso del sistema no lo permite.
+    setPushEnabled(next);
+    try {
+      if (next) {
+        // optIn dispara el prompt del sistema si aún no se ha decidido.
+        OneSignal.User.pushSubscription.optIn();
+        const granted = await OneSignal.Notifications.requestPermission(true);
+        const optedIn = await OneSignal.User.pushSubscription.getOptedInAsync();
+        setPushEnabled(!!optedIn);
+        // Si el permiso está denegado a nivel del sistema, hay que abrir ajustes.
+        if (!granted && !optedIn) {
+          showModal({
+            title: "Activa las notificaciones",
+            message:
+              "Las notificaciones están desactivadas en los ajustes del sistema. Ábrelos para permitirlas.",
+            confirmText: "Abrir ajustes",
+            cancelText: "Ahora no",
+            onConfirm: () => Linking.openSettings(),
+          });
+        }
+      } else {
+        OneSignal.User.pushSubscription.optOut();
+        setPushEnabled(false);
+      }
+    } catch (e) {
+      log.error("Error alternando push:", e);
+      // Revertir a lo que reporte el SDK.
+      try {
+        const v = await OneSignal.User.pushSubscription.getOptedInAsync();
+        setPushEnabled(!!v);
+      } catch {}
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
   const settingsOptions: { id: string; title: string; icon: IoniconName; onPress: () => void; color?: string; showChevron?: boolean }[] = [
     {
       id: "edit_profile",
@@ -159,6 +231,31 @@ const SettingsScreen: React.FC = () => {
       />
 
       <ScrollView style={styles.content}>
+        {Platform.OS !== "web" && (
+          <View style={styles.section}>
+            <View style={styles.optionItem}>
+              <View style={styles.optionLeft}>
+                <View style={styles.iconContainer}>
+                  <Ionicons
+                    name="notifications-outline"
+                    size={22}
+                    color={COLORS.primary}
+                  />
+                </View>
+                <Text style={styles.optionTitle}>Notificaciones push</Text>
+              </View>
+              <Switch
+                value={pushEnabled}
+                onValueChange={handleTogglePush}
+                disabled={pushBusy}
+                trackColor={{ false: COLORS.cardBorder, true: COLORS.primary }}
+                thumbColor={COLORS.white}
+                ios_backgroundColor={COLORS.cardBorder}
+              />
+            </View>
+          </View>
+        )}
+
         <View style={styles.section}>
           {settingsOptions.map((option) => (
             <TouchableOpacity

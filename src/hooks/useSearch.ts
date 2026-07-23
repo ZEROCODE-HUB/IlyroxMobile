@@ -81,15 +81,14 @@ const EMPTY_RESULTS: SearchResults = {
 };
 
 async function fetchUsers(q: string): Promise<SearchUser[]> {
-  const { data } = await supabase
-    .from("perfiles")
-    .select("id, nombre, nombre_completo, apellido_paterno, foto, ocupacion, calificacion_promedio")
-    .or(`nombre_completo.ilike.%${q}%,nombre.ilike.%${q}%,apellido_paterno.ilike.%${q}%`)
-    .neq("estado_registro", "eliminado")
-    .not("nombre", "is", null)
-    .limit(10);
+  // RPC `buscar_perfiles`: normaliza acentos/espacios y exige que TODAS las
+  // palabras del término estén presentes (AND) sobre el nombre completo armado
+  // de las partes. Reemplaza el `.or(...ilike...)` que fallaba con acentos
+  // ("Gutierrez" ≠ "Gutiérrez"), con apellidos parciales ("Alejandro G") y con
+  // datos que traían dobles espacios. Ver supabase/buscar_perfiles.sql.
+  const { data } = await supabase.rpc("buscar_perfiles", { q, lim: 10 });
 
-  return (data ?? []).map((p) => ({
+  return ((data as any[]) ?? []).map((p) => ({
     id: p.id,
     name: p.nombre_completo || [p.nombre, p.apellido_paterno].filter(Boolean).join(" ") || "Usuario",
     avatar: p.foto || undefined,

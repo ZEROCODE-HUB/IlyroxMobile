@@ -46,6 +46,7 @@ export const propertyService = {
           fotos,
           habitaciones,
           banos,
+          medios_banos,
           metros_cuadrados_construccion,
           metros_cuadrados_terreno,
           activo,
@@ -124,6 +125,7 @@ export const propertyService = {
         features: {
           beds: p.habitaciones || 0,
           baths: p.banos || 0,
+          halfBaths: p.medios_banos || 0,
           constructionSqft: p.metros_cuadrados_construccion || 0,
           landSqft: p.metros_cuadrados_terreno || 0,
         },

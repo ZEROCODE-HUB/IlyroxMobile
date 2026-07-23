@@ -104,7 +104,7 @@ function buildNotificationNavigation(
       return () => router.push("/(tabs)/profile");
 
     default:
-      if (data.type === "recordar_filtros") return () => router.push("/(stack)/map");
+      if (data.type === "recordar_filtros") return () => router.navigate("/(stack)/map");
       return null;
   }
 }

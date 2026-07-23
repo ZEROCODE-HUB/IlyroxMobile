@@ -306,6 +306,14 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                   }
                   onCommentClick={() => handleCommentClick(property.id)}
                   currentUserId={currentUserId}
+                  // Cerrar este modal nativo antes de abrir la pantalla de
+                  // mensajes; si no, en iOS se abre por detrás.
+                  onBeforeNavigate={() =>
+                    new Promise<void>((resolve) => {
+                      onClose();
+                      setTimeout(resolve, 350);
+                    })
+                  }
                 />
                 {/* Badge Overlay */}
                 <View

@@ -75,6 +75,7 @@ export interface PropertyFilters {
   };
   habitaciones: string;
   banos: string;
+  mediosBanos: string;
   estacionamientos: string;
   antiguedad: string;
   niveles: string;
@@ -169,6 +170,7 @@ const initialFilters: PropertyFilters = {
   },
   habitaciones: "",
   banos: "",
+  mediosBanos: "",
   estacionamientos: "",
   antiguedad: "",
   niveles: "",
@@ -362,6 +364,9 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
           },
           habitaciones: search.habitaciones ? String(search.habitaciones) : "",
           banos: search.banos ? String(search.banos) : "",
+          mediosBanos: (search as any).medios_banos
+            ? String((search as any).medios_banos)
+            : (criterios?.medios_banos ? String(criterios.medios_banos) : ""),
           estacionamientos: search.estacionamientos ? String(search.estacionamientos) : "",
           antiguedad: (search as any).antiguedad || criterios?.antiguedad || "",
           niveles: (search as any).pisos ? String((search as any).pisos) : (criterios?.niveles || ""),
@@ -406,6 +411,7 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
         filters.precioMax !== "" ||
         filters.habitaciones !== "" ||
         filters.banos !== "" ||
+        filters.mediosBanos !== "" ||
         filters.estacionamientos !== "" ||
         filters.antiguedad !== "" ||
         filters.niveles !== "" ||
