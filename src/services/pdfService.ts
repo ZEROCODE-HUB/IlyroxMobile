@@ -1,3 +1,4 @@
+import { Image } from "react-native";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { documentDirectory, moveAsync } from "expo-file-system/legacy";
@@ -254,9 +255,27 @@ export const fetchPropertyData = async (
 // GENERADOR DE HTML
 // ============================================================================
 
+/**
+ * Devuelve true si la imagen es VERTICAL (retrato, alto > ancho). Se usa para
+ * la portada del PDF: una foto vertical no cabe en la caja apaisada de alto fijo
+ * y `object-fit: cover` la recortaba. Si no se puede medir, asume horizontal.
+ */
+const isImagePortrait = (url: string): Promise<boolean> =>
+  new Promise((resolve) => {
+    if (!url) return resolve(false);
+    Image.getSize(
+      url,
+      (w, h) => resolve(h > w),
+      () => resolve(false),
+    );
+  });
+
 const generatePropertyHtml = (
   data: PropertyPdfData,
-  config: typeof PDF_FIELD_CONFIG & { showDatosCompletos?: boolean }, // Asumo que esta flag vendrá en tu config o puedes forzarla
+  config: typeof PDF_FIELD_CONFIG & {
+    showDatosCompletos?: boolean;
+    heroIsPortrait?: boolean;
+  }, // Asumo que esta flag vendrá en tu config o puedes forzarla
 ): string => {
   const operacionPrincipal = data.operaciones?.[0];
   const statusLabel =
@@ -461,6 +480,15 @@ const generatePropertyHtml = (
             width: 100%;
             height: 100%;
             object-fit: cover;
+        }
+        /* Portada VERTICAL: caja mas alta y object-fit contain para que la foto
+           se vea COMPLETA (sin recortar arriba/abajo). Fondo neutro. */
+        .hero-container.hero-portrait {
+            height: 560px;
+            background-color: #f3f4f6;
+        }
+        .hero-container.hero-portrait .hero-img {
+            object-fit: contain;
         }
         .tag-badge {
             position: absolute;
@@ -764,7 +792,7 @@ const generatePropertyHtml = (
     </head>
     <body>
       
-      <div class="hero-container">
+      <div class="hero-container${config.heroIsPortrait ? " hero-portrait" : ""}">
         ${heroImage ? `<img src="${heroImage}" class="hero-img" />` : '<div style="width:100%;height:100%;background:#ccc;"></div>'}
         <div class="tag-badge">${statusLabel}</div>
       </div>
@@ -901,12 +929,20 @@ export const pdfService = {
       throw new Error("No se pudieron obtener los datos de la propiedad");
     }
 
+    // Orientación de la portada: si la primera foto es vertical, la caja de la
+    // portada se adapta (más alta + contain) para no recortarla.
+    const firstPhoto = (propertyData.fotos || []).find(
+      (f) => f && typeof f === "string" && f.startsWith("http"),
+    );
+    const heroIsPortrait = firstPhoto ? await isImagePortrait(firstPhoto) : false;
+
     // Determinar configuración según el modo
     const config = {
       ...(includeAllData
         ? { ...PDF_FIELD_CONFIG }
         : { ...PDF_FIELD_CONFIG, ...PDF_SIN_DATOS_OVERRIDE }),
       showDatosCompletos: includeAllData,
+      heroIsPortrait,
     };
 
     // Generar HTML

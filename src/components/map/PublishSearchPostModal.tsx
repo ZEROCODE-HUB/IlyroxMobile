@@ -116,6 +116,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
   // Características
   const [habitaciones, setHabitaciones] = useState("");
   const [banos, setBanos] = useState("");
+  const [mediosBanos, setMediosBanos] = useState("");
   const [estacionamientos, setEstacionamientos] = useState("");
   const [niveles, setNiveles] = useState("");
   const [antiguedad, setAntiguedad] = useState("");
@@ -235,6 +236,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
       const car = f.caracteristicas ?? {};
       setHabitaciones(car.habitaciones ? String(car.habitaciones) : "");
       setBanos(car.banos ? String(car.banos) : "");
+      setMediosBanos(car.medios_banos ? String(car.medios_banos) : "");
       setEstacionamientos(car.estacionamientos ? String(car.estacionamientos) : "");
       setNiveles(car.niveles ? String(car.niveles) : "");
       setAntiguedad(car.antiguedad ? String(car.antiguedad) : "");
@@ -355,6 +357,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
           ...initialMetadata.filtros?.caracteristicas,
           habitaciones: parseNum(habitaciones) ?? initialMetadata.filtros?.caracteristicas?.habitaciones,
           banos: parseNum(banos) ?? initialMetadata.filtros?.caracteristicas?.banos,
+          medios_banos: parseNum(mediosBanos) ?? initialMetadata.filtros?.caracteristicas?.medios_banos,
           estacionamientos: parseNum(estacionamientos) ?? initialMetadata.filtros?.caracteristicas?.estacionamientos,
           niveles: parseNum(niveles) ?? initialMetadata.filtros?.caracteristicas?.niveles,
           antiguedad: antiguedad || initialMetadata.filtros?.caracteristicas?.antiguedad,
@@ -596,6 +599,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
           {/* ── Características (según tipo) ───────────────── */}
           {(camposVisibles.recamaras ||
             camposVisibles.banos ||
+            camposVisibles.mediosBanos ||
             camposVisibles.estacionamientos ||
             camposVisibles.niveles ||
             camposVisibles.antiguedad) && (
@@ -620,6 +624,17 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
                       keyboardType="numeric"
                       value={banos}
                       onChangeText={setBanos}
+                    />
+                  </View>
+                )}
+                {camposVisibles.mediosBanos && (
+                  <View style={styles.fieldHalf}>
+                    <AppInput
+                      label="Medios baños"
+                      placeholder="Ej. 1"
+                      keyboardType="numeric"
+                      value={mediosBanos}
+                      onChangeText={setMediosBanos}
                     />
                   </View>
                 )}

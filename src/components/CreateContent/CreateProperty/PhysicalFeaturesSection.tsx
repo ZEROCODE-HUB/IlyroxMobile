@@ -85,8 +85,8 @@ export const PhysicalFeaturesSection = React.memo(
       });
 
     const openNumberInput = useCallback(
-      (title: string, onSave: (val: string) => void) => {
-        setNumberInputConfig({ title, onSave });
+      (title: string, onSave: (val: string) => void, minValue?: number) => {
+        setNumberInputConfig({ title, onSave, minValue });
         setShowNumberInput(true);
       },
       [],
@@ -283,8 +283,10 @@ export const PhysicalFeaturesSection = React.memo(
               onClose={() => setShowNivelesModal(false)}
               onSelect={(val) => {
                 if (val === "Más") {
-                  openNumberInput("Niveles", (customVal) =>
-                    setNiveles(customVal),
+                  openNumberInput(
+                    "Niveles",
+                    (customVal) => setNiveles(customVal),
+                    1, // una construcción no puede tener 0 plantas
                   );
                 } else {
                   setNiveles(val);
@@ -445,7 +447,7 @@ export const PhysicalFeaturesSection = React.memo(
           title={numberInputConfig.title}
           placeholder="Ingresa un número"
           maxValue={999}
-          minValue={0}
+          minValue={numberInputConfig.minValue ?? 0}
         />
       </View>
     );

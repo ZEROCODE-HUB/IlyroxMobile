@@ -84,6 +84,7 @@ interface SupabaseProperty {
   fotos: string[] | null;
   habitaciones: number | null;
   banos: number | null;
+  medios_banos: number | null;
   metros_cuadrados_construccion: number | null;
   metros_cuadrados_terreno: number | null;
   ancho_terreno: number | null;
@@ -153,6 +154,7 @@ function mapProperty(p: SupabaseProperty): Property {
     features: {
       beds: p.habitaciones || 0,
       baths: p.banos || 0,
+      halfBaths: p.medios_banos || 0,
       parking: p.estacionamientos || 0,
       constructionSqft: p.metros_cuadrados_construccion || 0,
       landSqft: p.metros_cuadrados_terreno || 0,

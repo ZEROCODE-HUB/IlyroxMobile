@@ -64,6 +64,8 @@ export interface ComisionSetters {
 export interface NumberInputConfig {
   title: string;
   onSave: (val: string) => void;
+  /** Mínimo permitido en el input (default 0). Para "Niveles" se usa 1. */
+  minValue?: number;
 }
 
 export interface CreatePropertyProps {

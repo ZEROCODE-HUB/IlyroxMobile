@@ -134,20 +134,24 @@ function chipTextMatch(
   chip: LocationChip,
 ): boolean {
   const lf = chip.locationFilter;
+  // Respaldo del término con la etiqueta del chip (primer componente) por si el
+  // locationFilter del nivel viniera vacío.
+  const label = normalizeStr((chip.label || "").split(",")[0]);
   if (chip.type === "colonia") {
     const c = Array.isArray(lf.colonia) ? lf.colonia[0] : lf.colonia;
+    const term = normalizeStr(c || "") || label;
     const pColonia = normalizeStr(p.colonia || p.location?.colony || "");
-    return includesEither(pColonia, normalizeStr(c || ""));
+    return includesEither(pColonia, term);
   }
   if (chip.type === "municipio") {
-    const f = normalizeStr(lf.municipio || "");
+    const f = normalizeStr(lf.municipio || "") || label;
     const pMunicipio = normalizeStr(p.municipio || p.location?.municipio || "");
     const pCiudad = normalizeStr(rawP.ciudad || p.location?.city || "");
     return includesEither(pMunicipio, f) || includesEither(pCiudad, f);
   }
   if (chip.type === "estado") {
     const pEstado = normalizeStr(p.location?.state || rawP.estado || "");
-    return includesEither(pEstado, normalizeStr(lf.estado || ""));
+    return includesEither(pEstado, normalizeStr(lf.estado || "") || label);
   }
   return false;
 }
@@ -217,7 +221,15 @@ export const usePropertyFilters = (
         if (hasChips && !geoMatch) {
           geoMatch = filters.locationChips.some((chip) => {
             // 1) Dentro del recuadro geográfico (sistema por bounds).
-            if (chip.bounds && hasCoords) {
+            //    OJO: para chips de COLONIA NO usamos los bounds de Google. El
+            //    "viewport" que Google devuelve para una colonia suele ser mucho
+            //    más grande que la colonia real y arrastraba propiedades de
+            //    colonias vecinas (p. ej. buscar "Santa Imelda" mostraba las de
+            //    "Tamarindos"). Como la columna `colonia` está bien poblada, para
+            //    colonia confiamos en el match por TEXTO (paso 2). Los bounds
+            //    siguen valiendo para municipio/estado, donde el recuadro sí es
+            //    el área correcta.
+            if (chip.type !== "colonia" && chip.bounds && hasCoords) {
               const b = chip.bounds;
               const inBounds =
                 propLat! >= b.south &&
@@ -346,6 +358,20 @@ export const usePropertyFilters = (
         } else {
           const bExact = parseInt(filters.banos);
           if (!isNaN(bExact) && baths !== bExact) return false;
+        }
+      }
+
+      // ── Medios baños ──
+      if (filters.mediosBanos && filters.mediosBanos !== "No indicado") {
+        const half = p.features?.halfBaths ?? 0;
+        if (filters.mediosBanos === "Más" || filters.mediosBanos.includes("Más")) {
+          if (half < 5) return false;
+        } else if (filters.mediosBanos.includes("+")) {
+          const mMin = parseInt(filters.mediosBanos);
+          if (!isNaN(mMin) && half < mMin) return false;
+        } else {
+          const mExact = parseInt(filters.mediosBanos);
+          if (!isNaN(mExact) && half !== mExact) return false;
         }
       }
 
@@ -511,6 +537,7 @@ export const usePropertyFilters = (
     filters.precioMax !== "" ||
     filters.habitaciones !== "" ||
     filters.banos !== "" ||
+    filters.mediosBanos !== "" ||
     filters.estacionamientos !== "" ||
     filters.antiguedad !== "" ||
     filters.niveles !== "" ||

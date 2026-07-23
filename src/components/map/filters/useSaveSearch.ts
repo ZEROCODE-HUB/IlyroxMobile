@@ -237,6 +237,7 @@ export const useSaveSearch = (userId?: string) => {
           habitaciones: filters.habitaciones,
           icon_bed: "bed-outline",
           banos: filters.banos,
+          medios_banos: filters.mediosBanos,
           icon_bath: "water-outline",
           estacionamientos: filters.estacionamientos,
           icon_car: "car-outline",
@@ -296,6 +297,8 @@ export const useSaveSearch = (userId?: string) => {
       criterios_busqueda.habitaciones = filters.habitaciones;
     if (filters.banos && filters.banos !== "No indicado")
       criterios_busqueda.banos = filters.banos;
+    if (filters.mediosBanos && filters.mediosBanos !== "No indicado")
+      criterios_busqueda.medios_banos = filters.mediosBanos;
     if (filters.estacionamientos && filters.estacionamientos !== "No indicado")
       criterios_busqueda.estacionamientos = filters.estacionamientos;
     if (filters.niveles && filters.niveles !== "No indicado")
@@ -550,6 +553,7 @@ export const useSaveSearch = (userId?: string) => {
     if (filters.precioMax) criterios_busqueda.precio_max = parseFloat(filters.precioMax.toString().replace(/,/g, ""));
     if (filters.habitaciones && filters.habitaciones !== "No indicado") criterios_busqueda.habitaciones = filters.habitaciones;
     if (filters.banos && filters.banos !== "No indicado") criterios_busqueda.banos = filters.banos;
+    if (filters.mediosBanos && filters.mediosBanos !== "No indicado") criterios_busqueda.medios_banos = filters.mediosBanos;
     if (filters.estacionamientos && filters.estacionamientos !== "No indicado") criterios_busqueda.estacionamientos = filters.estacionamientos;
     if (filters.niveles && filters.niveles !== "No indicado") criterios_busqueda.niveles = filters.niveles;
     if (filters.antiguedad && filters.antiguedad !== "No indicado") criterios_busqueda.antiguedad = filters.antiguedad;
@@ -685,6 +689,7 @@ export const useSaveSearch = (userId?: string) => {
         trim(filters.precioMax) ||
         trim(filters.habitaciones) ||
         trim(filters.banos) ||
+        trim(filters.mediosBanos) ||
         trim(filters.estacionamientos) ||
         trim(filters.niveles) ||
         trim(filters.antiguedad) ||

@@ -14,6 +14,8 @@ interface CharacteristicsSectionProps {
   setShowRecamarasModal: (show: boolean) => void;
   showBanosModal: boolean;
   setShowBanosModal: (show: boolean) => void;
+  showMediosBanosModal: boolean;
+  setShowMediosBanosModal: (show: boolean) => void;
   showEstacionamientosModal: boolean;
   setShowEstacionamientosModal: (show: boolean) => void;
   showNivelesModal: boolean;
@@ -30,6 +32,8 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
   setShowRecamarasModal,
   showBanosModal,
   setShowBanosModal,
+  showMediosBanosModal,
+  setShowMediosBanosModal,
   showEstacionamientosModal,
   setShowEstacionamientosModal,
   showNivelesModal,
@@ -109,6 +113,35 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
         </>
       )}
 
+      {/* Medios baños */}
+      {camposVisibles.mediosBanos && (
+        <>
+          <Text style={[styles.label, { marginTop: 12 }]}>Medios baños</Text>
+          <TouchableOpacity
+            style={styles.selector}
+            onPress={() => setShowMediosBanosModal(true)}
+          >
+            <Text style={styles.selectorText}>
+              {filters.mediosBanos || "Cualquiera"}
+            </Text>
+            <Ionicons
+              name="chevron-down"
+              size={20}
+              color={COLORS.textTertiary}
+            />
+          </TouchableOpacity>
+          <SelectionMoreModal
+            visible={showMediosBanosModal}
+            onClose={() => setShowMediosBanosModal(false)}
+            onSelect={(val) => {
+              onUpdateFilter("mediosBanos", val);
+            }}
+            title="Medios baños"
+            currentValue={filters.mediosBanos}
+          />
+        </>
+      )}
+
       {/* Estacionamientos */}
       {camposVisibles.estacionamientos && (
         <>
@@ -165,6 +198,7 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
             }}
             title="Niveles"
             quantityLabel="Plantas"
+            minQuantity={1}
             currentValue={filters.niveles}
           />
         </>

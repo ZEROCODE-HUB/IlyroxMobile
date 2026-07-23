@@ -6,6 +6,7 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { perfiles } from "@/types";
+import { collapseSpaces } from "@/utils/stringNormalizer";
 
 import { OneSignal } from "react-native-onesignal";
 import { useImageUpload } from "@/hooks";
@@ -344,9 +345,9 @@ export function useAuthForm() {
 
         const newProfile: perfiles = {
           id: data.user.id,
-          nombre: formState.name,
-          apellido_paterno: formState.lastNamePaterno,
-          apellido_materno: formState.lastNameMaterno,
+          nombre: collapseSpaces(formState.name),
+          apellido_paterno: collapseSpaces(formState.lastNamePaterno),
+          apellido_materno: collapseSpaces(formState.lastNameMaterno),
           prefijo_celular: formState.phone.includes(" ")
             ? formState.phone.split(" ")[0]
             : "+52",
@@ -367,7 +368,9 @@ export function useAuthForm() {
           modalidad: formState.modalidad || undefined,
           nombre_inmobiliaria: formState.nombreInmobiliaria || undefined,
           curso_certificacion: undefined,
-          nombre_completo: `${formState.name} ${formState.lastNamePaterno} ${formState.lastNameMaterno}`,
+          nombre_completo: collapseSpaces(
+            `${formState.name} ${formState.lastNamePaterno} ${formState.lastNameMaterno}`,
+          ),
           activado_en: undefined,
           deleted_at: undefined,
           biografia: formState.biografia,

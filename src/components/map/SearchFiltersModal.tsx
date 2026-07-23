@@ -79,6 +79,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   // Estados para modals
   const [showRecamarasModal, setShowRecamarasModal] = useState(false);
   const [showBanosModal, setShowBanosModal] = useState(false);
+  const [showMediosBanosModal, setShowMediosBanosModal] = useState(false);
   const [showEstacionamientosModal, setShowEstacionamientosModal] =
     useState(false);
   const [showNivelesModal, setShowNivelesModal] = useState(false);
@@ -238,6 +239,8 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
               setShowRecamarasModal={setShowRecamarasModal}
               showBanosModal={showBanosModal}
               setShowBanosModal={setShowBanosModal}
+              showMediosBanosModal={showMediosBanosModal}
+              setShowMediosBanosModal={setShowMediosBanosModal}
               showEstacionamientosModal={showEstacionamientosModal}
               setShowEstacionamientosModal={setShowEstacionamientosModal}
               showNivelesModal={showNivelesModal}
