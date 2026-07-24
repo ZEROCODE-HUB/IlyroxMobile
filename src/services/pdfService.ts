@@ -32,6 +32,7 @@ export const PDF_FIELD_CONFIG = {
   showMetrosTerreno: true,
   showHabitaciones: true,
   showBanos: true,
+  showMediosBanos: true,
   showEstacionamientos: true,
   showPisos: true,
   showAntiguedad: true,
@@ -106,6 +107,7 @@ export interface PropertyPdfData {
   metros_cuadrados_terreno: number | null;
   habitaciones: number;
   banos: number;
+  medios_banos: number | null;
   estacionamientos: number;
   pisos: number | null;
   antiguedad: string | null;
@@ -481,10 +483,12 @@ const generatePropertyHtml = (
             height: 100%;
             object-fit: cover;
         }
-        /* Portada VERTICAL: caja mas alta y object-fit contain para que la foto
-           se vea COMPLETA (sin recortar arriba/abajo). Fondo neutro. */
+        /* Portada VERTICAL: MISMA altura que la horizontal (420px) + object-fit
+           contain para que la foto se vea COMPLETA (sin recortar) centrada con
+           fondo neutro. No se sube la altura a proposito: una caja mas alta
+           empujaba la tarjeta/Descripcion a la 2a pagina (por page-break-inside:
+           avoid). Manteniendo la altura, los detalles quedan en la pagina 1. */
         .hero-container.hero-portrait {
-            height: 560px;
             background-color: #f3f4f6;
         }
         .hero-container.hero-portrait .hero-img {
@@ -840,6 +844,17 @@ const generatePropertyHtml = (
                     <div class="stat-icon">${icons.bath}</div>
                     <span class="stat-label">Baños</span>
                     <span class="stat-value">${data.banos}</span>
+                </div>`
+                    : ""
+                }
+
+                ${
+                  config.showMediosBanos && (data.medios_banos ?? 0) > 0
+                    ? `
+                <div class="stat-item">
+                    <div class="stat-icon">${icons.bath}</div>
+                    <span class="stat-label">Medios</span>
+                    <span class="stat-value">${data.medios_banos}</span>
                 </div>`
                     : ""
                 }

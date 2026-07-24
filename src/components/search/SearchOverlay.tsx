@@ -358,9 +358,7 @@ function UserRow({ user, onPress }: { user: SearchUser; onPress: () => void }) {
           <Text style={userStyles.followers}>⭐ {user.rating.toFixed(1)}</Text>
         )}
       </View>
-      <TouchableOpacity style={userStyles.followBtn} activeOpacity={0.8} onPress={onPress}>
-        <Text style={userStyles.followText}>Ver perfil</Text>
-      </TouchableOpacity>
+      <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
     </TouchableOpacity>
   );
 }
@@ -774,17 +772,6 @@ const userStyles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
     opacity: 0.8,
-  },
-  followBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: COLORS.primary,
-  },
-  followText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.white,
   },
 });
 
