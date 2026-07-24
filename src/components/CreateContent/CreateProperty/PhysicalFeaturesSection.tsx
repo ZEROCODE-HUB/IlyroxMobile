@@ -340,7 +340,7 @@ export const PhysicalFeaturesSection = React.memo(
                 <AppInput
                   label="m² Construidos *"
                   placeholder="m²"
-                  keyboardType="decimal-pad"
+                  keyboardType="numeric"
                   value={m2Construccion || ""}
                   onChangeText={(text) => {
                     setM2Construccion(formatThousands(text));
@@ -358,7 +358,7 @@ export const PhysicalFeaturesSection = React.memo(
                 <AppInput
                   label={`m² Terreno ${esTerreno(subtipo) ? "*" : ""}`}
                   placeholder="m²"
-                  keyboardType="decimal-pad"
+                  keyboardType="numeric"
                   value={m2Terreno || ""}
                   onChangeText={(text) => {
                     setM2Terreno(formatThousands(text));
@@ -383,7 +383,7 @@ export const PhysicalFeaturesSection = React.memo(
               <AppInput
                 label="Frente (m)"
                 placeholder="Opcional"
-                keyboardType="decimal-pad"
+                keyboardType="numeric"
                 value={anchoTerreno || ""}
                 onChangeText={(text) => setAnchoTerreno(formatThousands(text))}
               />
@@ -392,7 +392,7 @@ export const PhysicalFeaturesSection = React.memo(
               <AppInput
                 label="Fondo (m)"
                 placeholder="Opcional"
-                keyboardType="decimal-pad"
+                keyboardType="numeric"
                 value={largoTerreno || ""}
                 onChangeText={(text) => setLargoTerreno(formatThousands(text))}
               />
@@ -405,7 +405,7 @@ export const PhysicalFeaturesSection = React.memo(
           <AppInput
             label="Mantenimiento mensual (opcional)"
             placeholder="ej. 1,500"
-            keyboardType="decimal-pad"
+            keyboardType="numeric"
             value={costoMantenimiento || ""}
             onChangeText={(text) => setCostoMantenimiento(formatThousands(text))}
           />

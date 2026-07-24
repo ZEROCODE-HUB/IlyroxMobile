@@ -756,70 +756,123 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         ))}
       </MapView>
 
-      {/* Overlay absoluto para los precios (Inmune a los recortes de Android) */}
+      {/* Overlay absoluto para los precios (Inmune a los recortes de Android).
+          Cuando varias propiedades comparten coordenada exacta (típico de
+          EasyBroker, que fija el centro de la colonia) sus badges quedaban
+          EXACTAMENTE encimados y parecía uno solo. Aquí dibujamos UN solo badge
+          por coordenada y le añadimos un contador "N" para dejar claro que hay
+          varias; el toque ya abre el selector (CoincidentPropertiesSheet). */}
       {Platform.OS !== "web" && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          {Object.entries(overlayPositions).map(([id, pos]) => {
-            const p = propertyMap.get(id);
-            if (!p) return null;
-            if (!individualPropertyIds.has(id)) return null;
+          {(() => {
+            const drawnCoincidentKeys = new Set<string>();
+            return Object.entries(overlayPositions).map(([id, pos]) => {
+              const p = propertyMap.get(id);
+              if (!p) return null;
+              if (!individualPropertyIds.has(id)) return null;
 
-            const isHighlighted = p.id === highlightedPropertyId;
-            const priceText = formatPrice(p.price || 0, p.currency);
-            const bgColor = isHighlighted ? COLORS.warning : COLORS.primary;
+              // Conteo de propiedades en la MISMA coordenada; si ya dibujamos un
+              // badge para esta coordenada, omitimos los duplicados encimados.
+              const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
+              const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
+              const coincKey =
+                lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng)
+                  ? coincidenceKey(lat, lng)
+                  : null;
+              const stackCount = coincKey
+                ? coincidentGroups.get(coincKey)?.length ?? 1
+                : 1;
+              if (coincKey && stackCount > 1) {
+                if (drawnCoincidentKeys.has(coincKey)) return null;
+                drawnCoincidentKeys.add(coincKey);
+              }
 
-            return (
-              <View
-                key={`price-${p.id}`}
-                style={{
-                  position: "absolute",
-                  left: Math.max(6, (pos as any).x - 35),
-                  top: Math.max(6, (pos as any).y - 35),
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
+              const isHighlighted = p.id === highlightedPropertyId;
+              const priceText = formatPrice(p.price || 0, p.currency);
+              const bgColor = isHighlighted ? COLORS.warning : COLORS.primary;
+
+              return (
                 <View
+                  key={`price-${p.id}`}
                   style={{
-                    backgroundColor: bgColor,
-                    paddingVertical: 5,
-                    paddingHorizontal: 8,
-                    borderRadius: 6,
-                    borderWidth: 1.5,
-                    borderColor: "white",
-                    elevation: 5,
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 2,
+                    position: "absolute",
+                    left: Math.max(6, (pos as any).x - 35),
+                    top: Math.max(6, (pos as any).y - 35),
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  <Text
+                  <View
                     style={{
-                      color: "white",
-                      fontSize: 11,
-                      fontWeight: "bold",
+                      backgroundColor: bgColor,
+                      paddingVertical: 5,
+                      paddingHorizontal: 8,
+                      borderRadius: 6,
+                      borderWidth: 1.5,
+                      borderColor: "white",
+                      elevation: 5,
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.3,
+                      shadowRadius: 2,
                     }}
                   >
-                    {priceText}
-                  </Text>
+                    <Text
+                      style={{
+                        color: "white",
+                        fontSize: 11,
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {priceText}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      width: 0,
+                      height: 0,
+                      borderLeftWidth: 5,
+                      borderRightWidth: 5,
+                      borderTopWidth: 7,
+                      borderLeftColor: "transparent",
+                      borderRightColor: "transparent",
+                      borderTopColor: bgColor,
+                      marginTop: -1,
+                    }}
+                  />
+                  {stackCount > 1 && (
+                    <View
+                      style={{
+                        position: "absolute",
+                        top: -8,
+                        right: -10,
+                        minWidth: 20,
+                        height: 20,
+                        paddingHorizontal: 4,
+                        borderRadius: 10,
+                        backgroundColor: COLORS.error,
+                        borderWidth: 1.5,
+                        borderColor: "white",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        elevation: 6,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "white",
+                          fontSize: 10,
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {stackCount > 99 ? "99+" : stackCount}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-                <View
-                  style={{
-                    width: 0,
-                    height: 0,
-                    borderLeftWidth: 5,
-                    borderRightWidth: 5,
-                    borderTopWidth: 7,
-                    borderLeftColor: "transparent",
-                    borderRightColor: "transparent",
-                    borderTopColor: bgColor,
-                    marginTop: -1,
-                  }}
-                />
-              </View>
-            );
-          })}
+              );
+            });
+          })()}
         </View>
       )}
 
