@@ -36,10 +36,21 @@ type Tab = "todos" | "usuarios" | "posts" | "reels" | "ubicaciones" | "fichas";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "todos", label: "Todos" },
+  { key: "usuarios", label: "Usuarios" },
   { key: "posts", label: "Posts" },
   { key: "reels", label: "Reels" },
   { key: "ubicaciones", label: "Propiedades" },
+  { key: "fichas", label: "Fichas" },
 ];
+
+/** Cuántos elementos muestra cada sección en la pestaña "Todos". */
+const PREVIEW = {
+  usuarios: 3,
+  ubicaciones: 2,
+  fichas: 4,
+  posts: 6,
+  reels: 4,
+} as const;
 
 // ─── Componente principal ───────────────────────────────────────────────────────
 
@@ -59,6 +70,9 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
     setQuery,
     loading,
     results,
+    loadMore,
+    hasMore,
+    loadingMore,
     selectLocation,
     navigateToUser,
     navigateToPost,
@@ -97,8 +111,15 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
           fuera de pantalla y no se encontraban. */}
       {results.users.length > 0 && (
         <>
-          <SectionHeader title="Usuarios" />
-          {results.users.slice(0, 3).map((u) => (
+          <SectionHeader
+            title="Usuarios"
+            onVerTodos={
+              results.users.length > PREVIEW.usuarios || hasMore.users
+                ? () => setActiveTab("usuarios")
+                : undefined
+            }
+          />
+          {results.users.slice(0, PREVIEW.usuarios).map((u) => (
             <UserRow key={u.id} user={u} onPress={() => handleNavigate(() => navigateToUser(u.id))} />
           ))}
         </>
@@ -109,9 +130,14 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
           <SectionHeader
             title="Ubicaciones"
             style={results.users.length > 0 ? { marginTop: 20 } : undefined}
+            onVerTodos={
+              results.locations.length > PREVIEW.ubicaciones
+                ? () => setActiveTab("ubicaciones")
+                : undefined
+            }
           />
           {/* Solo 2 en "Todos": las de más se ven en la pestaña Propiedades. */}
-          {results.locations.slice(0, 2).map((l, i) => (
+          {results.locations.slice(0, PREVIEW.ubicaciones).map((l, i) => (
             <LocationRow key={`${l.id}-${i}`} location={l} onPress={() => handleNavigate(() => selectLocation(l))} />
           ))}
         </>
@@ -119,9 +145,17 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
 
       {results.properties.length > 0 && (
         <>
-          <SectionHeader title="Fichas" style={{ marginTop: 20 }} />
+          <SectionHeader
+            title="Fichas"
+            style={{ marginTop: 20 }}
+            onVerTodos={
+              results.properties.length > PREVIEW.fichas || hasMore.properties
+                ? () => setActiveTab("fichas")
+                : undefined
+            }
+          />
           <PropertyFichasGrid
-            items={results.properties.slice(0, 4)}
+            items={results.properties.slice(0, PREVIEW.fichas)}
             onPress={(id) => handleNavigate(() => navigateToProperty(id))}
           />
         </>
@@ -129,15 +163,31 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
 
       {results.posts.length > 0 && (
         <>
-          <SectionHeader title="Posts" style={{ marginTop: 20 }} />
-          <PostGrid items={results.posts.slice(0, 6)} onPress={(id) => handleNavigate(() => navigateToPost(id))} />
+          <SectionHeader
+            title="Posts"
+            style={{ marginTop: 20 }}
+            onVerTodos={
+              results.posts.length > PREVIEW.posts || hasMore.posts
+                ? () => setActiveTab("posts")
+                : undefined
+            }
+          />
+          <PostGrid items={results.posts.slice(0, PREVIEW.posts)} onPress={(id) => handleNavigate(() => navigateToPost(id))} />
         </>
       )}
 
       {results.reels.length > 0 && (
         <>
-          <SectionHeader title="Reels" style={{ marginTop: 20 }} />
-          <ReelGrid items={results.reels.slice(0, 4)} onPress={(id) => handleNavigate(() => navigateToReel(id))} />
+          <SectionHeader
+            title="Reels"
+            style={{ marginTop: 20 }}
+            onVerTodos={
+              results.reels.length > PREVIEW.reels || hasMore.reels
+                ? () => setActiveTab("reels")
+                : undefined
+            }
+          />
+          <ReelGrid items={results.reels.slice(0, PREVIEW.reels)} onPress={(id) => handleNavigate(() => navigateToReel(id))} />
         </>
       )}
 
@@ -159,24 +209,43 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
       renderItem={({ item }) => <UserRow user={item} onPress={() => handleNavigate(() => navigateToUser(item.id))} />}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
+      onEndReached={() => loadMore("users")}
+      onEndReachedThreshold={0.5}
+      ListFooterComponent={<FooterLoader visible={loadingMore.users} />}
       ListEmptyComponent={!loading ? <EmptyResults query={query} /> : null}
     />
   );
 
+  // Las pestañas con grid van sobre ScrollView (los grids arman sus propias
+  // filas), así que el final se detecta con onScroll en vez de onEndReached.
   const renderTabPosts = () => (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      onScroll={({ nativeEvent }) => {
+        if (isCloseToBottom(nativeEvent)) loadMore("posts");
+      }}
+      scrollEventThrottle={400}
+    >
       {results.posts.length > 0
         ? <PostGrid items={results.posts} onPress={(id) => handleNavigate(() => navigateToPost(id))} />
         : (!loading && <EmptyResults query={query} />)}
+      <FooterLoader visible={loadingMore.posts} />
       <View style={{ height: 40 }} />
     </ScrollView>
   );
 
   const renderTabReels = () => (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      onScroll={({ nativeEvent }) => {
+        if (isCloseToBottom(nativeEvent)) loadMore("reels");
+      }}
+      scrollEventThrottle={400}
+    >
       {results.reels.length > 0
         ? <ReelGrid items={results.reels} onPress={(id) => handleNavigate(() => navigateToReel(id))} />
         : (!loading && <EmptyResults query={query} />)}
+      <FooterLoader visible={loadingMore.reels} />
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -193,10 +262,18 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
   );
 
   const renderTabFichas = () => (
-    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      onScroll={({ nativeEvent }) => {
+        if (isCloseToBottom(nativeEvent)) loadMore("properties");
+      }}
+      scrollEventThrottle={400}
+    >
       {results.properties.length > 0
         ? <PropertyFichasGrid items={results.properties} onPress={(id) => handleNavigate(() => navigateToProperty(id))} />
         : (!loading && <EmptyResults query={query} />)}
+      <FooterLoader visible={loadingMore.properties} />
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -331,10 +408,52 @@ function EmptyResults({ query }: { query: string }) {
   );
 }
 
-function SectionHeader({ title, style }: { title: string; style?: object }) {
+/**
+ * ¿El scroll llegó cerca del final? Es el equivalente de `onEndReached` para
+ * las pestañas montadas sobre ScrollView. `loadMore` ya ignora las llamadas
+ * repetidas mientras carga, así que dispararlo de más es inofensivo.
+ */
+function isCloseToBottom({
+  layoutMeasurement,
+  contentOffset,
+  contentSize,
+}: {
+  layoutMeasurement: { height: number };
+  contentOffset: { y: number };
+  contentSize: { height: number };
+}) {
+  const MARGEN = 200;
+  return (
+    layoutMeasurement.height + contentOffset.y >= contentSize.height - MARGEN
+  );
+}
+
+function FooterLoader({ visible }: { visible: boolean }) {
+  if (!visible) return null;
+  return (
+    <View style={{ paddingVertical: 20 }}>
+      <ActivityIndicator size="small" color={COLORS.primary} />
+    </View>
+  );
+}
+
+function SectionHeader({
+  title,
+  style,
+  onVerTodos,
+}: {
+  title: string;
+  style?: object;
+  onVerTodos?: () => void;
+}) {
   return (
     <View style={[sectionStyles.header, style]}>
       <Text style={sectionStyles.title}>{title}</Text>
+      {onVerTodos && (
+        <TouchableOpacity onPress={onVerTodos} activeOpacity={0.7} hitSlop={8}>
+          <Text style={sectionStyles.verTodos}>Ver todos</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -720,11 +839,19 @@ const sectionStyles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   title: {
     fontSize: 15,
     fontWeight: "700",
     color: COLORS.textPrimary,
+  },
+  verTodos: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.primary,
   },
 });
 

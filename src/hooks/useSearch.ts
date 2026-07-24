@@ -80,26 +80,89 @@ const EMPTY_RESULTS: SearchResults = {
   properties: [],
 };
 
-async function fetchUsers(q: string): Promise<SearchUser[]> {
+/** Categorías que se paginan. `locations` no: Google Places no es paginable. */
+export type SearchCategory = "users" | "posts" | "reels" | "properties";
+
+/**
+ * Tamaño de página por categoría. `posts` va más bajo porque lanza tres
+ * consultas (contenido, ubicación y tipo) y se quedaría con el triple de filas.
+ */
+const PAGE_SIZE: Record<SearchCategory, number> = {
+  users: 20,
+  posts: 10,
+  reels: 12,
+  properties: 20,
+};
+
+const EMPTY_PAGES: Record<SearchCategory, number> = {
+  users: 0,
+  posts: 0,
+  reels: 0,
+  properties: 0,
+};
+
+const FULL_HAS_MORE: Record<SearchCategory, boolean> = {
+  users: true,
+  posts: true,
+  reels: true,
+  properties: true,
+};
+
+const NO_LOADING: Record<SearchCategory, boolean> = {
+  users: false,
+  posts: false,
+  reels: false,
+  properties: false,
+};
+
+/** Una tanda de resultados: lo traído y si vale la pena pedir más. */
+interface Page<T> {
+  items: T[];
+  hasMore: boolean;
+}
+
+async function fetchUsers(q: string, page = 0): Promise<Page<SearchUser>> {
   // RPC `buscar_perfiles`: normaliza acentos/espacios y exige que TODAS las
   // palabras del término estén presentes (AND) sobre el nombre completo armado
   // de las partes. Reemplaza el `.or(...ilike...)` que fallaba con acentos
   // ("Gutierrez" ≠ "Gutiérrez"), con apellidos parciales ("Alejandro G") y con
   // datos que traían dobles espacios. Ver supabase/buscar_perfiles.sql.
-  const { data } = await supabase.rpc("buscar_perfiles", { q, lim: 10 });
+  // El RPC solo acepta `lim`, no offset, así que se pagina pidiendo un tope
+  // creciente y reemplazando la lista. A esta escala re-traer las filas ya
+  // vistas es más barato que cambiar la firma de la función en producción.
+  const lim = (page + 1) * PAGE_SIZE.users;
+  const { data } = await supabase.rpc("buscar_perfiles", { q, lim });
 
-  return ((data as any[]) ?? []).map((p) => ({
-    id: p.id,
-    name: p.nombre_completo || [p.nombre, p.apellido_paterno].filter(Boolean).join(" ") || "Usuario",
-    avatar: p.foto || undefined,
-    ocupacion: p.ocupacion || undefined,
-    rating: p.calificacion_promedio ? parseFloat(p.calificacion_promedio) : undefined,
-  }));
+  const rows = (data as any[]) ?? [];
+
+  return {
+    items: rows.map((p) => ({
+      id: p.id,
+      name: p.nombre_completo || [p.nombre, p.apellido_paterno].filter(Boolean).join(" ") || "Usuario",
+      avatar: p.foto || undefined,
+      ocupacion: p.ocupacion || undefined,
+      rating: p.calificacion_promedio ? parseFloat(p.calificacion_promedio) : undefined,
+    })),
+    // Si vino justo el tope pedido, es probable que haya más detrás.
+    hasMore: rows.length >= lim,
+  };
 }
 
-async function fetchPosts(q: string): Promise<SearchPost[]> {
+async function fetchPosts(q: string, page = 0): Promise<Page<SearchPost>> {
   const FIELDS = "id, tipo, imagenes, fecha_hora, ubicacion, foto_propiedad, busquedas_json, antiguedad, nombre_asesor, foto_perfil_usuario, status";
-  const base = () => supabase.from("posts").select(FIELDS).is("deleted_at", null).limit(9);
+  const size = PAGE_SIZE.posts;
+  const from = page * size;
+  // El rango se aplica a cada criterio por separado: son tres consultas
+  // independientes que después se deduplican por id.
+  // El orden explícito es obligatorio al paginar: sin ORDER BY, Postgres no
+  // garantiza el mismo orden entre páginas y se repetirían o perderían filas.
+  const base = () =>
+    supabase
+      .from("posts")
+      .select(FIELDS)
+      .is("deleted_at", null)
+      .order("id")
+      .range(from, from + size - 1);
 
   const [{ data: byContenido }, { data: byUbicacion }, { data: byTipo }] = await Promise.all([
     base().ilike("contenido", `%${q}%`),
@@ -107,12 +170,17 @@ async function fetchPosts(q: string): Promise<SearchPost[]> {
     base().ilike("tipo", `%${q}%`),
   ]);
 
+  // Basta con que un criterio siga dando páginas llenas para que haya más.
+  const hasMore = [byContenido, byUbicacion, byTipo].some(
+    (rows) => (rows?.length ?? 0) >= size,
+  );
+
   const seen = new Set<string>();
   const posts: any[] = [];
   for (const row of [...(byContenido ?? []), ...(byUbicacion ?? []), ...(byTipo ?? [])]) {
     if (!seen.has(row.id)) { seen.add(row.id); posts.push(row); }
   }
-  if (!posts.length) return [];
+  if (!posts.length) return { items: [], hasMore };
 
   const postIds = posts.map((p) => p.id);
   const { data: feedItems } = await supabase
@@ -124,7 +192,7 @@ async function fetchPosts(q: string): Promise<SearchPost[]> {
 
   const feedMap = new Map((feedItems ?? []).map((f) => [f.contenido_id, f]));
 
-  return posts
+  const items = posts
     .map((p) => {
       const fi = feedMap.get(p.id);
       if (!fi) return null;
@@ -145,17 +213,24 @@ async function fetchPosts(q: string): Promise<SearchPost[]> {
       };
     })
     .filter(Boolean) as SearchPost[];
+
+  return { items, hasMore };
 }
 
-async function fetchReels(q: string): Promise<SearchReel[]> {
+async function fetchReels(q: string, page = 0): Promise<Page<SearchReel>> {
+  const size = PAGE_SIZE.reels;
+  const from = page * size;
   const { data: reels } = await supabase
     .from("reels")
     .select("id, thumbnail_url")
     .ilike("descripcion", `%${q}%`)
     .is("deleted_at", null)
-    .limit(6);
+    .order("id")
+    .range(from, from + size - 1);
 
-  if (!reels?.length) return [];
+  const hasMore = (reels?.length ?? 0) >= size;
+
+  if (!reels?.length) return { items: [], hasMore };
 
   const reelIds = reels.map((r) => r.id);
   const { data: feedItems } = await supabase
@@ -167,7 +242,7 @@ async function fetchReels(q: string): Promise<SearchReel[]> {
 
   const feedMap = new Map((feedItems ?? []).map((f) => [f.contenido_id, f]));
 
-  return reels
+  const items = reels
     .map((r) => {
       const fi = feedMap.get(r.id);
       if (!fi) return null;
@@ -182,17 +257,22 @@ async function fetchReels(q: string): Promise<SearchReel[]> {
       };
     })
     .filter(Boolean) as SearchReel[];
+
+  return { items, hasMore };
 }
 
-async function fetchProperties(q: string): Promise<SearchProperty[]> {
+async function fetchProperties(q: string, page = 0): Promise<Page<SearchProperty>> {
+  const size = PAGE_SIZE.properties;
+  const from = page * size;
   const { data } = await supabase
     .from("propiedades")
     .select("id, codigo_propiedad, fotos, colonia, municipio, estado, habitaciones, banos, metros_cuadrados_construccion, metros_cuadrados_terreno, operaciones_propiedad(precio, moneda)")
     .ilike("codigo_propiedad", `%${q}%`)
     .is("deleted_at", null)
-    .limit(20);
+    .order("id")
+    .range(from, from + size - 1);
 
-  return (data ?? []).map((p) => {
+  const items = (data ?? []).map((p) => {
     const op = Array.isArray(p.operaciones_propiedad) ? p.operaciones_propiedad[0] : null;
     return {
       id: p.id,
@@ -209,12 +289,24 @@ async function fetchProperties(q: string): Promise<SearchProperty[]> {
       metros_cuadrados_terreno: p.metros_cuadrados_terreno ?? null,
     };
   });
+
+  return { items, hasMore: items.length >= size };
 }
+
+const FETCHERS = {
+  users: fetchUsers,
+  posts: fetchPosts,
+  reels: fetchReels,
+  properties: fetchProperties,
+} as const;
 
 export function useSearch() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<SearchResults>(EMPTY_RESULTS);
+  const [pages, setPages] = useState(EMPTY_PAGES);
+  const [hasMore, setHasMore] = useState(FULL_HAS_MORE);
+  const [loadingMore, setLoadingMore] = useState(NO_LOADING);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { searchLocations, suggestions, isLoading: locLoading } = useLocationSearchStore();
@@ -225,6 +317,12 @@ export function useSearch() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const trimmed = query.trim();
+    // Término nuevo: se vuelve a empezar desde la primera página en todas las
+    // categorías, para no mezclar resultados de la búsqueda anterior.
+    setPages(EMPTY_PAGES);
+    setHasMore(FULL_HAS_MORE);
+    setLoadingMore(NO_LOADING);
+
     if (!trimmed) {
       setResults(EMPTY_RESULTS);
       return;
@@ -239,6 +337,12 @@ export function useSearch() {
           fetchReels(trimmed),
           fetchProperties(trimmed),
         ]);
+        setHasMore({
+          users: users.hasMore,
+          posts: posts.hasMore,
+          reels: reels.hasMore,
+          properties: properties.hasMore,
+        });
         // Buscador general: sin filtro "(regions)" para encontrar TODO (igual que
         // el buscador de los posts de búsqueda) y sin contar propiedades (ese
         // contador se quitó de la UI del overlay).
@@ -246,7 +350,13 @@ export function useSearch() {
           restrictToRegions: false,
           withCounts: false,
         });
-        setResults({ users, posts, reels, locations: [], properties });
+        setResults({
+          users: users.items,
+          posts: posts.items,
+          reels: reels.items,
+          locations: [],
+          properties: properties.items,
+        });
       } finally {
         setLoading(false);
       }
@@ -274,6 +384,48 @@ export function useSearch() {
     }));
     setResults((prev) => ({ ...prev, locations }));
   }, [suggestions]);
+
+  /**
+   * Trae la siguiente página de una categoría (scroll infinito de su pestaña).
+   *
+   * `users` reemplaza la lista en vez de concatenar: el RPC no acepta offset y
+   * se pagina subiendo el tope, así que cada tanda ya trae todo lo anterior.
+   * Las demás concatenan deduplicando por id, porque en `posts` una misma fila
+   * puede venir por más de un criterio en páginas distintas.
+   */
+  const loadMore = useCallback(
+    async (categoria: SearchCategory) => {
+      const trimmed = query.trim();
+      // `loading` incluido: si la primera página aún viene en camino, pedir la
+      // segunda dejaría un hueco en la lista.
+      if (!trimmed || loading || loadingMore[categoria] || !hasMore[categoria])
+        return;
+
+      const siguiente = pages[categoria] + 1;
+      setLoadingMore((prev) => ({ ...prev, [categoria]: true }));
+      try {
+        const pagina = await FETCHERS[categoria](trimmed, siguiente);
+
+        setResults((prev) => {
+          if (categoria === "users") {
+            return { ...prev, users: pagina.items as SearchUser[] };
+          }
+          const actuales = prev[categoria] as { id: string }[];
+          const vistos = new Set(actuales.map((i) => i.id));
+          const nuevos = (pagina.items as { id: string }[]).filter(
+            (i) => !vistos.has(i.id),
+          );
+          return { ...prev, [categoria]: [...actuales, ...nuevos] };
+        });
+
+        setPages((prev) => ({ ...prev, [categoria]: siguiente }));
+        setHasMore((prev) => ({ ...prev, [categoria]: pagina.hasMore }));
+      } finally {
+        setLoadingMore((prev) => ({ ...prev, [categoria]: false }));
+      }
+    },
+    [query, loading, pages, hasMore, loadingMore],
+  );
 
   const selectLocation = useCallback(
     (loc: SearchLocation) => {
@@ -315,6 +467,9 @@ export function useSearch() {
     setQuery,
     loading: loading || locLoading,
     results,
+    loadMore,
+    hasMore,
+    loadingMore,
     selectLocation,
     navigateToUser,
     navigateToPost,
