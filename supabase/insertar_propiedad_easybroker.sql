@@ -5,6 +5,7 @@ AS $function$
 DECLARE
   v_propiedad_id UUID;
   v_existe BOOLEAN;
+  v_estaba_borrada BOOLEAN;
   v_operacion TEXT := 'insert';
   v_fotos TEXT[];
   v_videos TEXT[];
@@ -129,18 +130,28 @@ BEGIN
   v_sin_comision := (v_commission_value IS NULL OR v_commission_value = 0);
   v_status := CASE WHEN NOT v_sin_comision THEN 'Publicada' ELSE 'Suspendida' END;
 
-  SELECT id INTO v_propiedad_id
+  -- Se busca INCLUYENDO las borradas (deleted_at IS NOT NULL) a propósito: el índice
+  -- único idx_propiedades_easybroker_unique es sobre (created_by, easybroker_id) sin
+  -- excluir el soft-delete. Si sólo se miraran las activas, una propiedad que el usuario
+  -- borró en Ilyrox pero sigue publicada en EasyBroker caería en el INSERT y reventaría
+  -- con "duplicate key" en cada sincronización posterior. En vez de insertar, se revive
+  -- la fila existente (deleted_at = NULL).
+  SELECT id, (deleted_at IS NOT NULL)
+  INTO v_propiedad_id, v_estaba_borrada
   FROM public.propiedades
   WHERE created_by = p_usuario_id
     AND easybroker_id = p_easybroker_data->>'public_id'
-    AND deleted_at IS NULL;
+  ORDER BY deleted_at NULLS FIRST
+  LIMIT 1;
 
   v_existe := FOUND;
 
   IF v_existe THEN
-    v_operacion := 'update';
+    -- Para el usuario una propiedad revivida es "nueva" (reaparece), no una actualización.
+    v_operacion := CASE WHEN v_estaba_borrada THEN 'reactivada' ELSE 'update' END;
 
     UPDATE public.propiedades SET
+      deleted_at = NULL,
       tipo = COALESCE(v_tipo, tipo),
       subtipo = COALESCE(v_subtipo, subtipo),
       descripcion = COALESCE(v_descripcion, descripcion),
