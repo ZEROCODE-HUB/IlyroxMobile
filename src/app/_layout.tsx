@@ -1,5 +1,6 @@
 import {
   Stack,
+  usePathname,
   useRootNavigationState,
   useRouter,
   useSegments,
@@ -34,6 +35,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import PendingApprovalScreen from "@/screens/PendingApprovalScreen";
 import { InitialLoading } from "@/components/common/InitialLoading";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
+import { takePendingDeepLink } from "@/utils/deepLink";
 import { useOTAUpdates } from "@/hooks/useOTAUpdates";
 import { VersionUpdateModal } from "@/components/modals/VersionUpdateModal";
 
@@ -321,6 +323,44 @@ function RootLayoutNav() {
     session,
     profile,
     segments,
+    rootNavigationState?.key,
+    router,
+  ]);
+
+  /**
+   * Rescata el deep link que `+native-intent` no pudo completar.
+   *
+   * `redirectSystemPath` corre antes de que exista sesión: si el usuario no
+   * había iniciado sesión, el efecto de arriba lo mandó a /login y el destino se
+   * habría perdido. Se espera a lo mismo que las push (sesión, perfil y
+   * navegador raíz montado) y se descarta sin navegar si el redirect original sí
+   * llegó a su destino, para no repetir la navegación en el caso normal.
+   */
+  const pathname = usePathname();
+
+  useEffect(() => {
+    const ready =
+      !loading &&
+      !!session &&
+      !!profile &&
+      !!rootNavigationState?.key &&
+      segments[0] !== "(auth)";
+    if (!ready) return;
+
+    const target = takePendingDeepLink();
+    if (!target) return;
+
+    // El pathname no incluye los grupos: /(stack)/property/[id] → /property/<id>
+    const destino = target.href.replace("/(stack)", "").split("?")[0];
+    if (pathname === destino) return;
+
+    router.push({ pathname: target.pathname as never, params: target.params });
+  }, [
+    loading,
+    session,
+    profile,
+    segments,
+    pathname,
     rootNavigationState?.key,
     router,
   ]);

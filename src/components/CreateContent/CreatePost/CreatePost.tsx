@@ -90,6 +90,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   // Campos extra para post de búsqueda
   const [moneda, setMoneda] = useState("MXN");
   const [banos, setBanos] = useState("");
+  const [mediosBanos, setMediosBanos] = useState("");
   const [estacionamientos, setEstacionamientos] = useState("");
   const [niveles, setNiveles] = useState("");
   const [antiguedad, setAntiguedad] = useState("");
@@ -157,6 +158,9 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
               caracteristicas.habitaciones ? String(caracteristicas.habitaciones) : "",
             );
             setBanos(caracteristicas.banos ? String(caracteristicas.banos) : "");
+            setMediosBanos(
+              caracteristicas.medios_banos ? String(caracteristicas.medios_banos) : "",
+            );
             setEstacionamientos(
               caracteristicas.estacionamientos ? String(caracteristicas.estacionamientos) : "",
             );
@@ -379,6 +383,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
           const maxParsed = parseNum(precioMax);
           const habitacionesParsed = parseNum(habitaciones);
           const banosParsed = parseNum(banos);
+          const mediosBanosParsed = parseNum(mediosBanos);
           const estacionamientosParsed = parseNum(estacionamientos);
           const nivelesParsed = parseNum(niveles);
           const m2TerrenoParsed = parseNum(m2Terreno);
@@ -408,6 +413,10 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
                   banosParsed !== null
                     ? banosParsed
                     : currentCaracteristicas.banos,
+                medios_banos:
+                  mediosBanosParsed !== null
+                    ? mediosBanosParsed
+                    : currentCaracteristicas.medios_banos,
                 estacionamientos:
                   estacionamientosParsed !== null
                     ? estacionamientosParsed
@@ -572,6 +581,8 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             setMoneda={setMoneda}
             banos={banos}
             setBanos={setBanos}
+            mediosBanos={mediosBanos}
+            setMediosBanos={setMediosBanos}
             estacionamientos={estacionamientos}
             setEstacionamientos={setEstacionamientos}
             niveles={niveles}

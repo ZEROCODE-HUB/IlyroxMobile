@@ -479,6 +479,7 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
 
     const habitaciones = num(f.caracteristicas?.habitaciones);
     const banos = num(f.caracteristicas?.banos);
+    const mediosBanos = num(f.caracteristicas?.medios_banos);
     const estacionamientos = num(f.caracteristicas?.estacionamientos);
     const niveles = num(f.caracteristicas?.niveles);
     const antiguedad: string =
@@ -493,6 +494,7 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
     const stats: Array<{ key: string; emoji: string; value: string; label: string }> = [];
     if (habitaciones) stats.push({ key: "rec", emoji: "🛏️", value: String(habitaciones), label: "rec." });
     if (banos) stats.push({ key: "ban", emoji: "🚽", value: String(banos), label: "baños" });
+    if (mediosBanos) stats.push({ key: "medban", emoji: "🚽", value: String(mediosBanos), label: "½ baños" });
     if (estacionamientos) stats.push({ key: "est", emoji: "🚗", value: String(estacionamientos), label: "estac." });
     if (niveles) stats.push({ key: "niv", emoji: "🏢", value: String(niveles), label: niveles === 1 ? "planta" : "plantas" });
 

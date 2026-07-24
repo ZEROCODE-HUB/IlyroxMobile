@@ -31,6 +31,8 @@ interface BusquedaPostProps {
   setMoneda: (val: string) => void;
   banos: string;
   setBanos: (val: string) => void;
+  mediosBanos: string;
+  setMediosBanos: (val: string) => void;
   estacionamientos: string;
   setEstacionamientos: (val: string) => void;
   niveles: string;
@@ -83,6 +85,8 @@ export const BusquedaPost = ({
   setMoneda,
   banos,
   setBanos,
+  mediosBanos,
+  setMediosBanos,
   estacionamientos,
   setEstacionamientos,
   niveles,
@@ -267,6 +271,7 @@ export const BusquedaPost = ({
       {/* Características */}
       {(camposVisibles.recamaras ||
         camposVisibles.banos ||
+        camposVisibles.mediosBanos ||
         camposVisibles.estacionamientos ||
         camposVisibles.niveles ||
         camposVisibles.antiguedad) && (
@@ -293,6 +298,17 @@ export const BusquedaPost = ({
                     keyboardType="numeric"
                     value={banos}
                     onChangeText={setBanos}
+                  />
+                </View>
+              )}
+              {camposVisibles.mediosBanos && (
+                <View style={styles.fieldHalf}>
+                  <AppInput
+                    label="Medios baños"
+                    placeholder="Ej. 1"
+                    keyboardType="numeric"
+                    value={mediosBanos}
+                    onChangeText={setMediosBanos}
                   />
                 </View>
               )}

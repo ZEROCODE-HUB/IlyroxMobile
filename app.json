@@ -40,7 +40,9 @@
       },
       "associatedDomains": [
         "applinks:ilyrox.app",
-        "applinks:*.ilyrox.app"
+        "applinks:*.ilyrox.app",
+        "applinks:ilyrox-posts.vercel.app",
+        "applinks:feeds.ilyrox.com"
       ]
     },
     "androidStatusBar": {
@@ -72,6 +74,26 @@
             },
             {
               "scheme": "ilyroxapp"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "ilyrox-posts.vercel.app",
+              "path": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "feeds.ilyrox.com",
+              "path": "/"
             }
           ],
           "category": [
