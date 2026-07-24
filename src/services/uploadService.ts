@@ -1,9 +1,50 @@
+import { Image as RNImage } from "react-native";
+import * as ImageManipulator from "expo-image-manipulator";
 import { logger } from "@/utils/logger";
 
 const log = logger.scoped("uploadService");
 
-const VIDEO_API_URL =
-  "https://celebrated-celebration-production.up.railway.app";
+const VIDEO_API_URL = "https://video.109.205.178.162.sslip.io";
+
+/** Ancho máximo de una foto subida. Ver `compressForUpload`. */
+const MAX_IMAGE_WIDTH = 1920;
+
+/**
+ * Comprime una foto antes de subirla.
+ *
+ * La galería entrega el original de la cámara: 2-4 MB por foto. Al publicar una
+ * propiedad con 5-15 fotos eso son decenas de MB por una subida móvil, cada
+ * imagen se pasaba del límite de 30 s y fallaban TODAS ("No se pudo subir
+ * ninguna imagen"). A 1920px/0.8 quedan ~300-500 KB sin perder calidad visible
+ * —el servidor las recomprime igual— y suben varias veces más rápido.
+ *
+ * Si la foto ya es más angosta no se reescala (`resize` también AMPLÍA). Si algo
+ * falla, se sube el original: comprimir nunca debe impedir publicar.
+ */
+async function compressForUpload(uri: string): Promise<string> {
+  if (/^https?:/i.test(uri)) return uri;
+
+  try {
+    const width = await new Promise<number>((resolve) =>
+      RNImage.getSize(
+        uri,
+        (w) => resolve(w),
+        () => resolve(0),
+      ),
+    );
+    const actions =
+      width > MAX_IMAGE_WIDTH ? [{ resize: { width: MAX_IMAGE_WIDTH } }] : [];
+
+    const result = await ImageManipulator.manipulateAsync(uri, actions, {
+      compress: 0.8,
+      format: ImageManipulator.SaveFormat.JPEG,
+    });
+    return result.uri;
+  } catch (err) {
+    log.warn("No se pudo comprimir la imagen, se sube el original:", err);
+    return uri;
+  }
+}
 
 export async function uploadImage(
   uri: string,
@@ -16,13 +57,16 @@ export async function uploadImage(
     | "reels",
   retries = 3,
 ): Promise<string> {
+  // Una sola vez, fuera del bucle: los reintentos reusan la versión comprimida.
+  const uploadUri = await compressForUpload(uri);
+
   let attempt = 0;
   while (attempt < retries) {
     try {
       const formData = new FormData();
 
       formData.append("image", {
-        uri,
+        uri: uploadUri,
         type: "image/jpeg",
         name: `image-${Date.now()}.jpg`,
       } as any);

@@ -13,6 +13,7 @@ import { User } from "../../types";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 import { COLORS } from "../../constants/colors";
+import PushPermissionBanner from "../../components/PushPermissionBanner";
 
 export default function FeedScreen() {
   const router = useRouter();
@@ -80,9 +81,24 @@ export default function FeedScreen() {
   useEffect(() => {
     if (pendingOpenMap) {
       setPendingOpenMap(false);
-      router.push("/(stack)/map");
+      // navigate (no push): si el mapa ya está en el stack, vuelve a esa
+      // instancia en vez de apilar otra. Evita que el mapa quede duplicado y que
+      // "Atrás" (en iPhone) te devuelva a un segundo mapa recargándose.
+      router.navigate("/(stack)/map");
     }
   }, [pendingOpenMap]);
+
+  // Tras publicar (llega el param `refresh`), mostrar el header aunque estuviera
+  // oculto: el scroll programático al top no dispara onScroll, así que el header
+  // no se resetea solo.
+  const lastRefreshParamRef = useRef<string | null>(null);
+  useEffect(() => {
+    const r = Array.isArray(refresh) ? refresh[0] : refresh;
+    if (r && r !== lastRefreshParamRef.current) {
+      lastRefreshParamRef.current = r;
+      resetHeader();
+    }
+  }, [refresh]);
 
   return (
     <View style={styles.container}>
@@ -124,10 +140,11 @@ export default function FeedScreen() {
           style={{ height: TOTAL_HEADER_HEIGHT }}
           onSearchingChange={setIsSearching}
           isHeaderVisible={headerShown}
-          onOpenMap={() => router.push("/(stack)/map")}
+          onOpenMap={() => router.navigate("/(stack)/map")}
         />
       </Animated.View>
 
+      <PushPermissionBanner />
     </View>
   );
 }

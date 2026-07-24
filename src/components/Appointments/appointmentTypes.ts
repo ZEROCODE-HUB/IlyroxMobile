@@ -1,10 +1,18 @@
 export type AppointmentStatus = "pending" | "completed" | "cancelled" | "rated";
 
 export interface FeatureRatings {
-    conocimiento_mercado: number;
-    comunicacion: number;
     profesionalismo: number;
-    disponibilidad: number;
+    etica_valores: number;
+    pago_comisiones: number;
+    comunicacion_servicio: number;
+}
+
+export interface RatingTarget {
+    id: string;
+    name: string;
+    avatar: string | null;
+    phone?: string | null;
+    location?: string | null;
 }
 
 export interface AppointmentItem {
@@ -38,11 +46,15 @@ export interface AppointmentItem {
         nombre: string;
         apellido_paterno: string;
         foto: string | null;
+        prefijo_celular?: string | null;
+        celular?: string | null;
     };
     cliente?: {
         id: string;
         nombre: string;
         apellido_paterno: string;
         foto: string | null;
+        prefijo_celular?: string | null;
+        celular?: string | null;
     };
 }

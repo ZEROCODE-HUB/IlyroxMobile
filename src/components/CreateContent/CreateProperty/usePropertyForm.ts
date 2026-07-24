@@ -7,8 +7,11 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useModal } from "@/context/ModalContext";
+import type { LocalModalOptions } from "@/hooks/useLocalModal";
 import { supabase } from "../../../lib/supabase";
-import { COORDENADAS_ESTADO } from "../../../constants/MexLocations/estados";
+import { COORDENADAS_ESTADO } from "../../../constants/estadosMexico";
+import { DEFAULT_COUNTRY } from "../../../lib/location/registry";
+import { pinDentroDeZona } from "../../../lib/geocodingService";
 import {
   PROPERTY_TYPES,
   TipoPrincipal,
@@ -43,7 +46,7 @@ const INITIAL_STATE: PropertyFormState = {
 
   // Información básica
   descripcion: "",
-  tipoOperacion: "venta",
+  tipoOperacion: "",
   precioVenta: "",
   precioRenta: "",
   moneda: "MXN",
@@ -59,6 +62,7 @@ const INITIAL_STATE: PropertyFormState = {
     ciudad: "",
     municipio: "",
     colonia: "",
+    pais: DEFAULT_COUNTRY,
   },
   calle: "",
   numeroExterior: "",
@@ -67,23 +71,26 @@ const INITIAL_STATE: PropertyFormState = {
   location: { latitude: 0, longitude: 0 },
   mapCenter: null,
 
-  // Características físicas
-  recamaras: "0",
-  banosCompletos: "0",
-  mediosBanos: "0",
-  estacionamientos: "0",
+  // Características físicas (sin preseleccionar: el usuario debe elegirlos)
+  recamaras: "",
+  banosCompletos: "",
+  mediosBanos: "",
+  estacionamientos: "",
   m2Construccion: "",
   m2Terreno: "",
-  niveles: "1",
+  anchoTerreno: "",
+  largoTerreno: "",
+  niveles: "",
   antiguedad: "",
-  amueblado: "No",
-  petFriendly: "No",
+  amueblado: "",
+  petFriendly: "",
+  costoMantenimiento: "",
 
   // Amenidades
   amenidadesSeleccionadas: [],
 
   // Comisión Venta
-  comparteComision: "No",
+  comparteComision: "Sí",
   comisionTipo: "porcentaje",
   comisionValor: "",
   comisionCompartidaTipo: "porcentaje",
@@ -91,20 +98,20 @@ const INITIAL_STATE: PropertyFormState = {
   condicionesComision: "",
 
   // Comisión Renta
-  comparteComisionRenta: "No",
+  comparteComisionRenta: "Sí",
   comisionTipoRenta: "porcentaje",
   comisionValorRenta: "1",        // default 1 mes
   comisionCompartidaTipoRenta: "porcentaje",
   comisionCompartidaValorRenta: "50",  // % de mi comisión que comparto (0-100)
   condicionesComisionRenta: "",
 
-  // Gravamen
-  tieneGravamen: "No",
-  institucionGravamen: "",
-  montoGravamen: "",
+  // Gravamen (sin preseleccionar)
+  tieneGravamen: "",
+  institucionGravamen: [],
+  montosGravamen: {},
 
-  // Financiamiento
-  aceptaFinanciamiento: "No",
+  // Financiamiento (sin preseleccionar)
+  aceptaFinanciamiento: "",
   tiposFinanciamientoSeleccionados: [],
 
   // Propietario
@@ -121,8 +128,8 @@ const INITIAL_STATE: PropertyFormState = {
   // Campos especializados — Agrícola
   tiposAgua: [],
   concesionAgua: false,
-  usoTerreno: '',
-  tipoRiego: '',
+  usoTerreno: [],
+  tipoRiego: [],
   infraElectricidad: false,
   infraCaminoAcceso: false,
   infraCercado: false,
@@ -176,6 +183,10 @@ type PropertyFormAction =
   | { type: "CLEAR_ERROR"; key: string }
   | { type: "TOGGLE_AMENIDAD"; amenidad: string }
   | { type: "TOGGLE_FINANCIAMIENTO"; tipo: string };
+
+/** Mensaje único para el caso "PIN fuera de la zona escrita" (validate + feedback en vivo). */
+const PIN_FUERA_DE_ZONA_MSG =
+  "El pin está fuera de la zona seleccionada. Arrástralo a la ubicación real o ajusta la ubicación escrita.";
 
 function reducer(
   state: PropertyFormState,
@@ -231,16 +242,52 @@ type Updater<T> = T | ((prev: T) => T);
 // Hook
 // ============================================
 
+/**
+ * Huella del formulario para detectar cambios sin guardar. Se ignoran:
+ * - `errors`: estado derivado de la validación, no datos del usuario.
+ * - `mapCenter`: valor derivado de la ubicación; un efecto lo re-calcula tras
+ *   cargar la propiedad en edición, lo que marcaba el formulario como "sucio"
+ *   sin que el usuario tocara nada (rompía el botón Atrás al editar).
+ */
+function serializeForm(state: PropertyFormState): string {
+  const { errors: _errors, mapCenter: _mapCenter, ...fields } = state;
+  return JSON.stringify(fields);
+}
+
 export function usePropertyForm(
   propertyId?: string,
   onBack?: (shouldRefresh?: boolean) => void,
+  // Ver nota en usePublishProperty: en edición se inyecta un showModal LOCAL
+  // para que el aviso se vea sobre el <Modal> nativo en iOS.
+  showModalOverride?: (options: LocalModalOptions) => void,
 ) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
-  const { showModal } = useModal();
+  const { showModal: globalShowModal } = useModal();
+  const showModal = showModalOverride ?? globalShowModal;
 
   // Loading state — es estado de transacción (no de formulario), se queda como useState
   const [isLoadingProperty, setIsLoadingProperty] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Detección de cambios sin guardar, para poder confirmar antes de descartar.
+  // Se lee vía ref para que `isDirty` no cambie de identidad en cada tecleo.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const baselineRef = useRef(serializeForm(INITIAL_STATE));
+
+  // En edición la línea base es la propiedad ya cargada, no el estado vacío:
+  // `dispatch({type:"LOAD"})` y `setIsLoadingProperty(false)` se agrupan en el
+  // mismo render, así que aquí `stateRef` ya contiene los datos cargados.
+  useEffect(() => {
+    if (propertyId && !isLoadingProperty) {
+      baselineRef.current = serializeForm(stateRef.current);
+    }
+  }, [propertyId, isLoadingProperty]);
+
+  const isDirty = useCallback(
+    () => serializeForm(stateRef.current) !== baselineRef.current,
+    [],
+  );
 
   // ============================================
   // Setter factory — una por campo, memoizado con useCallback
@@ -289,7 +336,10 @@ export function usePropertyForm(
   const setEstacionamientos = makeSetter("estacionamientos");
   const setM2Construccion = makeSetter("m2Construccion");
   const setM2Terreno = makeSetter("m2Terreno");
+  const setAnchoTerreno = makeSetter("anchoTerreno");
+  const setLargoTerreno = makeSetter("largoTerreno");
   const setNiveles = makeSetter("niveles");
+  const setCostoMantenimiento = makeSetter("costoMantenimiento");
   const setAntiguedad = makeSetter("antiguedad");
   const setAmueblado = makeSetter("amueblado");
   const setPetFriendly = makeSetter("petFriendly");
@@ -307,7 +357,7 @@ export function usePropertyForm(
   const setCondicionesComisionRenta = makeSetter("condicionesComisionRenta");
   const setTieneGravamen = makeSetter("tieneGravamen");
   const setInstitucionGravamen = makeSetter("institucionGravamen");
-  const setMontoGravamen = makeSetter("montoGravamen");
+  const setMontosGravamen = makeSetter("montosGravamen");
   const setAceptaFinanciamiento = makeSetter("aceptaFinanciamiento");
   const setNombreCompletoPropietario = makeSetter("nombreCompletoPropietario");
   const setEmailPropietario = makeSetter("emailPropietario");
@@ -317,8 +367,6 @@ export function usePropertyForm(
 
   // Setters especializados — Agrícola
   const setConcesionAgua = makeSetter("concesionAgua");
-  const setUsoTerreno = makeSetter("usoTerreno");
-  const setTipoRiego = makeSetter("tipoRiego");
   const setInfraElectricidad = makeSetter("infraElectricidad");
   const setInfraCaminoAcceso = makeSetter("infraCaminoAcceso");
   const setInfraCercado = makeSetter("infraCercado");
@@ -344,6 +392,24 @@ export function usePropertyForm(
     dispatch({
       type: "UPDATE_FIELD",
       field: "tiposAgua",
+      updater: (prev: string[]) =>
+        prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo],
+    } as unknown as PropertyFormAction);
+  }, []);
+
+  const toggleUsoTerreno = useCallback((tipo: string) => {
+    dispatch({
+      type: "UPDATE_FIELD",
+      field: "usoTerreno",
+      updater: (prev: string[]) =>
+        prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo],
+    } as unknown as PropertyFormAction);
+  }, []);
+
+  const toggleTipoRiego = useCallback((tipo: string) => {
+    dispatch({
+      type: "UPDATE_FIELD",
+      field: "tipoRiego",
       updater: (prev: string[]) =>
         prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo],
     } as unknown as PropertyFormAction);
@@ -453,24 +519,117 @@ export function usePropertyForm(
     if (state.precioRenta.trim()) clearError("precioRenta");
   }, [state.precioRenta, clearError]);
 
+  // PIN del mapa: limpia el error si entra en la zona escrita; lo marca en vivo
+  // si queda fuera (sin esperar al submit). Si no hay PIN aún, el caso lo cubre
+  // validate(). Sin bounds, pinDentroDeZona devuelve true (no se valida).
   useEffect(() => {
-    if (state.location.latitude !== 0 && state.location.longitude !== 0) {
-      clearError("location");
+    const { latitude, longitude } = state.location;
+    if (latitude === 0 && longitude === 0) return;
+    const dentro = pinDentroDeZona(latitude, longitude, state.ubicacionData.bounds);
+    dispatch({
+      type: "UPDATE_FIELD",
+      field: "errors",
+      updater: (prev) => {
+        if (dentro) {
+          if (!prev.location) return prev;
+          const { location: _omit, ...rest } = prev;
+          return rest;
+        }
+        if (prev.location === PIN_FUERA_DE_ZONA_MSG) return prev;
+        return { ...prev, location: PIN_FUERA_DE_ZONA_MSG };
+      },
+    });
+  }, [state.location, state.ubicacionData.bounds]);
+
+  // Campos sin preselección: limpiar su error en cuanto el usuario los completa.
+  useEffect(() => {
+    if (state.tipoOperacion) clearError("tipoOperacion");
+    if (state.recamaras) clearError("recamaras");
+    if (state.banosCompletos) clearError("banos");
+    if (state.mediosBanos) clearError("mediosBanos");
+    if (state.estacionamientos) clearError("estacionamientos");
+    if (state.niveles) clearError("niveles");
+    if (state.amueblado) clearError("amueblado");
+    if (state.petFriendly) clearError("petFriendly");
+    if (state.tieneGravamen) clearError("gravamen");
+    if (state.aceptaFinanciamiento) clearError("financiamiento");
+  }, [
+    state.tipoOperacion,
+    state.recamaras,
+    state.banosCompletos,
+    state.mediosBanos,
+    state.estacionamientos,
+    state.niveles,
+    state.amueblado,
+    state.petFriendly,
+    state.tieneGravamen,
+    state.aceptaFinanciamiento,
+    clearError,
+  ]);
+
+  // Comisión: limpiar el error en cuanto deja de compartir o define un valor > 0.
+  useEffect(() => {
+    if (state.comparteComision !== "Sí" || (parseFloat(state.comisionValor) || 0) > 0) {
+      clearError("comision");
     }
-  }, [state.location, clearError]);
+  }, [state.comparteComision, state.comisionValor, clearError]);
+
+  useEffect(() => {
+    const share =
+      state.tipoOperacion === "ambas"
+        ? state.comparteComisionRenta
+        : state.comparteComision;
+    const raw =
+      state.tipoOperacion === "ambas"
+        ? state.comisionValorRenta
+        : state.comisionValor;
+    if (share !== "Sí" || (parseFloat(raw) || 0) > 0) {
+      clearError("comisionRenta");
+    }
+  }, [
+    state.tipoOperacion,
+    state.comparteComisionRenta,
+    state.comparteComision,
+    state.comisionValorRenta,
+    state.comisionValor,
+    clearError,
+  ]);
 
   // ============================================
   // MAP CENTER BASED ON STATE OR GEO COORDS
   // ============================================
 
+  // Clave (lat,lng) de la última colonia aplicada al pin, para colocar el pin
+  // solo cuando la colonia CAMBIA (no en cada cambio de ubicacionData).
+  const lastColoniaKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
-    const { latitud, longitud, estado } = state.ubicacionData;
+    const { latitud, longitud, estado, colonia } = state.ubicacionData;
     if (latitud && longitud) {
       dispatch({
         type: "SET_FIELD",
         field: "mapCenter",
         value: { lat: latitud, lng: longitud },
       });
+
+      // Al elegir una colonia, colocar el pin en su centro como punto de
+      // partida (el asesor lo arrastra al lugar exacto). Solo cuando la
+      // colonia cambia. En edición NO se pisa un pin ya guardado.
+      if (colonia) {
+        const key = `${latitud},${longitud}`;
+        if (key !== lastColoniaKeyRef.current) {
+          lastColoniaKeyRef.current = key;
+          const hasPin =
+            state.location.latitude !== 0 || state.location.longitude !== 0;
+          if (!propertyId || !hasPin) {
+            dispatch({
+              type: "SET_FIELD",
+              field: "location",
+              value: { latitude: latitud, longitude: longitud },
+            });
+          }
+        }
+      }
     } else if (estado && COORDENADAS_ESTADO[estado]) {
       dispatch({
         type: "SET_FIELD",
@@ -478,6 +637,7 @@ export function usePropertyForm(
         value: COORDENADAS_ESTADO[estado],
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.ubicacionData]);
 
   // ============================================
@@ -598,7 +758,7 @@ export function usePropertyForm(
       // 4. Características Físicas
       payload.recamaras = data.habitaciones?.toString() || "0";
       payload.banosCompletos = data.banos?.toString() || "0";
-      payload.mediosBanos = "";
+      payload.mediosBanos = data.medios_banos != null ? data.medios_banos.toString() : "";
       payload.estacionamientos = data.estacionamientos?.toString() || "0";
       payload.m2Construccion = data.metros_cuadrados_construccion
         ? formatThousands(data.metros_cuadrados_construccion.toString())
@@ -606,6 +766,15 @@ export function usePropertyForm(
       payload.m2Terreno = data.metros_cuadrados_terreno
         ? formatThousands(data.metros_cuadrados_terreno.toString())
         : "";
+      payload.anchoTerreno = data.ancho_terreno != null
+        ? formatThousands(data.ancho_terreno.toString())
+        : '';
+      payload.largoTerreno = data.largo_terreno != null
+        ? formatThousands(data.largo_terreno.toString())
+        : '';
+      payload.costoMantenimiento = data.costo_mantenimiento != null
+        ? formatThousands(data.costo_mantenimiento.toString())
+        : '';
       payload.niveles = data.pisos?.toString() || "1";
       payload.antiguedad = data.antiguedad || "";
       payload.amueblado = (data.amueblado || "No") as AmuebladoType;
@@ -633,7 +802,9 @@ export function usePropertyForm(
 
       // Configurar campos de VENTA
       if (ventaOp) {
-        payload.precioVenta = ventaOp.precio?.toString() || "";
+        payload.precioVenta = ventaOp.precio != null
+          ? formatThousands(ventaOp.precio.toString())
+          : "";
         payload.moneda = ventaOp.moneda || "MXN";
         payload.comparteComision = ventaOp.comparte_comision ? "Sí" : "No";
 
@@ -657,7 +828,9 @@ export function usePropertyForm(
 
       // Configurar campos de RENTA
       if (rentaOp) {
-        payload.precioRenta = rentaOp.precio?.toString() || "";
+        payload.precioRenta = rentaOp.precio != null
+          ? formatThousands(rentaOp.precio.toString())
+          : "";
         if (!ventaOp) payload.moneda = rentaOp.moneda || "MXN";
 
         const isAmbas = !!ventaOp;
@@ -717,19 +890,32 @@ export function usePropertyForm(
       // 8. Gravamen
       if (data.propiedad_gravamenes && data.propiedad_gravamenes.length > 0) {
         payload.tieneGravamen = "Sí";
-        const grav = data.propiedad_gravamenes[0];
-        payload.institucionGravamen =
-          grav.catalogo_instituciones_financieras?.nombre || "";
-        payload.montoGravamen = grav.monto?.toString() || "";
+        payload.institucionGravamen = data.propiedad_gravamenes.map(
+          (grav: any) => grav.catalogo_instituciones_financieras?.nombre || ""
+        );
+        const montos: Record<string, string> = {};
+        data.propiedad_gravamenes.forEach((grav: any) => {
+          const nombre = grav.catalogo_instituciones_financieras?.nombre;
+          if (nombre) {
+            montos[nombre] =
+              grav.monto != null ? formatThousands(grav.monto.toString()) : "";
+          }
+        });
+        payload.montosGravamen = montos;
       } else {
         payload.tieneGravamen = "No";
+        payload.institucionGravamen = [];
       }
 
       // 9. Campos especializados
       payload.tiposAgua = data.tipo_agua ?? [];
       payload.concesionAgua = data.concesion_agua ?? false;
-      payload.usoTerreno = data.uso_terreno ?? '';
-      payload.tipoRiego = data.tipo_riego ?? '';
+      payload.usoTerreno = Array.isArray(data.uso_terreno)
+        ? data.uso_terreno
+        : (data.uso_terreno ? [data.uso_terreno] : []);
+      payload.tipoRiego = Array.isArray(data.tipo_riego)
+        ? data.tipo_riego
+        : (data.tipo_riego ? [data.tipo_riego] : []);
       payload.infraElectricidad = data.infra_electricidad ?? false;
       payload.infraCaminoAcceso = data.infra_camino_acceso ?? false;
       payload.infraCercado = data.infra_cercado ?? false;
@@ -744,7 +930,15 @@ export function usePropertyForm(
       payload.altoFlujoVehicular = data.alto_flujo_vehicular ?? false;
       payload.ubicacionIndustrial = data.ubicacion_industrial ?? '';
       payload.alturaLibreM = data.altura_libre_m ?? '';
-      payload.tipoEnergiaKva = data.tipo_energia_kva ?? [];
+      const ENERGIA_LEGACY: Record<string, string> = {
+        'Trifásica 25 kVA': 'Monofásica: hasta 25 kVA',
+        'Trifásica 45 kVA': 'Trifásica: 25 a 45 kVA',
+        'Trifásica 150 kVA': 'Industrial: 45 a 150 kVA',
+        'Más de 150 kVA': 'Alta capacidad: más de 150 kVA',
+      };
+      payload.tipoEnergiaKva = (data.tipo_energia_kva ?? []).map(
+        (v: string) => ENERGIA_LEGACY[v] ?? v
+      );
       payload.areaOficinas = data.area_oficinas_m2?.toString() ?? '';
       payload.patioManiobras = data.patio_maniobras_m2?.toString() ?? '';
 
@@ -759,19 +953,34 @@ export function usePropertyForm(
   // VALIDACIÓN
   // ============================================
 
+  // Guarda los errores recién calculados de forma síncrona, para que el flujo de
+  // publicación pueda leerlos (y hacer scroll al primero) sin esperar al re-render.
+  const lastErrorsRef = useRef<Record<string, string>>({});
+  const getValidationErrors = useCallback(
+    () => lastErrorsRef.current,
+    [],
+  );
+
   const validate = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
+    // Campos visibles según tipo/subtipo (para exigir solo lo que se muestra).
+    const cv = getCamposVisibles(state.subtipo, state.tipoPrincipal as TipoPrincipal);
 
+    // Los chequeos siguen el MISMO orden visual del formulario (de arriba hacia
+    // abajo), para que el resaltado y el scroll-al-error sean coherentes.
+
+    // 1) Imágenes
     if (state.images.length === 0) {
       newErrors.images = "Debes agregar al menos 1 imagen";
     }
-    if (!state.descripcion.trim()) {
-      newErrors.descripcion = "La descripción es requerida";
-    }
+
+    // 2) Información básica: subtipo → operación → precio → descripción
     if (!state.subtipo) {
       newErrors.subtipo = "Debes seleccionar un subtipo de propiedad";
     }
-
+    if (!state.tipoOperacion) {
+      newErrors.tipoOperacion = "Selecciona el tipo de operación";
+    }
     if (state.tipoOperacion === "venta" && !state.precioVenta.trim()) {
       newErrors.precioVenta = "El precio de venta es requerido";
     }
@@ -784,12 +993,30 @@ export function usePropertyForm(
       if (!state.precioRenta.trim())
         newErrors.precioRenta = "El precio de renta es requerido";
     }
+    if (!state.descripcion.trim()) {
+      newErrors.descripcion = "La descripción es requerida";
+    }
 
+    // 3) Ubicación. Solo se exige el estado: el municipio puede quedar vacío
+    // cuando el usuario elige una ubicación a nivel estado en Google Places (que
+    // deja municipio en blanco a propósito); la ubicación precisa se captura
+    // aparte con el pin del mapa.
     if (!state.ubicacionData.estado)
       newErrors.estado = "El estado es requerido";
-    if (!state.ubicacionData.municipio)
-      newErrors.municipio = "El municipio es requerido";
 
+    // 4) Características físicas (en el orden en que aparecen en pantalla),
+    // obligatorias solo cuando el campo es visible para el tipo/subtipo. Los
+    // selectores inician vacíos (sin preseleccionar).
+    if (cv.recamaras && !state.recamaras)
+      newErrors.recamaras = "Indica el número de recámaras";
+    if (cv.banos && !state.banosCompletos)
+      newErrors.banos = "Indica el número de baños";
+    if (cv.mediosBanos && !state.mediosBanos)
+      newErrors.mediosBanos = "Indica el número de medios baños";
+    if (cv.estacionamientos && !state.estacionamientos)
+      newErrors.estacionamientos = "Indica el número de estacionamientos";
+    if (cv.niveles && !state.niveles)
+      newErrors.niveles = "Indica el número de niveles";
     if (esTerreno(state.subtipo)) {
       if (!state.m2Terreno.trim()) {
         newErrors.m2Terreno =
@@ -801,11 +1028,67 @@ export function usePropertyForm(
           "Debes especificar al menos m² de construcción o terreno";
       }
     }
+    if (cv.amueblado && !state.amueblado)
+      newErrors.amueblado = "Indica si está amueblado";
+    if (
+      (state.tipoOperacion === "renta" || state.tipoOperacion === "ambas") &&
+      cv.petFriendly &&
+      !state.petFriendly
+    )
+      newErrors.petFriendly = "Indica si se permiten mascotas";
 
-    if (state.location.latitude === 0 && state.location.longitude === 0) {
-      newErrors.location = "Debes seleccionar la ubicación en el mapa";
+    // 5) Comisión: no tiene sentido compartir 0% (venta) ni 0 meses (renta).
+    const comisionVentaNum = parseFloat(state.comisionValor) || 0;
+    const comisionRentaNum =
+      parseFloat(
+        state.tipoOperacion === "ambas"
+          ? state.comisionValorRenta
+          : state.comisionValor,
+      ) || 0;
+    if (
+      (state.tipoOperacion === "venta" || state.tipoOperacion === "ambas") &&
+      state.comparteComision === "Sí" &&
+      comisionVentaNum === 0
+    ) {
+      newErrors.comision =
+        "No puedes compartir una comisión de 0%. Define un porcentaje mayor antes de publicar.";
+    }
+    if (
+      (state.tipoOperacion === "renta" || state.tipoOperacion === "ambas") &&
+      (state.tipoOperacion === "ambas"
+        ? state.comparteComisionRenta
+        : state.comparteComision) === "Sí" &&
+      comisionRentaNum === 0
+    ) {
+      newErrors.comisionRenta =
+        "No puedes compartir una comisión de 0 meses. Define un valor mayor antes de publicar.";
     }
 
+    // 6) Gravamen y Financiamiento (siempre visibles)
+    if (!state.tieneGravamen)
+      newErrors.gravamen = "Indica si la propiedad tiene gravamen";
+    if (!state.aceptaFinanciamiento)
+      newErrors.financiamiento = "Indica si aceptas financiamiento";
+
+    // 7) Ubicación exacta en el mapa (sección final)
+    if (state.location.latitude === 0 && state.location.longitude === 0) {
+      newErrors.location =
+        "Marca la ubicación exacta en el mapa. Si no lo haces, tu propiedad no podrá ser encontrada por asesores ni clientes.";
+    } else if (
+      // El PIN debe caer dentro de la zona escrita (cuando Google nos dio su área).
+      // Evita que el texto diga "Aguascalientes" y el PIN quede en otro estado:
+      // el matching usa solo el PIN, así que un PIN inconsistente "esconde" la
+      // propiedad de las búsquedas correctas. Si no hay bounds, no se valida.
+      !pinDentroDeZona(
+        state.location.latitude,
+        state.location.longitude,
+        state.ubicacionData.bounds,
+      )
+    ) {
+      newErrors.location = PIN_FUERA_DE_ZONA_MSG;
+    }
+
+    lastErrorsRef.current = newErrors;
     dispatch({ type: "SET_FIELD", field: "errors", value: newErrors });
     return Object.keys(newErrors).length === 0;
   }, [state]);
@@ -881,8 +1164,14 @@ export function usePropertyForm(
     setM2Construccion,
     m2Terreno: state.m2Terreno,
     setM2Terreno,
+    anchoTerreno: state.anchoTerreno,
+    setAnchoTerreno,
+    largoTerreno: state.largoTerreno,
+    setLargoTerreno,
     niveles: state.niveles,
     setNiveles,
+    costoMantenimiento: state.costoMantenimiento,
+    setCostoMantenimiento,
     antiguedad: state.antiguedad,
     setAntiguedad,
     amueblado: state.amueblado,
@@ -928,8 +1217,8 @@ export function usePropertyForm(
     setTieneGravamen,
     institucionGravamen: state.institucionGravamen,
     setInstitucionGravamen,
-    montoGravamen: state.montoGravamen,
-    setMontoGravamen,
+    montosGravamen: state.montosGravamen,
+    setMontosGravamen,
 
     // Financiamiento
     aceptaFinanciamiento: state.aceptaFinanciamiento,
@@ -954,9 +1243,9 @@ export function usePropertyForm(
     concesionAgua: state.concesionAgua,
     setConcesionAgua,
     usoTerreno: state.usoTerreno,
-    setUsoTerreno,
+    toggleUsoTerreno,
     tipoRiego: state.tipoRiego,
-    setTipoRiego,
+    toggleTipoRiego,
     infraElectricidad: state.infraElectricidad,
     setInfraElectricidad,
     infraCaminoAcceso: state.infraCaminoAcceso,
@@ -1003,6 +1292,10 @@ export function usePropertyForm(
 
     // Validation
     validate,
+    getValidationErrors,
+
+    // Cambios sin guardar
+    isDirty,
 
     // Helpers
     handleCurrencyChange,

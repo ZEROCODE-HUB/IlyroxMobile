@@ -8,73 +8,99 @@ import {
   TextInput,
   ScrollView,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../constants/colors";
+import { Avatar } from "./shared";
+import {
+  FeatureRatings,
+  RatingTarget,
+} from "./Appointments/appointmentTypes";
 
 interface RatingModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (
-    overallRating: number,
     featureRatings: FeatureRatings,
-    comentario: string
+    comentario: string,
+    recomienda: boolean | null,
   ) => void;
+  target?: RatingTarget | null;
 }
 
-interface FeatureRatings {
-  conocimiento_mercado: number;
-  comunicacion: number;
-  profesionalismo: number;
-  disponibilidad: number;
-}
+type FeatureKey = keyof FeatureRatings;
 
-const FEATURES = [
-  { key: "conocimiento_mercado", label: "Conocimiento del Mercado" },
-  { key: "comunicacion", label: "Comunicación" },
-  { key: "profesionalismo", label: "Profesionalismo" },
-  { key: "disponibilidad", label: "Disponibilidad" },
-] as const;
+const FEATURES: {
+  key: FeatureKey;
+  label: string;
+  description: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  {
+    key: "profesionalismo",
+    label: "Profesionalismo",
+    description: "Conocimiento del mercado, cumplimiento y calidad en su trabajo.",
+    icon: "briefcase-outline",
+  },
+  {
+    key: "etica_valores",
+    label: "Ética y valores",
+    description: "Honestidad, transparencia y respeto en su actuar.",
+    icon: "shield-checkmark-outline",
+  },
+  {
+    key: "pago_comisiones",
+    label: "Pago de comisiones",
+    description: "Cumple en tiempo y forma con los pagos acordados.",
+    icon: "cash-outline",
+  },
+  {
+    key: "comunicacion_servicio",
+    label: "Comunicación y servicio",
+    description: "Comunicación efectiva, atención y disposición para ayudar.",
+    icon: "chatbubble-ellipses-outline",
+  },
+];
+
+const EMPTY_RATINGS: FeatureRatings = {
+  profesionalismo: 0,
+  etica_valores: 0,
+  pago_comisiones: 0,
+  comunicacion_servicio: 0,
+};
 
 export const RatingModal: React.FC<RatingModalProps> = ({
   visible,
   onClose,
   onSubmit,
+  target,
 }) => {
-  const [overallRating, setOverallRating] = useState(0);
-  const [featureRatings, setFeatureRatings] = useState<FeatureRatings>({
-    conocimiento_mercado: 0,
-    comunicacion: 0,
-    profesionalismo: 0,
-    disponibilidad: 0,
-  });
+  const [featureRatings, setFeatureRatings] =
+    useState<FeatureRatings>(EMPTY_RATINGS);
   const [comentario, setComentario] = useState("");
+  const [recomienda, setRecomienda] = useState<boolean | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Reset ratings when modal opens
   useEffect(() => {
     if (visible) {
-      setOverallRating(0);
-      setFeatureRatings({
-        conocimiento_mercado: 0,
-        comunicacion: 0,
-        profesionalismo: 0,
-        disponibilidad: 0,
-      });
+      setFeatureRatings(EMPTY_RATINGS);
       setComentario("");
+      setRecomienda(null);
       setSubmitting(false);
     }
   }, [visible]);
 
+  const allRated = FEATURES.every((f) => featureRatings[f.key] > 0);
+
   const handleSubmit = async () => {
-    if (overallRating === 0) {
-      // Podrías mostrar una alerta aquí
-      return;
-    }
+    if (!allRated) return;
 
     setSubmitting(true);
     try {
-      await onSubmit(overallRating, featureRatings, comentario);
+      await onSubmit(featureRatings, comentario, recomienda);
     } catch (error) {
       // El error ya fue manejado en el componente padre
     } finally {
@@ -82,64 +108,195 @@ export const RatingModal: React.FC<RatingModalProps> = ({
     }
   };
 
-  const updateFeatureRating = (key: keyof FeatureRatings, value: number) => {
+  const updateFeatureRating = (key: FeatureKey, value: number) => {
     setFeatureRatings((prev) => ({ ...prev, [key]: value }));
   };
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
         <View style={styles.rateModalCard}>
+          {/* Header */}
           <View style={styles.modalHeaderRow}>
-            <Text style={styles.modalTitle}>Calificar Asesor</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={20} color={COLORS.textSecondary} />
+            <TouchableOpacity onPress={onClose} style={styles.headerBtn}>
+              <Ionicons
+                name="chevron-back"
+                size={22}
+                color={COLORS.textPrimary}
+              />
             </TouchableOpacity>
+            <View style={styles.headerTitleWrap}>
+              <Text style={styles.modalTitle}>Calificar asesor</Text>
+              <Text style={styles.modalSubtitle}>
+                Tu evaluación ayuda a mantener la calidad en{" "}
+                <Text style={styles.brand}>ILYROX</Text>
+              </Text>
+            </View>
+            <View style={styles.headerBtn} />
           </View>
 
           <ScrollView
             style={styles.modalContent}
+            contentContainerStyle={styles.modalContentInner}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            <Text style={styles.modalLabel}>Calificación general</Text>
-            <View style={styles.starsLarge}>
-              {[1, 2, 3, 4, 5].map((s) => (
-                <TouchableOpacity key={s} onPress={() => setOverallRating(s)}>
-                  <Ionicons
-                    name={overallRating >= s ? "star" : "star-outline"}
-                    size={32}
-                    color={COLORS.warning}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={[styles.modalLabel, styles.featuresTitle]}>
-              Características
-            </Text>
-            {FEATURES.map((feature) => (
-              <View key={feature.key} style={styles.featureRateRow}>
-                <Text style={styles.featureLabel}>{feature.label}</Text>
-                <View style={styles.stars}>
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <TouchableOpacity
-                      key={s}
-                      onPress={() => updateFeatureRating(feature.key, s)}
-                    >
+            {/* Tarjeta del asesor */}
+            {target && (
+              <View style={styles.advisorCard}>
+                <Avatar
+                  uri={target.avatar || undefined}
+                  name={target.name}
+                  size={64}
+                />
+                <View style={styles.advisorInfo}>
+                  <Text style={styles.advisorName} numberOfLines={1}>
+                    {target.name}
+                  </Text>
+                  {target.phone && (
+                    <View style={styles.advisorMetaRow}>
+                      <Ionicons name="call" size={13} color={COLORS.primary} />
+                      <Text style={styles.advisorPhone}>{target.phone}</Text>
+                    </View>
+                  )}
+                  {target.location && (
+                    <View style={styles.advisorMetaRow}>
                       <Ionicons
-                        name={
-                          featureRatings[feature.key] >= s
-                            ? "star"
-                            : "star-outline"
-                        }
-                        size={25}
-                        color={COLORS.warning}
+                        name="location-outline"
+                        size={13}
+                        color={COLORS.textTertiary}
                       />
-                    </TouchableOpacity>
-                  ))}
+                      <Text style={styles.advisorLocation} numberOfLines={1}>
+                        {target.location}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </View>
-            ))}
+            )}
+
+            {/* Categorías */}
+            <Text style={styles.sectionTitle}>
+              Califica las siguientes categorías
+            </Text>
+            <Text style={styles.sectionSubtitle}>
+              Selecciona de 1 a 5 estrellas para cada categoría.
+            </Text>
+
+            <View style={styles.featuresCard}>
+              {FEATURES.map((feature, idx) => {
+                const value = featureRatings[feature.key];
+                return (
+                  <View
+                    key={feature.key}
+                    style={[
+                      styles.featureRow,
+                      idx === FEATURES.length - 1 && styles.featureRowLast,
+                    ]}
+                  >
+                    <View style={styles.featureIconCircle}>
+                      <Ionicons
+                        name={feature.icon}
+                        size={20}
+                        color={COLORS.primary}
+                      />
+                    </View>
+                    <View style={styles.featureTextWrap}>
+                      <Text style={styles.featureLabel}>{feature.label}</Text>
+                      <Text style={styles.featureDesc}>
+                        {feature.description}
+                      </Text>
+                    </View>
+                    <View style={styles.featureRightWrap}>
+                      <View style={styles.stars}>
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <TouchableOpacity
+                            key={s}
+                            onPress={() => updateFeatureRating(feature.key, s)}
+                            hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
+                          >
+                            <Ionicons
+                              name={value >= s ? "star" : "star-outline"}
+                              size={20}
+                              color={
+                                value >= s ? COLORS.warning : COLORS.textDisabled
+                              }
+                            />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <Text
+                        style={[
+                          styles.featureValue,
+                          value === 0 && styles.featureValueEmpty,
+                        ]}
+                      >
+                        {value.toFixed(1)}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* ¿Trabajarías nuevamente? (recomendación) */}
+            <View style={styles.recommendCard}>
+              <View style={styles.recommendLabelWrap}>
+                <Ionicons
+                  name="heart-outline"
+                  size={20}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.recommendLabel}>
+                  ¿Trabajarías nuevamente con este asesor?
+                </Text>
+              </View>
+              <View style={styles.recommendButtons}>
+                <TouchableOpacity
+                  style={[
+                    styles.recommendBtn,
+                    recomienda === true && styles.recommendBtnYesActive,
+                  ]}
+                  onPress={() =>
+                    setRecomienda((prev) => (prev === true ? null : true))
+                  }
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.recommendBtnText,
+                      recomienda === true && styles.recommendBtnTextActive,
+                    ]}
+                  >
+                    Sí
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.recommendBtn,
+                    styles.recommendBtnNo,
+                    recomienda === false && styles.recommendBtnNoActive,
+                  ]}
+                  onPress={() =>
+                    setRecomienda((prev) => (prev === false ? null : false))
+                  }
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.recommendBtnText,
+                      styles.recommendBtnTextNo,
+                      recomienda === false && styles.recommendBtnTextActive,
+                    ]}
+                  >
+                    No
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
             {/* Comentario opcional */}
             <View style={styles.commentSection}>
@@ -158,34 +315,47 @@ export const RatingModal: React.FC<RatingModalProps> = ({
               <Text style={styles.charCount}>{comentario.length}/500</Text>
             </View>
 
-            <View style={styles.modalActionsRow}>
-              <TouchableOpacity
-                onPress={onClose}
-                style={[styles.btnSecondary, submitting && styles.btnDisabled]}
-                disabled={submitting}
-              >
-                <Text style={styles.btnTextSec}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleSubmit}
-                style={[styles.btnPrimary, submitting && styles.btnDisabled]}
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <>
-                    <ActivityIndicator size="small" color={COLORS.white} />
-                    <Text style={[styles.btnTextPri, { marginLeft: 8 }]}>
-                      Guardando...
-                    </Text>
-                  </>
-                ) : (
-                  <Text style={styles.btnTextPri}>Guardar</Text>
-                )}
-              </TouchableOpacity>
+            {/* Publicar */}
+            <TouchableOpacity
+              onPress={handleSubmit}
+              style={[
+                styles.publishBtn,
+                (!allRated || submitting) && styles.publishBtnDisabled,
+              ]}
+              disabled={!allRated || submitting}
+              activeOpacity={0.85}
+            >
+              {submitting ? (
+                <>
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                  <Text style={[styles.publishBtnText, { marginLeft: 8 }]}>
+                    Publicando...
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="paper-plane-outline" size={18} color={COLORS.white} />
+                  <Text style={styles.publishBtnText}>Publicar evaluación</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Nota al pie */}
+            <View style={styles.footerNote}>
+              <Ionicons
+                name="lock-closed-outline"
+                size={16}
+                color={COLORS.textTertiary}
+              />
+              <Text style={styles.footerNoteText}>
+                En esta versión tu nombre no será visible públicamente.{" "}
+                <Text style={styles.footerNoteHighlight}>Próximamente</Text> las
+                evaluaciones incluirán el perfil de quien evaluó.
+              </Text>
             </View>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -196,13 +366,15 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.blackTransparent60,
     justifyContent: "center",
     alignItems: "center",
-    padding: 24,
+    padding: 16,
   },
   rateModalCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
+    backgroundColor: COLORS.background,
+    borderRadius: 20,
     width: "100%",
-    maxWidth: 400,
+    maxWidth: 440,
+    maxHeight: "92%",
+    overflow: "hidden",
     elevation: 5,
     shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
@@ -212,19 +384,212 @@ const styles = StyleSheet.create({
   modalHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
+    paddingHorizontal: 12,
+    paddingTop: 16,
+    paddingBottom: 12,
+    backgroundColor: COLORS.background,
+  },
+  headerBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitleWrap: {
+    flex: 1,
+    alignItems: "center",
   },
   modalTitle: {
     fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.textPrimary,
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textAlign: "center",
+    marginTop: 2,
+    paddingHorizontal: 8,
+  },
+  brand: {
+    color: COLORS.primary,
+    fontWeight: "800",
+  },
+  modalContent: {
+    paddingHorizontal: 16,
+  },
+  modalContentInner: {
+    paddingBottom: 24,
+  },
+  // Tarjeta asesor
+  advisorCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    marginBottom: 20,
+  },
+  advisorInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  advisorName: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.textPrimary,
+  },
+  advisorMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  advisorPhone: {
+    fontSize: 13,
+    color: COLORS.primary,
+    fontWeight: "600",
+  },
+  advisorLocation: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    flex: 1,
+  },
+  // Sección categorías
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: COLORS.textPrimary,
+    marginBottom: 2,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginBottom: 12,
+  },
+  featuresCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    paddingHorizontal: 14,
+    marginBottom: 20,
+  },
+  featureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.background,
+  },
+  featureRowLast: {
+    borderBottomWidth: 0,
+  },
+  featureIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.primaryTransparent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  featureTextWrap: {
+    flex: 1,
+  },
+  featureLabel: {
+    fontSize: 15,
     fontWeight: "700",
     color: COLORS.textPrimary,
   },
-  modalContent: {
+  featureDesc: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  featureRightWrap: {
+    alignItems: "center",
+    gap: 4,
+  },
+  stars: {
+    flexDirection: "row",
+    gap: 2,
+  },
+  featureValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: COLORS.primary,
+  },
+  featureValueEmpty: {
+    color: COLORS.textDisabled,
+  },
+  // Recomendación
+  recommendCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
     padding: 16,
+    marginBottom: 20,
+  },
+  recommendLabelWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  recommendLabel: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+  },
+  recommendButtons: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  recommendBtn: {
+    minWidth: 64,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.white,
+  },
+  recommendBtnYesActive: {
+    backgroundColor: COLORS.primary,
+  },
+  recommendBtnNo: {
+    borderColor: COLORS.cardBorder,
+  },
+  recommendBtnNoActive: {
+    backgroundColor: COLORS.error,
+    borderColor: COLORS.error,
+  },
+  recommendBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.primary,
+  },
+  recommendBtnTextNo: {
+    color: COLORS.textSecondary,
+  },
+  recommendBtnTextActive: {
+    color: COLORS.white,
+  },
+  // Comentario
+  commentSection: {
+    marginBottom: 20,
   },
   modalLabel: {
     fontSize: 13,
@@ -232,92 +597,13 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 8,
   },
-  featuresTitle: {
-    marginTop: 20,
-  },
-  starsLarge: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 8,
-  },
-  featureRateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.background,
-  },
-  featureLabel: {
-    fontSize: 13,
-    color: COLORS.textPrimary,
-    flex: 1,
-  },
-  stars: {
-    flexDirection: "row",
-    gap: 4,
-  },
-  modalActionsRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 20,
-  },
-  btnSecondary: {
-    flex: 1,
-    padding: 14,
-    backgroundColor: COLORS.backgroundDark,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  btnPrimary: {
-    flex: 1,
-    padding: 14,
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-  },
-  btnTextSec: {
-    fontWeight: "600",
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  },
-  btnTextPri: {
-    fontWeight: "600",
-    fontSize: 14,
-    color: COLORS.white,
-  },
-  btnDisabled: {
-    opacity: 0.5,
-  },
-  recommendSection: {
-    marginTop: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.background,
-  },
-  switchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-  },
-  switchLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-  },
-  commentSection: {
-    marginTop: 16,
-  },
   commentInput: {
-    backgroundColor: COLORS.background,
-    borderRadius: 8,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
     padding: 12,
     fontSize: 14,
     color: COLORS.textPrimary,
-    minHeight: 100,
+    minHeight: 90,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
@@ -326,5 +612,45 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
     textAlign: "right",
     marginTop: 4,
+  },
+  // Publicar
+  publishBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: COLORS.primary,
+    borderRadius: 14,
+    paddingVertical: 16,
+    marginBottom: 16,
+  },
+  publishBtnDisabled: {
+    opacity: 0.5,
+  },
+  publishBtnText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  // Nota al pie
+  footerNote: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  footerNoteText: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    lineHeight: 17,
+  },
+  footerNoteHighlight: {
+    color: COLORS.primary,
+    fontWeight: "700",
   },
 });

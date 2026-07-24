@@ -36,11 +36,9 @@ type Tab = "todos" | "usuarios" | "posts" | "reels" | "ubicaciones" | "fichas";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "todos", label: "Todos" },
-  { key: "usuarios", label: "Usuarios" },
   { key: "posts", label: "Posts" },
   { key: "reels", label: "Reels" },
   { key: "ubicaciones", label: "Propiedades" },
-  { key: "fichas", label: "Fichas" },
 ];
 
 // ─── Componente principal ───────────────────────────────────────────────────────
@@ -94,22 +92,38 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
 
   const renderTabTodos = () => (
     <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-      {results.properties.length > 0 && (
-        <>
-          <SectionHeader title="Fichas" />
-          <PropertyFichasGrid
-            items={results.properties.slice(0, 4)}
-            onPress={(id) => handleNavigate(() => navigateToProperty(id))}
-          />
-        </>
-      )}
-
+      {/* Usuarios PRIMERO: al buscar un nombre, lo que se busca casi siempre es
+          una persona. Antes las Ubicaciones (hasta 5) empujaban a los usuarios
+          fuera de pantalla y no se encontraban. */}
       {results.users.length > 0 && (
         <>
           <SectionHeader title="Usuarios" />
           {results.users.slice(0, 3).map((u) => (
             <UserRow key={u.id} user={u} onPress={() => handleNavigate(() => navigateToUser(u.id))} />
           ))}
+        </>
+      )}
+
+      {results.locations.length > 0 && (
+        <>
+          <SectionHeader
+            title="Ubicaciones"
+            style={results.users.length > 0 ? { marginTop: 20 } : undefined}
+          />
+          {/* Solo 2 en "Todos": las de más se ven en la pestaña Propiedades. */}
+          {results.locations.slice(0, 2).map((l, i) => (
+            <LocationRow key={`${l.id}-${i}`} location={l} onPress={() => handleNavigate(() => selectLocation(l))} />
+          ))}
+        </>
+      )}
+
+      {results.properties.length > 0 && (
+        <>
+          <SectionHeader title="Fichas" style={{ marginTop: 20 }} />
+          <PropertyFichasGrid
+            items={results.properties.slice(0, 4)}
+            onPress={(id) => handleNavigate(() => navigateToProperty(id))}
+          />
         </>
       )}
 
@@ -124,15 +138,6 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
         <>
           <SectionHeader title="Reels" style={{ marginTop: 20 }} />
           <ReelGrid items={results.reels.slice(0, 4)} onPress={(id) => handleNavigate(() => navigateToReel(id))} />
-        </>
-      )}
-
-      {results.locations.length > 0 && (
-        <>
-          <SectionHeader title="Ubicaciones" style={{ marginTop: 20 }} />
-          {results.locations.slice(0, 3).map((l, i) => (
-            <LocationRow key={`${l.id}-${i}`} location={l} onPress={() => handleNavigate(() => selectLocation(l))} />
-          ))}
         </>
       )}
 
@@ -222,7 +227,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
             <TextInput
               ref={inputRef}
               style={styles.input}
-              placeholder="Buscar usuarios, posts, reels..."
+              placeholder="¿Dónde busca tu cliente?"
               placeholderTextColor={COLORS.textSecondary}
               value={query}
               onChangeText={setQuery}
@@ -353,14 +358,10 @@ function UserRow({ user, onPress }: { user: SearchUser; onPress: () => void }) {
           <Text style={userStyles.followers}>⭐ {user.rating.toFixed(1)}</Text>
         )}
       </View>
-      <TouchableOpacity style={userStyles.followBtn} activeOpacity={0.8} onPress={onPress}>
-        <Text style={userStyles.followText}>Ver perfil</Text>
-      </TouchableOpacity>
+      <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
     </TouchableOpacity>
   );
 }
-
-const SPECIAL_TYPES = new Set(["openhouse", "busqueda", "sold", "aniversario"]);
 
 function searchPostToFeedItem(post: SearchPost): FeedItem {
   return {
@@ -399,12 +400,11 @@ const CARD_HEIGHT_ESTIMATES: Record<string, number> = {
   busqueda: 325,
   aniversario: 390,
 };
-const SCALE = COL2 / SCREEN_WIDTH;
+const SCALE = COL3 / SCREEN_WIDTH;
 
-// Renderiza SpecialPostCard preview escalado a la mitad del ancho.
+// Renderiza SpecialPostCard preview escalado a un tercio del ancho.
 // Usa transform (no margin) para que los cambios de posición no afecten el layout
-// y no redisparar onLayout en un ciclo. feedItem memoizado para estabilizar el
-// source de las imágenes internas y evitar parpadeo.
+// y no redisparar onLayout en un ciclo.
 const ScaledSpecialCard = React.memo(function ScaledSpecialCard({
   post,
   onPress,
@@ -417,8 +417,6 @@ const ScaledSpecialCard = React.memo(function ScaledSpecialCard({
 
   const feedItem = React.useMemo(() => searchPostToFeedItem(post), [post]);
 
-  // translateX/translateY en transform NO afectan layout (a diferencia de marginLeft/marginTop)
-  // → cambiar offsetY no dispara onLayout de nuevo
   const offsetX = -(SCREEN_WIDTH * (1 - SCALE)) / 2;
   const offsetY = -(cardHeight * (1 - SCALE)) / 2;
 
@@ -444,44 +442,43 @@ const ScaledSpecialCard = React.memo(function ScaledSpecialCard({
   );
 });
 
-// Posts con imagen → grid 3 columnas. Posts especiales → grid 2 columnas escalado.
+// Todos los posts (imagen y special) van en grid de 3 columnas para evitar
+// huecos visuales a la derecha.
 function PostGrid({ items, onPress }: { items: SearchPost[]; onPress: (feedItemId: string) => void }) {
-  const imageItems = items.filter((i) => i.img);
-  const specialItems = items.filter((i) => !i.img && SPECIAL_TYPES.has(i.tipo ?? ""));
-
-  const imageRows: SearchPost[][] = [];
-  for (let i = 0; i < imageItems.length; i += 3) imageRows.push(imageItems.slice(i, i + 3));
-
-  const specialRows: SearchPost[][] = [];
-  for (let i = 0; i < specialItems.length; i += 2) specialRows.push(specialItems.slice(i, i + 2));
+  const rows: SearchPost[][] = [];
+  for (let i = 0; i < items.length; i += 3) rows.push(items.slice(i, i + 3));
 
   return (
     <View>
-      {imageRows.map((row, ri) => (
-        <View key={`img-${ri}`} style={gridStyles.row}>
-          {row.map((item, ci) => (
-            <TouchableOpacity key={item.id} activeOpacity={0.9} onPress={() => onPress(item.feed_item_id)}>
-              <Image
-                source={{ uri: item.img }}
-                style={[gridStyles.postCell, ci < row.length - 1 && gridStyles.postCellGap]}
-                contentFit="cover"
-              />
-            </TouchableOpacity>
+      {rows.map((row, ri) => (
+        <View key={`row-${ri}`} style={gridStyles.row}>
+          {row.map((item, ci) => {
+            const isImage = !!item.img;
+            const showGap = ci < row.length - 1;
+            if (isImage) {
+              return (
+                <TouchableOpacity key={item.id} activeOpacity={0.9} onPress={() => onPress(item.feed_item_id)}>
+                  <Image
+                    source={{ uri: item.img }}
+                    style={[gridStyles.postCell, showGap && gridStyles.postCellGap]}
+                    contentFit="cover"
+                  />
+                </TouchableOpacity>
+              );
+            }
+            return (
+              <View key={item.id} style={showGap && gridStyles.postCellGap}>
+                <ScaledSpecialCard
+                  post={item}
+                  onPress={() => onPress(item.feed_item_id)}
+                />
+              </View>
+            );
+          })}
+          {/* Celdas vacías para completar la fila si quedan menos de 3 items */}
+          {Array.from({ length: 3 - row.length }).map((_, idx) => (
+            <View key={`empty-${idx}`} style={[gridStyles.postCell, { backgroundColor: "transparent" }]} />
           ))}
-        </View>
-      ))}
-
-      {specialRows.map((row, ri) => (
-        <View key={`sp-${ri}`} style={[gridStyles.row, { marginBottom: 2 }]}>
-          {row.map((item, ci) => (
-            <ScaledSpecialCard
-              key={item.id}
-              post={item}
-              onPress={() => onPress(item.feed_item_id)}
-            />
-          ))}
-          {/* Celda vacía si la fila tiene solo 1 item */}
-          {row.length === 1 && <View style={gridStyles.specialCell} />}
         </View>
       ))}
     </View>
@@ -544,7 +541,10 @@ function PropertyFichaCard({ property, onPress }: { property: SearchProperty; on
     : null;
 
   const priceDisplay = property.precio != null ? formatPriceShort(property.precio) : null;
-  const location = property.municipio || property.colonia || property.estado || null;
+  const location =
+    [property.colonia, property.municipio, property.estado]
+      .filter(Boolean)
+      .join(", ") || null;
   const m2 = (property.metros_cuadrados_construccion ?? 0) > 0
     ? property.metros_cuadrados_construccion
     : property.metros_cuadrados_terreno;
@@ -598,14 +598,17 @@ function PropertyFichaCard({ property, onPress }: { property: SearchProperty; on
 }
 
 function LocationRow({ location, onPress }: { location: SearchLocation; onPress: () => void }) {
+  // Descripción completa separada por comas, estilo Google Places.
+  const fullText =
+    location.fullDescription ||
+    [location.name, location.municipio, location.estado].filter(Boolean).join(", ");
   return (
     <TouchableOpacity style={locStyles.row} activeOpacity={0.7} onPress={onPress}>
       <View style={locStyles.iconWrapper}>
         <Ionicons name="location" size={22} color={COLORS.primary} />
       </View>
       <View style={locStyles.info}>
-        <Text style={locStyles.name}>{location.name}</Text>
-        <Text style={locStyles.count}>{location.count} propiedades</Text>
+        <Text style={locStyles.name} numberOfLines={2}>{fullText}</Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={COLORS.cardBorder} />
     </TouchableOpacity>
@@ -770,17 +773,6 @@ const userStyles = StyleSheet.create({
     color: COLORS.textSecondary,
     opacity: 0.8,
   },
-  followBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: COLORS.primary,
-  },
-  followText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.white,
-  },
 });
 
 const gridStyles = StyleSheet.create({
@@ -789,7 +781,7 @@ const gridStyles = StyleSheet.create({
     marginBottom: 1,
   },
   specialCell: {
-    width: COL2,
+    width: COL3,
     overflow: "hidden",
   },
   postCell: {
@@ -855,10 +847,10 @@ const locStyles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.textPrimary,
   },
-  count: {
+  hierarchy: {
     fontSize: 12,
-    color: "#3B82F6",
-    marginTop: 2,
+    color: COLORS.textSecondary,
+    marginTop: 1,
   },
 });
 

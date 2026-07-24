@@ -40,7 +40,8 @@ export const useReportProperty = () => {
       Burnt.toast({
         title: "Propiedad Reportada",
         preset: "done",
-        duration: 2500,
+        // Burnt mide la duración en SEGUNDOS: 2500 eran ~41 min (nunca se iba).
+        duration: 2.5,
       });
       return true;
     } catch (error) {
@@ -48,7 +49,7 @@ export const useReportProperty = () => {
       Burnt.toast({
         title: "Error al reportar",
         preset: "error",
-        duration: 2000,
+        duration: 2,
       });
       return false;
     } finally {

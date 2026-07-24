@@ -1,11 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { PAGINATION } from "@/constants";
-import { reelService, ContextualReelRow } from "@/services/reelService";
+import { reelService, ReelFeedRow } from "@/services/reelService";
 import { FeedItem } from "../../types";
 
-const mapContextualReelToFeedItem = (
-  r: ContextualReelRow,
-): FeedItem & { tipo_match: string } => ({
+const mapRowToFeedItem = (r: ReelFeedRow): FeedItem => ({
   id: r.feed_item_id,
   type: "reel",
   content: r.descripcion || "",
@@ -22,67 +20,63 @@ const mapContextualReelToFeedItem = (
   reelDetails: {
     id: r.reel_id,
   } as any,
-  tipo_match: r.tipo_match,
 });
 
-export const useReelFeed = (initialReelId: string, initialItem?: any) => {
-  const [reels, setReels] = useState<any[]>(
-    initialItem ? [{ ...initialItem, tipo_match: "actual" }] : [],
+/**
+ * Feed lineal de reels para el visor.
+ *
+ * El reel abierto (`initialItem`) queda fijo en el índice 0; al deslizar
+ * hacia abajo se cargan TODOS los demás reels en el mismo orden que el feed
+ * principal (RPC get_reels_feed_paged). La paginación es por offset y los
+ * reels ya presentes se deduplican por feed_item id (incluido el abierto).
+ */
+export const useReelFeed = (initialItem?: any) => {
+  const [reels, setReels] = useState<FeedItem[]>(
+    initialItem ? [initialItem] : [],
   );
   const [loading, setLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const [initialScrollIndex, setInitialScrollIndex] = useState(0);
-  const limit = PAGINATION.REEL_CONTEXT_LIMIT;
+  const [hasMore, setHasMore] = useState(true);
 
-  const fetchInitialReels = useCallback(async () => {
-    setLoading(true);
-    const data = await reelService.getContextualFeed(initialReelId, limit);
+  const offsetRef = useRef(0);
+  // ids de feed_item ya presentes en la lista (evita duplicar el reel abierto)
+  const seenIdsRef = useRef<Set<string>>(
+    new Set(initialItem?.id ? [initialItem.id] : []),
+  );
+  const pageSize = PAGINATION.REEL_PAGE_SIZE;
 
-    if (data.length > 0) {
-      const mapped = data.map(mapContextualReelToFeedItem);
-      const idx = mapped.findIndex((r) => r.tipo_match === "actual");
-      setInitialScrollIndex(idx !== -1 ? idx : 0);
-      setReels(mapped);
+  const appendPage = useCallback(async () => {
+    const rows = await reelService.getReelsFeed(pageSize, offsetRef.current);
+    offsetRef.current += rows.length;
+
+    if (rows.length < pageSize) setHasMore(false);
+
+    const fresh = rows
+      .filter((r) => !seenIdsRef.current.has(r.feed_item_id))
+      .map(mapRowToFeedItem);
+
+    if (fresh.length > 0) {
+      fresh.forEach((item) => seenIdsRef.current.add(item.id));
+      setReels((prev) => [...prev, ...fresh]);
     }
-    setLoading(false);
-  }, [initialReelId, limit]);
+  }, [pageSize]);
+
+  // Carga inicial (una sola vez por montaje del visor)
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await appendPage();
+      setLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchMoreReels = async () => {
-    if (isFetchingMore || reels.length === 0) return;
-
+    if (isFetchingMore || !hasMore) return;
     setIsFetchingMore(true);
-    const lastReel = reels[reels.length - 1];
-
-    if (!lastReel || lastReel.likes === undefined) {
-      setIsFetchingMore(false);
-      return;
-    }
-
-    const data = await reelService.getContextualFeed(
-      lastReel.reelDetails?.id || lastReel.id,
-      limit,
-    );
-
-    if (data.length > 0) {
-      const posteriors = data
-        .filter((r) => r.tipo_match === "posterior")
-        .map(mapContextualReelToFeedItem);
-      if (posteriors.length > 0) {
-        setReels((prev) => {
-          const newIds = new Set(posteriors.map((p) => p.id));
-          const prevWithoutNewIds = prev.filter((p) => !newIds.has(p.id));
-          return [...prevWithoutNewIds, ...posteriors];
-        });
-      }
-    }
+    await appendPage();
     setIsFetchingMore(false);
   };
 
-  useEffect(() => {
-    if (initialReelId) {
-      fetchInitialReels();
-    }
-  }, [fetchInitialReels, initialReelId]);
-
-  return { reels, loading, fetchMoreReels, isFetchingMore, initialScrollIndex };
+  return { reels, loading, fetchMoreReels, isFetchingMore };
 };

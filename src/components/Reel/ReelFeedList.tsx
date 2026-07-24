@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   useWindowDimensions,
-  Modal,
   StatusBar,
   FlatList,
 } from "react-native";
@@ -20,7 +19,6 @@ import { COLORS } from "../../constants";
 
 interface ReelFeedListProps {
   initialReelItem?: any;
-  initialReelId: string;
   onClose: () => void;
   onUserClick?: (user: any) => void;
   currentUserId?: string;
@@ -28,28 +26,17 @@ interface ReelFeedListProps {
 
 const ReelFeedList: React.FC<ReelFeedListProps> = ({
   initialReelItem,
-  initialReelId,
   onClose,
   onUserClick,
   currentUserId,
 }) => {
   const { height, width } = useWindowDimensions();
-  const { reels, fetchMoreReels, initialScrollIndex } = useReelFeed(
-    initialReelId,
-    initialReelItem,
-  );
+  const { reels, fetchMoreReels } = useReelFeed(initialReelItem);
 
+  // El reel abierto siempre queda en el índice 0, así que no hace falta
+  // calcular un índice inicial ni remontar la lista.
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
-
-  // Sync currentIndex when data is fully loaded
-  React.useEffect(() => {
-    if (reels.length > 1) {
-      setCurrentIndex(initialScrollIndex);
-    }
-  }, [reels.length, initialScrollIndex]);
-
-  // Remove manual scroll effect — we'll use 'key' to remount with proper initialScrollIndex
 
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 80,
@@ -95,48 +82,40 @@ const ReelFeedList: React.FC<ReelFeedListProps> = ({
     [currentIndex, height, width, onClose, onUserClick, currentUserId],
   );
 
+  // La ruta `reel/[id]` ya se presenta como `fullScreenModal`, así que el visor
+  // es solo una View a pantalla completa. (Antes había un <Modal> de RN anidado
+  // aquí, pero un Modal montado sobre una pantalla nativa-modal a veces no
+  // aparece en Android — era la causa de que el reel "no abriera".)
   return (
-    <Modal
-      visible={true}
-      animationType="fade"
-      transparent={false}
-      statusBarTranslucent
-      supportedOrientations={["portrait"]}
-    >
+    <View style={styles.container}>
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
         translucent
       />
-      <View style={styles.container}>
-        {reels.length > 0 ? (
-          <FlatList
-            key={reels.length > 1 ? "loaded" : "initial"}
-            ref={flatListRef}
-            data={reels}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id}
-            pagingEnabled
-            showsVerticalScrollIndicator={false}
-            decelerationRate="fast"
-            disableIntervalMomentum
-            snapToInterval={height}
-            snapToAlignment="start"
-            getItemLayout={getItemLayout}
-            initialScrollIndex={initialScrollIndex}
-            viewabilityConfigCallbackPairs={
-              viewabilityConfigCallbackPairs.current
-            }
-            onEndReached={fetchMoreReels}
-            onEndReachedThreshold={1}
-            removeClippedSubviews={false}
-            windowSize={3}
-            maxToRenderPerBatch={2}
-            initialNumToRender={2}
-          />
-        ) : null}
-      </View>
-    </Modal>
+      {reels.length > 0 ? (
+        <FlatList
+          ref={flatListRef}
+          data={reels}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          pagingEnabled
+          showsVerticalScrollIndicator={false}
+          decelerationRate="fast"
+          disableIntervalMomentum
+          snapToInterval={height}
+          snapToAlignment="start"
+          getItemLayout={getItemLayout}
+          viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
+          onEndReached={fetchMoreReels}
+          onEndReachedThreshold={1}
+          removeClippedSubviews={false}
+          windowSize={3}
+          maxToRenderPerBatch={2}
+          initialNumToRender={2}
+        />
+      ) : null}
+    </View>
   );
 };
 

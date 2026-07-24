@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { Property } from "@/types";
 import { useExchangeRate } from "./useExchangeRate";
 import { normalizeStr } from "@/utils/stringNormalizer";
@@ -6,6 +6,7 @@ import {
   usePropertyFiltersStore,
   PropertyFilters,
   PolygonCoord,
+  LocationChip,
 } from "@/store/propertyFiltersStore";
 
 type RawOperacion = {
@@ -23,6 +24,8 @@ type RawProperty = Property & {
   ciudad?: string | null;
   antiguedad?: number | null;
   niveles?: string | number | null;
+  ancho_terreno?: number | null;
+  largo_terreno?: number | null;
   operaciones_propiedad?: RawOperacion[] | null;
   operaciones?: RawOperacion[] | null;
   operacion?: string | null;
@@ -41,8 +44,8 @@ type RawProperty = Property & {
   patio_maniobras_m2?: number | null;
   tipo_agua?: string[] | null;
   concesion_agua?: boolean | null;
-  uso_terreno?: string | null;
-  tipo_riego?: string | null;
+  uso_terreno?: string[] | null;
+  tipo_riego?: string[] | null;
   infra_electricidad?: boolean | null;
   infra_camino_acceso?: boolean | null;
   infra_cercado?: boolean | null;
@@ -115,6 +118,44 @@ const matchesLocationFilter = (
   return true;
 };
 
+/**
+ * Match por TEXTO según el nivel del chip (colonia/municipio/estado), tolerante.
+ * A diferencia de `matchesLocationFilter`, NO exige que coincidan los tres
+ * campos: compara solo el del nivel buscado. Así una propiedad de la colonia
+ * correcta coincide aunque Google haya abreviado el estado ("Ags.") o el pin
+ * esté corrido. La "zona" (polígono dibujado) no tiene texto → solo bounds.
+ */
+const includesEither = (a: string, b: string) =>
+  !!a && !!b && (a.includes(b) || b.includes(a));
+
+function chipTextMatch(
+  p: Property,
+  rawP: RawProperty,
+  chip: LocationChip,
+): boolean {
+  const lf = chip.locationFilter;
+  // Respaldo del término con la etiqueta del chip (primer componente) por si el
+  // locationFilter del nivel viniera vacío.
+  const label = normalizeStr((chip.label || "").split(",")[0]);
+  if (chip.type === "colonia") {
+    const c = Array.isArray(lf.colonia) ? lf.colonia[0] : lf.colonia;
+    const term = normalizeStr(c || "") || label;
+    const pColonia = normalizeStr(p.colonia || p.location?.colony || "");
+    return includesEither(pColonia, term);
+  }
+  if (chip.type === "municipio") {
+    const f = normalizeStr(lf.municipio || "") || label;
+    const pMunicipio = normalizeStr(p.municipio || p.location?.municipio || "");
+    const pCiudad = normalizeStr(rawP.ciudad || p.location?.city || "");
+    return includesEither(pMunicipio, f) || includesEither(pCiudad, f);
+  }
+  if (chip.type === "estado") {
+    const pEstado = normalizeStr(p.location?.state || rawP.estado || "");
+    return includesEither(pEstado, normalizeStr(lf.estado || "") || label);
+  }
+  return false;
+}
+
 export const usePropertyFilters = (
   properties: Property[],
   geofenceBounds?: GeofenceBounds | null,
@@ -134,10 +175,8 @@ export const usePropertyFilters = (
     clearFilters,
   } = usePropertyFiltersStore();
 
-  const [filteredProperties, setFilteredProperties] = useState<Property[]>(properties);
-
-  useEffect(() => {
-    const filtered = properties.filter((p) => {
+  const filteredProperties = useMemo(() => {
+    return properties.filter((p) => {
       const rawP = p as RawProperty;
 
       // Status check
@@ -162,20 +201,52 @@ export const usePropertyFilters = (
       if (hasPolygons || hasChips || hasBaseLocation) {
         let geoMatch = false;
 
+        // Coordenadas de la propiedad (latitud/longitud ya son number en la BD)
+        const propLat = p.coordinates?.lat ?? p.latitud ?? undefined;
+        const propLng = p.coordinates?.lng ?? p.longitud ?? undefined;
+        const hasCoords =
+          propLat != null && propLng != null &&
+          !isNaN(propLat) && !isNaN(propLng);
+
         if (hasPolygons && !geoMatch) {
-          const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
-          const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
-          if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+          if (hasCoords) {
             geoMatch = filters.polygons.some(
-              (polygon) => polygon.length >= 3 && isPointInPolygon(lat, lng, polygon),
+              (polygon) =>
+                polygon.length >= 3 &&
+                isPointInPolygon(propLat!, propLng!, polygon),
             );
           }
         }
 
         if (hasChips && !geoMatch) {
-          geoMatch = filters.locationChips.some((chip) =>
-            matchesLocationFilter(p, rawP, chip.locationFilter),
-          );
+          geoMatch = filters.locationChips.some((chip) => {
+            // 1) Dentro del recuadro geográfico (sistema por bounds).
+            //    OJO: para chips de COLONIA NO usamos los bounds de Google. El
+            //    "viewport" que Google devuelve para una colonia suele ser mucho
+            //    más grande que la colonia real y arrastraba propiedades de
+            //    colonias vecinas (p. ej. buscar "Santa Imelda" mostraba las de
+            //    "Tamarindos"). Como la columna `colonia` está bien poblada, para
+            //    colonia confiamos en el match por TEXTO (paso 2). Los bounds
+            //    siguen valiendo para municipio/estado, donde el recuadro sí es
+            //    el área correcta.
+            if (chip.type !== "colonia" && chip.bounds && hasCoords) {
+              const b = chip.bounds;
+              const inBounds =
+                propLat! >= b.south &&
+                propLat! <= b.north &&
+                propLng! >= b.west &&
+                propLng! <= b.east;
+              if (inBounds) return true;
+            }
+            // 2) O por texto, SEGÚN EL NIVEL del chip. Recupera propiedades con
+            //    la ubicación correcta aunque su pin (impreciso en EasyBroker)
+            //    caiga fuera del recuadro. Se compara SOLO el campo del nivel
+            //    (colonia/municipio/estado), no los tres a la vez: Google
+            //    abrevia el estado ("Ags." vs "Aguascalientes") y exigir que
+            //    coincidieran todos rompía el match aunque la colonia fuera la
+            //    correcta.
+            return chipTextMatch(p, rawP, chip);
+          });
         }
 
         if (hasBaseLocation && !geoMatch) {
@@ -185,8 +256,8 @@ export const usePropertyFilters = (
         if (!geoMatch) return false;
       } else if (geofenceBounds) {
         // Sin filtros explícitos: solo geobounds del mapa
-        const lat = p.coordinates?.lat ?? (p.latitud ? parseFloat(p.latitud) : undefined);
-        const lng = p.coordinates?.lng ?? (p.longitud ? parseFloat(p.longitud) : undefined);
+        const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
+        const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
         const valid =
           lat != null && lng != null && !isNaN(lat) && !isNaN(lng) &&
           lat >= geofenceBounds.minLat && lat <= geofenceBounds.maxLat &&
@@ -290,6 +361,20 @@ export const usePropertyFilters = (
         }
       }
 
+      // ── Medios baños ──
+      if (filters.mediosBanos && filters.mediosBanos !== "No indicado") {
+        const half = p.features?.halfBaths ?? 0;
+        if (filters.mediosBanos === "Más" || filters.mediosBanos.includes("Más")) {
+          if (half < 5) return false;
+        } else if (filters.mediosBanos.includes("+")) {
+          const mMin = parseInt(filters.mediosBanos);
+          if (!isNaN(mMin) && half < mMin) return false;
+        } else {
+          const mExact = parseInt(filters.mediosBanos);
+          if (!isNaN(mExact) && half !== mExact) return false;
+        }
+      }
+
       // ── Estacionamientos ──
       if (filters.estacionamientos && filters.estacionamientos !== "No indicado") {
         const parking = p.features?.parking || 0;
@@ -320,6 +405,16 @@ export const usePropertyFilters = (
         if (constr < parseFloat(filters.m2ConstruccionMin.replace(/,/g, ""))) return false;
       }
 
+      // ── Ancho / Largo de terreno (frente/fondo, mínimos) ──
+      if (filters.anchoTerrenoMin) {
+        const ancho = rawP.ancho_terreno ?? 0;
+        if (ancho < parseFloat(filters.anchoTerrenoMin.replace(/,/g, ""))) return false;
+      }
+      if (filters.largoTerrenoMin) {
+        const largo = rawP.largo_terreno ?? 0;
+        if (largo < parseFloat(filters.largoTerrenoMin.replace(/,/g, ""))) return false;
+      }
+
       // ── Niveles ──
       if (filters.niveles && filters.niveles !== "No indicado") {
         const pLevels = parseInt(String(rawP.niveles ?? p.features?.floors ?? "0"));
@@ -332,6 +427,15 @@ export const usePropertyFilters = (
           const nExact = parseInt(filters.niveles);
           if (!isNaN(nExact) && pLevels !== nExact) return false;
         }
+      }
+
+      // ── Amenidades (la propiedad debe tenerlas TODAS) ──
+      if (filters.amenidades && filters.amenidades.length > 0) {
+        const propAmenities = (p.amenities ?? []).map(normalizeStr);
+        const hasAll = filters.amenidades.every((a) =>
+          propAmenities.includes(normalizeStr(a)),
+        );
+        if (!hasAll) return false;
       }
 
       // ── Comisión Venta (%) ──
@@ -365,7 +469,8 @@ export const usePropertyFilters = (
       // ── Filtros comerciales ──
       if (filters.tipoPropiedad === 'comercial') {
         const cf = filters.comercialFilters;
-        if (cf.tipoUbicacion && rawP.tipo_ubicacion_comercial !== cf.tipoUbicacion) return false;
+        // Solo filtra cuando se eligió exactamente una opción; ambas (o ninguna) = sin filtro
+        if (cf.tipoUbicacion.length === 1 && rawP.tipo_ubicacion_comercial !== cf.tipoUbicacion[0]) return false;
         if (cf.frenteMin && (rawP.frente_metros ?? 0) < parseFloat(cf.frenteMin)) return false;
         if (cf.nivel && String(rawP.nivel_piso ?? '') !== cf.nivel) return false;
         if (cf.sobreAvenidaPrincipal && !rawP.sobre_avenida_principal) return false;
@@ -377,7 +482,8 @@ export const usePropertyFilters = (
       // ── Filtros industriales ──
       if (filters.tipoPropiedad === 'industrial') {
         const inf = filters.industrialFilters;
-        if (inf.ubicacion && rawP.ubicacion_industrial !== inf.ubicacion) return false;
+        // Solo filtra cuando se eligió exactamente una opción; ambas (o ninguna) = sin filtro
+        if (inf.ubicacion.length === 1 && rawP.ubicacion_industrial !== inf.ubicacion[0]) return false;
         if (inf.alturaLibre && rawP.altura_libre_m !== inf.alturaLibre) return false;
         if (inf.energiaKva.length > 0) {
           const propEnergy = rawP.tipo_energia_kva ?? [];
@@ -397,8 +503,8 @@ export const usePropertyFilters = (
           if (!hasMatch) return false;
         }
         if (ag.concesionAgua && !rawP.concesion_agua) return false;
-        if (ag.usoTerreno && rawP.uso_terreno !== ag.usoTerreno) return false;
-        if (ag.tipoRiego && rawP.tipo_riego !== ag.tipoRiego) return false;
+        if (ag.usoTerreno.length === 1 && !rawP.uso_terreno?.includes(ag.usoTerreno[0])) return false;
+        if (ag.tipoRiego.length === 1 && !rawP.tipo_riego?.includes(ag.tipoRiego[0])) return false;
         if (ag.electricidad && !rawP.infra_electricidad) return false;
         if (ag.caminoAcceso && !rawP.infra_camino_acceso) return false;
         if (ag.cercado && !rawP.infra_cercado) return false;
@@ -408,20 +514,18 @@ export const usePropertyFilters = (
 
       return true;
     });
-
-    setFilteredProperties(filtered);
   }, [properties, filters, geofenceBounds]);
 
   const cf = filters.comercialFilters;
   const inf = filters.industrialFilters;
   const ag = filters.agricolaFilters;
   const hasSpecializedFilters =
-    (cf && (cf.tipoUbicacion !== "" || cf.frenteMin !== "" || cf.nivel !== "" ||
+    (cf && (cf.tipoUbicacion.length > 0 || cf.frenteMin !== "" || cf.nivel !== "" ||
       cf.sobreAvenidaPrincipal || cf.enEsquina || cf.altaVisibilidad || cf.altoFlujoVehicular)) ||
-    (inf && (inf.ubicacion !== "" || inf.alturaLibre !== "" || inf.energiaKva?.length > 0 ||
+    (inf && (inf.ubicacion.length > 0 || inf.alturaLibre !== "" || inf.energiaKva?.length > 0 ||
       inf.areaOficinasMin !== "" || inf.patioManiobrasMin !== "")) ||
-    (ag && (ag.tiposAgua?.length > 0 || ag.concesionAgua || ag.usoTerreno !== "" ||
-      ag.tipoRiego !== "" || ag.electricidad || ag.caminoAcceso || ag.cercado ||
+    (ag && (ag.tiposAgua?.length > 0 || ag.concesionAgua || ag.usoTerreno.length > 0 ||
+      ag.tipoRiego.length > 0 || ag.electricidad || ag.caminoAcceso || ag.cercado ||
       ag.pieCarretera || ag.accesCamiones));
 
   const hasActiveFilters =
@@ -433,11 +537,14 @@ export const usePropertyFilters = (
     filters.precioMax !== "" ||
     filters.habitaciones !== "" ||
     filters.banos !== "" ||
+    filters.mediosBanos !== "" ||
     filters.estacionamientos !== "" ||
     filters.antiguedad !== "" ||
     filters.niveles !== "" ||
     filters.m2TerrenoMin !== "" ||
     filters.m2ConstruccionMin !== "" ||
+    filters.anchoTerrenoMin !== "" ||
+    filters.largoTerrenoMin !== "" ||
     filters.operacion !== "" ||
     parseFloat(filters.comisionVentaMin) > 0 ||
     parseFloat(filters.comisionRentaMin) > 0 ||

@@ -5,6 +5,7 @@
 
 import React, {
   createContext,
+  useCallback,
   useContext,
   useState,
 } from "react";
@@ -13,7 +14,6 @@ import { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { perfiles } from "../types";
 import { useProfileLoader } from "./auth/useProfileLoader";
 import { useAuthListener } from "./auth/useAuthListener";
-import { useSessionRefresh } from "./auth/useSessionRefresh";
 import { OneSignal } from "react-native-onesignal";
 import { Platform } from "react-native";
 import { router } from "expo-router";
@@ -62,28 +62,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   /**
    * Refrescar perfil manualmente o actualizarlo con datos conocidos
+   *
+   * Memoizado: PendingApprovalScreen lo usa como dependencia de un efecto que
+   * monta un intervalo de sondeo. Una referencia nueva por render reiniciaría
+   * el efecto en bucle.
    */
-  const refreshProfile = async (newData?: perfiles) => {
-    if (!user) return;
+  const refreshProfile = useCallback(
+    async (newData?: perfiles) => {
+      if (!user) return;
 
-    if (newData) {
-      // Actualizar localmente sin llamar a la red
-      setProfile(newData);
-      updateCache(user.id, newData);
-    } else {
-      // Forzar carga desde la red
-      clearCache(user.id);
-      const profileData = await loadProfile(user.id);
-      setProfile(profileData);
-    }
-  };
+      if (newData) {
+        // Actualizar localmente sin llamar a la red
+        setProfile(newData);
+        updateCache(user.id, newData);
+      } else {
+        // Forzar carga desde la red
+        clearCache(user.id);
+        const profileData = await loadProfile(user.id);
+        // Un fallo de red devuelve null: conservar el perfil actual. Ponerlo a
+        // null dejaría la app en la pantalla de carga (hay sesión, no hay
+        // perfil) hasta reiniciarla.
+        if (profileData) setProfile(profileData);
+      }
+    },
+    [user, loadProfile, clearCache, updateCache],
+  );
 
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
       if (Platform.OS !== "web") {
+        // logout() basta: removeAlias("external_id") destruye la identidad del
+        // usuario en OneSignal y su external_id se queda sin dispositivos.
         await OneSignal.logout();
-        OneSignal.User.removeAlias("external_id");
       }
     } catch (error) {
       log.error("signOut error:", error);
@@ -98,8 +109,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Hook para refrescar sesión cada 50 minutos
-  useSessionRefresh(session);
+  // El refresco de sesión lo gestiona auth-js automáticamente vía
+  // `autoRefreshToken: true` (ver lib/supabase.ts). NO añadir un refresco
+  // manual en paralelo: con la rotación de refresh tokens activa en el
+  // proyecto, dos refrescadores concurrentes reutilizan un token ya rotado,
+  // Supabase lo interpreta como robo y revoca toda la sesión
+  // ("Invalid Refresh Token: Refresh Token Not Found").
 
   // Hook para manejar cambios de autenticación
   useAuthListener({

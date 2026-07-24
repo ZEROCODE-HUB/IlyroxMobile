@@ -19,6 +19,7 @@ import SharePropertyModal from "./modals/SharePropertyModal";
 import { useReportProperty } from "@/hooks/useReportProperty";
 import { useLikes, useShare } from "@/hooks";
 import { useCommentCount } from "@/hooks/useCommentCount";
+import { useShareCount } from "@/hooks/useShareCount";
 import { propertyService } from "../services/propertyService";
 import firstUpperCase from "@/utils/firstUpperCase";
 
@@ -27,6 +28,8 @@ interface ActionButtonsProps {
   feedItemType: "post" | "reel" | "property";
   initialLikes: number;
   comments: number;
+  initialViews?: number;
+  initialShares?: number;
   userId?: string;
   onCommentClick: () => void;
   shareTitle?: string;
@@ -49,6 +52,8 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   feedItemType,
   initialLikes,
   comments,
+  initialViews,
+  initialShares,
   userId,
   onCommentClick,
   shareTitle = "Check this out!",
@@ -112,6 +117,12 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     initialCount: comments,
   });
 
+  // Hook de contador de compartidos (lee feed_items.compartidos_count)
+  const { count: shareCount, incrementShareCount } = useShareCount({
+    feedItemId,
+    initialCount: initialShares ?? 0,
+  });
+
   // Hook de compartir con deep linking
   const { shareContent } = useShare();
   const [showShareModal, setShowShareModal] = React.useState(false);
@@ -129,6 +140,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
       imageUrl: shareImageUrl,
     });
     if (success) {
+      incrementShareCount();
       showToast("Contenido compartido exitosamente", "success");
     }
   };
@@ -201,9 +213,12 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             size={isVertical ? 26 : 20}
             color={tintColor}
           />
+          <Text style={[styles.iconCountText, { color: textColor }]}>
+            {shareCount}
+          </Text>
         </TouchableOpacity>
 
-        {feedItemType === "property" && (
+        {feedItemType === "property" && userId !== propertyAuthorId && (
           <TouchableOpacity
             onPress={handleReport}
             style={itemStyle}
@@ -258,6 +273,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           feedItemId={feedItemId}
           shareDescription={shareDescription}
           shareImageUrl={shareImageUrl}
+          onShared={incrementShareCount}
         />
       )}
     </View>

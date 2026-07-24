@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { stylesRecommendedSection } from "./RecommendedSection";
+import { stylesRecommendedSection } from "./RecommendedSection.styles";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants";
@@ -16,49 +16,66 @@ import { useProfileStore, useAuthProfileStore } from "@/store/profileStore";
 import { router } from "expo-router";
 
 interface RecommendedModalProps {
-  showRecommendedByModal: boolean;
-  setShowRecommendedByModal: (show: boolean) => void;
+  variant: "positive" | "negative";
+  showModal: boolean;
+  setShowModal: (show: boolean) => void;
   formatRole: (rol: string) => string;
   isMe: boolean;
-  loadRecommendedByUsers: (options?: { reset?: boolean }) => Promise<void>;
+  loadUsers: (options?: { reset?: boolean }) => Promise<void>;
 }
 
 export const RecommendedModal = ({
-  showRecommendedByModal,
-  setShowRecommendedByModal,
+  variant,
+  showModal,
+  setShowModal,
   formatRole,
   isMe,
-  loadRecommendedByUsers,
+  loadUsers,
 }: RecommendedModalProps) => {
   // Use either external or auth store based on isMe
   const externalStore = useProfileStore();
   const authStore = useAuthProfileStore();
   const store = isMe ? authStore : externalStore;
 
-  const {
-    recommendedByUsers,
-    recommendedByError,
-    loadingRecommendedBy,
-    recommendedByHasMore,
-    reviewStats,
-  } = store;
+  const isPositive = variant === "positive";
 
-  // Wait, useProfile(userId) uses targetUserId = userId || authUser?.id
-  // If we want the one currently in store, we should make sure we call the right load function.
-  // Actually, useProfile returns a loadRecommendedByUsers that already uses the correct store internally because it's the SAME hook used in Profile.tsx
-  
+  const users = isPositive
+    ? store.recommendedByUsers
+    : store.notRecommendedByUsers;
+  const error = isPositive
+    ? store.recommendedByError
+    : store.notRecommendedByError;
+  const loading = isPositive
+    ? store.loadingRecommendedBy
+    : store.loadingNotRecommendedBy;
+  const hasMore = isPositive
+    ? store.recommendedByHasMore
+    : store.notRecommendedByHasMore;
+  const total = isPositive
+    ? store.reviewStats?.total_recomiendan || 0
+    : store.reviewStats?.total_no_recomiendan || 0;
+  const title = isPositive ? "Recomendado por" : "No recomendado por";
+  const emptyTitle = isPositive
+    ? "Aún no hay recomendaciones"
+    : "Aún no hay valoraciones negativas";
+
   return (
     <Modal
-      visible={showRecommendedByModal}
+      visible={showModal}
       animationType="slide"
-      onRequestClose={() => setShowRecommendedByModal(false)}
+      // pageSheet: en iOS permite cerrar deslizando hacia abajo (escape
+      // garantizado, además del chevron), y onDismiss sincroniza el estado para
+      // que no quede "atascado" abierto si el botón no respondiera.
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowModal(false)}
+      onDismiss={() => setShowModal(false)}
     >
       <SafeAreaView
         style={stylesRecommendedSection.recommendedByModalContainer}
       >
         <View style={stylesRecommendedSection.recommendedByModalHeader}>
           <TouchableOpacity
-            onPress={() => setShowRecommendedByModal(false)}
+            onPress={() => setShowModal(false)}
             style={stylesRecommendedSection.recommendedByModalBackBtn}
           >
             <Ionicons
@@ -70,38 +87,38 @@ export const RecommendedModal = ({
 
           <View style={stylesRecommendedSection.recommendedByModalTitleWrap}>
             <Text style={stylesRecommendedSection.recommendedByModalTitle}>
-              Recomendado por
+              {title}
             </Text>
             <Text style={stylesRecommendedSection.recommendedByModalSubtitle}>
-              {reviewStats?.total_recomiendan || 0} usuarios
+              {total} usuarios
             </Text>
           </View>
           <View style={stylesRecommendedSection.recommendedByModalBackBtn} />
         </View>
 
-        {recommendedByError ? (
+        {error ? (
           <View style={stylesRecommendedSection.recommendedByModalEmpty}>
             <Text style={stylesRecommendedSection.recommendedByEmptyText}>
-              {recommendedByError}
+              {error}
             </Text>
           </View>
         ) : (
           <FlatList
-            data={recommendedByUsers}
+            data={users}
             keyExtractor={(u, idx) => `${u.id}-${idx}`}
             contentContainerStyle={
               stylesRecommendedSection.recommendedByModalList
             }
             onEndReached={() => {
-              if (loadingRecommendedBy || !recommendedByHasMore) return;
-              loadRecommendedByUsers();
+              if (loading || !hasMore) return;
+              loadUsers();
             }}
             onEndReachedThreshold={0.6}
             ListEmptyComponent={
-              loadingRecommendedBy ? (
+              loading ? (
                 <LoadingState size="small" />
               ) : (
-                <EmptyState title="Aún no hay recomendaciones" />
+                <EmptyState title={emptyTitle} />
               )
             }
             renderItem={({ item: u }) => {
@@ -118,7 +135,7 @@ export const RecommendedModal = ({
                 <TouchableOpacity
                   style={stylesRecommendedSection.recommendedByModalItem}
                   onPress={() => {
-                    setShowRecommendedByModal(false);
+                    setShowModal(false);
                     router.push({ pathname: "/user/[id]", params: { id: u.id } });
                   }}
                   activeOpacity={0.85}
@@ -136,26 +153,30 @@ export const RecommendedModal = ({
                     >
                       {fullName || "Usuario"}
                     </Text>
+                    {/* La etiqueta es la OCUPACIÓN con la que se dio de alta
+                        (p. ej. "Asesor Inmobiliario"), NO `rol` (permiso de la
+                        app: cliente/admin/agente), que hacía que a todos les
+                        saliera "Cliente". */}
                     <Text
                       style={stylesRecommendedSection.recommendedByRole}
                       numberOfLines={1}
                     >
-                      {formatRole(u.rol)}
+                      {u.ocupacion?.trim() || formatRole(u.rol)}
                     </Text>
                   </View>
                 </TouchableOpacity>
               );
             }}
             ListFooterComponent={
-              loadingRecommendedBy ? (
+              loading ? (
                 <View style={stylesRecommendedSection.recommendedByModalFooter}>
                   <ActivityIndicator size="small" color={COLORS.primary} />
                 </View>
-              ) : recommendedByHasMore ? (
+              ) : hasMore ? (
                 <View style={stylesRecommendedSection.recommendedByModalFooter}>
                   <TouchableOpacity
                     style={stylesRecommendedSection.recommendedByLoadMoreBtn}
-                    onPress={() => loadRecommendedByUsers()}
+                    onPress={() => loadUsers()}
                     activeOpacity={0.85}
                   >
                     <Text

@@ -1,0 +1,50 @@
+
+BEGIN
+  IF (TG_OP = 'INSERT')
+     OR OLD.status IS DISTINCT FROM NEW.status
+     OR OLD.activo IS DISTINCT FROM NEW.activo
+     OR OLD.deleted_at IS DISTINCT FROM NEW.deleted_at
+     OR OLD.tipo IS DISTINCT FROM NEW.tipo
+     OR OLD.subtipo IS DISTINCT FROM NEW.subtipo
+     OR OLD.estado IS DISTINCT FROM NEW.estado
+     OR OLD.ciudad IS DISTINCT FROM NEW.ciudad
+     OR OLD.municipio IS DISTINCT FROM NEW.municipio
+     OR OLD.colonia IS DISTINCT FROM NEW.colonia
+     OR OLD.latitud IS DISTINCT FROM NEW.latitud
+     OR OLD.longitud IS DISTINCT FROM NEW.longitud
+     OR OLD.habitaciones IS DISTINCT FROM NEW.habitaciones
+     OR OLD.banos IS DISTINCT FROM NEW.banos
+     OR OLD.estacionamientos IS DISTINCT FROM NEW.estacionamientos
+     OR OLD.pisos IS DISTINCT FROM NEW.pisos
+     OR OLD.metros_cuadrados_construccion IS DISTINCT FROM NEW.metros_cuadrados_construccion
+     OR OLD.metros_cuadrados_terreno IS DISTINCT FROM NEW.metros_cuadrados_terreno
+     -- Comercial
+     OR OLD.tipo_ubicacion_comercial IS DISTINCT FROM NEW.tipo_ubicacion_comercial
+     OR OLD.frente_metros IS DISTINCT FROM NEW.frente_metros
+     OR OLD.nivel_piso IS DISTINCT FROM NEW.nivel_piso
+     OR OLD.sobre_avenida_principal IS DISTINCT FROM NEW.sobre_avenida_principal
+     OR OLD.en_esquina IS DISTINCT FROM NEW.en_esquina
+     OR OLD.alta_visibilidad IS DISTINCT FROM NEW.alta_visibilidad
+     OR OLD.alto_flujo_vehicular IS DISTINCT FROM NEW.alto_flujo_vehicular
+     -- Industrial
+     OR OLD.ubicacion_industrial IS DISTINCT FROM NEW.ubicacion_industrial
+     OR OLD.altura_libre_m IS DISTINCT FROM NEW.altura_libre_m
+     OR OLD.tipo_energia_kva IS DISTINCT FROM NEW.tipo_energia_kva
+     OR OLD.area_oficinas_m2 IS DISTINCT FROM NEW.area_oficinas_m2
+     OR OLD.patio_maniobras_m2 IS DISTINCT FROM NEW.patio_maniobras_m2
+     -- Agricola
+     OR OLD.tipo_agua IS DISTINCT FROM NEW.tipo_agua
+     OR OLD.concesion_agua IS DISTINCT FROM NEW.concesion_agua
+     OR OLD.uso_terreno IS DISTINCT FROM NEW.uso_terreno
+     OR OLD.tipo_riego IS DISTINCT FROM NEW.tipo_riego
+     OR OLD.infra_electricidad IS DISTINCT FROM NEW.infra_electricidad
+     OR OLD.infra_camino_acceso IS DISTINCT FROM NEW.infra_camino_acceso
+     OR OLD.infra_cercado IS DISTINCT FROM NEW.infra_cercado
+     OR OLD.acceso_carretera IS DISTINCT FROM NEW.acceso_carretera
+     OR OLD.acceso_camiones IS DISTINCT FROM NEW.acceso_camiones
+  THEN
+    PERFORM public.evaluate_property_matches(NEW.id);
+  END IF;
+  RETURN NEW;
+END;
+

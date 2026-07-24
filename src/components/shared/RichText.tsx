@@ -1,5 +1,11 @@
 import React from "react";
-import { Text, View, StyleSheet } from "react-native";
+import {
+  Text,
+  View,
+  StyleSheet,
+  TextLayoutEventData,
+  NativeSyntheticEvent,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Bath } from "lucide-react-native";
 
@@ -8,6 +14,10 @@ interface RichTextProps {
   style?: any;
   iconSize?: number;
   iconColor?: string;
+  /** Trunca a N líneas (pass-through al <Text> raíz). */
+  numberOfLines?: number;
+  /** Se emite con el layout del texto (para medir líneas y decidir "ver más"). */
+  onTextLayout?: (e: NativeSyntheticEvent<TextLayoutEventData>) => void;
 }
 
 const ICON_MAP: Record<string, any> = {
@@ -27,12 +37,14 @@ export const RichText: React.FC<RichTextProps> = ({
   style,
   iconSize = 16,
   iconColor = "black",
+  numberOfLines,
+  onTextLayout,
 }) => {
   // Regex to match [ICON:name]
   const parts = content.split(/(\[ICON:[\w]+\])/g);
 
   return (
-    <Text style={style}>
+    <Text style={style} numberOfLines={numberOfLines} onTextLayout={onTextLayout}>
       {parts.map((part, index) => {
         const match = part.match(/\[ICON:([\w]+)\]/);
         if (match) {

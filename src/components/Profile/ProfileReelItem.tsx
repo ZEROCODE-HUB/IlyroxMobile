@@ -84,7 +84,13 @@ const ProfileReelItem: React.FC<ProfileReelItemProps> = React.memo(
     return (
       <TouchableOpacity
         style={styles.gridItem}
-        onPress={() => onPress(item)}
+        onPress={() => {
+          console.log("[RDBG] ProfileReelItem.onPress", {
+            id: item.id,
+            feed_item_id: item.feed_item_id,
+          });
+          onPress(item);
+        }}
         activeOpacity={0.8}
       >
         <Image

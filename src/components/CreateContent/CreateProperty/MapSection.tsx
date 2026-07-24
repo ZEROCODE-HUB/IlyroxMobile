@@ -33,16 +33,14 @@ export const MapSection = React.memo(function MapSection() {
 const styles = StyleSheet.create({
   section: {
     backgroundColor: COLORS.white,
-    borderRadius: 16,
     padding: 16,
+    // Banda a todo el ancho: -16 compensa el padding horizontal del ScrollView
+    // (scrollContent) para que el mapa aproveche toda la pantalla.
+    marginHorizontal: -16,
     marginBottom: 16,
-    borderWidth: 1,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
     borderColor: COLORS.cardBorder,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   errorText: {
     fontSize: 12,

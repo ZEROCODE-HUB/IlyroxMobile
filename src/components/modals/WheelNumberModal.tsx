@@ -10,6 +10,7 @@ import {
   NativeScrollEvent,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useDismissKeyboardWhenVisible } from "../../hooks/useDismissKeyboardWhenVisible";
 import { COLORS } from "../../constants/colors";
 
 interface WheelNumberModalProps {
@@ -39,6 +40,8 @@ export default function WheelNumberModal({
 }: WheelNumberModalProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+
+  useDismissKeyboardWhenVisible(visible);
 
   const data = Array.from({ length: max - min + 1 }, (_, i) =>
     (i + min).toString(),

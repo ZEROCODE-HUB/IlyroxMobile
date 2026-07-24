@@ -23,6 +23,7 @@ import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
 
 import CreatePost from "../CreateContent/CreatePost/CreatePost";
+import { PublishSearchPostModal } from "../map/PublishSearchPostModal";
 import { useGridProfile } from "@/hooks/profile/useGridProfile";
 import { logger } from "@/utils/logger";
 
@@ -89,8 +90,7 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
     const hasImages = item.imagenes && item.imagenes.length > 0;
     const hasMultipleImages = item.imagenes && item.imagenes.length > 1;
 
-    const postType = (item.tipo || "post").toLowerCase().replace(/\s+/g, "");
-    const canEdit = ["post", "openhouse", "busqueda"].includes(postType);
+    const canEdit = true;
 
     const menuOptions: MenuOption[] = [
       ...(canEdit
@@ -179,17 +179,36 @@ const ProfilePostGrid: React.FC<ProfilePostGridProps> = ({
         }
       />
 
-      <Modal visible={showPostModal}>
-        <CreatePost
-          post={postToEdit || undefined} // Pass post to edit
-          onBack={() => {
+      {postToEdit?.tipo === "busqueda" && postToEdit?.busquedas_json ? (
+        <PublishSearchPostModal
+          visible={showPostModal}
+          editPost={postToEdit}
+          initialMetadata={postToEdit.busquedas_json}
+          onClose={() => {
+            setShowPostModal(false);
+            setPostToEdit(null);
+          }}
+          onPublished={() => {
             setShowPostModal(false);
             setPostToEdit(null);
             if (userId) getPosts(userId);
             if (onDelete) onDelete();
           }}
+          userId={userId}
         />
-      </Modal>
+      ) : (
+        <Modal visible={showPostModal}>
+          <CreatePost
+            post={postToEdit || undefined} // Pass post to edit
+            onBack={() => {
+              setShowPostModal(false);
+              setPostToEdit(null);
+              if (userId) getPosts(userId);
+              if (onDelete) onDelete();
+            }}
+          />
+        </Modal>
+      )}
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

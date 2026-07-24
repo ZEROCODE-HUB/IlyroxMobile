@@ -7,9 +7,11 @@ import {
   Text,
   View,
   ActivityIndicator,
+  Modal,
+  Platform,
 } from "react-native";
 import { COLORS } from "../../../constants/colors";
-import { useModal } from "@/context/ModalContext";
+import { useLocalModal } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
 import { Post } from "@/types";
 import { Image } from "expo-image";
@@ -50,7 +52,7 @@ export const OpenHousePost = ({
   statusPost,
   setStatusPost,
 }: OpenHousePostProps) => {
-  const { showModal } = useModal();
+  const { showModal, modalElement } = useLocalModal();
   const { showToast } = useToast();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -70,7 +72,10 @@ export const OpenHousePost = ({
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
+        // Sin `allowsEditing`: el recorte nativo se quedaba SIN botón de
+        // confirmar en algunos Android y los usuarios no podían salir. Se sube
+        // la imagen tal cual seleccionada.
+        allowsEditing: false,
         quality: 0.8,
       });
 
@@ -193,85 +198,63 @@ export const OpenHousePost = ({
         />
       </View>
 
-      {showDatePicker && (
-        <DateTimePicker
-          value={fechaHora}
-          mode="date"
-          display="default"
-          onChange={(event, selectedDate) => {
-            setShowDatePicker(false);
-            if (selectedDate) {
-              const newDate = new Date(fechaHora);
-              newDate.setFullYear(
-                selectedDate.getFullYear(),
-                selectedDate.getMonth(),
-                selectedDate.getDate(),
-              );
-              setFechaHora(newDate);
-            }
-          }}
-        />
-      )}
+      <DateTimeField
+        visible={showDatePicker}
+        value={fechaHora}
+        mode="date"
+        onClose={() => setShowDatePicker(false)}
+        onPicked={(selectedDate) => {
+          const newDate = new Date(fechaHora);
+          newDate.setFullYear(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate(),
+          );
+          setFechaHora(newDate);
+        }}
+      />
 
-      {showTimePicker && (
-        <DateTimePicker
-          value={fechaHora}
-          mode="time"
-          display="default"
-          onChange={(event, selectedDate) => {
-            setShowTimePicker(false);
-            if (selectedDate) {
-              const newDate = new Date(fechaHora);
-              newDate.setHours(
-                selectedDate.getHours(),
-                selectedDate.getMinutes(),
-              );
-              setFechaHora(newDate);
-            }
-          }}
-        />
-      )}
+      <DateTimeField
+        visible={showTimePicker}
+        value={fechaHora}
+        mode="time"
+        onClose={() => setShowTimePicker(false)}
+        onPicked={(selectedDate) => {
+          const newDate = new Date(fechaHora);
+          newDate.setHours(selectedDate.getHours(), selectedDate.getMinutes());
+          setFechaHora(newDate);
+        }}
+      />
 
-      {showEndDatePicker && (
-        <DateTimePicker
-          value={fechaFinalizacion || new Date()}
-          mode="date"
-          display="default"
-          onChange={(event, selectedDate) => {
-            setShowEndDatePicker(false);
-            if (selectedDate) {
-              const baseDate = fechaFinalizacion || new Date();
-              const newDate = new Date(baseDate);
-              newDate.setFullYear(
-                selectedDate.getFullYear(),
-                selectedDate.getMonth(),
-                selectedDate.getDate(),
-              );
-              setFechaFinalizacion(newDate);
-            }
-          }}
-        />
-      )}
+      <DateTimeField
+        visible={showEndDatePicker}
+        value={fechaFinalizacion || new Date()}
+        mode="date"
+        onClose={() => setShowEndDatePicker(false)}
+        onPicked={(selectedDate) => {
+          const baseDate = fechaFinalizacion || new Date();
+          const newDate = new Date(baseDate);
+          newDate.setFullYear(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate(),
+          );
+          setFechaFinalizacion(newDate);
+        }}
+      />
 
-      {showEndTimePicker && (
-        <DateTimePicker
-          value={fechaFinalizacion || new Date()}
-          mode="time"
-          display="default"
-          onChange={(event, selectedDate) => {
-            setShowEndTimePicker(false);
-            if (selectedDate) {
-              const baseDate = fechaFinalizacion || new Date();
-              const newDate = new Date(baseDate);
-              newDate.setHours(
-                selectedDate.getHours(),
-                selectedDate.getMinutes(),
-              );
-              setFechaFinalizacion(newDate);
-            }
-          }}
-        />
-      )}
+      <DateTimeField
+        visible={showEndTimePicker}
+        value={fechaFinalizacion || new Date()}
+        mode="time"
+        onClose={() => setShowEndTimePicker(false)}
+        onPicked={(selectedDate) => {
+          const baseDate = fechaFinalizacion || new Date();
+          const newDate = new Date(baseDate);
+          newDate.setHours(selectedDate.getHours(), selectedDate.getMinutes());
+          setFechaFinalizacion(newDate);
+        }}
+      />
 
       <View style={styles.card}>
         <Text style={styles.label}>Imagen del Open House</Text>
@@ -328,11 +311,101 @@ export const OpenHousePost = ({
           </Pressable>
         </View>
       </View>
+      {modalElement}
     </View>
   );
 };
 
+/**
+ * Picker de fecha/hora que funciona en ambas plataformas.
+ * - Android: diálogo nativo; se cierra al elegir/cancelar.
+ * - iOS: el `onChange` del picker dispara en CADA scroll de la rueda, así que
+ *   NO se puede cerrar ahí (se cerraba al instante y "no aparecía el calendario").
+ *   Se muestra dentro de un modal con botón "Listo" que es el que cierra.
+ */
+function DateTimeField({
+  visible,
+  value,
+  mode,
+  onPicked,
+  onClose,
+}: {
+  visible: boolean;
+  value: Date;
+  mode: "date" | "time";
+  onPicked: (d: Date) => void;
+  onClose: () => void;
+}) {
+  if (!visible) return null;
+
+  if (Platform.OS === "android") {
+    return (
+      <DateTimePicker
+        value={value}
+        mode={mode}
+        display="default"
+        onChange={(event, selectedDate) => {
+          onClose();
+          if (event.type !== "dismissed" && selectedDate) onPicked(selectedDate);
+        }}
+      />
+    );
+  }
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.pickerBackdrop} onPress={onClose}>
+        <Pressable style={styles.pickerSheet} onPress={() => {}}>
+          <View style={styles.pickerHeader}>
+            <Pressable onPress={onClose} hitSlop={12}>
+              <Text style={styles.pickerDone}>Listo</Text>
+            </Pressable>
+          </View>
+          <DateTimePicker
+            value={value}
+            mode={mode}
+            display="spinner"
+            themeVariant="light"
+            locale="es-MX"
+            onChange={(_e, selectedDate) => {
+              if (selectedDate) onPicked(selectedDate);
+            }}
+            style={styles.iosPicker}
+          />
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
+  pickerBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  pickerSheet: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 24,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
+  },
+  pickerDone: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.primary,
+  },
+  iosPicker: {
+    backgroundColor: COLORS.white,
+  },
   container: {
     gap: 16,
   },

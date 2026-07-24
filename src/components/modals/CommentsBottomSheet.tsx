@@ -19,15 +19,14 @@ import {
   View,
   Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   StyleSheet,
   ActivityIndicator,
   Platform,
-  Modal,
   FlatList,
   TextInput,
-  Dimensions,
+  useWindowDimensions,
 } from "react-native";
+import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 import { Ionicons } from "@expo/vector-icons";
 import {
   KeyboardProvider,
@@ -65,8 +64,6 @@ interface CommentItemProps {
 // Constants
 // ============================================================================
 
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-const MODAL_HEIGHT = SCREEN_HEIGHT * 0.95;
 
 // ============================================================================
 // Subcomponents
@@ -162,6 +159,9 @@ export default function CommentsBottomSheet({
   feedItemId,
   currentUserId,
 }: CommentsBottomSheetProps) {
+  const { height: screenHeight } = useWindowDimensions();
+  const modalHeight = screenHeight * 0.95;
+
   // State
   const [replyTo, setReplyTo] = useState<string | null>(null);
 
@@ -279,29 +279,8 @@ export default function CommentsBottomSheet({
   // ============================================================================
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={handleClose}
-      statusBarTranslucent
-    >
-      <View style={styles.overlay}>
-        {/* Backdrop */}
-        <TouchableWithoutFeedback onPress={handleClose}>
-          <View style={styles.backdrop} />
-        </TouchableWithoutFeedback>
-
-        {/* Sheet */}
-        <View
-          style={[
-            styles.sheet,
-            {
-              height: MODAL_HEIGHT,
-              // paddingBottom: insets.bottom, // MessageInput handles this
-            },
-          ]}
-        >
+    <AppBottomSheet visible={visible} onClose={handleClose} statusBarTranslucent>
+      <View style={[styles.sheet, { height: modalHeight }]}>
           <KeyboardProvider>
             <KeyboardAvoidingView
               style={styles.container}
@@ -372,9 +351,8 @@ export default function CommentsBottomSheet({
               </View>
             </KeyboardAvoidingView>
           </KeyboardProvider>
-        </View>
       </View>
-    </Modal>
+    </AppBottomSheet>
   );
 }
 const styles = StyleSheet.create({
@@ -382,14 +360,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.white,
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: COLORS.overlay,
-    justifyContent: "flex-end",
-  },
-  backdrop: {
-    flex: 1,
   },
   sheet: {
     backgroundColor: COLORS.white,

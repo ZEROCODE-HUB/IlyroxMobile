@@ -3,7 +3,7 @@ import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from "rea
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 import { Property } from "@/types";
-import { Bath } from "lucide-react-native";
+import { Toilet, Building2 } from "lucide-react-native";
 
 interface PropertyMapCardProps {
   id: string;
@@ -69,7 +69,7 @@ export const PropertyMapCard: React.FC<PropertyMapCardProps> = ({
 
           {(property.features?.baths || property.banos) ? (
             <View style={styles.statItem}>
-              <Bath size={12} color={COLORS.textTertiary} />
+              <Toilet size={12} color={COLORS.textTertiary} />
               <Text style={styles.statValue}>
                 {property.features?.baths || property.banos}
               </Text>
@@ -87,7 +87,7 @@ export const PropertyMapCard: React.FC<PropertyMapCardProps> = ({
 
           {(property.features?.constructionSqft || property.metros_construccion) ? (
             <View style={styles.statItem}>
-              <Ionicons name="home-outline" size={14} color={COLORS.textTertiary} />
+              <Building2 size={14} color={COLORS.textTertiary} />
               <Text style={styles.statValue}>
                 {property.features?.constructionSqft || property.metros_construccion}m²
               </Text>

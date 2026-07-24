@@ -22,8 +22,17 @@ const normalizePropertyStatus = (
 };
 
 export const propertyService = {
-  async propertiesByUser(targetUserId: string): Promise<Property[]> {
-    const { data: propsData, error: propsError } = await supabase
+  /**
+   * @param targetUserId   dueño del perfil cuyas propiedades se listan
+   * @param viewerIsOwner  true si quien mira es el propio creador. Cuando es
+   *   false (visitante), solo se devuelven las propiedades que comparten
+   *   comisión; las que no la comparten quedan ocultas para otros usuarios.
+   */
+  async propertiesByUser(
+    targetUserId: string,
+    viewerIsOwner: boolean = true,
+  ): Promise<Property[]> {
+    let query = supabase
       .from("propiedades")
       .select(
         `
@@ -37,11 +46,13 @@ export const propertyService = {
           fotos,
           habitaciones,
           banos,
+          medios_banos,
           metros_cuadrados_construccion,
           metros_cuadrados_terreno,
           activo,
           status,
           sin_comision,
+          comparte_comision,
           es_easybroker,
           codigo_propiedad,
           created_at,
@@ -59,8 +70,20 @@ export const propertyService = {
         `,
       )
       .eq("created_by", targetUserId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false });
+      .is("deleted_at", null);
+
+    if (!viewerIsOwner) {
+      // Otros asesores solo ven propiedades que realmente OFRECEN comisión
+      // compartida: deben compartir comisión Y tener una comisión definida.
+      // Las "Sin comisión" (aunque tengan comparte_comision=true) solo las ve
+      // su creador.
+      query = query.eq("comparte_comision", true).eq("sin_comision", false);
+    }
+
+    const { data: propsData, error: propsError } = await query.order(
+      "created_at",
+      { ascending: false },
+    );
 
     if (propsError) {
       log.error("Error fetching properties:", propsError);
@@ -102,6 +125,7 @@ export const propertyService = {
         features: {
           beds: p.habitaciones || 0,
           baths: p.banos || 0,
+          halfBaths: p.medios_banos || 0,
           constructionSqft: p.metros_cuadrados_construccion || 0,
           landSqft: p.metros_cuadrados_terreno || 0,
         },
@@ -111,6 +135,7 @@ export const propertyService = {
         operation: operation?.tipo_operacion === "venta" ? "Sale" : "Rent",
         status: status,
         sin_comision: p.sin_comision || false,
+        comparte_comision: p.comparte_comision ?? false,
         es_easybroker: p.es_easybroker || false,
         commission,
       };
@@ -169,12 +194,17 @@ export const propertyService = {
     await this.addPropertyRelations(propiedadId, relatedData);
 
     // 3. Create Feed Item
+    // estado_moderacion: "activo" siempre — la visibilidad real la controla
+    // propiedades.activo (filtro en feedService). Si se publica sin comisión
+    // (activo=false), el feed_item existe pero propiedades.activo=false lo oculta.
+    // Cuando el usuario agrega comisión y actualiza, updateProperty activa el
+    // feed_item con publicado_en=NOW() para que aparezca "fresco" en el feed.
     const { error: feedError } = await supabase.from("feed_items").insert({
       tipo_contenido: "propiedad",
       contenido_id: propiedadId,
       publicado_por: propertyData.created_by,
       visibilidad: "publico",
-      estado_moderacion: "activo",
+      estado_moderacion: propertyData.activo ? "activo" : "inactivo",
     });
 
     if (feedError) throw feedError;
@@ -195,7 +225,29 @@ export const propertyService = {
 
     if (updateError) throw updateError;
 
-    // 2. Clean existing relations
+    // 2. Sincronizar feed_items según el nuevo estado activo/inactivo
+    if (propertyData.activo === true) {
+      // La propiedad se vuelve visible: activar el feed_item y refrescar
+      // publicado_en para que aparezca "fresco" en el feed (ordenado por
+      // engagement_score DESC, publicado_en DESC).
+      await supabase
+        .from("feed_items")
+        .update({
+          estado_moderacion: "activo",
+          publicado_en: new Date().toISOString(),
+        })
+        .eq("contenido_id", propertyId)
+        .eq("tipo_contenido", "propiedad");
+    } else if (propertyData.activo === false) {
+      // La propiedad queda suspendida: desactivar en el feed
+      await supabase
+        .from("feed_items")
+        .update({ estado_moderacion: "inactivo" })
+        .eq("contenido_id", propertyId)
+        .eq("tipo_contenido", "propiedad");
+    }
+
+    // 3. Clean existing relations
     await supabase
       .from("operaciones_propiedad")
       .delete()
@@ -213,7 +265,7 @@ export const propertyService = {
       .delete()
       .eq("propiedad_id", propertyId);
 
-    // 3. Add new Relations
+    // 4. Add new Relations
     await this.addPropertyRelations(propertyId, relatedData);
 
     return true;
@@ -293,9 +345,8 @@ export const propertyService = {
         if (catInst) {
           await supabase.from("propiedad_gravamenes").insert({
             propiedad_id: propiedadId,
-            institucion_financiera_id: catInst.id,
+            institucion_id: catInst.id,
             monto: grav.monto,
-            fecha_gravamen: new Date(), // Default
           });
         }
       }

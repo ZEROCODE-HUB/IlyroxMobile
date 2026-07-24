@@ -7,9 +7,11 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { COLORS } from "@/constants";
 import { useModal } from "@/context/ModalContext";
 import { Avatar } from "../shared";
+import { OwnerRecommendations } from "./OwnerRecommendations";
 import { propertyDetailStyles as styles } from "./propertyDetailStyles";
 
 export interface PropertyOwnerContactProps {
@@ -21,6 +23,9 @@ export interface PropertyOwnerContactProps {
   onContactExternal?: (ownerId: string, propertyId: string) => void;
   onContactInternal: (profile: any) => void;
   onEditProperty: () => void;
+  /** Ejecuta una navegación cerrando antes el <Modal> contenedor, si lo hay.
+      Ver `navigateAway` en PropertyDetail. Sin él se navega directo. */
+  onNavigateAway?: (go: () => void) => void;
 }
 
 export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
@@ -32,8 +37,10 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
   onContactExternal,
   onContactInternal,
   onEditProperty,
+  onNavigateAway,
 }) => {
   const { showModal } = useModal();
+  const navigate = onNavigateAway ?? ((go: () => void) => go());
 
   if (sinDatos || !profile) return null;
 
@@ -45,6 +52,16 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
       return;
     }
     onContactInternal(profile);
+  };
+
+  const handleProfilePress = () => {
+    if (!profile?.id) return;
+    navigate(() =>
+      router.push({
+        pathname: "/(stack)/user/[id]",
+        params: { id: profile.id },
+      }),
+    );
   };
 
   const handleCall = () => {
@@ -63,7 +80,11 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
 
   return (
     <>
-      <View style={styles.profileSection}>
+      <TouchableOpacity
+        style={styles.profileSection}
+        onPress={handleProfilePress}
+        activeOpacity={0.7}
+      >
         <Avatar
           uri={profile.foto}
           name={profile.nombre}
@@ -73,6 +94,10 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
         <View style={styles.profileInfo}>
           <Text style={styles.profileName}>{profile.nombre}</Text>
           <Text style={styles.profileRole}>Agente Inmobiliario</Text>
+          <OwnerRecommendations
+            userId={profile.id}
+            ocupacion={profile.ocupacion}
+          />
         </View>
 
         {!isOwnProperty && (
@@ -87,7 +112,7 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
             />
           </TouchableOpacity>
         )}
-      </View>
+      </TouchableOpacity>
 
       {isOwnProperty ? (
         <TouchableOpacity

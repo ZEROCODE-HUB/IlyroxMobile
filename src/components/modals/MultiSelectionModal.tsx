@@ -2,14 +2,15 @@ import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
-  Modal,
   StyleSheet,
   TouchableOpacity,
   FlatList,
   Platform,
   KeyboardAvoidingView,
-  SafeAreaView,
+  useWindowDimensions,
 } from "react-native";
+import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
+import { useDismissKeyboardWhenVisible } from "../../hooks/useDismissKeyboardWhenVisible";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
 import { COLORS } from "../../constants";
@@ -37,8 +38,12 @@ export default function MultiSelectionModal({
   currentValues = [],
   placeholder = "Buscar...",
 }: MultiSelectionModalProps) {
+  const { height: screenHeight } = useWindowDimensions();
+  const modalHeight = screenHeight * 0.9;
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedValues, setSelectedValues] = useState<string[]>(currentValues);
+
+  useDismissKeyboardWhenVisible(visible);
 
   // Sync state when modal becomes visible
   React.useEffect(() => {
@@ -99,18 +104,12 @@ export default function MultiSelectionModal({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <SafeAreaView style={styles.safeArea}>
+    <AppBottomSheet visible={visible} onClose={onClose}>
+      <View style={[styles.modalContent, { height: modalHeight }]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.container}
         >
-          <View style={styles.modalContent}>
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.title}>{title}</Text>
@@ -177,18 +176,13 @@ export default function MultiSelectionModal({
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
         </KeyboardAvoidingView>
-      </SafeAreaView>
-    </Modal>
+      </View>
+    </AppBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.blackTransparent50,
-  },
   container: {
     flex: 1,
     justifyContent: "flex-end",
@@ -197,7 +191,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    height: "75%",
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },

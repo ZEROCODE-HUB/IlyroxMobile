@@ -5,7 +5,11 @@ import { logger } from "@/utils/logger";const log = logger.scoped("useUserRecomm
 export interface RecommendedUser {
   id: string;
   name: string;
+  /** Rol de permisos en la app (cliente/admin/web). NO sirve para etiquetar al
+      usuario de cara al público: para eso está `ocupacion`. */
   role?: string;
+  /** Lo que la persona ES ("Asesor Inmobiliario", "Constructor", …). */
+  ocupacion?: string | null;
   avatar?: string | null;
 }
 
@@ -39,6 +43,7 @@ export const useUserRecommendations = (userId?: string) => {
           id: p.id,
           name: name || "Usuario",
           role: p.rol,
+          ocupacion: p.ocupacion ?? null,
           avatar: p.foto ?? null,
         };
       });

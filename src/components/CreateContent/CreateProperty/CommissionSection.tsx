@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../../design-system/components/AppInput";
 import RadioGroupSelector from "../../common/RadioGroupSelector";
@@ -7,6 +7,7 @@ import { COLORS } from "../../../constants/colors";
 import { OPCIONES_SI_NO } from "../../../constants/propertyData";
 import type { SiNo, ComisionValues, ComisionSetters } from "./types";
 import { usePropertyFormContext } from "./PropertyFormContext";
+import { FieldAnchor } from "./fieldAnchors";
 
 const THUMB = 22;
 const TRACK_H = 6;
@@ -26,8 +27,6 @@ interface SliderProps {
 
 function CommissionSlider({ label, value, onChange, min, max, step, formatValue, hint, onScrollLock }: SliderProps) {
   const [trackWidth, setTrackWidth] = useState(0);
-  const viewRef = useRef<View>(null);
-  const pageXRef = useRef(0);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -35,8 +34,10 @@ function CommissionSlider({ label, value, onChange, min, max, step, formatValue,
   const usable = Math.max(1, trackWidth - THUMB);
   const thumbLeft = ((numVal - min) / (max - min)) * usable;
 
-  const resolve = (px: number) => {
-    const localX = px - pageXRef.current;
+  // Usa locationX (posición del toque RELATIVA a la barra), no pageX+measure():
+  // dentro de un <Modal> nativo en iOS `measure()` devuelve coordenadas
+  // incorrectas, y por eso el slider "no se movía" al EDITAR (que abre en Modal).
+  const resolve = (localX: number) => {
     const ratio = Math.max(0, Math.min(1, (localX - THUMB / 2) / usable));
     const raw = min + ratio * (max - min);
     const snapped = Math.round(raw / step) * step;
@@ -51,21 +52,22 @@ function CommissionSlider({ label, value, onChange, min, max, step, formatValue,
       </View>
 
       <View
-        ref={viewRef}
         style={styles.touchZone}
-        onLayout={(e) => {
-          setTrackWidth(e.nativeEvent.layout.width);
-          viewRef.current?.measure((_x, _y, _w, _h, px) => { pageXRef.current = px; });
-        }}
+        onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+        // Agarra cualquier toque que EMPIECE sobre la barra (no solo la bolita):
+        // más tolerante y funciona aunque la bolita esté en un extremo.
         onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => true}
+        // No reclamar en movimiento: un scroll que empezó FUERA de la barra sigue
+        // perteneciendo al formulario.
+        onMoveShouldSetResponder={() => false}
         onResponderTerminationRequest={() => false}
         onResponderGrant={(e) => {
           onScrollLock?.(false);
-          viewRef.current?.measure((_x, _y, _w, _h, px) => { pageXRef.current = px; });
-          resolve(e.nativeEvent.pageX);
+          resolve(e.nativeEvent.locationX);
         }}
-        onResponderMove={(e) => resolve(e.nativeEvent.pageX)}
+        onResponderMove={(e) => resolve(e.nativeEvent.locationX)}
+        // Restaurar SIEMPRE el scroll al soltar/cancelar (si no, el formulario y
+        // el perfil quedaban "congelados" con el scroll bloqueado).
         onResponderRelease={() => onScrollLock?.(true)}
         onResponderTerminate={() => onScrollLock?.(true)}
       >
@@ -163,11 +165,32 @@ export const CommissionSection = React.memo(function CommissionSection({
       <View style={withTopBorder ? styles.secondSection : undefined}>
         {!!title && <Text style={styles.operationTitle}>{title}</Text>}
 
+        <View style={styles.presetRow}>
+          {[2, 3, 4, 5, 8, 10].map((p) => (
+            <TouchableOpacity
+              key={p}
+              style={[
+                styles.presetChip,
+                parseFloat(values.valor) === p && styles.presetChipActive,
+              ]}
+              onPress={() => setters.setValor(String(p))}
+            >
+              <Text
+                style={[
+                  styles.presetChipText,
+                  parseFloat(values.valor) === p && styles.presetChipTextActive,
+                ]}
+              >
+                {p}%
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
         <CommissionSlider
           label="Mi comisión"
           value={values.valor}
           onChange={setters.setValor}
-          min={0} max={10} step={0.5}
+          min={0} max={20} step={0.5}
           formatValue={fmtPct}
           hint={precio > 0 ? formatMXN(miMonto) : undefined}
           onScrollLock={onScrollLock}
@@ -301,12 +324,17 @@ export const CommissionSection = React.memo(function CommissionSection({
   const isRenta = tipoOperacion === "renta";
   const isAmbas = tipoOperacion === "ambas";
 
+  const comisionError = form.errors.comision || form.errors.comisionRenta;
+
   return (
-    <View style={styles.section}>
+    <FieldAnchor name="commission">
+    <View style={[styles.section, comisionError && styles.sectionError]}>
       <View style={styles.sectionHeaderBand}>
         <Ionicons name="cash-outline" size={18} color={COLORS.primary} />
         <Text style={styles.sectionTitleBand}>Comisión</Text>
       </View>
+
+      {comisionError && <Text style={styles.errorText}>{comisionError}</Text>}
 
       {!isRenta &&
         renderVentaForm(isAmbas ? "Comisión para Venta" : "", ventaValues, ventaSetters)}
@@ -319,6 +347,7 @@ export const CommissionSection = React.memo(function CommissionSection({
           isAmbas,
         )}
     </View>
+    </FieldAnchor>
   );
 });
 
@@ -337,6 +366,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  sectionError: {
+    borderColor: COLORS.error,
+  },
   sectionHeaderBand: {
     flexDirection: "row",
     alignItems: "center",
@@ -351,6 +383,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     color: COLORS.primary,
+  },
+  errorText: {
+    fontSize: 12,
+    color: COLORS.error,
+    marginTop: -8,
+    marginBottom: 12,
   },
   operationTitle: {
     fontSize: 16,
@@ -472,5 +510,31 @@ const styles = StyleSheet.create({
   },
   summaryAmountShare: {
     color: COLORS.primary,
+  },
+  presetRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 8,
+  },
+  presetChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    backgroundColor: COLORS.white,
+  },
+  presetChipActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
+  },
+  presetChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
+  presetChipTextActive: {
+    color: COLORS.white,
   },
 });

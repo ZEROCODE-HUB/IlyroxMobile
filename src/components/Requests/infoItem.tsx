@@ -46,8 +46,24 @@ export const InfoItem = ({
     showToast(`${label} copiado`, "success");
   };
 
+  const getTimeAgo = (dateString: string) => {
+    try {
+      const diff = Date.now() - new Date(dateString).getTime();
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return "Ahora";
+      if (mins < 60) return `Hace ${mins} min`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return `Hace ${hrs} hora${hrs > 1 ? "s" : ""}`;
+      const days = Math.floor(hrs / 24);
+      return `Hace ${days} día${days > 1 ? "s" : ""}`;
+    } catch {
+      return "";
+    }
+  };
+
   const titulo = `${firstUpperCase(item.propiedad?.tipo)} en ${item.propiedad?.municipio}`;
   const nameInitial = (item.nombre || "U").charAt(0).toUpperCase();
+  const isNew = !item.leido;
 
   return (
     <View style={styles.card}>
@@ -78,6 +94,16 @@ export const InfoItem = ({
             <Text style={styles.userSubtitle} numberOfLines={1}>
               {item.email || "Sin email"}
             </Text>
+            <View style={styles.statusRow}>
+              {isNew && (
+                <View style={styles.newBadge}>
+                  <Text style={styles.newBadgeText}>Nuevo</Text>
+                </View>
+              )}
+              <Text style={styles.timeAgo}>
+                {isNew ? " • " : ""}{getTimeAgo(item.created_at)}
+              </Text>
+            </View>
           </View>
         </View>
         <View style={styles.sectionIcons}>
@@ -104,42 +130,80 @@ export const InfoItem = ({
 
       <View style={styles.divider} />
 
-      <View style={styles.propertyInfo}>
-        <Ionicons name="home-outline" size={14} color={COLORS.textTertiary} />
-        <Text style={styles.propertyTitle} numberOfLines={1}>
-          {titulo || "Propiedad no especificada"}
-        </Text>
-        {item.propiedad?.id && (
-          <Pressable
-            onPress={() =>
-              copyToClipboard(item.propiedad.codigo_propiedad, "Código")
-            }
-            style={styles.propertyCode}
-          >
-            <Ionicons name="copy-outline" size={10} color={COLORS.primary} />
-            <Text style={styles.codeText}>
-              {" "}
-              {item.propiedad.codigo_propiedad ||
-                String(item.propiedad.id).split("-")[0]}
+      <View style={styles.fieldsWithPhoto}>
+        <View style={styles.fieldsColumn}>
+          <View style={styles.fieldRow}>
+            <Ionicons name="home-outline" size={14} color={COLORS.textTertiary} />
+            <Text style={styles.fieldLabel}>Interesado en: </Text>
+            <Text style={styles.fieldValue} numberOfLines={1}>
+              {titulo || "Propiedad no especificada"}
             </Text>
-          </Pressable>
-        )}
-      </View>
+            {item.propiedad?.telefono && (
+              <Pressable
+                onPress={() =>
+                  copyToClipboard(item.propiedad.telefono, "Teléfono")
+                }
+                style={styles.phoneBadge}
+              >
+                <Ionicons name="copy-outline" size={10} color={COLORS.primary} />
+                <Text style={styles.phoneBadgeText}>
+                  {" "}
+                  {item.propiedad.telefono}
+                </Text>
+              </Pressable>
+            )}
+          </View>
 
-      <View style={styles.sectionMessageImage}>
-        <View style={styles.messageBox}>
-          {item.mensaje ? (
-            <Text style={styles.messageText}>{item.mensaje}</Text>
-          ) : (
-            <Text style={styles.noMessageText}>Sin mensaje adicional</Text>
+          {(item.presupuesto_min != null || item.presupuesto_max != null) && (
+            <View style={styles.fieldRow}>
+              <Ionicons
+                name="cash-outline"
+                size={14}
+                color={COLORS.textTertiary}
+              />
+              <Text style={styles.fieldLabel}>Presupuesto: </Text>
+              <Text style={styles.fieldValue}>
+                ${item.presupuesto_min ?? 1} - ${item.presupuesto_max != null
+                  ? Number(item.presupuesto_max) >= 1000000
+                    ? `${(item.presupuesto_max / 1000000).toFixed(1).replace(/\.0$/, "")}M`
+                    : item.presupuesto_max
+                  : "N/A"}
+              </Text>
+            </View>
           )}
+
+          {item.plazo && (
+            <View style={styles.fieldRow}>
+              <Ionicons
+                name="calendar-outline"
+                size={14}
+                color={COLORS.textTertiary}
+              />
+              <Text style={styles.fieldLabel}>Plazo: </Text>
+              <Text style={styles.fieldValue}>{item.plazo}</Text>
+            </View>
+          )}
+
+          <View style={styles.fieldRow}>
+            <Ionicons
+              name="chatbubble-outline"
+              size={14}
+              color={COLORS.textTertiary}
+            />
+            <Text style={styles.fieldLabel}>Comentarios: </Text>
+            <Text style={[styles.fieldValue, styles.fieldValueItalic]} numberOfLines={2}>
+              {item.mensaje || "Sin comentarios adicionales"}
+            </Text>
+          </View>
         </View>
 
-        <Image
-          source={item.propiedad?.fotos[0]}
-          style={styles.fotoPropiedad}
-          contentFit="cover"
-        />
+        {item.propiedad?.fotos?.[0] && (
+          <Image
+            source={item.propiedad.fotos[0]}
+            style={styles.fotoPropiedad}
+            contentFit="cover"
+          />
+        )}
       </View>
 
       <View style={styles.cardFooter}>
@@ -254,56 +318,56 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     marginVertical: 12,
   },
-  propertyInfo: {
+  statusRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginBottom: 12,
-    flexWrap: "wrap",
+    marginTop: 4,
+    gap: 2,
   },
-  propertyTitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-    flexShrink: 1,
+  newBadge: {
+    backgroundColor: "#25D366",
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
-  propertyCode: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.primary + "10",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  codeText: {
-    fontSize: 11,
-    color: COLORS.primary,
+  newBadgeText: {
+    color: COLORS.white,
+    fontSize: 10,
     fontWeight: "700",
   },
-  sectionMessageImage: {
+  timeAgo: {
+    fontSize: 11,
+    color: COLORS.textTertiary,
+  },
+  fieldsWithPhoto: {
     flexDirection: "row",
     gap: 12,
     marginBottom: 12,
     alignItems: "flex-start",
   },
-  messageBox: {
+  fieldsColumn: {
     flex: 1,
-    backgroundColor: COLORS.background,
-    padding: 12,
-    borderRadius: 12,
-    minHeight: 80,
+    gap: 8,
   },
-  messageText: {
-    fontSize: 14,
+  fieldRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 4,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
+  fieldValue: {
+    fontSize: 13,
     color: COLORS.textPrimary,
-    lineHeight: 20,
-    fontStyle: "italic",
+    flexShrink: 1,
   },
-  noMessageText: {
-    fontSize: 14,
-    color: COLORS.textTertiary,
+  fieldValueItalic: {
     fontStyle: "italic",
+    color: COLORS.textTertiary,
   },
   fotoPropiedad: {
     width: 80,

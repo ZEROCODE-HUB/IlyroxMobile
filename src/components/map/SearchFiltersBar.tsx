@@ -36,7 +36,7 @@ export const SearchFiltersBar: React.FC<SearchFiltersBarProps> = ({
     <View style={styles.container}>
       <View style={styles.buttonsRow}>
         {onBack && (
-          <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={8}>
+          <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 0 }}>
             <Ionicons name="arrow-back" size={20} color={COLORS.textPrimary} />
           </TouchableOpacity>
         )}
@@ -47,8 +47,8 @@ export const SearchFiltersBar: React.FC<SearchFiltersBarProps> = ({
             hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
             activeOpacity={0.7}
           >
-            <Ionicons name="map-outline" size={17} color={COLORS.primary} />
-            <Text style={styles.zoneBtnText}>Agregar Zona</Text>
+            <Ionicons name="search-outline" size={18} color={COLORS.textTertiary} />
+            <Text style={styles.zoneBtnText}>¿Dónde busca tu cliente?</Text>
           </TouchableOpacity>
         )}
 
@@ -137,20 +137,19 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     minHeight: 44,
-    backgroundColor: COLORS.background,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
+    backgroundColor: COLORS.white,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
     borderRadius: 12,
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: COLORS.primaryLight,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
   },
   zoneBtnText: {
-    color: COLORS.primary,
+    flex: 1,
+    color: COLORS.textSecondary,
     fontSize: 14,
-    fontWeight: "600",
   },
   clearBtn: {
     width: 38,

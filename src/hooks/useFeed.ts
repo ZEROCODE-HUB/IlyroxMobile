@@ -7,13 +7,15 @@
  * auto-refresh y enriquecimiento post-carga (stats + recomendaciones).
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useInfiniteQuery,
   useQuery,
   useQueryClient,
+  type QueryClient,
 } from "@tanstack/react-query";
 import { FeedItem, RecommendedByPreviewUser, User } from "@/types";
+import { useAuth } from "@/context/AuthContext";
 import { feedService } from "@/services/feedService";
 import { profileService } from "@/services/profileService";
 import { PAGINATION, TIMEOUTS } from "@/constants/config";
@@ -32,8 +34,10 @@ interface UseFeedOptions {
 
 const feedKeys = {
   all: ["feed"] as const,
-  list: (pageSize: number) => [...feedKeys.all, "list", pageSize] as const,
-  item: (id: string) => [...feedKeys.all, "item", id] as const,
+  list: (pageSize: number, userId?: string) =>
+    [...feedKeys.all, "list", pageSize, userId ?? "anon"] as const,
+  item: (id: string, userId?: string) =>
+    [...feedKeys.all, "item", id, userId ?? "anon"] as const,
 };
 
 function dedupeItems(items: FeedItem[]): FeedItem[] {
@@ -52,6 +56,7 @@ function dedupeItems(items: FeedItem[]): FeedItem[] {
 
 export function useFeed(options: UseFeedOptions = {}) {
   const {
+    userId,
     pageSize = PAGINATION.FEED_PAGE_SIZE,
     enableAutoRefresh = true,
   } = options;
@@ -59,9 +64,9 @@ export function useFeed(options: UseFeedOptions = {}) {
   const queryClient = useQueryClient();
 
   const query = useInfiniteQuery({
-    queryKey: feedKeys.list(pageSize),
+    queryKey: feedKeys.list(pageSize, userId),
     queryFn: ({ pageParam = 0 }) =>
-      feedService.getFeedPage(pageParam as number, pageSize),
+      feedService.getFeedPage(pageParam as number, pageSize, userId),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextPage,
     staleTime: 30_000,
@@ -150,7 +155,7 @@ export function useFeed(options: UseFeedOptions = {}) {
 
       // Mutar la cache directamente con las stats frescas
       queryClient.setQueryData(
-        feedKeys.list(pageSize),
+        feedKeys.list(pageSize, userId),
         (prev: any) => {
           if (!prev) return prev;
           return {
@@ -195,7 +200,17 @@ export function useFeed(options: UseFeedOptions = {}) {
         return next;
       });
     };
-  }, [baseItems, pageSize, queryClient]);
+  }, [baseItems, pageSize, queryClient, userId]);
+
+  const loadMore = useCallback(() => {
+    if (query.hasNextPage && !query.isFetchingNextPage) {
+      query.fetchNextPage();
+    }
+  }, [query.hasNextPage, query.isFetchingNextPage, query.fetchNextPage]);
+
+  const refresh = useCallback(() => {
+    return query.refetch();
+  }, [query.refetch]);
 
   return {
     items,
@@ -203,23 +218,61 @@ export function useFeed(options: UseFeedOptions = {}) {
     refreshing: query.isRefetching && !query.isFetchingNextPage,
     hasMore: Boolean(query.hasNextPage),
     error: query.error ? (query.error as Error).message : null,
-    loadMore: () => {
-      if (query.hasNextPage && !query.isFetchingNextPage) {
-        query.fetchNextPage();
-      }
-    },
-    refresh: () => query.refetch(),
+    loadMore,
+    refresh,
     refreshUserStats,
   };
+}
+
+/**
+ * Inserta una publicación recién creada al inicio del feed (prepend optimista),
+ * para que aparezca SIEMPRE en la posición 0 justo tras publicar, ignorando el
+ * engagement_score. El orden por score se reaplica en el siguiente refetch
+ * (pull-to-refresh, cambio de pestaña, auto-refresh o reentrar).
+ *
+ * `contenidoId` es el id del post/reel/propiedad: getFeedItem acepta tanto el id
+ * del feed_item como el contenido_id.
+ */
+export async function prependPublishedFeedItem(
+  queryClient: QueryClient,
+  contenidoId: string,
+  userId?: string,
+) {
+  try {
+    const item = await feedService.getFeedItem(contenidoId, userId);
+    if (!item) return;
+    queryClient.setQueriesData(
+      { queryKey: [...feedKeys.all, "list"] },
+      (prev: any) => {
+        if (!prev?.pages?.length) return prev;
+        const exists = prev.pages.some((pg: any) =>
+          pg.items?.some((it: FeedItem) => it.id === item.id),
+        );
+        if (exists) return prev;
+        const [first, ...rest] = prev.pages;
+        return {
+          ...prev,
+          pages: [
+            { ...first, items: [item, ...(first.items ?? [])] },
+            ...rest,
+          ],
+        };
+      },
+    );
+  } catch (e) {
+    log.warn("prependPublishedFeedItem failed", e);
+  }
 }
 
 // Re-exports para consumidores existentes
 export { formatTimestamp } from "@/services/feedService";
 
 export function useFeedItem(feedItemId: string) {
+  const { user } = useAuth();
+  const currentUserId = user?.id;
   const query = useQuery({
-    queryKey: feedKeys.item(feedItemId),
-    queryFn: () => feedService.getFeedItem(feedItemId),
+    queryKey: feedKeys.item(feedItemId, currentUserId),
+    queryFn: () => feedService.getFeedItem(feedItemId, currentUserId),
     enabled: Boolean(feedItemId),
     staleTime: TIMEOUTS.SESSION_REFRESH_MS,
   });

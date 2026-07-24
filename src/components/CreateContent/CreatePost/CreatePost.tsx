@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import {
   View,
@@ -13,13 +14,15 @@ import {
   StyleSheet,
   ActivityIndicator,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "@/design-system/components/AppInput";
 import * as ImagePicker from "expo-image-picker";
 
 import { useAuth } from "@/context/AuthContext";
-import { useModal } from "@/context/ModalContext";
+import { useLocalModal } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
 import { COLORS } from "@/constants/colors";
 import { ScreenWrapper } from "@/screens/ScreenWrapper";
@@ -33,9 +36,24 @@ import { uploadImage as uploadImageService } from "@/services/uploadService";
 import { AppHeader } from "@/components/AppHeader";
 import { OpenHousePost } from "./OpenHousePost";
 import { BusquedaPost } from "./BusquedaPost";
+import { LocationChipItem } from "@/components/common/MultiLevelLocationPicker";
 import { logger } from "@/utils/logger";
 
 const log = logger.scoped("CreatePost");
+
+const formatNumericInput = (num: number | string): string => {
+  const raw = String(num).replace(/,/g, "");
+  if (!raw || isNaN(Number(raw))) return "";
+  const parts = raw.split(".");
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return parts.join(".");
+};
+
+const parseNum = (val: string): number | null => {
+  if (!val || !val.trim()) return null;
+  const n = parseFloat(val.replace(/,/g, ""));
+  return isNaN(n) ? null : n;
+};
 
 interface CreatePostProps {
   post?: Post;
@@ -44,9 +62,10 @@ interface CreatePostProps {
 
 export default function CreatePost({ post, onBack }: CreatePostProps) {
   const { user } = useAuth();
-  const { showModal } = useModal();
+  const { showModal, modalElement } = useLocalModal();
   const { showToast } = useToast();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { createPost, uploading: creatingPost } = useCreateContent(user?.id);
 
   const [content, setContent] = useState("");
@@ -67,6 +86,20 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   const [tipoPropiedad, setTipoPropiedad] = useState("");
   const [ubicacion, setUbicacion] = useState("");
   const [statusPost, setStatusPost] = useState("Visible");
+
+  // Campos extra para post de búsqueda
+  const [moneda, setMoneda] = useState("MXN");
+  const [banos, setBanos] = useState("");
+  const [mediosBanos, setMediosBanos] = useState("");
+  const [estacionamientos, setEstacionamientos] = useState("");
+  const [niveles, setNiveles] = useState("");
+  const [antiguedad, setAntiguedad] = useState("");
+  const [m2Terreno, setM2Terreno] = useState("");
+  const [m2Construccion, setM2Construccion] = useState("");
+  const [anchoTerreno, setAnchoTerreno] = useState("");
+  const [largoTerreno, setLargoTerreno] = useState("");
+  const [ubicaciones, setUbicaciones] = useState<LocationChipItem[]>([]);
+  const [nota, setNota] = useState("");
 
   const isEditing = !!post;
   const [isUploadingManual, setIsUploadingManual] = useState(false);
@@ -106,15 +139,119 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
 
           if (data.tipo === "busqueda" && data.busquedas_json) {
             const filtros = data.busquedas_json.filtros || {};
-            setPrecioMin(filtros.precio_min?.toString() || "");
-            setPrecioMax(filtros.precio_max?.toString() || "");
-            setHabitaciones(
-              filtros.caracteristicas?.habitaciones?.toString() || "",
+            const caracteristicas = filtros.caracteristicas || {};
+            const superficies = filtros.superficies || {};
+            const ub = filtros.ubicacion || {};
+
+            setPrecioMin(
+              typeof filtros.precio_min === "number" && filtros.precio_min > 0
+                ? formatNumericInput(filtros.precio_min)
+                : "",
             );
+            setPrecioMax(
+              typeof filtros.precio_max === "number" && filtros.precio_max > 0
+                ? formatNumericInput(filtros.precio_max)
+                : "",
+            );
+            // Check truthy: un valor 0 debe quedar vacío (no "0") en el formulario.
+            setHabitaciones(
+              caracteristicas.habitaciones ? String(caracteristicas.habitaciones) : "",
+            );
+            setBanos(caracteristicas.banos ? String(caracteristicas.banos) : "");
+            setMediosBanos(
+              caracteristicas.medios_banos ? String(caracteristicas.medios_banos) : "",
+            );
+            setEstacionamientos(
+              caracteristicas.estacionamientos ? String(caracteristicas.estacionamientos) : "",
+            );
+            setNiveles(caracteristicas.niveles ? String(caracteristicas.niveles) : "");
+            setAntiguedad(
+              caracteristicas.antiguedad ? String(caracteristicas.antiguedad) : "",
+            );
+            setM2Terreno(
+              typeof superficies.m2_terreno_min === "number" && superficies.m2_terreno_min > 0
+                ? String(superficies.m2_terreno_min)
+                : "",
+            );
+            setM2Construccion(
+              typeof superficies.m2_construccion_min === "number" && superficies.m2_construccion_min > 0
+                ? String(superficies.m2_construccion_min)
+                : "",
+            );
+            setAnchoTerreno(
+              typeof superficies.ancho_terreno_min === "number" && superficies.ancho_terreno_min > 0
+                ? String(superficies.ancho_terreno_min)
+                : "",
+            );
+            setLargoTerreno(
+              typeof superficies.largo_terreno_min === "number" && superficies.largo_terreno_min > 0
+                ? String(superficies.largo_terreno_min)
+                : "",
+            );
+            setMoneda(filtros.moneda || "MXN");
+            setNota(typeof filtros.nota === "string" ? filtros.nota : "");
             setOperacion(filtros.operacion || "");
             setTipoPropiedad(filtros.tipo_propiedad || "");
             const rawSubtipo = filtros.subtipo;
             setSubtipo(Array.isArray(rawSubtipo) ? rawSubtipo : rawSubtipo ? [rawSubtipo] : []);
+
+            const rawUbic: any[] = Array.isArray(filtros.ubicaciones)
+              ? filtros.ubicaciones
+              : [];
+            const ubicacionesFromArray: LocationChipItem[] = rawUbic
+              .filter((u) => u && u.level && u.estado)
+              .map((u) => ({
+                level: u.level,
+                estado: u.estado,
+                municipio: u.municipio,
+                colonia: u.colonia,
+                label:
+                  u.label ||
+                  [u.colonia, u.municipio, u.estado].filter(Boolean).join(", "),
+                latitud: u.latitud,
+                longitud: u.longitud,
+              }));
+
+            // Fallback: derivar desde el campo legacy `ubicacion`
+            let derivedUbicaciones: LocationChipItem[] = ubicacionesFromArray;
+            if (derivedUbicaciones.length === 0 && ub && ub.estado) {
+              const coloniasLegacy: string[] = Array.isArray(ub.colonias)
+                ? ub.colonias.filter(
+                    (c: unknown) => typeof c === "string" && (c as string).trim(),
+                  )
+                : typeof ub.colonia === "string" && ub.colonia.trim()
+                  ? [ub.colonia]
+                  : [];
+
+              if (coloniasLegacy.length > 0) {
+                derivedUbicaciones = coloniasLegacy.map((col) => ({
+                  level: "colonia" as const,
+                  estado: ub.estado,
+                  municipio: ub.municipio,
+                  colonia: col,
+                  label: [col, ub.municipio, ub.estado].filter(Boolean).join(", "),
+                }));
+              } else if (ub.municipio) {
+                derivedUbicaciones = [
+                  {
+                    level: "municipio",
+                    estado: ub.estado,
+                    municipio: ub.municipio,
+                    label: [ub.municipio, ub.estado].filter(Boolean).join(", "),
+                  },
+                ];
+              } else {
+                derivedUbicaciones = [
+                  {
+                    level: "estado",
+                    estado: ub.estado,
+                    label: ub.estado,
+                  },
+                ];
+              }
+            }
+
+            setUbicaciones(derivedUbicaciones);
           }
         }
       } catch (err) {
@@ -165,7 +302,9 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!content.trim()) {
+    // Los posts de Open House no tienen campo de texto libre obligatorio
+    const skipContent = isEditing && post?.tipo === "openhouse";
+    if (!skipContent && !content.trim()) {
       newErrors.content = "El contenido no puede estar vacío";
     }
 
@@ -222,25 +361,93 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
           const currentJson = post.busquedas_json || {};
           const currentFiltros = currentJson.filtros || {};
           const currentCaracteristicas = currentFiltros.caracteristicas || {};
+          const currentSuperficies = currentFiltros.superficies || {};
+          const currentUbicacion = currentFiltros.ubicacion || {};
+
+          // Derivar ubicacion legacy desde el primer chip multi-nivel
+          const firstChip = ubicaciones[0];
+          const derivedUbicacion = firstChip
+            ? {
+                ...currentUbicacion,
+                estado: firstChip.estado ?? "",
+                municipio: firstChip.municipio ?? "",
+                colonia: firstChip.colonia ?? "",
+                colonias: ubicaciones
+                  .filter((u) => u.level === "colonia" && !!u.colonia)
+                  .map((u) => u.colonia as string),
+                icon: currentUbicacion.icon || "location-outline",
+              }
+            : currentUbicacion;
+
+          const minParsed = parseNum(precioMin);
+          const maxParsed = parseNum(precioMax);
+          const habitacionesParsed = parseNum(habitaciones);
+          const banosParsed = parseNum(banos);
+          const mediosBanosParsed = parseNum(mediosBanos);
+          const estacionamientosParsed = parseNum(estacionamientos);
+          const nivelesParsed = parseNum(niveles);
+          const m2TerrenoParsed = parseNum(m2Terreno);
+          const m2ConstruccionParsed = parseNum(m2Construccion);
+          const anchoParsed = parseNum(anchoTerreno);
+          const largoParsed = parseNum(largoTerreno);
 
           updatedData.busquedas_json = {
             ...currentJson,
             filtros: {
               ...currentFiltros,
               operacion: operacion || currentFiltros.operacion,
+              tipo_propiedad: tipoPropiedad || currentFiltros.tipo_propiedad,
               subtipo: subtipo.length > 0 ? subtipo : currentFiltros.subtipo,
-              precio_min: precioMin
-                ? Number(precioMin)
-                : currentFiltros.precio_min,
-              precio_max: precioMax
-                ? Number(precioMax)
-                : currentFiltros.precio_max,
+              moneda: moneda || currentFiltros.moneda,
+              precio_min: minParsed !== null ? minParsed : currentFiltros.precio_min,
+              precio_max: maxParsed !== null ? maxParsed : currentFiltros.precio_max,
+              ubicacion: derivedUbicacion,
+              ubicaciones,
               caracteristicas: {
                 ...currentCaracteristicas,
-                habitaciones: habitaciones
-                  ? Number(habitaciones)
-                  : currentCaracteristicas.habitaciones,
+                habitaciones:
+                  habitacionesParsed !== null
+                    ? habitacionesParsed
+                    : currentCaracteristicas.habitaciones,
+                banos:
+                  banosParsed !== null
+                    ? banosParsed
+                    : currentCaracteristicas.banos,
+                medios_banos:
+                  mediosBanosParsed !== null
+                    ? mediosBanosParsed
+                    : currentCaracteristicas.medios_banos,
+                estacionamientos:
+                  estacionamientosParsed !== null
+                    ? estacionamientosParsed
+                    : currentCaracteristicas.estacionamientos,
+                niveles:
+                  nivelesParsed !== null
+                    ? nivelesParsed
+                    : currentCaracteristicas.niveles,
+                antiguedad: antiguedad || currentCaracteristicas.antiguedad,
               },
+              superficies: {
+                ...currentSuperficies,
+                m2_terreno_min:
+                  m2TerrenoParsed !== null
+                    ? m2TerrenoParsed
+                    : currentSuperficies.m2_terreno_min,
+                m2_construccion_min:
+                  m2ConstruccionParsed !== null
+                    ? m2ConstruccionParsed
+                    : currentSuperficies.m2_construccion_min,
+                ancho_terreno_min:
+                  anchoParsed !== null
+                    ? anchoParsed
+                    : currentSuperficies.ancho_terreno_min,
+                largo_terreno_min:
+                  largoParsed !== null
+                    ? largoParsed
+                    : currentSuperficies.largo_terreno_min,
+                icon: currentSuperficies.icon || "resize-outline",
+              },
+              nota: nota.trim(),
             },
           };
         }
@@ -271,6 +478,15 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             pathname: "/(tabs)",
             params: { refresh: String(Date.now()) },
           });
+        } else if (post?.tipo === "busqueda") {
+          // Edición de post de búsqueda: no hay prepend, así que refrescamos el
+          // feed para que el cambio editado se refleje (se reordena por score).
+          queryClient.invalidateQueries({ queryKey: ["feed"] });
+          onBack();
+          router.replace({
+            pathname: "/(tabs)",
+            params: { refresh: String(Date.now()) },
+          });
         } else {
           onBack();
         }
@@ -292,35 +508,42 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
         onBack={onBack}
       />
 
+      <KeyboardAvoidingView
+        style={styles.scrollView}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
-        {/* Contenido */}
-        <View style={styles.card}>
-          <AppInput
-            label="Nueva Publicación *"
-            multiline
-            placeholder="¿Qué quieres compartir?"
-            value={content}
-            onChangeText={(text) => {
-              if (text.length <= 2500) {
-                setContent(text);
-              } else {
-                setContent(text.substring(0, 2500));
-              }
+        {/* Contenido — oculto al editar Open House (no tiene campo de texto libre) */}
+        {!(isEditing && post?.tipo === "openhouse") && (
+          <View style={styles.card}>
+            <AppInput
+              label="Nueva Publicación *"
+              multiline
+              placeholder="¿Qué quieres compartir?"
+              value={content}
+              onChangeText={(text) => {
+                if (text.length <= 2500) {
+                  setContent(text);
+                } else {
+                  setContent(text.substring(0, 2500));
+                }
 
-              if (errors.content) {
-                setErrors({ ...errors, content: "" });
-              }
-            }}
-            error={errors.content}
-            inputStyle={styles.textArea}
-            numberOfLines={10}
-            maxLength={2500}
-            helperText={`${content.length}/2500`}
-          />
-        </View>
+                if (errors.content) {
+                  setErrors({ ...errors, content: "" });
+                }
+              }}
+              error={errors.content}
+              inputStyle={styles.textArea}
+              numberOfLines={10}
+              maxLength={2500}
+              helperText={`${content.length}/2500`}
+            />
+          </View>
+        )}
 
         {isEditing && post?.tipo === "openhouse" && (
           <OpenHousePost
@@ -353,6 +576,31 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             subtipo={subtipo}
             setSubtipo={setSubtipo}
             tipoPropiedad={tipoPropiedad}
+            setTipoPropiedad={setTipoPropiedad}
+            moneda={moneda}
+            setMoneda={setMoneda}
+            banos={banos}
+            setBanos={setBanos}
+            mediosBanos={mediosBanos}
+            setMediosBanos={setMediosBanos}
+            estacionamientos={estacionamientos}
+            setEstacionamientos={setEstacionamientos}
+            niveles={niveles}
+            setNiveles={setNiveles}
+            antiguedad={antiguedad}
+            setAntiguedad={setAntiguedad}
+            m2Terreno={m2Terreno}
+            setM2Terreno={setM2Terreno}
+            m2Construccion={m2Construccion}
+            setM2Construccion={setM2Construccion}
+            anchoTerreno={anchoTerreno}
+            setAnchoTerreno={setAnchoTerreno}
+            largoTerreno={largoTerreno}
+            setLargoTerreno={setLargoTerreno}
+            ubicaciones={ubicaciones}
+            setUbicaciones={setUbicaciones}
+            nota={nota}
+            setNota={setNota}
           />
         )}
 
@@ -402,6 +650,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
             </View>
           )}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Botón Publicar */}
       <View style={styles.footer}>
@@ -447,6 +696,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
           </View>
         </View>
       </Modal>
+      {modalElement}
     </ScreenWrapper>
   );
 }

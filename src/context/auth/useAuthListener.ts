@@ -6,7 +6,7 @@
  * OPTIMIZACIÓN: Realtime de perfil deshabilitado para reducir requests
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { perfiles } from "../../types";
@@ -31,156 +31,121 @@ export const useAuthListener = ({
   onLoadingChange,
   loadProfile,
 }: UseAuthListenerProps) => {
-  const currentUserIdRef = useRef<string | null>(null);
-
   useEffect(() => {
     let mounted = true;
 
-    /**
-     * Inicializar autenticación
-     */
-    const initAuth = async () => {
-      // Timeout de emergencia — solo fallback si todo lo demás falla
-      const emergencyTimeoutId = setTimeout(() => {
-        if (mounted) {
-          log.warn("Auth init emergency timeout (20s), forcing loading false");
-          onLoadingChange(false);
-        }
-      }, 20000);
-
-      try {
-        // Obtener sesión — sin timeout agresivo, onAuthStateChange maneja el resto
-        const { data: { session }, error } = await supabase.auth.getSession();
-
-        if (!mounted) return;
-
-        if (error) {
-          log.error("Error getting session:", error);
-          // Solo limpiar en errores reales (token inválido), no en timeouts de red
-          if (error.message?.includes("invalid") || error.message?.includes("expired")) {
-            onSessionChange(null);
-            onUserChange(null);
-            onProfileChange(null);
-          }
-          return;
-        }
-
-        // Verificar expiración
-        if (session?.expires_at) {
-          const expiresAt = session.expires_at * 1000;
-          if (Date.now() >= expiresAt) {
-            onSessionChange(null);
-            onUserChange(null);
-            onProfileChange(null);
-            return;
-          }
-        }
-
-        onSessionChange(session);
-        onUserChange(session?.user ?? null);
-
-        if (session?.user) {
-          if (Platform.OS !== "web") OneSignal.login(session.user.id);
-
-          try {
-            const profileData = await loadProfile(session.user.id);
-            if (mounted) {
-              onProfileChange(profileData);
-              currentUserIdRef.current = session.user.id;
-            }
-          } catch (profileErr) {
-            log.error("Error loading profile:", profileErr);
-            if (mounted) onProfileChange(null);
-          }
-        } else {
-          onProfileChange(null);
-          if (Platform.OS !== "web") {
-            OneSignal.User.removeAlias("external_id");
-            OneSignal.logout();
-          }
-        }
-      } catch (err: any) {
-        log.error("Unexpected error during auth init:", err);
-      } finally {
-        clearTimeout(emergencyTimeoutId);
-        if (mounted) onLoadingChange(false);
+    // Timeout de emergencia — fallback por si INITIAL_SESSION nunca llega o la
+    // carga del perfil se cuelga; garantiza que `loading` no quede atascado.
+    const emergencyTimeoutId = setTimeout(() => {
+      if (mounted) {
+        log.warn("Auth init emergency timeout (20s), forcing loading false");
+        onLoadingChange(false);
       }
+    }, 20000);
+
+    // Finaliza la carga inicial y desactiva el timeout de emergencia.
+    const finishLoading = () => {
+      clearTimeout(emergencyTimeoutId);
+      if (mounted) onLoadingChange(false);
     };
+
     /**
-     * Manejar cambios de autenticación
-     * FIX: Realtime deshabilitado
+     * Manejar cambios de autenticación.
+     *
+     * auth-js emite automáticamente INITIAL_SESSION al registrar este listener
+     * (recuperando la sesión persistida en AsyncStorage), por lo que NO hace
+     * falta un initAuth() con getSession() aparte: este único punto cubre tanto
+     * la carga inicial como todos los cambios posteriores (SIGNED_IN,
+     * TOKEN_REFRESHED, SIGNED_OUT...), sin duplicar la carga del perfil.
+     *
+     * ⚠️ CRÍTICO: Este callback se ejecuta DENTRO del lock de auth de gotrue
+     * (auth-js emite los eventos sosteniendo `_acquireLock`). Hacer `await` de
+     * cualquier operación de Supabase aquí —p. ej. loadProfile, que ejecuta
+     * `supabase.from(...).select()`— provoca un DEADLOCK: la query intenta tomar
+     * el mismo lock que ya posee el emisor del evento, y este espera a que
+     * termine el callback. El deadlock duraba hasta que el antiguo timeout de 8s
+     * lo cortaba con "Profile load timeout".
+     *
+     * Solución (recomendada por Supabase): la parte síncrona actualiza el estado
+     * de inmediato; el trabajo async se difiere con setTimeout(0) para que el
+     * callback retorne y libere el lock ANTES de tocar la base de datos.
      */
-    const handleAuthChange = async (event: string, session: Session | null) => {
+    const handleAuthChange = (_event: string, session: Session | null) => {
       if (!mounted) return;
 
-      // Verificar expiración
+      // Verificar expiración (síncrono, seguro dentro del callback)
       if (session?.expires_at) {
         const expiresAt = session.expires_at * 1000;
-        const now = Date.now();
-        if (now >= expiresAt) {
+        if (Date.now() >= expiresAt) {
           onSessionChange(null);
           onUserChange(null);
           onProfileChange(null);
-          onLoadingChange(false);
+          finishLoading();
           return;
         }
       }
 
+      // Actualización de estado síncrona (no toca la DB, no usa el lock)
       onSessionChange(session);
       onUserChange(session?.user ?? null);
 
-      if (session?.user) {
-        if (Platform.OS !== "web") OneSignal.login(session.user.id);
+      if (!session?.user) {
+        // Sin sesión, limpiar todo
+        onProfileChange(null);
+        if (Platform.OS !== "web") {
+          // Solo logout(): desasocia el external_id de este dispositivo y crea
+          // un usuario anónimo. NO usar removeAlias("external_id") — borra la
+          // identidad del usuario en OneSignal, dejando su external_id sin
+          // suscripciones push (la API responde entonces "All included players
+          // are not subscribed") o directamente sin usuario.
+          OneSignal.logout();
+        }
+        finishLoading();
+        return;
+      }
+
+      // Diferir el trabajo async FUERA del lock de auth para evitar el deadlock.
+      const userId = session.user.id;
+      setTimeout(async () => {
+        if (!mounted) return;
+
+        if (Platform.OS !== "web") {
+          OneSignal.login(userId);
+          // login() SOLO asocia el external_id a este dispositivo; NO reactiva la
+          // suscripción push. Si quedó en opt-out (un logout previo la apagó, o el
+          // dispositivo estaba "muerto": token vacío / enabled:false), las push
+          // dejan de llegar aunque el usuario vuelva a entrar. optIn() la vuelve a
+          // encender. Es idempotente y NO pide permiso (eso es requestPermission),
+          // así que no puede robar el foco ni pisar una preferencia del usuario:
+          // si el permiso del SO sigue concedido, revive la suscripción; si el
+          // usuario denegó en Ajustes, es un no-op (no hay token que activar).
+          OneSignal.User.pushSubscription.optIn();
+        }
+
         try {
-          const profilePromise = loadProfile(session.user.id);
-          const profileTimeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("Profile load timeout")), 8000);
-          });
+          // loadProfile ya tiene reintentos con backoff y cache propios;
+          // sin el lock contenido, responde en ms y el backoff solo actúa
+          // ante fallos de red reales.
+          const profileData = await loadProfile(userId);
+          // Solo se propaga un perfil válido. Poner `profile` a null con la
+          // sesión viva hace que RootLayoutNav sustituya el <Stack> por
+          // <InitialLoading>, desmontando la pantalla actual: un TOKEN_REFRESHED
+          // con mala red borraba el formulario que el usuario estaba llenando.
+          if (mounted && profileData) onProfileChange(profileData);
 
-          const profileData = (await Promise.race([
-            profilePromise,
-            profileTimeoutPromise,
-          ])) as perfiles | null;
-
-          if (mounted) {
-            onProfileChange(profileData);
-
-            // ✅ REALTIME DESHABILITADO
-            // const shouldSetupSubscription = [
-            //   "SIGNED_IN",
-            //   "INITIAL_SESSION",
-            // ].includes(event);
-            // if (shouldSetupSubscription) {
-            //   await setupProfileSubscription(session.user.id);
-            // }
-          }
+          // ✅ REALTIME DESHABILITADO
+          // if (["SIGNED_IN", "INITIAL_SESSION"].includes(_event)) {
+          //   await setupProfileSubscription(userId);
+          // }
         } catch (profileErr) {
           log.error("Error loading profile:", profileErr);
-          if (mounted) {
-            onProfileChange(null);
-          }
+        } finally {
+          finishLoading();
         }
-      } else {
-        // Sin sesión, limpiar todo
-        if (mounted) {
-          onProfileChange(null);
-          if (Platform.OS !== "web") {
-            OneSignal.User.removeAlias("external_id");
-            OneSignal.logout();
-          }
-          // await cleanupProfileSubscription(); // DESHABILITADO
-        }
-      }
-
-      if (mounted) {
-        onLoadingChange(false);
-      }
+      }, 0);
     };
 
-    // Iniciar autenticación
-    initAuth();
-
-    // Escuchar cambios
+    // Registrar el listener — dispara INITIAL_SESSION con la sesión persistida.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(handleAuthChange);
@@ -188,6 +153,7 @@ export const useAuthListener = ({
     // Cleanup
     return () => {
       mounted = false;
+      clearTimeout(emergencyTimeoutId);
       subscription.unsubscribe();
       // cleanupProfileSubscription(); // DESHABILITADO
     };

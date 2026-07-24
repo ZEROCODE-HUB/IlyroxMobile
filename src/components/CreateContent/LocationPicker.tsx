@@ -39,9 +39,24 @@ export default function LocationPicker({
     isColonia: boolean;
   } | null>(null);
 
-  const [mapTypeId, setMapTypeId] = useState<"standard" | "satellite">(
-    "standard",
-  );
+  // Arranca en "standard" (mapa con nombres de calles/colonias) para poder
+  // ubicar bien; el botón cicla standard → híbrido → satélite.
+  const [mapTypeId, setMapTypeId] = useState<
+    "standard" | "hybrid" | "satellite"
+  >("standard");
+
+  const MAP_CYCLE = ["standard", "hybrid", "satellite"] as const;
+  const nextMapType = () => {
+    const idx = MAP_CYCLE.indexOf(mapTypeId);
+    setMapTypeId(MAP_CYCLE[(idx + 1) % MAP_CYCLE.length]);
+  };
+  // Etiqueta/ícono del SIGUIENTE modo (lo que se activará al tocar).
+  const nextLabel =
+    mapTypeId === "standard"
+      ? "Híbrido"
+      : mapTypeId === "hybrid"
+        ? "Satélite"
+        : "Mapa";
 
   const [region, setRegion] = useState<Region>({
     latitude: selectedLocation?.latitude || focusLocation?.latitude || 25.6866,
@@ -150,25 +165,15 @@ export default function LocationPicker({
           </View>
         ) : (
           <>
-            <Pressable
-              style={styles.mapTypeButton}
-              onPress={() =>
-                setMapTypeId(
-                  mapTypeId === "standard" ? "satellite" : "standard",
-                )
-              }
-            >
-              {mapTypeId === "standard" ? (
-                <View style={styles.mapTypeButtonIcon}>
-                  <Globe size={10} />
-                  <Text style={styles.mapTypeButtonText}>Satélite</Text>
-                </View>
-              ) : (
-                <View style={styles.mapTypeButtonIcon}>
+            <Pressable style={styles.mapTypeButton} onPress={nextMapType}>
+              <View style={styles.mapTypeButtonIcon}>
+                {nextLabel === "Mapa" ? (
                   <MapIcon size={10} />
-                  <Text style={styles.mapTypeButtonText}>Mapa</Text>
-                </View>
-              )}
+                ) : (
+                  <Globe size={10} />
+                )}
+                <Text style={styles.mapTypeButtonText}>{nextLabel}</Text>
+              </View>
             </Pressable>
             <MapView
               ref={mapRef}
@@ -237,11 +242,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   mapContainer: {
-    height: 300,
-    borderRadius: 12,
+    // Más alto y a todo el ancho: los -16 compensan el padding del section de
+    // MapSection para que el mapa llegue a los bordes (MapSection a su vez
+    // compensa el padding del ScrollView). Facilita orientarse y colocar el pin.
+    height: 420,
+    marginHorizontal: -16,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
     position: "relative",
     backgroundColor: COLORS.background,
   },

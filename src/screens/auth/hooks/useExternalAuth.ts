@@ -13,6 +13,7 @@ import { OneSignal } from "react-native-onesignal";
 import { Platform } from "react-native";
 import { useModal } from "@/context/ModalContext";
 import { logger } from "@/utils/logger";
+import { collapseSpaces } from "@/utils/stringNormalizer";
 
 const log = logger.scoped("useExternalAuth");
 
@@ -35,7 +36,7 @@ export interface ExternalAuthFormData {
   ocupacion: string;
   modalidad: string;
   nombreInmobiliaria: string;
-  anosExperiencia: string;
+  fechaInicioCarrera: string;
 }
 
 export function useExternalAuth() {
@@ -181,8 +182,8 @@ export function useExternalAuth() {
           return false;
         }
       }
-      if (!formData.anosExperiencia) {
-        showModal({ title: "Error", message: "Selecciona tus años de experiencia", confirmText: "OK" });
+      if (!formData.fechaInicioCarrera) {
+        showModal({ title: "Error", message: "Selecciona la fecha en que iniciaste tu carrera", confirmText: "OK" });
         return false;
       }
 
@@ -202,9 +203,9 @@ export function useExternalAuth() {
         const newProfile: perfiles = {
           id: pendingUser.id,
           email: pendingUser.email,
-          nombre: formData.name || pendingUser.fullName || "Usuario",
-          apellido_paterno: formData.lastNamePaterno,
-          apellido_materno: formData.lastNameMaterno,
+          nombre: collapseSpaces(formData.name || pendingUser.fullName || "Usuario"),
+          apellido_paterno: collapseSpaces(formData.lastNamePaterno),
+          apellido_materno: collapseSpaces(formData.lastNameMaterno),
           celular: formData.phone || "",
           prefijo_celular: undefined,
           rol: "cliente",
@@ -214,14 +215,15 @@ export function useExternalAuth() {
           estado_registro: "pendiente",
           aprobaciones_recibidas: 0,
           aprobaciones_requeridas: 3,
-          anos_experiencia: formData.anosExperiencia,
+          fecha_inicio_carrera: formData.fechaInicioCarrera || undefined,
           ocupacion: formData.ocupacion,
           otro_ocupacion: undefined,
           modalidad: formData.modalidad || undefined,
           nombre_inmobiliaria: formData.nombreInmobiliaria || undefined,
           curso_certificacion: undefined,
-          nombre_completo:
-            `${formData.name} ${formData.lastNamePaterno} ${formData.lastNameMaterno}`.trim(),
+          nombre_completo: collapseSpaces(
+            `${formData.name} ${formData.lastNamePaterno} ${formData.lastNameMaterno}`,
+          ),
           activado_en: undefined,
           deleted_at: undefined,
           biografia: undefined,
@@ -260,7 +262,8 @@ export function useExternalAuth() {
     try {
       await supabase.auth.signOut();
       if (Platform.OS !== "web") {
-        OneSignal.User.removeAlias("external_id");
+        // Ver AuthContext.signOut: removeAlias("external_id") rompe la
+        // identidad en OneSignal y deja al usuario sin push.
         await OneSignal.logout();
       }
     } catch (error) {

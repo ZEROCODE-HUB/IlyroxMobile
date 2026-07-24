@@ -2,6 +2,70 @@ import { useState } from "react";
 import { supabase } from "../../../lib/supabase";
 import { useToast } from "../../../context/ToastContext";
 import { useModal } from "../../../context/ModalContext";
+import { DEFAULT_COUNTRY } from "../../../lib/location/registry";
+import { geocodeAddress } from "../../../lib/geocodingService";
+
+/**
+ * Normaliza los filtros comerciales para persistencia/matching. `tipoUbicacion`
+ * se maneja como array en la UI (selección múltiple), pero el matching (SQL y
+ * cliente) lo lee como texto: una sola opción → ese valor; ambas o ninguna → ""
+ * (= sin filtro de tipo de ubicación).
+ */
+function serializeComercialFilters(cf: any): any {
+  if (!cf) return cf;
+  const tu = cf.tipoUbicacion;
+  const tipoUbicacion = Array.isArray(tu)
+    ? tu.length === 1
+      ? tu[0]
+      : ""
+    : tu ?? "";
+  return { ...cf, tipoUbicacion };
+}
+
+/**
+ * Igual que el comercial: en industrial, `ubicacion` (dentro/fuera de parque) se
+ * maneja como array en la UI (selección múltiple) pero el matching la lee como
+ * texto. Una sola opción → ese valor; ambas o ninguna → "" (= sin filtro).
+ */
+function serializeIndustrialFilters(inf: any): any {
+  if (!inf) return inf;
+  const u = inf.ubicacion;
+  const ubicacion = Array.isArray(u) ? (u.length === 1 ? u[0] : "") : (u ?? "");
+  return { ...inf, ubicacion };
+}
+
+/**
+ * Igual que el comercial: en agrícola, usoTerreno y tipoRiego se manejan como
+ * array en la UI (selección múltiple) pero el matching los lee como texto. Una
+ * sola opción → ese valor; varias o ninguna → "" (= sin filtro).
+ */
+function serializeAgricolaFilters(ag: any): any {
+  if (!ag) return ag;
+  const one = (v: any) =>
+    Array.isArray(v) ? (v.length === 1 ? v[0] : "") : (v ?? "");
+  return { ...ag, usoTerreno: one(ag.usoTerreno), tipoRiego: one(ag.tipoRiego) };
+}
+
+/**
+ * Garantiza que `data.bounds` exista para el matching geográfico server-side.
+ * Si no hay bounds (p. ej. búsqueda por filtros de texto, sin chip de zona),
+ * geocodifica la ubicación más específica (colonia > municipio > estado) para
+ * obtener su área. Así una búsqueda por colonia trae propiedades del municipio
+ * que la contiene y viceversa, sin depender de comparar nombres.
+ */
+async function ensureSearchBounds(data: any, filters: any): Promise<void> {
+  if (data.bounds) return;
+  const lf = filters?.locationFilter || {};
+  const coloniaTxt = Array.isArray(lf.colonia) ? lf.colonia[0] : lf.colonia;
+  const partes = [coloniaTxt, lf.municipio, lf.estado].filter(Boolean);
+  if (partes.length === 0) return;
+  try {
+    const geo = await geocodeAddress(partes.join(", "), filters?.pais);
+    if (geo?.bounds) data.bounds = geo.bounds;
+  } catch {
+    // Si la geocodificación falla, el matching cae al texto normalizado.
+  }
+}
 
 export const useSaveSearch = (userId?: string) => {
   const { showToast } = useToast();
@@ -89,14 +153,35 @@ export const useSaveSearch = (userId?: string) => {
   };
 
   const buildSearchPostMetadata = (filters: any) => {
-    // Zonas de interés: tomamos los chips de ubicación nombrada (excluye polígonos a propósito)
-    const zonas_interes = Array.isArray(filters.locationChips)
-      ? filters.locationChips.map((c: any) => ({
-          id: c.id,
-          label: c.label,
-          type: c.type,
-          locationFilter: c.locationFilter,
+    // Zonas de interés: SOLO los polígonos dibujados en el mapa.
+    const zonas_interes = Array.isArray(filters.polygons)
+      ? filters.polygons.map((_poly: any, i: number) => ({
+          id: `poly-${i}`,
+          label: `Zona ${i + 1}`,
+          type: "zona",
         }))
+      : [];
+
+    // Ubicaciones (multi-nivel): las zonas nombradas del buscador se muestran en
+    // la sección "Ubicación", no en "Zonas de interés".
+    const ubicaciones = Array.isArray(filters.locationChips)
+      ? filters.locationChips.map((c: any) => {
+          const lf = c.locationFilter || {};
+          const center = c.bounds
+            ? {
+                latitud: (c.bounds.north + c.bounds.south) / 2,
+                longitud: (c.bounds.east + c.bounds.west) / 2,
+              }
+            : {};
+          return {
+            level: c.type === "zona" ? "colonia" : c.type,
+            estado: lf.estado || (c.type === "estado" ? c.label : ""),
+            municipio: lf.municipio || undefined,
+            colonia: lf.colonia || undefined,
+            label: c.label,
+            ...center,
+          };
+        })
       : [];
 
     // Filtros especializados según tipo de propiedad (NO comisión, NO polígonos)
@@ -104,14 +189,24 @@ export const useSaveSearch = (userId?: string) => {
     let industrial: any = undefined;
     let agricola: any = undefined;
     if (filters.tipoPropiedad === "comercial" && filters.comercialFilters) {
-      comercial = filters.comercialFilters;
+      comercial = serializeComercialFilters(filters.comercialFilters);
     }
     if (filters.tipoPropiedad === "industrial" && filters.industrialFilters) {
-      industrial = filters.industrialFilters;
+      industrial = serializeIndustrialFilters(filters.industrialFilters);
     }
     if (filters.tipoPropiedad === "agricola" && filters.agricolaFilters) {
-      agricola = filters.agricolaFilters;
+      agricola = serializeAgricolaFilters(filters.agricolaFilters);
     }
+
+    // Enrutar el precio al campo correcto según la operación, para que al publicar
+    // el rango se muestre en compra o en renta (sin perder el dato).
+    const pMin = filters.precioMin && filters.precioMin !== "0"
+      ? parseFloat(filters.precioMin.toString().replace(/,/g, ""))
+      : 0;
+    const pMax = filters.precioMax && filters.precioMax !== "Sin límite"
+      ? parseFloat(filters.precioMax.toString().replace(/,/g, ""))
+      : null;
+    const esRenta = String(filters.operacion ?? "").toLowerCase() === "renta";
 
     return {
       titulo: "SE BUSCA",
@@ -123,14 +218,10 @@ export const useSaveSearch = (userId?: string) => {
         icon_tipo: "business-outline",
         subtipo: Array.isArray(filters.subtipo) ? filters.subtipo : filters.subtipo ? [filters.subtipo] : [],
         moneda: filters.moneda,
-        precio_min:
-          filters.precioMin && filters.precioMin !== "0"
-            ? parseFloat(filters.precioMin.toString().replace(/,/g, ""))
-            : 0,
-        precio_max:
-          filters.precioMax && filters.precioMax !== "Sin límite"
-            ? parseFloat(filters.precioMax.toString().replace(/,/g, ""))
-            : null,
+        precio_min: esRenta ? 0 : pMin,
+        precio_max: esRenta ? null : pMax,
+        precio_renta_min: esRenta ? pMin : 0,
+        precio_renta_max: esRenta ? pMax : null,
         ubicacion: {
           estado: filters.locationFilter.estado,
           ciudad: filters.locationFilter.ciudad,
@@ -141,10 +232,12 @@ export const useSaveSearch = (userId?: string) => {
           icon: "location-outline",
         },
         zonas_interes,
+        ubicaciones,
         caracteristicas: {
           habitaciones: filters.habitaciones,
           icon_bed: "bed-outline",
           banos: filters.banos,
+          medios_banos: filters.mediosBanos,
           icon_bath: "water-outline",
           estacionamientos: filters.estacionamientos,
           icon_car: "car-outline",
@@ -160,8 +253,15 @@ export const useSaveSearch = (userId?: string) => {
           m2_construccion_min: filters.m2ConstruccionMin
             ? parseFloat(filters.m2ConstruccionMin.toString().replace(/,/g, ""))
             : 0,
+          ancho_terreno_min: filters.anchoTerrenoMin
+            ? parseFloat(filters.anchoTerrenoMin.toString().replace(/,/g, ""))
+            : 0,
+          largo_terreno_min: filters.largoTerrenoMin
+            ? parseFloat(filters.largoTerrenoMin.toString().replace(/,/g, ""))
+            : 0,
           icon: "resize-outline",
         },
+        amenidades: Array.isArray(filters.amenidades) ? filters.amenidades : [],
         ...(comercial ? { comercial } : {}),
         ...(industrial ? { industrial } : {}),
         ...(agricola ? { agricola } : {}),
@@ -197,6 +297,8 @@ export const useSaveSearch = (userId?: string) => {
       criterios_busqueda.habitaciones = filters.habitaciones;
     if (filters.banos && filters.banos !== "No indicado")
       criterios_busqueda.banos = filters.banos;
+    if (filters.mediosBanos && filters.mediosBanos !== "No indicado")
+      criterios_busqueda.medios_banos = filters.mediosBanos;
     if (filters.estacionamientos && filters.estacionamientos !== "No indicado")
       criterios_busqueda.estacionamientos = filters.estacionamientos;
     if (filters.niveles && filters.niveles !== "No indicado")
@@ -211,6 +313,14 @@ export const useSaveSearch = (userId?: string) => {
       criterios_busqueda.m2_construccion_min = parseFloat(
         filters.m2ConstruccionMin.toString().replace(/,/g, ""),
       );
+    if (filters.anchoTerrenoMin)
+      criterios_busqueda.ancho_terreno_min = parseFloat(
+        filters.anchoTerrenoMin.toString().replace(/,/g, ""),
+      );
+    if (filters.largoTerrenoMin)
+      criterios_busqueda.largo_terreno_min = parseFloat(
+        filters.largoTerrenoMin.toString().replace(/,/g, ""),
+      );
     if (filters.locationFilter.estado)
       criterios_busqueda.estado = filters.locationFilter.estado;
     if (filters.locationFilter.ciudad)
@@ -223,13 +333,30 @@ export const useSaveSearch = (userId?: string) => {
         : [filters.locationFilter.colonia];
     }
 
-    // Location chips (zonas nombradas)
+    // Location chips (zonas nombradas con bounds geográficos)
     if (filters.locationChips?.length > 0) {
       criterios_busqueda.location_chips = filters.locationChips.map((c: any) => ({
         label: c.label,
         type: c.type,
+        bounds: c.bounds,        // nuevo campo
         locationFilter: c.locationFilter,
       }));
+
+      // Guardar bounds del primer chip (o unión de todos) en el campo de nivel superior
+      const chipsConBounds = filters.locationChips.filter((c: any) => c.bounds);
+      if (chipsConBounds.length > 0) {
+        let north = chipsConBounds[0].bounds.north;
+        let south = chipsConBounds[0].bounds.south;
+        let east = chipsConBounds[0].bounds.east;
+        let west = chipsConBounds[0].bounds.west;
+        for (const chip of chipsConBounds) {
+          north = Math.max(north, chip.bounds.north);
+          south = Math.min(south, chip.bounds.south);
+          east = Math.max(east, chip.bounds.east);
+          west = Math.min(west, chip.bounds.west);
+        }
+        criterios_busqueda.bounds = { north, south, east, west };
+      }
     }
 
     // Comisiones
@@ -240,19 +367,26 @@ export const useSaveSearch = (userId?: string) => {
       criterios_busqueda.comision_renta_min = parseFloat(filters.comisionRentaMin);
     }
 
+    // Amenidades
+    if (Array.isArray(filters.amenidades) && filters.amenidades.length > 0) {
+      criterios_busqueda.amenidades = filters.amenidades;
+    }
+
     // Filtros especializados por tipo
     if (filters.tipoPropiedad === "comercial" && filters.comercialFilters) {
-      criterios_busqueda.comercial = filters.comercialFilters;
+      criterios_busqueda.comercial = serializeComercialFilters(filters.comercialFilters);
     }
     if (filters.tipoPropiedad === "industrial" && filters.industrialFilters) {
-      criterios_busqueda.industrial = filters.industrialFilters;
+      criterios_busqueda.industrial = serializeIndustrialFilters(filters.industrialFilters);
     }
     if (filters.tipoPropiedad === "agricola" && filters.agricolaFilters) {
-      criterios_busqueda.agricola = filters.agricolaFilters;
+      criterios_busqueda.agricola = serializeAgricolaFilters(filters.agricolaFilters);
     }
 
     const insertData: any = {
       usuario_id: userId,
+      // País de la búsqueda — el matching solo cruza propiedades del mismo país.
+      pais: filters.pais || DEFAULT_COUNTRY,
       criterios_busqueda: criterios_busqueda,
       activa: true,
       frecuencia_notificaciones: 24,
@@ -332,9 +466,43 @@ export const useSaveSearch = (userId?: string) => {
       );
       if (!isNaN(m2Terr)) insertData.metros_terreno = m2Terr;
     }
+    if (filters.niveles && filters.niveles !== "No indicado") {
+      const niv = parseInt(filters.niveles);
+      if (!isNaN(niv)) insertData.pisos = niv;
+    }
+    if (filters.antiguedad && filters.antiguedad !== "No indicado") {
+      insertData.antiguedad = filters.antiguedad;
+    }
+    if (filters.comisionVentaMin) {
+      const cvm = parseFloat(filters.comisionVentaMin);
+      if (!isNaN(cvm) && cvm > 0) insertData.comision_venta_min = cvm;
+    }
+    if (filters.comisionRentaMin) {
+      const crm = parseFloat(filters.comisionRentaMin);
+      if (!isNaN(crm) && crm > 0) insertData.comision_renta_min = crm;
+    }
 
     if (filters.polygons && filters.polygons.length > 0) {
       insertData.polygon_coords = filters.polygons;
+    }
+
+    // Bounds y place_name de la zona buscada (nuevo sistema Google Places)
+    if (filters.locationChips?.length > 0) {
+      const chipsConBounds = filters.locationChips.filter((c: any) => c.bounds);
+      if (chipsConBounds.length > 0) {
+        let north = chipsConBounds[0].bounds.north;
+        let south = chipsConBounds[0].bounds.south;
+        let east = chipsConBounds[0].bounds.east;
+        let west = chipsConBounds[0].bounds.west;
+        for (const chip of chipsConBounds) {
+          north = Math.max(north, chip.bounds.north);
+          south = Math.min(south, chip.bounds.south);
+          east = Math.max(east, chip.bounds.east);
+          west = Math.min(west, chip.bounds.west);
+        }
+        insertData.bounds = { north, south, east, west };
+        insertData.place_name = chipsConBounds.map((c: any) => c.label).join(", ");
+      }
     }
 
     if (filters.moneda) {
@@ -352,6 +520,9 @@ export const useSaveSearch = (userId?: string) => {
       }
     }
 
+    // Garantizar área geográfica para el matching server-side (resuelve jerarquía).
+    await ensureSearchBounds(insertData, filters);
+
     const { data: searchData, error: searchError } = await supabase
       .from("busquedas_guardadas")
       .insert([insertData])
@@ -364,6 +535,138 @@ export const useSaveSearch = (userId?: string) => {
     }
 
     return searchData;
+  };
+
+  /**
+   * Actualiza una búsqueda guardada existente con los filtros actuales.
+   * Reutiliza la misma lógica de normalización de saveSearchToDatabase pero hace UPDATE.
+   */
+  const updateSearchInDatabase = async (busquedaId: string, filters: any): Promise<boolean> => {
+    if (!userId) throw new Error("No autenticado");
+
+    // Construir objeto con la misma lógica que saveSearchToDatabase
+    const criterios_busqueda: any = { operacion: filters.operacion };
+    if (filters.moneda) criterios_busqueda.moneda = filters.moneda;
+    if (filters.tipoPropiedad) criterios_busqueda.tipo_propiedad = filters.tipoPropiedad;
+    if (filters.subtipo) criterios_busqueda.subtipo = filters.subtipo;
+    if (filters.precioMin) criterios_busqueda.precio_min = parseFloat(filters.precioMin.toString().replace(/,/g, ""));
+    if (filters.precioMax) criterios_busqueda.precio_max = parseFloat(filters.precioMax.toString().replace(/,/g, ""));
+    if (filters.habitaciones && filters.habitaciones !== "No indicado") criterios_busqueda.habitaciones = filters.habitaciones;
+    if (filters.banos && filters.banos !== "No indicado") criterios_busqueda.banos = filters.banos;
+    if (filters.mediosBanos && filters.mediosBanos !== "No indicado") criterios_busqueda.medios_banos = filters.mediosBanos;
+    if (filters.estacionamientos && filters.estacionamientos !== "No indicado") criterios_busqueda.estacionamientos = filters.estacionamientos;
+    if (filters.niveles && filters.niveles !== "No indicado") criterios_busqueda.niveles = filters.niveles;
+    if (filters.antiguedad && filters.antiguedad !== "No indicado") criterios_busqueda.antiguedad = filters.antiguedad;
+    if (filters.m2TerrenoMin) criterios_busqueda.m2_terreno_min = parseFloat(filters.m2TerrenoMin.toString().replace(/,/g, ""));
+    if (filters.m2ConstruccionMin) criterios_busqueda.m2_construccion_min = parseFloat(filters.m2ConstruccionMin.toString().replace(/,/g, ""));
+    if (filters.anchoTerrenoMin) criterios_busqueda.ancho_terreno_min = parseFloat(filters.anchoTerrenoMin.toString().replace(/,/g, ""));
+    if (filters.largoTerrenoMin) criterios_busqueda.largo_terreno_min = parseFloat(filters.largoTerrenoMin.toString().replace(/,/g, ""));
+    if (filters.locationFilter.estado) criterios_busqueda.estado = filters.locationFilter.estado;
+    if (filters.locationFilter.ciudad) criterios_busqueda.ciudad = filters.locationFilter.ciudad;
+    if (filters.locationFilter.municipio) criterios_busqueda.municipio = filters.locationFilter.municipio;
+    if (filters.locationFilter.colonia) {
+      criterios_busqueda.colonias = Array.isArray(filters.locationFilter.colonia)
+        ? filters.locationFilter.colonia
+        : [filters.locationFilter.colonia];
+    }
+    if (filters.locationChips?.length > 0) {
+      criterios_busqueda.location_chips = filters.locationChips.map((c: any) => ({
+        label: c.label, type: c.type, bounds: c.bounds, locationFilter: c.locationFilter,
+      }));
+      const chipsConBounds = filters.locationChips.filter((c: any) => c.bounds);
+      if (chipsConBounds.length > 0) {
+        let north = chipsConBounds[0].bounds.north, south = chipsConBounds[0].bounds.south;
+        let east = chipsConBounds[0].bounds.east, west = chipsConBounds[0].bounds.west;
+        for (const chip of chipsConBounds) {
+          north = Math.max(north, chip.bounds.north); south = Math.min(south, chip.bounds.south);
+          east = Math.max(east, chip.bounds.east); west = Math.min(west, chip.bounds.west);
+        }
+        criterios_busqueda.bounds = { north, south, east, west };
+      }
+    }
+    if (filters.comisionVentaMin) criterios_busqueda.comision_venta_min = parseFloat(filters.comisionVentaMin);
+    if (filters.comisionRentaMin) criterios_busqueda.comision_renta_min = parseFloat(filters.comisionRentaMin);
+    if (Array.isArray(filters.amenidades) && filters.amenidades.length > 0) criterios_busqueda.amenidades = filters.amenidades;
+    if (filters.tipoPropiedad === "comercial" && filters.comercialFilters) criterios_busqueda.comercial = serializeComercialFilters(filters.comercialFilters);
+    if (filters.tipoPropiedad === "industrial" && filters.industrialFilters) criterios_busqueda.industrial = serializeIndustrialFilters(filters.industrialFilters);
+    if (filters.tipoPropiedad === "agricola" && filters.agricolaFilters) criterios_busqueda.agricola = serializeAgricolaFilters(filters.agricolaFilters);
+
+    const updateData: any = {
+      criterios_busqueda,
+      updated_at: new Date().toISOString(),
+    };
+    if (filters.operacion && filters.operacion !== "") updateData.tipo_operacion = filters.operacion;
+    if (filters.tipoPropiedad) updateData.tipo_propiedad = filters.tipoPropiedad;
+    if (filters.subtipo) updateData.subtipo = filters.subtipo;
+    if (filters.precioMin) { const v = parseFloat(filters.precioMin.toString().replace(/,/g, "")); if (!isNaN(v)) updateData.precio_min = v; }
+    if (filters.precioMax) { const v = parseFloat(filters.precioMax.toString().replace(/,/g, "")); if (!isNaN(v)) updateData.precio_max = v; }
+    if (filters.locationFilter.estado) updateData.estado = [filters.locationFilter.estado];
+    if (filters.locationFilter.ciudad) updateData.ciudad = filters.locationFilter.ciudad;
+    if (filters.locationFilter.municipio) updateData.municipio = [filters.locationFilter.municipio];
+    if (filters.locationFilter.colonia) {
+      updateData.colonias = Array.isArray(filters.locationFilter.colonia) ? filters.locationFilter.colonia : [filters.locationFilter.colonia];
+    }
+    if (filters.locationChips?.length > 0 && !filters.locationFilter?.estado) {
+      const estadosDeChips = [...new Set(filters.locationChips.map((c: any) => c.locationFilter?.estado).filter((e: string) => e && e.trim()))] as string[];
+      if (estadosDeChips.length > 0) updateData.estado = estadosDeChips;
+    }
+    if (filters.habitaciones && filters.habitaciones !== "No indicado") { const v = parseInt(filters.habitaciones); if (!isNaN(v)) updateData.habitaciones = v; }
+    if (filters.banos && filters.banos !== "No indicado") { const v = parseInt(filters.banos); if (!isNaN(v)) updateData.banos = v; }
+    if (filters.estacionamientos && filters.estacionamientos !== "No indicado") { const v = parseInt(filters.estacionamientos); if (!isNaN(v)) updateData.estacionamientos = v; }
+    if (filters.m2ConstruccionMin) { const v = parseFloat(filters.m2ConstruccionMin.toString().replace(/,/g, "")); if (!isNaN(v)) updateData.metros_construccion = v; }
+    if (filters.m2TerrenoMin) { const v = parseFloat(filters.m2TerrenoMin.toString().replace(/,/g, "")); if (!isNaN(v)) updateData.metros_terreno = v; }
+    if (filters.polygons?.length > 0) updateData.polygon_coords = filters.polygons;
+    if (filters.locationChips?.length > 0) {
+      const chipsConBounds = filters.locationChips.filter((c: any) => c.bounds);
+      if (chipsConBounds.length > 0) {
+        let north = chipsConBounds[0].bounds.north, south = chipsConBounds[0].bounds.south;
+        let east = chipsConBounds[0].bounds.east, west = chipsConBounds[0].bounds.west;
+        for (const chip of chipsConBounds) {
+          north = Math.max(north, chip.bounds.north); south = Math.min(south, chip.bounds.south);
+          east = Math.max(east, chip.bounds.east); west = Math.min(west, chip.bounds.west);
+        }
+        updateData.bounds = { north, south, east, west };
+        updateData.place_name = chipsConBounds.map((c: any) => c.label).join(", ");
+      }
+    }
+    if (filters.moneda) {
+      const { data: monedaData } = await supabase
+        .from("configuracion_monedas")
+        .select("codigo")
+        .eq("simbolo", filters.moneda === "MXN" ? "$" : "USD")
+        .eq("activa", true)
+        .single();
+      updateData.moneda = monedaData?.codigo || filters.moneda;
+    }
+
+    // Garantizar área geográfica también al actualizar.
+    await ensureSearchBounds(updateData, filters);
+
+    const { error } = await supabase
+      .from("busquedas_guardadas")
+      .update(updateData)
+      .eq("id", busquedaId)
+      .eq("usuario_id", userId);
+
+    if (error) throw error;
+
+    // Recalcular coincidencias de inmediato (sin esperar al cron, que corre cada
+    // minuto), para que al volver a "Coincidencias" se vean ya las propiedades que
+    // cumplen los nuevos criterios y desaparezcan las que dejaron de cumplir.
+    // El RPC valida que la búsqueda pertenezca al usuario antes de recalcular.
+    const { error: rpcError } = await supabase.rpc(
+      "recalcular_matches_busqueda",
+      { p_busqueda_id: busquedaId },
+    );
+    if (rpcError) {
+      // No es crítico: el job encolado por el trigger lo recalculará igualmente.
+      console.warn(
+        "[useSaveSearch] recalcular_matches_busqueda falló (no crítico):",
+        rpcError.message,
+      );
+    }
+
+    return true;
   };
 
   const hasAnyCriteria = (filters: any): boolean => {
@@ -386,11 +689,14 @@ export const useSaveSearch = (userId?: string) => {
         trim(filters.precioMax) ||
         trim(filters.habitaciones) ||
         trim(filters.banos) ||
+        trim(filters.mediosBanos) ||
         trim(filters.estacionamientos) ||
         trim(filters.niveles) ||
         trim(filters.antiguedad) ||
         trim(filters.m2TerrenoMin) ||
         trim(filters.m2ConstruccionMin) ||
+        trim(filters.anchoTerrenoMin) ||
+        trim(filters.largoTerrenoMin) ||
         parseFloat(filters.comisionVentaMin || "0") > 0 ||
         parseFloat(filters.comisionRentaMin || "0") > 0,
     );
@@ -456,5 +762,6 @@ export const useSaveSearch = (userId?: string) => {
     setLeadEmail,
     errors,
     handleSaveSearch,
+    updateSearchInDatabase,
   };
 };

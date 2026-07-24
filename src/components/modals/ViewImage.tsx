@@ -2,12 +2,12 @@ import React, { useState, useEffect } from "react";
 import {
   Modal,
   View,
-  Image,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   Dimensions,
 } from "react-native";
+import { Image, ImageLoadEventData } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -38,12 +38,19 @@ export function ViewImage({
   const isModalVisible = isVisibleAuto || visible;
 
   useEffect(() => {
-    if (src) {
-      Image.getSize(src, (width, height) => {
-        setAspectRatio(width / height);
-      });
-    }
+    setAspectRatio(1);
   }, [src]);
+
+  /**
+   * La proporción se toma de la imagen ya descargada. Antes se pedía aparte con
+   * `Image.getSize`, que descarga el archivo COMPLETO una segunda vez: con las
+   * fotos de chat (varios MB) eso duplicaba el trabajo y las burbujas se
+   * quedaban en gris.
+   */
+  const handleLoad = (e: ImageLoadEventData) => {
+    const { width, height } = e.source ?? {};
+    if (width && height) setAspectRatio(width / height);
+  };
 
   useEffect(() => {
     if (isModalVisible) {
@@ -69,7 +76,10 @@ export function ViewImage({
           <Image
             source={{ uri: src }}
             style={[styles.thumbnail, { aspectRatio }]}
-            resizeMode="contain"
+            contentFit="contain"
+            cachePolicy="memory-disk"
+            transition={150}
+            onLoad={handleLoad}
           />
         </TouchableOpacity>
       )}
@@ -88,8 +98,9 @@ export function ViewImage({
           <TouchableOpacity
             style={[styles.closeButton, { top: insets.top + 10 }]}
             onPress={handleClose}
+            hitSlop={12}
           >
-            <Ionicons name="close-circle" size={32} color="#fff" />
+            <Ionicons name="close" size={26} color="#fff" />
           </TouchableOpacity>
 
           <View style={styles.imageWrapper}>
@@ -106,7 +117,9 @@ export function ViewImage({
                 styles.fullImage,
                 { aspectRatio, maxHeight: SCREEN_HEIGHT },
               ]}
-              resizeMode="contain"
+              contentFit="contain"
+              cachePolicy="memory-disk"
+              onLoad={handleLoad}
               onLoadEnd={() => setLoading(false)}
             />
           </View>
@@ -147,6 +160,15 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 20,
     zIndex: 10,
-    padding: 10, // Área de toque más grande (UX)
+    // Círculo oscuro para que el botón se vea SIEMPRE, también sobre imágenes
+    // claras (antes era un icono blanco que desaparecía sobre fondos claros).
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
   },
 });

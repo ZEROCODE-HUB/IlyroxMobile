@@ -82,7 +82,7 @@ export const IndustrialSection = React.memo(function IndustrialSection() {
       <View style={styles.row}>
         <View style={styles.half}>
           <AppInput
-            label="Área de Oficinas (m²)"
+            label="Área Operativa (m²)"
             placeholder="Opcional"
             keyboardType="decimal-pad"
             value={areaOficinas}

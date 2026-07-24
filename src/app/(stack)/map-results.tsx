@@ -13,10 +13,11 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/constants";
-import { useMapProperties } from "@/hooks/useMapProperties";
+import { useMapProperties, MapServerFilters } from "@/hooks/useMapProperties";
 import { usePropertyFilters } from "@/hooks/usePropertyFilters";
 import { useMapFeedItems } from "@/hooks/useMapFeedItems";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
+import { extractServerFilters } from "@/utils/mapServerFilters";
 import { PropertyCard } from "@/components/cards";
 import { CommentsBottomSheet } from "@/components/modals";
 import { SaveSearchModal } from "@/components/map/SaveSearchModal";
@@ -56,6 +57,8 @@ function SearchSummaryBar({ hasActiveFilters }: { hasActiveFilters: boolean }) {
 
   if (filters.m2TerrenoMin) pills.push(`≥ ${filters.m2TerrenoMin} m² terreno`);
   if (filters.m2ConstruccionMin) pills.push(`≥ ${filters.m2ConstruccionMin} m² const.`);
+  if (filters.anchoTerrenoMin) pills.push(`≥ ${filters.anchoTerrenoMin} m frente`);
+  if (filters.largoTerrenoMin) pills.push(`≥ ${filters.largoTerrenoMin} m fondo`);
   if (filters.comisionVentaMin) pills.push(`Comisión venta ≥ ${filters.comisionVentaMin}%`);
   if (filters.comisionRentaMin) pills.push(`Comisión renta ≥ ${filters.comisionRentaMin} mes`);
 
@@ -79,10 +82,10 @@ function SearchSummaryBar({ hasActiveFilters }: { hasActiveFilters: boolean }) {
   const cf = filters.comercialFilters;
   const inf = filters.industrialFilters;
   const ag = filters.agricolaFilters;
-  if (cf?.tipoUbicacion) pills.push(cf.tipoUbicacion);
-  if (inf?.ubicacion) pills.push(inf.ubicacion);
+  if (cf?.tipoUbicacion?.length) pills.push(cf.tipoUbicacion.join(", "));
+  if (inf?.ubicacion?.length) pills.push(inf.ubicacion.join(", "));
   if (inf?.alturaLibre) pills.push(`Altura ${inf.alturaLibre}`);
-  if (ag?.usoTerreno) pills.push(ag.usoTerreno);
+  if (ag?.usoTerreno?.length) pills.push(ag.usoTerreno.join(", "));
 
   if (pills.length === 0 && !hasActiveFilters) return null;
 
@@ -157,7 +160,20 @@ const summaryStyles = StyleSheet.create({
 export default function MapResultsScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { data: allProperties = [] } = useMapProperties();
+  const storeFilters = usePropertyFiltersStore((s) => s.filters);
+  const [debouncedFilters, setDebouncedFilters] = useState<MapServerFilters>(
+    () => extractServerFilters(storeFilters),
+  );
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      setDebouncedFilters(extractServerFilters(storeFilters));
+    }, 600);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [storeFilters]);
+
+  const { data: allProperties = [] } = useMapProperties(debouncedFilters);
   const { filteredProperties, hasActiveFilters } = usePropertyFilters(allProperties, null);
 
   const [activeCommentItem, setActiveCommentItem] = useState<FeedItem | null>(null);
@@ -272,11 +288,11 @@ export default function MapResultsScreen() {
         />
       )}
 
-      {/* Botón "Avísame si encuentras algo" — flotante */}
+      {/* Botón "Notifícame" — flotante */}
       <View style={[styles.saveBtnWrapper, { paddingBottom: insets.bottom + 12 }]}>
         <Pressable style={styles.saveBtnBar} onPress={() => setShowSaveSearchModal(true)}>
           <Ionicons name="notifications-outline" size={22} color={COLORS.white} />
-          <Text style={styles.saveBtnBarText}>Avísame si encuentras algo</Text>
+          <Text style={styles.saveBtnBarText}>Notifícame</Text>
         </Pressable>
       </View>
 
@@ -300,8 +316,12 @@ export default function MapResultsScreen() {
       <SaveSearchSuccessSheet
         visible={successSheetVisible}
         onPublish={() => {
+          // Cerrar primero el bottom sheet y abrir el modal de publicar DESPUÉS
+          // de que termine su animación de cierre. Apilar la transición de dos
+          // Modales en el mismo commit provoca un bucle de render
+          // ("Maximum update depth exceeded") al abrir "Publicar búsqueda".
           setSuccessSheetVisible(false);
-          setPublishModalVisible(true);
+          setTimeout(() => setPublishModalVisible(true), 320);
         }}
         onDismiss={() => setSuccessSheetVisible(false)}
       />
@@ -313,6 +333,20 @@ export default function MapResultsScreen() {
         onPublished={() => {
           setPublishModalVisible(false);
           setPendingPostMetadata(null);
+          // Limpiar los filtros activos: si no, el feed (que oculta posts/reels
+          // cuando hay filtros activos) saldría vacío al volver tras publicar.
+          // Se pasa un locationFilter vacío explícito porque clearFilters() sin
+          // argumento conserva el locationFilter actual.
+          usePropertyFiltersStore.getState().clearFilters({
+            estado: "",
+            ciudad: "",
+            municipio: "",
+            colonia: "",
+          });
+          router.replace({
+            pathname: "/(tabs)",
+            params: { refresh: String(Date.now()) },
+          });
         }}
         userId={user?.id}
       />

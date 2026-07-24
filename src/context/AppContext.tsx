@@ -28,17 +28,21 @@ interface AppContextType {
   selectedLocation: {
     type: "estado" | "municipio" | "colonia";
     name: string;
-    estado_id: number;
+    /** @deprecated Era ID en Supabase Geo. Ahora opcional. */
+    estado_id?: number;
     municipio_nombre?: string;
     estado_nombre?: string;
+    /** placeId de Google Places para obtener bounds directamente */
+    placeId?: string;
   } | null;
   setSelectedLocation: (
     location: {
       type: "estado" | "municipio" | "colonia";
       name: string;
-      estado_id: number;
+      estado_id?: number;
       municipio_nombre?: string;
       estado_nombre?: string;
+      placeId?: string;
     } | null,
   ) => void;
   isGlobalMuted: boolean;
@@ -57,9 +61,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const [selectedLocation, setSelectedLocation] = useState<{
     type: "estado" | "municipio" | "colonia";
     name: string;
-    estado_id: number;
+    estado_id?: number;
     municipio_nombre?: string;
     estado_nombre?: string;
+    placeId?: string;
   } | null>(null);
   const [isGlobalMuted, setIsGlobalMuted] = useState(true);
 

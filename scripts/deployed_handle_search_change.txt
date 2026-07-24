@@ -1,0 +1,32 @@
+
+DECLARE
+  v_prop RECORD;
+BEGIN
+  -- Si la búsqueda se desactivó o borró, marcar inactivos sus matches
+  IF (NEW.activa = FALSE OR NEW.deleted_at IS NOT NULL) THEN
+    UPDATE public.matches
+       SET activo = FALSE
+     WHERE busqueda_id = NEW.id
+       AND activo = TRUE;
+    RETURN NEW;
+  END IF;
+
+  -- Si la búsqueda está activa: barrer propiedades publicadas (top N recientes)
+  -- y evaluar contra esta búsqueda específicamente. Para no hacer un cruce
+  -- masivo, reusamos evaluate_property_matches con cada propiedad publicada
+  -- creada por OTROS usuarios.
+  FOR v_prop IN
+    SELECT id FROM public.propiedades
+    WHERE deleted_at IS NULL
+      AND COALESCE(activo, FALSE) = TRUE
+      AND LOWER(TRIM(COALESCE(status, ''))) = 'publicada'
+      AND created_by IS DISTINCT FROM NEW.usuario_id
+    ORDER BY created_at DESC
+    LIMIT 500
+  LOOP
+    PERFORM public.evaluate_property_matches(v_prop.id);
+  END LOOP;
+
+  RETURN NEW;
+END;
+

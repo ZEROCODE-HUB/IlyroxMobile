@@ -96,7 +96,7 @@ serve(async (req) => {
         .single(),
       supabaseClient
         .from("propiedades")
-        .select("easybroker_id")
+        .select("id, easybroker_id")
         .eq("created_by", usuario_id)
         .eq("es_easybroker", true)
         .is("deleted_at", null),
@@ -228,7 +228,7 @@ serve(async (req) => {
 
           const sinComisionFlag = !detalle.share_commission;
 
-          return { publicId, operacion: data.operacion as "insert" | "update", sinComisionFlag };
+          return { publicId, operacion: data.operacion as "insert" | "update" | "reactivada", sinComisionFlag };
         }),
       );
 
@@ -245,8 +245,10 @@ serve(async (req) => {
               actualizadas++;
               console.log(`  ✅ ACTUALIZADA: ${publicId}`);
             } else {
+              // "reactivada" = estaba borrada en Ilyrox y sigue publicada en EasyBroker;
+              // para el usuario reaparece, así que cuenta como nueva.
               nuevas++;
-              console.log(`  ✅ NUEVA: ${publicId}`);
+              console.log(`  ✅ ${operacion === "reactivada" ? "REACTIVADA" : "NUEVA"}: ${publicId}`);
             }
             if (sinComisionFlag) {
               sinComision++;

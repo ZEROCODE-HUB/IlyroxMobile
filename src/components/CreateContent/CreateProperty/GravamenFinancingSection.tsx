@@ -6,7 +6,7 @@ import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../../design-system/components/AppInput";
-import { SelectionModal } from "../../modals";
+import { MultiSelectionModal } from "../../modals";
 import RadioGroupSelector from "../../common/RadioGroupSelector";
 import { COLORS } from "../../../constants/colors";
 import {
@@ -16,6 +16,7 @@ import {
 } from "../../../constants/propertyData";
 import type { SiNo } from "./types";
 import { usePropertyFormContext } from "./PropertyFormContext";
+import { FieldAnchor } from "./fieldAnchors";
 
 export const GravamenFinancingSection = React.memo(
   function GravamenFinancingSection() {
@@ -24,13 +25,14 @@ export const GravamenFinancingSection = React.memo(
       setTieneGravamen,
       institucionGravamen,
       setInstitucionGravamen,
-      montoGravamen,
-      setMontoGravamen,
+      montosGravamen,
+      setMontosGravamen,
       handleCurrencyChange,
       aceptaFinanciamiento,
       setAceptaFinanciamiento,
       tiposFinanciamientoSeleccionados,
       toggleFinanciamiento,
+      errors,
     } = usePropertyFormContext();
     const [showInstitucionGravamenModal, setShowInstitucionGravamenModal] =
       useState(false);
@@ -44,28 +46,33 @@ export const GravamenFinancingSection = React.memo(
             <Text style={styles.sectionTitleBand}>Gravamen</Text>
           </View>
 
-          <RadioGroupSelector
-            label="¿Tiene gravamen?"
-            options={[...OPCIONES_SI_NO]}
-            selectedValue={tieneGravamen}
-            onSelect={(val) => setTieneGravamen(val as SiNo)}
-          />
+          <FieldAnchor name="gravamen">
+            <RadioGroupSelector
+              label="¿Tiene gravamen?"
+              options={[...OPCIONES_SI_NO]}
+              selectedValue={tieneGravamen}
+              onSelect={(val) => setTieneGravamen(val as SiNo)}
+              error={errors.gravamen}
+            />
+          </FieldAnchor>
 
           {tieneGravamen === "Sí" && (
             <>
-              <Text style={styles.label}>Institución</Text>
+              <Text style={styles.label}>Instituciones de Gravamen</Text>
               <TouchableOpacity
                 style={styles.selector}
                 onPress={() => setShowInstitucionGravamenModal(true)}
               >
                 <Text
                   style={
-                    institucionGravamen
+                    institucionGravamen.length > 0
                       ? styles.selectorText
                       : styles.selectorPlaceholder
                   }
                 >
-                  {institucionGravamen || "Selecciona una institución..."}
+                  {institucionGravamen.length > 0
+                    ? `${institucionGravamen.length} seleccionado${institucionGravamen.length !== 1 ? "s" : ""}`
+                    : "Selecciona instituciones..."}
                 </Text>
                 <Ionicons
                   name="chevron-down"
@@ -74,25 +81,58 @@ export const GravamenFinancingSection = React.memo(
                 />
               </TouchableOpacity>
 
-              <SelectionModal
+              {institucionGravamen.length > 0 && (
+                <View style={styles.selectedChipsContainer}>
+                  {institucionGravamen.map((inst, idx) => (
+                    <View key={idx} style={styles.selectedChip}>
+                      <Text style={styles.selectedChipText}>{inst}</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setInstitucionGravamen(
+                            institucionGravamen.filter((_, i) => i !== idx)
+                          );
+                          setMontosGravamen((prev) => {
+                            const { [inst]: _omit, ...rest } = prev;
+                            return rest;
+                          });
+                        }}
+                      >
+                        <Ionicons
+                          name="close-circle"
+                          size={16}
+                          color={COLORS.white}
+                          style={styles.chipCloseIcon}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              <MultiSelectionModal
                 visible={showInstitucionGravamenModal}
                 onClose={() => setShowInstitucionGravamenModal(false)}
                 onSelect={(val) => setInstitucionGravamen(val)}
-                title="Institución de Gravamen"
+                title="Selecciona Instituciones de Gravamen"
                 options={[...INSTITUCIONES_GRAVAMEN]}
-                currentValue={institucionGravamen}
+                currentValues={institucionGravamen}
                 searchable
               />
 
-              <AppInput
-                label="Monto del Gravamen (opcional)"
-                placeholder="0.00"
-                keyboardType="numeric"
-                value={montoGravamen}
-                onChangeText={(text) =>
-                  handleCurrencyChange(text, setMontoGravamen)
-                }
-              />
+              {institucionGravamen.map((inst) => (
+                <AppInput
+                  key={inst}
+                  label={`Monto — ${inst} (opcional)`}
+                  placeholder="0.00"
+                  keyboardType="numeric"
+                  value={montosGravamen[inst] || ""}
+                  onChangeText={(text) =>
+                    handleCurrencyChange(text, (val) =>
+                      setMontosGravamen((prev) => ({ ...prev, [inst]: val })),
+                    )
+                  }
+                />
+              ))}
             </>
           )}
         </View>
@@ -104,12 +144,15 @@ export const GravamenFinancingSection = React.memo(
             <Text style={styles.sectionTitleBand}>Financiamiento</Text>
           </View>
 
-          <RadioGroupSelector
-            label="¿Acepta financiamiento?"
-            options={[...OPCIONES_SI_NO]}
-            selectedValue={aceptaFinanciamiento}
-            onSelect={(val) => setAceptaFinanciamiento(val as SiNo)}
-          />
+          <FieldAnchor name="financiamiento">
+            <RadioGroupSelector
+              label="¿Acepta financiamiento?"
+              options={[...OPCIONES_SI_NO]}
+              selectedValue={aceptaFinanciamiento}
+              onSelect={(val) => setAceptaFinanciamiento(val as SiNo)}
+              error={errors.financiamiento}
+            />
+          </FieldAnchor>
 
           {aceptaFinanciamiento === "Sí" && (
             <>
@@ -226,5 +269,29 @@ const styles = StyleSheet.create({
   amenidadTextActive: {
     color: COLORS.primary,
     fontWeight: "600",
+  },
+  selectedChipsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  selectedChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  selectedChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.white,
+  },
+  chipCloseIcon: {
+    marginLeft: 4,
   },
 });

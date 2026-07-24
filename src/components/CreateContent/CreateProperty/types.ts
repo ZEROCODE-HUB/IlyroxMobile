@@ -2,6 +2,9 @@
 // CreateProperty - Types
 // ============================================
 
+import type { CountryCode } from "@/lib/location/types";
+import type { GeoBounds } from "@/lib/geocodingService";
+
 export type TipoOperacion = "venta" | "renta" | "ambas";
 export type MonedaType = "MXN" | "USD";
 export type SiNo = "No" | "Sí";
@@ -19,8 +22,15 @@ export interface UbicacionData {
   ciudad: string;
   municipio: string;
   colonia: string;
+  /** Código de país ISO detectado de la ubicación (default: MX). */
+  pais?: CountryCode;
   latitud?: number;
   longitud?: number;
+  /** Bounds (área) del lugar elegido en Google Places. Se usa para validar que
+   *  el PIN marcado caiga dentro de la zona escrita. */
+  bounds?: GeoBounds;
+  /** Nivel del lugar elegido (estado/municipio/colonia). */
+  placeType?: "estado" | "municipio" | "colonia";
 }
 
 export interface LocationCoords {
@@ -54,6 +64,8 @@ export interface ComisionSetters {
 export interface NumberInputConfig {
   title: string;
   onSave: (val: string) => void;
+  /** Mínimo permitido en el input (default 0). Para "Niveles" se usa 1. */
+  minValue?: number;
 }
 
 export interface CreatePropertyProps {
@@ -68,7 +80,8 @@ export interface PropertyFormState {
 
   // Información básica
   descripcion: string;
-  tipoOperacion: TipoOperacion;
+  // "" = sin seleccionar todavía (el usuario debe elegir; se valida).
+  tipoOperacion: TipoOperacion | "";
   precioVenta: string;
   precioRenta: string;
   moneda: MonedaType;
@@ -94,10 +107,14 @@ export interface PropertyFormState {
   estacionamientos: string;
   m2Construccion: string;
   m2Terreno: string;
+  anchoTerreno: string;
+  largoTerreno: string;
   niveles: string;
   antiguedad: string;
-  amueblado: AmuebladoType;
-  petFriendly: SiNo;
+  // "" = sin seleccionar todavía (se valida cuando el campo es visible).
+  amueblado: AmuebladoType | "";
+  petFriendly: SiNo | "";
+  costoMantenimiento: string;
 
   // Amenidades
   amenidadesSeleccionadas: string[];
@@ -119,12 +136,13 @@ export interface PropertyFormState {
   condicionesComisionRenta: string;
 
   // Gravamen
-  tieneGravamen: SiNo;
-  institucionGravamen: string;
-  montoGravamen: string;
+  tieneGravamen: SiNo | "";
+  institucionGravamen: string[];
+  // Monto opcional por institución: { [nombreInstitucion]: monto formateado }
+  montosGravamen: Record<string, string>;
 
   // Financiamiento
-  aceptaFinanciamiento: SiNo;
+  aceptaFinanciamiento: SiNo | "";
   tiposFinanciamientoSeleccionados: string[];
 
   // Propietario
@@ -141,8 +159,8 @@ export interface PropertyFormState {
   // Campos especializados — Agrícola
   tiposAgua: string[];
   concesionAgua: boolean;
-  usoTerreno: string;
-  tipoRiego: string;
+  usoTerreno: string[];
+  tipoRiego: string[];
   infraElectricidad: boolean;
   infraCaminoAcceso: boolean;
   infraCercado: boolean;

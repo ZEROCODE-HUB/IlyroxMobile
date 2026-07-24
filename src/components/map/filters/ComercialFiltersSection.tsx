@@ -1,26 +1,60 @@
 import React from "react";
-import { View, Text, Switch, StyleSheet } from "react-native";
+import { View, Text, Switch, TouchableOpacity, StyleSheet } from "react-native";
 import { COLORS } from "@/constants/colors";
 import { TIPOS_UBICACION_COMERCIAL } from "@/constants/propertyData";
 import { AppInput } from "@/design-system/components/AppInput";
-import RadioGroupSelector from "@/components/common/RadioGroupSelector";
-import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
+import {
+  usePropertyFiltersStore,
+  type ComercialFilters,
+} from "@/store/propertyFiltersStore";
 
-export const ComercialFiltersSection: React.FC = () => {
-  const { filters, updateComercialFilter } = usePropertyFiltersStore();
-  const cf = filters.comercialFilters;
+interface ComercialFiltersSectionProps {
+  /** Si se pasan, el componente opera sobre este valor en lugar del store global. */
+  value?: ComercialFilters;
+  onUpdate?: <K extends keyof ComercialFilters>(
+    key: K,
+    value: ComercialFilters[K],
+  ) => void;
+}
+
+export const ComercialFiltersSection: React.FC<ComercialFiltersSectionProps> = ({
+  value,
+  onUpdate,
+}) => {
+  const store = usePropertyFiltersStore();
+  const cf = value ?? store.filters.comercialFilters;
+  const updateComercialFilter = onUpdate ?? store.updateComercialFilter;
 
   return (
     <View style={styles.container}>
       <Text style={styles.sectionLabel}>Características Comerciales</Text>
 
-      {/* TIPO DE UBICACIÓN */}
-      <RadioGroupSelector
-        label="Tipo de Ubicación"
-        options={[...TIPOS_UBICACION_COMERCIAL]}
-        selectedValue={cf.tipoUbicacion}
-        onSelect={(v) => updateComercialFilter("tipoUbicacion", v === cf.tipoUbicacion ? "" : v)}
-      />
+      {/* TIPO DE UBICACIÓN (selección múltiple) */}
+      <Text style={styles.label}>Tipo de Ubicación</Text>
+      <View style={styles.chipsRow}>
+        {TIPOS_UBICACION_COMERCIAL.map((op) => {
+          const active = cf.tipoUbicacion.includes(op);
+          return (
+            <TouchableOpacity
+              key={op}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() =>
+                updateComercialFilter(
+                  "tipoUbicacion",
+                  active
+                    ? cf.tipoUbicacion.filter((t) => t !== op)
+                    : [...cf.tipoUbicacion, op],
+                )
+              }
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                {op}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       {/* FRENTE MÍNIMO Y NIVEL */}
       <View style={styles.row}>
@@ -103,6 +137,32 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: "uppercase",
     marginTop: 4,
+  },
+  chipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: COLORS.cardBorder,
+    backgroundColor: COLORS.background,
+  },
+  chipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
+  chipTextActive: {
+    color: COLORS.white,
   },
   row: {
     flexDirection: "row",

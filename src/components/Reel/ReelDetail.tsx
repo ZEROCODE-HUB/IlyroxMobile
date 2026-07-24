@@ -276,6 +276,7 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
                 item.reelDetails?.id ||
                 (item.type === "reel" ? item.id : undefined)
               }
+              initialShares={item.shares}
             />
           </View>
         </View>

@@ -17,11 +17,10 @@ import { useApp } from "../context/AppContext";
 import { LocationSuggestionWithCount } from "../store/locationSearchStore";
 import { usePropertyFiltersStore } from "../store/propertyFiltersStore";
 import { useChatStore } from "../store/chatStore";
+import { useCitasStore } from "../store/citasStore";
+import { useMatchesStore } from "../store/matchesStore";
 
-// Assuming Logo is in assets folder relative to src/components -> ../../assets/Logo.jpeg
-// Adjust path if necessary based on project structure.
-// User's App.tsx had require("./assets/Logo.jpeg") from root.
-const LOGO_SOURCE = require("../assets/Logo.jpeg");
+const LOGO_SOURCE = require("../assets/Logo.png");
 
 interface HomeHeaderProps {
   style?: any;
@@ -40,6 +39,8 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   const router = useRouter();
   const { setSelectedLocation } = useApp();
   const unreadCount = useChatStore((state) => state.totalUnreadCount);
+  const pendingCitas = useCitasStore((state) => state.pendingCount);
+  const unseenMatches = useMatchesStore((state) => state.unseenCount);
 
   const handleNavigation = (screen: string) => {
     switch (screen) {
@@ -83,9 +84,8 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
           <Image
             source={LOGO_SOURCE}
             style={styles.headerLogo}
-            resizeMode="cover"
+            resizeMode="contain"
           />
-          <Text style={styles.headerTitle}>ilyrox</Text>
         </View>
         <View style={styles.headerIcons}>
           {(["Matches", "Messages", "Requests", "Appointments"] as const).map(
@@ -110,10 +110,24 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
                     color={COLORS.white}
                   />
                 )}
+                {screen === "Matches" && unseenMatches > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {unseenMatches > 9 ? "9+" : unseenMatches}
+                    </Text>
+                  </View>
+                )}
                 {screen === "Messages" && unreadCount > 0 && (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
                       {unreadCount > 9 ? "9+" : unreadCount}
+                    </Text>
+                  </View>
+                )}
+                {screen === "Appointments" && pendingCitas > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {pendingCitas > 9 ? "9+" : pendingCitas}
                     </Text>
                   </View>
                 )}
@@ -139,6 +153,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
               estado_id: loc.estado_id ?? 0,
               municipio_nombre: loc.municipio_nombre,
               estado_nombre: loc.estado_nombre,
+              placeId: loc.placeId,
             });
             onOpenMap?.();
           }}
@@ -174,11 +189,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: COLORS.white,
-  },
   headerTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -186,11 +196,8 @@ const styles = StyleSheet.create({
     height: 60,
   },
   headerLogo: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.whiteTransparent30,
+    width: 140,
+    height: 56,
   },
   headerIcons: {
     flexDirection: "row",
@@ -199,8 +206,6 @@ const styles = StyleSheet.create({
   iconButton: {
     width: 38,
     height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.15)",
     justifyContent: "center",
     alignItems: "center",
   },

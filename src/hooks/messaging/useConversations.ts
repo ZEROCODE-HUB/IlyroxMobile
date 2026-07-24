@@ -40,6 +40,9 @@ export function useConversations(userId?: string) {
     queryFn: () => conversationsService.listConversations(userId!),
     enabled: Boolean(userId),
     staleTime: 30_000,
+    // Red de seguridad: si el canal Realtime cae (CHANNEL_ERROR más abajo), el
+    // contador de no leídos se congelaría hasta reiniciar la app.
+    refetchInterval: 60_000,
   });
 
   const conversations = query.data ?? [];
@@ -62,30 +65,36 @@ export function useConversations(userId?: string) {
   useEffect(() => {
     if (!userId) return;
 
+    // Dos suscripciones con filtro explícito (requerido por Supabase Realtime v2 con RLS).
+    // No se puede hacer OR en un solo filtro, por eso se crean dos listeners en el mismo canal.
     const channel = supabase
       .channel(`conversations-realtime-${userId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "conversaciones" },
-        (payload) => {
-          const conv = payload.new as any;
-          if (
-            conv &&
-            (conv.usuario1_id === userId || conv.usuario2_id === userId)
-          ) {
-            scheduleInvalidation();
-          }
+        {
+          event: "*",
+          schema: "public",
+          table: "conversaciones",
+          filter: `usuario1_id=eq.${userId}`,
         },
+        () => scheduleInvalidation(),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "conversaciones",
+          filter: `usuario2_id=eq.${userId}`,
+        },
+        () => scheduleInvalidation(),
       )
       .subscribe((status, err) => {
         if (err) {
           log.error("Realtime subscription error", err);
-          return;
         }
         if (status === "CHANNEL_ERROR") {
-          log.error(
-            "Channel error — revisa Realtime settings para 'conversaciones'",
-          );
+          log.warn("Channel error en conversaciones Realtime — retrying via polling");
         }
       });
 

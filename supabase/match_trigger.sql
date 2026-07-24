@@ -339,6 +339,8 @@ BEGIN
      OR OLD.estacionamientos IS DISTINCT FROM NEW.estacionamientos
      OR OLD.metros_cuadrados_construccion IS DISTINCT FROM NEW.metros_cuadrados_construccion
      OR OLD.metros_cuadrados_terreno IS DISTINCT FROM NEW.metros_cuadrados_terreno
+     OR OLD.ancho_terreno IS DISTINCT FROM NEW.ancho_terreno
+     OR OLD.largo_terreno IS DISTINCT FROM NEW.largo_terreno
   THEN
     PERFORM public.evaluate_property_matches(NEW.id);
   END IF;

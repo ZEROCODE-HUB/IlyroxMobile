@@ -4,14 +4,20 @@
  */
 
 import React, { useState } from "react";
-import { Text, TouchableOpacity, StyleSheet } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import {
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
+import { ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { Avatar } from "../../../components/shared";
 import { SubmitButton } from "./SubmitButton";
 import { BackButton } from "./BackButton";
+import { LegalAcceptanceText } from "./LegalAcceptanceText";
+import { CareerStartDateField } from "./CareerStartDateField";
 import SelectionModal from "../../../components/modals/SelectionModal";
 import { AuthFormState } from "../hooks/useAuthForm";
 import { COLORS } from "../../../constants/colors";
@@ -36,15 +42,16 @@ const OCUPACIONES = [
 
 const MODALIDADES = ["Inmobiliaria", "Independiente"];
 
-const EXPERIENCIA_OPTIONS = [...Array(51).keys()].map((n) => ({
-  label: `${n} años`,
-  value: n.toString(),
-}));
+const CAREER_LABELS: Record<string, string> = {
+  "Asesor Inmobiliario": "¿Cuándo iniciaste como Asesor Inmobiliario? *",
+  "Desarrollador Inmobiliario": "¿Cuándo iniciaste como Desarrollador Inmobiliario? *",
+  "Arquitecto": "¿Cuándo iniciaste como Arquitecto? *",
+  "Constructor": "¿Cuándo iniciaste como Constructor? *",
+};
 
-EXPERIENCIA_OPTIONS.push({
-  label: "+ 50 años",
-  value: "50+",
-});
+function getCareerLabel(ocupacion: string): string {
+  return CAREER_LABELS[ocupacion] ?? "¿Cuándo iniciaste tu carrera? *";
+}
 
 export function RegisterStepTwo({
   formState,
@@ -55,7 +62,6 @@ export function RegisterStepTwo({
 }: RegisterStepTwoProps) {
   const [showOcupacionModal, setShowOcupacionModal] = useState(false);
   const [showModalidadModal, setShowModalidadModal] = useState(false);
-  const [showExperienciaModal, setShowExperienciaModal] = useState(false);
   const [photoTouched, setPhotoTouched] = useState(false);
 
   const handleSubmit = () => {
@@ -69,8 +75,6 @@ export function RegisterStepTwo({
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
       quality: 0.7,
     });
 
@@ -80,16 +84,12 @@ export function RegisterStepTwo({
   };
 
   return (
-    <KeyboardAwareScrollView
-      extraScrollHeight={40}
-      extraHeight={60}
-      enableOnAndroid={true}
-      enableAutomaticScroll={true}
-      keyboardOpeningTime={0}
-      enableResetScrollToCoords={false}
-      keyboardShouldPersistTaps="handled"
+    <ScrollView
+      style={styles.scroll}
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
     >
       <Text style={styles.stepTitle}>Información Profesional</Text>
 
@@ -179,45 +179,28 @@ export function RegisterStepTwo({
         </>
       )}
 
-      {/* Años de experiencia */}
-      <TouchableOpacity
-        style={styles.selectButton}
-        onPress={() => setShowExperienciaModal(true)}
-        activeOpacity={0.7}
-      >
-        <Text
-          style={[
-            styles.selectText,
-            !formState.anosExperiencia && styles.selectPlaceholder,
-          ]}
-        >
-          {formState.anosExperiencia
-            ? `${formState.anosExperiencia} años`
-            : "Años de experiencia *"}
-        </Text>
-        <Ionicons name="chevron-down" size={20} color={COLORS.textSecondary} />
-      </TouchableOpacity>
-
-      <SelectionModal
-        visible={showExperienciaModal}
-        onClose={() => setShowExperienciaModal(false)}
-        onSelect={(v) => onUpdateField("anosExperiencia", v)}
-        title="Años de experiencia"
-        options={EXPERIENCIA_OPTIONS}
-        currentValue={formState.anosExperiencia}
+      {/* Fecha de inicio de carrera */}
+      <CareerStartDateField
+        value={formState.fechaInicioCarrera}
+        onChange={(iso) => onUpdateField("fechaInicioCarrera", iso)}
+        label={getCareerLabel(formState.ocupacion)}
       />
 
       <AppInput
-        placeholder="Biografía *"
+        placeholder="Ej: Asesor con 5 años en el sector residencial de Guadalajara, especializado en propiedades de lujo y arrendamiento *"
         autoCapitalize="sentences"
         keyboardType="default"
         value={formState.biografia}
         onChangeText={(v) => onUpdateField("biografia", v)}
+        multiline
         numberOfLines={4}
+        textAlignVertical="top"
         inputStyle={{ height: 100 }}
         maxLength={200}
         showCounter
       />
+
+      <LegalAcceptanceText />
 
       <SubmitButton
         loading={loading}
@@ -226,11 +209,14 @@ export function RegisterStepTwo({
       />
 
       <BackButton onPress={onBack} text="Volver al paso 1" />
-    </KeyboardAwareScrollView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flexShrink: 1,
+  },
   container: {
     flexGrow: 1,
     paddingBottom: 20,
@@ -257,7 +243,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: COLORS.background,
     borderWidth: 1,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.cardBorder,
     borderRadius: 10,
     padding: 16,
     marginBottom: 16,
@@ -265,6 +251,7 @@ const styles = StyleSheet.create({
   selectText: {
     fontSize: 16,
     color: COLORS.textPrimary,
+    flex: 1,
   },
   selectPlaceholder: {
     color: COLORS.textTertiary,

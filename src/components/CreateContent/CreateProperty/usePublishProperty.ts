@@ -5,8 +5,11 @@
 // ============================================
 
 import { useState, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { prependPublishedFeedItem } from "@/hooks/useFeed";
 import { useModal } from "@/context/ModalContext";
+import type { LocalModalOptions } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
 import { uploadImage as uploadImageService } from "../../../services/uploadService";
 import { usePropertyMutation } from "@/hooks/usePropertyMutation";
@@ -15,6 +18,7 @@ import {
   PROPERTY_TYPES,
   getCamposVisibles,
 } from "../../../constants/propertyData";
+import { DEFAULT_COUNTRY } from "../../../lib/location/registry";
 
 import type {
   ContractData,
@@ -26,10 +30,17 @@ import { notifyMatchingUsers } from "@/hooks/useMatchNotifier";
 
 const log = logger.scoped("usePublishProperty");
 
-// Timeout para la operación completa de publicación (2 minutos)
-const PUBLISH_TIMEOUT_MS = 120_000;
-// Timeout individual por imagen (30 segundos)
-const IMAGE_UPLOAD_TIMEOUT_MS = 30_000;
+// Timeout individual por imagen. Eran 30 s: con las fotos sin comprimir de la
+// cámara (2-4 MB) y una subida móvil lenta, CADA imagen se pasaba y fallaban
+// todas. Ya se suben comprimidas (ver uploadService), pero se deja margen.
+const IMAGE_UPLOAD_TIMEOUT_MS = 60_000;
+// Red de seguridad de la publicación completa. Era fija en 2 min, así que con
+// 5-15 fotos el reloj global mataba la subida aunque cada imagen fuera bien.
+// Ahora crece con el número de fotos y nunca queda por debajo de la suma de los
+// timeouts individuales.
+const PUBLISH_BASE_TIMEOUT_MS = 60_000;
+const publishTimeoutFor = (imageCount: number) =>
+  PUBLISH_BASE_TIMEOUT_MS + imageCount * IMAGE_UPLOAD_TIMEOUT_MS;
 
 /**
  * Sube una imagen con timeout individual
@@ -56,15 +67,40 @@ async function uploadImageWithTimeout(
   });
 }
 
+/** Callback que se llama al publicar una propiedad NUEVA con éxito,
+ *  para que el caller pueda abrir el flujo de Open House. */
+export interface OpenHousePrefill {
+  propertyId: string;
+  location: string;
+  firstPhoto: string | null;
+}
+
+/** Info que se pasa al callback de éxito para que el caller maneje la UI */
+export interface PublishSuccessInfo {
+  newPropertyId: string | null;
+  isUpdate: boolean;
+  firstPhotoUrl: string | null;
+  location: string;
+}
+
 export function usePublishProperty(
   form: ReturnType<typeof usePropertyForm>,
   propertyId?: string,
   onBack?: (shouldRefresh?: boolean) => void,
+  onOpenHousePrompt?: (prefill: OpenHousePrefill) => void,
+  onPublishSuccess?: (info: PublishSuccessInfo) => void,
+  // En edición, CreateProperty vive dentro de un <Modal> nativo; el modal global
+  // (ModalContext, en la raíz) queda invisible detrás en iOS. El caller inyecta
+  // un showModal LOCAL (useLocalModal) para que los avisos se vean. Si no se
+  // pasa, cae al global (mismo comportamiento previo).
+  showModalOverride?: (options: LocalModalOptions) => void,
 ) {
   const { user } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { saveProperty } = usePropertyMutation();
-  const { showModal } = useModal();
+  const { showModal: globalShowModal } = useModal();
+  const showModal = showModalOverride ?? globalShowModal;
   const { showToast } = useToast();
 
   const [publishState, setPublishState] = useState<PublishState>({
@@ -115,16 +151,27 @@ export function usePublishProperty(
     async (contractDataParam?: ContractData | null) => {
       const resolvedContractData = contractDataParam ?? form.contractData;
 
-      // Validar
+      // ── Validar (de arriba hacia abajo) ───────────────────────────────────
+      // validate() cubre todos los campos requeridos, incluida la ubicación
+      // exacta en el mapa ({0,0} = sin marcar). Si falla, devolvemos un centinela
+      // para que la pantalla haga scroll al primer campo en rojo.
       if (!form.validate()) {
+        const errs = form.getValidationErrors();
+        const errKeys = Object.keys(errs);
+        const soloComision =
+          errKeys.length > 0 &&
+          errKeys.every((k) => k === "comision" || k === "comisionRenta");
+        const comisionMsg = errs.comision || errs.comisionRenta;
         setTimeout(() => {
           showModal({
-            title: "Faltan datos requeridos",
-            message: "Por favor revisa los campos marcados en rojo",
+            title: soloComision ? "Comisión inválida" : "Faltan datos requeridos",
+            message: soloComision
+              ? comisionMsg
+              : "Por favor revisa los campos marcados en rojo",
             confirmText: "Entendido",
           });
         }, 50);
-        return;
+        return "VALIDATION_FAILED";
       }
 
       if (!user) {
@@ -141,6 +188,36 @@ export function usePublishProperty(
       ) {
         return "SHOW_CONTRACT_MODAL";
       }
+
+      // ── Aviso de sin comisión ANTES de arrancar la subida ──────────────────
+      // Si no hay comisión definida, mostramos la advertencia y esperamos
+      // confirmación del usuario antes de iniciar cualquier carga.
+      const tieneComision = checkComisionPresente(form);
+      if (!tieneComision && form.status === "Publicada") {
+        showModal({
+          title: "Sin comisión definida",
+          message:
+            "Tu propiedad se guardará pero no aparecerá en el feed ni en el mapa hasta que definas tu comisión. ¿Deseas continuar de todas formas?",
+          confirmText: "Publicar de todas formas",
+          cancelText: "Agregar comisión",
+          confirmVariant: "primary",
+          onConfirm: () => void doUpload(resolvedContractData),
+          onCancel: () => {},
+        });
+        return;
+      }
+
+      // Sin advertencia pendiente: arrancar directamente
+      void doUpload(resolvedContractData);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [form, propertyId, user, onBack, router, saveProperty, updateProgress, showModal, showToast],
+  );
+
+  // ── Lógica de subida separada para poder llamarla desde el modal ──────────
+  const doUpload = useCallback(
+    async (resolvedContractData: ContractData | null | undefined) => {
+      if (!user) return; // handlePublish ya lo valida; guarda defensiva
 
       // Resetear cancelación
       cancelledRef.current = false;
@@ -167,10 +244,12 @@ export function usePublishProperty(
             message: "La publicación tardó demasiado. ¿Deseas intentar de nuevo?",
             confirmText: "Reintentar",
             cancelText: "No",
+            confirmVariant: "primary",
             onConfirm: () => void handlePublish(resolvedContractData),
+            onCancel: () => {},
           });
         }
-      }, PUBLISH_TIMEOUT_MS);
+      }, publishTimeoutFor(form.images.length));
 
       try {
         // ============================================
@@ -237,10 +316,11 @@ export function usePublishProperty(
         // ============================================
         updateProgress(45, "Preparando datos...");
 
-        const camposVisibles = getCamposVisibles(form.subtipo);
+        const camposVisibles = getCamposVisibles(form.subtipo, form.tipoPrincipal);
 
         const tieneComision = checkComisionPresente(form);
         const sinComision = !tieneComision;
+        // Nota: el aviso de sinComision ya se mostró ANTES de arrancar doUpload.
 
         const propertyData = {
           tipo: form.tipoPrincipal,
@@ -250,6 +330,7 @@ export function usePublishProperty(
               form.tipoPrincipal as keyof typeof PROPERTY_TYPES
             ]?.[0],
           descripcion: form.descripcion,
+          pais: form.ubicacionData.pais || DEFAULT_COUNTRY,
           ciudad: form.ubicacionData.municipio,
           municipio: form.ubicacionData.municipio,
           estado: form.ubicacionData.estado,
@@ -265,6 +346,7 @@ export function usePublishProperty(
             ? parseInt(form.recamaras) || 0
             : 0,
           banos: camposVisibles.banos ? parseInt(form.banosCompletos) || 0 : 0,
+          medios_banos: camposVisibles.mediosBanos ? parseInt(form.mediosBanos) || 0 : null,
           estacionamientos: camposVisibles.estacionamientos
             ? parseInt(form.estacionamientos) || 0
             : 0,
@@ -274,9 +356,20 @@ export function usePublishProperty(
           metros_cuadrados_terreno: camposVisibles.m2Terreno
             ? parseFloat(form.m2Terreno?.replace(/,/g, "") || "") || null
             : null,
+          ancho_terreno: parseFloat(form.anchoTerreno?.replace(/,/g, "") || "") || null,
+          largo_terreno: parseFloat(form.largoTerreno?.replace(/,/g, "") || "") || null,
+          costo_mantenimiento: parseFloat(form.costoMantenimiento?.replace(/,/g, "") || "") || null,
           pisos: camposVisibles.niveles ? parseInt(form.niveles) || 1 : null,
           amueblado: camposVisibles.amueblado ? form.amueblado : null,
-          pet_friendly: camposVisibles.petFriendly ? form.petFriendly : "No",
+          // pet_friendly solo aplica/se muestra en renta o ambas; en venta el
+          // campo nunca se renderiza y form.petFriendly queda "" (violaría el
+          // CHECK 'Sí'|'No'|'Parcial'). Enviamos "No" como valor seguro.
+          pet_friendly:
+            camposVisibles.petFriendly &&
+            (form.tipoOperacion === "renta" || form.tipoOperacion === "ambas") &&
+            form.petFriendly
+              ? form.petFriendly
+              : "No",
           antiguedad: camposVisibles.antiguedad ? form.antiguedad : null,
           status: sinComision ? "Suspendida" : form.status,
           activo: form.status === "Publicada" && tieneComision,
@@ -296,8 +389,8 @@ export function usePublishProperty(
           ...(form.tipoPrincipal === 'agricola' ? {
             tipo_agua: form.tiposAgua.length ? form.tiposAgua : null,
             concesion_agua: form.concesionAgua || null,
-            uso_terreno: form.usoTerreno || null,
-            tipo_riego: form.tipoRiego || null,
+            uso_terreno: form.usoTerreno.length ? form.usoTerreno : null,
+            tipo_riego: form.tipoRiego.length ? form.tipoRiego : null,
             infra_electricidad: form.infraElectricidad || null,
             infra_camino_acceso: form.infraCaminoAcceso || null,
             infra_cercado: form.infraCercado || null,
@@ -321,14 +414,6 @@ export function usePublishProperty(
             patio_maniobras_m2: parseFloat(form.patioManiobras) || null,
           } : {}),
         };
-
-        if (sinComision && form.status === "Publicada") {
-          showModal({
-            title: "Propiedad oculta",
-            message: "Tu propiedad se guardará, pero no será visible en el feed ni en el mapa hasta que agregues la comisión.",
-            confirmText: "Entendido",
-          });
-        }
 
         if (cancelledRef.current) throw new Error("CANCELLED");
 
@@ -354,15 +439,18 @@ export function usePublishProperty(
               ? form.tiposFinanciamientoSeleccionados
               : [],
           gravamenes:
-            form.tieneGravamen === "Sí" && form.institucionGravamen
-              ? [
-                  {
-                    institucion: form.institucionGravamen,
-                    monto: form.montoGravamen
-                      ? parseFloat(form.montoGravamen)
-                      : null,
-                  },
-                ]
+            form.tieneGravamen === "Sí" && form.institucionGravamen.length > 0
+              ? form.institucionGravamen.map((institucion) => {
+                  const raw = (form.montosGravamen[institucion] || "").replace(
+                    /,/g,
+                    "",
+                  );
+                  const monto = raw ? parseFloat(raw) : null;
+                  return {
+                    institucion,
+                    monto: monto != null && Number.isFinite(monto) ? monto : null,
+                  };
+                })
               : [],
         };
 
@@ -407,6 +495,16 @@ export function usePublishProperty(
         }
 
         // Éxito
+        const newPropertyId = !propertyId ? (saveResult?.id ?? null) : null;
+
+        // Prepend optimista: que la propiedad aparezca arriba del feed al instante
+        // (ignora el score; el orden por score se reaplica al refrescar/reentrar).
+        if (newPropertyId) {
+          prependPublishedFeedItem(queryClient, newPropertyId, user?.id).catch(
+            () => {},
+          );
+        }
+
         setTimeout(() => {
           setPublishState({
             uploading: false,
@@ -416,23 +514,55 @@ export function usePublishProperty(
             canCancel: true,
           });
 
-          showModal({
-            title: propertyId ? "¡Propiedad actualizada!" : "¡Propiedad publicada!",
-            message: propertyId
-              ? "Propiedad actualizada correctamente"
-              : "Propiedad publicada correctamente",
-            confirmText: "Listo",
-            onConfirm: () => {
-              if (!propertyId) {
-                router.replace({
-                  pathname: "/(tabs)",
-                  params: { refresh: String(Date.now()) },
-                });
-              } else {
-                if (onBack) onBack(true);
-              }
-            },
-          });
+          if (onPublishSuccess) {
+            // El caller (CreateProperty/index.tsx) muestra el bottom sheet
+            const location = [
+              form.calle,
+              form.ubicacionData.municipio,
+              form.ubicacionData.estado,
+            ]
+              .filter(Boolean)
+              .join(" - ");
+
+            // Presentar el bottom sheet en un tick POSTERIOR: cerrar el
+            // ProgressModal y presentar otro <Modal> nativo en el mismo commit
+            // provoca en iOS la race "present while a presentation is in
+            // progress" (modal fantasma / pantalla negra al editar). Se espera a
+            // que el ProgressModal termine de cerrarse.
+            setTimeout(() => {
+              onPublishSuccess({
+                newPropertyId,
+                isUpdate: !!propertyId,
+                firstPhotoUrl: uploadedUrls[0] ?? null,
+                location,
+              });
+            }, 350);
+          } else {
+            // Fallback: modal legacy (si se usa el hook sin el nuevo callback)
+            showModal({
+              title: propertyId ? "¡Propiedad actualizada!" : "¡Propiedad publicada!",
+              message: propertyId
+                ? "Propiedad actualizada correctamente"
+                : "Propiedad publicada correctamente",
+              confirmText: newPropertyId ? "Ver propiedad" : "Listo",
+              confirmVariant: "primary",
+              onConfirm: () => {
+                if (newPropertyId) {
+                  router.push({
+                    pathname: "/(stack)/property/[id]",
+                    params: { id: newPropertyId },
+                  });
+                } else if (!propertyId) {
+                  router.replace({
+                    pathname: "/(tabs)",
+                    params: { refresh: String(Date.now()) },
+                  });
+                } else {
+                  if (onBack) onBack(true);
+                }
+              },
+            });
+          }
         }, 500); // Pequeño delay para que el usuario vea el 100%
       } catch (error: any) {
         // Limpiar timeout global
@@ -464,11 +594,14 @@ export function usePublishProperty(
           message: errorMessage,
           confirmText: "Reintentar",
           cancelText: "Cerrar",
-          onConfirm: () => void handlePublish(resolvedContractData),
+          confirmVariant: "primary",
+          onConfirm: () => void doUpload(resolvedContractData),
+          onCancel: () => {},
         });
       }
     },
-    [form, propertyId, user, onBack, router, saveProperty, updateProgress, showModal],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [form, propertyId, user, onBack, router, saveProperty, updateProgress, showModal, showToast, onOpenHousePrompt, onPublishSuccess],
   );
 
   return {
@@ -480,16 +613,18 @@ export function usePublishProperty(
 }
 
 // ============================================
-// HELPER: Verificar si hay comisión definida
+// HELPER: Verificar si hay comisión definida (y > 0)
 // ============================================
 function checkComisionPresente(form: ReturnType<typeof usePropertyForm>): boolean {
   if (form.tipoOperacion === "venta" || form.tipoOperacion === "ambas") {
-    if (!form.comisionValor) return false;
+    const val = parseFloat(form.comisionValor) || 0;
+    if (val === 0) return false;
   }
   if (form.tipoOperacion === "renta" || form.tipoOperacion === "ambas") {
-    const rentaVal =
+    const rawVal =
       form.tipoOperacion === "ambas" ? form.comisionValorRenta : form.comisionValor;
-    if (!rentaVal) return false;
+    const val = parseFloat(rawVal) || 0;
+    if (val === 0) return false;
   }
   return true;
 }

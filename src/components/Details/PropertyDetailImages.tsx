@@ -1,18 +1,10 @@
 import React from "react";
-import {
-  Image,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { COLORS, FALLBACKS } from "@/constants";
-import { ActionButtons } from "../shared";
-import {
-  DETAIL_IMAGE_WIDTH,
-  propertyDetailStyles as styles,
-} from "./propertyDetailStyles";
+import { ActionButtons, ImageGallery } from "../shared";
+import { propertyDetailStyles as styles } from "./propertyDetailStyles";
 
 const FALLBACK_IMAGE = FALLBACKS.PROPERTY_IMAGE_URL;
 
@@ -24,6 +16,7 @@ export interface PropertyDetailImagesProps {
   feedItemId: string;
   feedItemLikes: number;
   feedItemComments: number;
+  feedItemShares?: number;
   userId?: string;
   propertyId: string;
   shareTitle: string;
@@ -41,6 +34,7 @@ export const PropertyDetailImages: React.FC<PropertyDetailImagesProps> = ({
   feedItemId,
   feedItemLikes,
   feedItemComments,
+  feedItemShares,
   userId,
   propertyId,
   shareTitle,
@@ -50,26 +44,27 @@ export const PropertyDetailImages: React.FC<PropertyDetailImagesProps> = ({
   onTrackInteraction,
 }) => {
   const hasImages = images.length > 0;
+  const galleryImages = hasImages ? images : [FALLBACK_IMAGE];
 
   return (
     <View style={styles.imageContainer}>
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={(e) => {
-          const offset = e.nativeEvent.contentOffset.x;
-          onImageIndexChange(Math.round(offset / DETAIL_IMAGE_WIDTH));
-        }}
-      >
-        {hasImages ? (
-          images.map((img, index) => (
-            <Image key={index} source={{ uri: img }} style={styles.image} />
-          ))
-        ) : (
-          <Image source={{ uri: FALLBACK_IMAGE }} style={styles.image} />
-        )}
-      </ScrollView>
+      {/* Misma galería que el feed: proporción real de la foto, sin recortar,
+          con marco oscuro en los lados para las verticales. */}
+      <ImageGallery
+        images={galleryImages}
+        showDots={galleryImages.length > 1}
+        showImageCount={false}
+        onIndexChange={onImageIndexChange}
+      />
+
+      {/* Velo lateral para legibilidad de los iconos blancos. */}
+      <LinearGradient
+        colors={["transparent", "rgba(15,23,42,0.55)"]}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        pointerEvents="none"
+        style={styles.actionsScrim}
+      />
 
       <View style={styles.floatingActions}>
         <ActionButtons
@@ -77,6 +72,7 @@ export const PropertyDetailImages: React.FC<PropertyDetailImagesProps> = ({
           feedItemType="property"
           initialLikes={feedItemLikes}
           comments={feedItemComments}
+          initialShares={feedItemShares}
           userId={userId}
           onCommentClick={() => {
             onTrackInteraction("comentario");

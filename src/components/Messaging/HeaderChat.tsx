@@ -8,7 +8,7 @@ import { useState, useEffect } from "react";
 import TagsModal from "./TagsModal";
 import CreateAppointmentModal from "../Appointments/CreateAppointmentModal";
 import { useRouter } from "expo-router";
-import { Image } from "expo-image";
+import { GoogleCalendarIcon } from "../shared/GoogleCalendarIcon";
 
 export default function HeaderChat({
   onBack,
@@ -147,10 +147,7 @@ export default function HeaderChat({
           onPress={() => setShowAppointmentModal(true)}
           style={styles.headerButton}
         >
-          <Image
-            source={require("@/assets/google-calendar-svg.svg")}
-            style={{ width: 30, height: 30 }}
-          />
+          <GoogleCalendarIcon size={30} />
         </TouchableOpacity>
       )}
 

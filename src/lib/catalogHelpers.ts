@@ -156,16 +156,14 @@ export const poblarCatalogos = async () => {
 
     // Poblar tipos de financiamiento
     const tiposFinanciamiento = [
-      "BBVA",
-      "Santander",
-      "Banorte",
-      "HSBC",
-      "Scotiabank",
-      "Citibanamex",
+      "Crédito bancario",
       "Infonavit",
       "Fovissste",
-      "Apoyo Infonavit",
-      "Crédito Cofinavit",
+      "Cofinavit",
+      "Arrendamiento financiero",
+      "Crédito puente",
+      "Desarrollador",
+      "Pago de contado",
     ];
 
     for (const nombre of tiposFinanciamiento) {

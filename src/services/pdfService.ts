@@ -1,9 +1,11 @@
+import { Image } from "react-native";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { documentDirectory, moveAsync } from "expo-file-system/legacy";
 import { supabase } from "@/lib/supabase";
 import firstUpperCase from "@/utils/firstUpperCase";
 import { logger } from "@/utils/logger";
+import { LogoBase64 } from "@/assets/logoBase64";
 
 const log = logger.scoped("pdfService");
 // ============================================================================
@@ -30,6 +32,7 @@ export const PDF_FIELD_CONFIG = {
   showMetrosTerreno: true,
   showHabitaciones: true,
   showBanos: true,
+  showMediosBanos: true,
   showEstacionamientos: true,
   showPisos: true,
   showAntiguedad: true,
@@ -104,6 +107,7 @@ export interface PropertyPdfData {
   metros_cuadrados_terreno: number | null;
   habitaciones: number;
   banos: number;
+  medios_banos: number | null;
   estacionamientos: number;
   pisos: number | null;
   antiguedad: string | null;
@@ -142,6 +146,7 @@ interface OperacionPropiedad {
 }
 
 interface PerfilCreador {
+  id?: string | null;
   nombre: string | null;
   nombre_completo: string | null;
   apellido_paterno: string | null;
@@ -150,10 +155,12 @@ interface PerfilCreador {
   prefijo_celular: string | null;
   email: string | null;
   foto: string | null;
-  anos_experiencia: string | null;
+  fecha_inicio_carrera: string | null;
   nombre_inmobiliaria: string | null;
   biografia: string | null;
   ocupacion: string | null;
+  calificacion_promedio?: number | null;
+  total_resenas?: number | null;
 }
 
 // ============================================================================
@@ -250,9 +257,27 @@ export const fetchPropertyData = async (
 // GENERADOR DE HTML
 // ============================================================================
 
+/**
+ * Devuelve true si la imagen es VERTICAL (retrato, alto > ancho). Se usa para
+ * la portada del PDF: una foto vertical no cabe en la caja apaisada de alto fijo
+ * y `object-fit: cover` la recortaba. Si no se puede medir, asume horizontal.
+ */
+const isImagePortrait = (url: string): Promise<boolean> =>
+  new Promise((resolve) => {
+    if (!url) return resolve(false);
+    Image.getSize(
+      url,
+      (w, h) => resolve(h > w),
+      () => resolve(false),
+    );
+  });
+
 const generatePropertyHtml = (
   data: PropertyPdfData,
-  config: typeof PDF_FIELD_CONFIG & { showDatosCompletos?: boolean }, // Asumo que esta flag vendrá en tu config o puedes forzarla
+  config: typeof PDF_FIELD_CONFIG & {
+    showDatosCompletos?: boolean;
+    heroIsPortrait?: boolean;
+  }, // Asumo que esta flag vendrá en tu config o puedes forzarla
 ): string => {
   const operacionPrincipal = data.operaciones?.[0];
   const statusLabel =
@@ -281,13 +306,13 @@ const generatePropertyHtml = (
   // 2. Iconos SVG (Inline para asegurar que se vean en el PDF sin dependencias externas)
   const icons = {
     bed: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" stroke="#008f85" class="ionicon" viewBox="0 0 512 512"><path fill="none" stroke-width="32" d="M384 240H96V136a40.12 40.12 0 0 1 40-40h240a40.12 40.12 0 0 1 40 40v104zM48 416V304a64.19 64.19 0 0 1 64-64h288a64.19 64.19 0 0 1 64 64v112"/><path fill="none" stroke-width="32" d="M48 416v-8a24.07 24.07 0 0 1 24-24h368a24.07 24.07 0 0 1 24 24v8M112 240v-16a32.09 32.09 0 0 1 32-32h80a32.09 32.09 0 0 1 32 32v16m0 0v-16a32.09 32.09 0 0 1 32-32h80a32.09 32.09 0 0 1 32 32v16"/></svg>`,
-    bath: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#008f85" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bath-icon lucide-bath"><path d="M10 4 8 6"/><path d="M17 19v2"/><path d="M2 12h20"/><path d="M7 19v2"/><path d="M9 5 7.621 3.621A2.121 2.121 0 0 0 4 5v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg>`,
+    bath: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#008f85" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-toilet"><path d="M7 12h13a1 1 0 0 1 1 1 5 5 0 0 1-5 5h-.598a.5.5 0 0 0-.424.765l1.544 2.47a.5.5 0 0 1-.424.765H5.402a.5.5 0 0 1-.424-.765L7 18"/><path d="M8 18a5 5 0 0 1-5-5V4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v9"/></svg>`,
     car: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" stroke="#008f85" class="ionicon" viewBox="0 0 512 512"><path d="M80 224l37.78-88.15C123.93 121.5 139.6 112 157.11 112h197.78c17.51 0 33.18 9.5 39.33 23.85L432 224M80 224h352v144H80zM112 368v32H80v-32M432 368v32h-32v-32" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/><circle cx="144" cy="288" r="16" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/><circle cx="368" cy="288" r="16" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/></svg>`,
-    area: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" stroke="#008f85" class="ionicon" viewBox="0 0 512 512"><path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M304 96h112v112M405.77 106.2L111.98 400.02M208 416H96V304"/></svg>`,
-    home: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" stroke="#008f85" class="ionicon" viewBox="0 0 512 512"><path d="M80 212v236a16 16 0 0016 16h96V328a24 24 0 0124-24h80a24 24 0 0124 24v136h96a16 16 0 0016-16V212" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/><path d="M480 256L266.89 52c-5-5.28-16.69-5.34-21.78 0L32 256M400 179V64h-48v69" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/></svg>`,
+    area: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" stroke="#008f85" fill="none" class="ionicon" viewBox="0 0 512 512"><path d="M342.59 80H424a24.07 24.07 0 0124 24v80.41M168.83 80H88a24.07 24.07 0 00-24 24v80.41M344.34 432H424a24.07 24.07 0 0024-24v-80.46M168.83 432H88a24.07 24.07 0 01-24-24v-80.46" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/></svg>`,
+    home: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#008f85" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-building-2"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>`,
     pin: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" stroke="#008f85" class="ionicon" viewBox="0 0 512 512"><path d="M256 48c-79.5 0-144 61.39-144 137 0 87 96 224.87 131.25 272.49a15.77 15.77 0 0025.5 0C304 409.89 400 272.07 400 185c0-75.61-64.5-137-144-137z" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/><circle cx="256" cy="192" r="48" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/></svg>`,
     check: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" stroke="#008f85" class="ionicon" viewBox="0 0 512 512"><path d="M448 256c0-106-86-192-192-192S64 150 64 256s86 192 192 192 192-86 192-192z" fill="none" stroke-miterlimit="10" stroke-width="32"/><path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M352 176L217.6 336 160 272"/></svg>`,
-    level: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" stroke="#008f85" class="ionicon" viewBox="0 0 512 512"><path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M176 416v64M80 32h192a32 32 0 0132 32v412a4 4 0 01-4 4H48h0V64a32 32 0 0132-32zM320 192h112a32 32 0 0132 32v256h0-160 0V208a16 16 0 0116-16z"/><path d="M98.08 431.87a16 16 0 1113.79-13.79 16 16 0 01-13.79 13.79zM98.08 351.87a16 16 0 1113.79-13.79 16 16 0 01-13.79 13.79zM98.08 271.87a16 16 0 1113.79-13.79 16 16 0 01-13.79 13.79zM98.08 191.87a16 16 0 1113.79-13.79 16 16 0 01-13.79 13.79zM98.08 111.87a16 16 0 1113.79-13.79 16 16 0 01-13.79 13.79zM178.08 351.87a16 16 0 1113.79-13.79 16 16 0 01-13.79 13.79zM178.08 271.87a16 16 0 1113.79-13.79 16 16 0 01-13.79 13.79zM178.08 191.87a16 16 0 1113.79-13.79 16 16 0 01-13.79 13.79zM178.08 111.87a16 16 0 1113.79-13.79 16 16 0 01-13.79 13.79zM258.08 431.87a16 16 0 1113.79-13.79 16 16 0 01-13.79 13.79zM258.08 351.87a16 16 0 1113.79-13.79 16 16 0 01-13.79 13.79zM258.08 271.87a16 16 0 1113.79-13.79 16 16 0 01-13.79 13.79z"/><ellipse cx="256" cy="176" rx="15.95" ry="16.03" transform="rotate(-45 255.99 175.996)"/><path d="M258.08 111.87a16 16 0 1113.79-13.79 16 16 0 01-13.79 13.79zM400 400a16 16 0 1016 16 16 16 0 00-16-16zM400 320a16 16 0 1016 16 16 16 0 00-16-16zM400 240a16 16 0 1016 16 16 16 0 00-16-16zM336 400a16 16 0 1016 16 16 16 0 00-16-16zM336 320a16 16 0 1016 16 16 16 0 00-16-16zM336 240a16 16 0 1016 16 16 16 0 00-16-16z"/></svg>`,
+    level: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" stroke="#008f85" fill="none" class="ionicon" viewBox="0 0 512 512"><path d="M448 341L255.8 448 64 341M448 256L256 363 64 256" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/><path d="M255.8 64L448 171 256 278 64 171 255.8 64z" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/></svg>`,
   };
 
   // 3. Formateadores
@@ -298,17 +323,28 @@ const generatePropertyHtml = (
 
   // --- CONSTRUCCIÓN DE SECCIONES HTML ---
 
-  // Galería de imágenes (Estilo Masonry/Grid ajustado)
+  // Galería de imágenes como TABLA de 2 columnas (no grid). Los motores de
+  // impresión (WebKit en iOS, Chromium en Android) paginan de forma fiable por
+  // filas de tabla y respetan page-break-inside en <tr>, cosa que NO hacen con
+  // los items de un `display: grid` → por eso las fotos se partían entre hojas.
   let galleryHtml = "";
   if (config.showImagenes && galleryPhotos.length > 0) {
-    galleryHtml = galleryPhotos
-      .map(
-        (foto, index) => `
-      <div class="gallery-item">
-        <img src="${foto}" alt="Foto ${index + 2}" onerror="this.style.display='none'" />
-      </div>
-    `,
-      )
+    const rows: string[][] = [];
+    for (let i = 0; i < galleryPhotos.length; i += 2) {
+      rows.push(galleryPhotos.slice(i, i + 2));
+    }
+    galleryHtml = rows
+      .map((row) => {
+        const cells = row
+          .map(
+            (foto) => `
+          <td class="gallery-cell"${row.length === 1 ? ' colspan="2"' : ""}>
+            <img src="${foto}" alt="Foto" onerror="this.style.display='none'" />
+          </td>`,
+          )
+          .join("");
+        return `<tr class="gallery-row">${cells}</tr>`;
+      })
       .join("");
   }
 
@@ -352,8 +388,16 @@ const generatePropertyHtml = (
             ${data.perfil.foto && config.showFotoCreador ? `<img src="${data.perfil.foto}" class="agent-avatar" />` : ""}
             <div class="agent-details">
                 ${config.showNombreCreador ? `<div class="agent-name">${safeText(getCreatorFullName(data.perfil))}</div>` : ""}
+                ${(() => {
+                  const rating = data.perfil?.calificacion_promedio;
+                  const reviews = data.perfil?.total_resenas;
+                  if (!rating || !reviews) return "";
+                  const fullStars = Math.floor(rating);
+                  const halfStar = rating - fullStars >= 0.5;
+                  const stars = "★".repeat(fullStars) + (halfStar ? "½" : "") + "☆".repeat(5 - fullStars - (halfStar ? 1 : 0));
+                  return `<div class="agent-rating"><span class="agent-stars">${stars}</span><span class="agent-reviews">${rating.toFixed(1)} (${reviews} reseñas)</span></div>`;
+                })()}
                 ${config.showInmobiliariaCreador && data.perfil.nombre_inmobiliaria ? `<div class="agent-company">${safeText(data.perfil.nombre_inmobiliaria)}</div>` : ""}
-                ${config.showInmobiliariaCreador && data.perfil.nombre_inmobiliaria && data.perfil.celular ? `<div class="agent-company">${safeText(data.perfil.nombre_inmobiliaria)}    ${safeText(data.perfil.celular)}</div>` : ""}
                 <div class="agent-contact">
                     ${config.showTelefonoCreador ? `<span>${safeText(getCreatorPhone(data.perfil))}</span>` : ""}
                 </div>
@@ -361,8 +405,7 @@ const generatePropertyHtml = (
             </div>
         </div>
         <div class="footer-logo-container">
-          <img src="https://www.ilyrox.com/Logo.jpeg" alt="Logo" class="Logo" />
-          <div class="footer-logo-text">ilyrox</div>
+          <img src="${LogoBase64}" alt="Ilyrox" class="Logo" />
         </div>
       </div>
     `;
@@ -372,8 +415,7 @@ const generatePropertyHtml = (
       <div class="footer-agent">
          <div class="agent-details">
             <div class="footer-logo-container">
-              <img src="https://www.ilyrox.com/Logo.jpeg" alt="Logo" class="Logo" />
-              <div class="footer-logo-text">ilyrox</div>
+              <img src="${LogoBase64}" alt="Ilyrox" class="Logo" />
             </div>
             ${idDateHtml}
          </div>
@@ -402,7 +444,21 @@ const generatePropertyHtml = (
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* Forzar impresion de colores de fondo. En iPhone el motor de PDF
+           (WebKit) descarta los backgrounds al imprimir por defecto, asi el
+           fondo verde del logo (y otros) desaparecia y el logo quedaba flotando.
+           Con esto el fondo se respeta en iOS igual que en Android. */
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        html, body {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
         body {
           font-family: 'Inter', sans-serif;
           background-color: #f3f4f6;
@@ -417,11 +473,26 @@ const generatePropertyHtml = (
             height: 420px; /* Ajuste para que se vea la imagen principal grande */
             background-color: #ddd;
             overflow: hidden;
+            /* Sin esto, el motor de impresión parte la imagen en el salto de página */
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-column-break-inside: avoid;
         }
         .hero-img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+        }
+        /* Portada VERTICAL: MISMA altura que la horizontal (420px) + object-fit
+           contain para que la foto se vea COMPLETA (sin recortar) centrada con
+           fondo neutro. No se sube la altura a proposito: una caja mas alta
+           empujaba la tarjeta/Descripcion a la 2a pagina (por page-break-inside:
+           avoid). Manteniendo la altura, los detalles quedan en la pagina 1. */
+        .hero-container.hero-portrait {
+            background-color: #f3f4f6;
+        }
+        .hero-container.hero-portrait .hero-img {
+            object-fit: contain;
         }
         .tag-badge {
             position: absolute;
@@ -452,6 +523,9 @@ const generatePropertyHtml = (
             padding: 30px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.08);
             margin-bottom: 30px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-column-break-inside: avoid;
         }
 
         .card-header {
@@ -493,7 +567,9 @@ const generatePropertyHtml = (
         /* --- STATS ICONS --- */
         .stats-row {
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            gap: 28px;
             padding: 20px 0;
             border-bottom: 1px solid #f0f0f0;
             margin-bottom: 20px;
@@ -503,6 +579,9 @@ const generatePropertyHtml = (
             display: flex;
             align-items: center;
             gap: 8px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-column-break-inside: avoid;
         }
         
         .stat-icon {
@@ -515,6 +594,12 @@ const generatePropertyHtml = (
             justify-content: center;
         }
         
+        .stat-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #777;
+        }
+
         .stat-value {
             font-size: 18px;
             font-weight: 700;
@@ -542,6 +627,9 @@ const generatePropertyHtml = (
             gap: 8px;
             color: #444;
             font-size: 13px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-column-break-inside: avoid;
         }
 
         /* --- DESCRIPTION SECTION (Imagen 2) --- */
@@ -550,6 +638,9 @@ const generatePropertyHtml = (
             padding: 40px;
             margin: 0 40px 30px 40px;
             border-radius: 12px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-column-break-inside: avoid;
         }
         
         .details-section h2 {
@@ -575,28 +666,35 @@ const generatePropertyHtml = (
             text-align: justify;
         }
 
-        /* --- GALLERY GRID --- */
+        /* --- GALLERY (tabla: paginación fiable en impresión) --- */
         .gallery-container {
             margin-top: 30px;
             padding: 20px 40px 40px 40px;
         }
-        .gallery-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px; /* Espaciado suave */
+        .gallery-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
         }
-        
-        .gallery-item img {
+        /* La fila entera no se parte: si no cabe, salta completa a la siguiente
+           página. Es lo que WebKit/Chromium sí respetan (a diferencia del grid). */
+        .gallery-row {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .gallery-cell {
+            width: 50%;
+            padding: 6px;
+            vertical-align: top;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .gallery-cell img {
             width: 100%;
             height: 220px;
             object-fit: cover;
             border-radius: 4px;
             display: block;
-        }
-        
-        /* Layout para la última imagen si es impar, para que ocupe todo el ancho */
-        .gallery-item:last-child:nth-child(odd) {
-             grid-column: span 2;
         }
 
         /* --- FOOTER & AGENT --- */
@@ -639,23 +737,37 @@ const generatePropertyHtml = (
             color: #666;
         }
 
+        .agent-rating {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 2px;
+        }
+
+        .agent-stars {
+            color: #f59e0b;
+            font-size: 13px;
+            letter-spacing: 1px;
+        }
+
+        .agent-reviews {
+            font-size: 11px;
+            color: #888;
+        }
+
         .footer-logo-container {
             display: flex;
             align-items: center;
             gap: 10px;
+            background: #45a0a5; /* teal de marca, como el header del feed */
+            padding: 8px 14px;
+            border-radius: 10px;
         }
 
         .Logo {
-            width: 40px;
             height: 40px;
-            border-radius: 8px;
-            object-fit: cover;
-        }
-
-        .footer-logo-text {
-            color: #3cc3ec;
-            font-weight: 900;
-            font-size: 24px;
+            width: auto;
+            object-fit: contain;
         }
         
         .id-date-footer {
@@ -684,7 +796,7 @@ const generatePropertyHtml = (
     </head>
     <body>
       
-      <div class="hero-container">
+      <div class="hero-container${config.heroIsPortrait ? " hero-portrait" : ""}">
         ${heroImage ? `<img src="${heroImage}" class="hero-img" />` : '<div style="width:100%;height:100%;background:#ccc;"></div>'}
         <div class="tag-badge">${statusLabel}</div>
       </div>
@@ -693,8 +805,12 @@ const generatePropertyHtml = (
         <div class="property-card">
             
             <div class="card-header">
-                <div class="property-title">${firstUpperCase(data.tipo)} generando ingresos</div>
-                <div class="property-subtitle">${data.subtipo ? safeText(data.subtipo) : "Ideal para inversión"}</div>
+                <div class="property-title">${
+                  data.subtipo
+                    ? firstUpperCase(data.subtipo)
+                    : firstUpperCase(data.tipo)
+                } en ${safeText(data.municipio || data.estado || data.ciudad || "")}</div>
+                <div class="property-subtitle">${firstUpperCase(data.tipo)}</div>
                 
                 <div class="price-section">
                     ${formatPriceSafe(operacionPrincipal?.precio, operacionPrincipal?.moneda)}
@@ -715,17 +831,30 @@ const generatePropertyHtml = (
                     ? `
                 <div class="stat-item">
                     <div class="stat-icon">${icons.bed}</div>
-                    <div class="stat-value">${data.habitaciones}</div>
+                    <span class="stat-label">Rec.</span>
+                    <span class="stat-value">${data.habitaciones}</span>
                 </div>`
                     : ""
                 }
-                
+
                 ${
                   config.showBanos && data.banos > 0
                     ? `
                 <div class="stat-item">
                     <div class="stat-icon">${icons.bath}</div>
-                    <div class="stat-value">${data.banos}</div>
+                    <span class="stat-label">Baños</span>
+                    <span class="stat-value">${data.banos}</span>
+                </div>`
+                    : ""
+                }
+
+                ${
+                  config.showMediosBanos && (data.medios_banos ?? 0) > 0
+                    ? `
+                <div class="stat-item">
+                    <div class="stat-icon">${icons.bath}</div>
+                    <span class="stat-label">Medios</span>
+                    <span class="stat-value">${data.medios_banos}</span>
                 </div>`
                     : ""
                 }
@@ -735,7 +864,8 @@ const generatePropertyHtml = (
                     ? `
                 <div class="stat-item">
                     <div class="stat-icon">${icons.car}</div>
-                    <div class="stat-value">${data.estacionamientos}</div>
+                    <span class="stat-label">Estac.</span>
+                    <span class="stat-value">${data.estacionamientos}</span>
                 </div>`
                     : ""
                 }
@@ -746,7 +876,8 @@ const generatePropertyHtml = (
                     ? `
                 <div class="stat-item">
                     <div class="stat-icon">${icons.home}</div>
-                    <div class="stat-value">${data.metros_cuadrados_construccion} <span style="font-size:12px; font-weight:400;">m²</span></div>
+                    <span class="stat-label">Const.</span>
+                    <span class="stat-value">${data.metros_cuadrados_construccion} <span style="font-size:12px; font-weight:400;">m²</span></span>
                 </div>`
                     : ""
                 }
@@ -757,7 +888,8 @@ const generatePropertyHtml = (
                     ? `
                 <div class="stat-item">
                     <div class="stat-icon">${icons.area}</div>
-                    <div class="stat-value">${data.metros_cuadrados_terreno} <span style="font-size:12px; font-weight:400;">m²</span></div>
+                    <span class="stat-label">Terreno</span>
+                    <span class="stat-value">${data.metros_cuadrados_terreno} <span style="font-size:12px; font-weight:400;">m²</span></span>
                 </div>`
                     : ""
                 }
@@ -766,7 +898,8 @@ const generatePropertyHtml = (
                      ? `
                 <div class="stat-item">
                     <div class="stat-icon">${icons.level}</div>
-                    <div class="stat-value">${data.pisos} <span style="font-size:12px; font-weight:400;">Pisos</span></div>
+                    <span class="stat-label">Niveles</span>
+                    <span class="stat-value">${data.pisos}</span>
                 </div>`
                      : ""
                  }
@@ -782,7 +915,7 @@ const generatePropertyHtml = (
          ${descripcionHtml}
       </div>
 
-      ${galleryHtml ? `<div class="gallery-container"><div class="gallery-grid">${galleryHtml}</div></div>` : ""}
+      ${galleryHtml ? `<div class="gallery-container"><table class="gallery-table"><tbody>${galleryHtml}</tbody></table></div>` : ""}
 
       ${creatorHtml}
     </body>
@@ -811,12 +944,20 @@ export const pdfService = {
       throw new Error("No se pudieron obtener los datos de la propiedad");
     }
 
+    // Orientación de la portada: si la primera foto es vertical, la caja de la
+    // portada se adapta (más alta + contain) para no recortarla.
+    const firstPhoto = (propertyData.fotos || []).find(
+      (f) => f && typeof f === "string" && f.startsWith("http"),
+    );
+    const heroIsPortrait = firstPhoto ? await isImagePortrait(firstPhoto) : false;
+
     // Determinar configuración según el modo
     const config = {
       ...(includeAllData
         ? { ...PDF_FIELD_CONFIG }
         : { ...PDF_FIELD_CONFIG, ...PDF_SIN_DATOS_OVERRIDE }),
       showDatosCompletos: includeAllData,
+      heroIsPortrait,
     };
 
     // Generar HTML

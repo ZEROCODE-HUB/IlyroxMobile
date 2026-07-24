@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  Modal,
   TextInput,
   FlatList,
 } from "react-native";
@@ -16,7 +15,6 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { FeedItem, User } from "../types";
-import PropertyDetail from "./Details/PropertyDetail";
 
 import { LeadPropertiesModal } from "./LeadPropertiesModal";
 import { AppHeader } from "./AppHeader";
@@ -53,6 +51,8 @@ interface LeadGroup {
   leadEmail?: string;
   coincidences: FeedItem[];
   similars: FeedItem[];
+  /** Objeto completo de busquedas_guardadas para el flujo de edición */
+  busquedaObject?: any;
   searchCriteria: {
     tipo_propiedad?: string;
     subtipo?: string;
@@ -74,7 +74,9 @@ interface LeadGroup {
 
 import { usePropertyFeedItems } from "../hooks/usePropertyFeedItems";
 import { LeadMatchCard } from "./LeadMatchCard";
-// ... (keep existing imports)
+import { SearchFiltersModal } from "./map/SearchFiltersModal";
+import { usePropertyFiltersStore } from "../store/propertyFiltersStore";
+import { useMatchesStore } from "../store/matchesStore";
 import { logger } from "@/utils/logger";
 
 const log = logger.scoped("Matches");
@@ -82,15 +84,16 @@ const log = logger.scoped("Matches");
 const Matches: React.FC = () => {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { setFiltersFromSearch } = usePropertyFiltersStore();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [savedSearches, setSavedSearches] = useState<any[]>([]);
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(
-    null,
-  );
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  // Estado para edición de búsqueda
+  const [editingBusqueda, setEditingBusqueda] = useState<any | null>(null);
+  const [showEditFilters, setShowEditFilters] = useState(false);
 
   // Hook para obtener FeedItems (likes/comments)
   const propertyIds = React.useMemo(
@@ -195,6 +198,22 @@ const Matches: React.FC = () => {
     fetchMatches();
   }, [user]);
 
+  // Al abrir la pantalla, marcar los matches sin ver como vistos: limpia el
+  // badge del header (useMatchesStore) espejo del contador useUnseenMatchesCount.
+  useEffect(() => {
+    if (!user) return;
+    // Vacía el badge al instante; el UPDATE persiste el visto_en en segundo plano.
+    useMatchesStore.getState().setUnseenCount(0);
+    supabase
+      .from("matches")
+      .update({ visto_en: new Date().toISOString() })
+      .eq("usuario_id", user.id)
+      .is("visto_en", null)
+      .then(({ error }) => {
+        if (error) log.error("No se pudieron marcar los matches como vistos:", error);
+      });
+  }, [user]);
+
   const handleDeleteSearch = async (busquedaId: string) => {
     try {
       // Soft delete de la búsqueda guardada
@@ -224,6 +243,18 @@ const Matches: React.FC = () => {
     fetchMatches();
   };
 
+  const handleEditSearch = useCallback((busqueda: any) => {
+    setFiltersFromSearch(busqueda);
+    setEditingBusqueda(busqueda);
+    setShowEditFilters(true);
+  }, [setFiltersFromSearch]);
+
+  const handleUpdateDone = useCallback(() => {
+    setShowEditFilters(false);
+    setEditingBusqueda(null);
+    fetchMatches();
+  }, []);
+
   // Agrupar matches por lead e incluir búsquedas sin matches
   const groupMatchesByLead = (
     matchesList: MatchData[],
@@ -242,6 +273,7 @@ const Matches: React.FC = () => {
           leadPhone: lead.telefono || "Sin teléfono",
           leadEmail: lead.correo || lead.email,
           busquedaId: search.id,
+          busquedaObject: search,
           matches: [],
           properties: [],
           latestMatchDate: search.created_at, // Usar fecha de creación de búsqueda por defecto
@@ -393,6 +425,7 @@ const Matches: React.FC = () => {
         likes: feedData?.likes_count || 0,
         comments: feedData?.comentarios_count || 0,
         timestamp: new Date(match.created_at).toLocaleDateString(),
+        matchedAt: match.created_at,
         propertyDetails: {
           id: prop.id,
           title: `${prop.subtipo} en ${prop.municipio}`,
@@ -407,10 +440,18 @@ const Matches: React.FC = () => {
             colony: prop.colonia,
             municipio: prop.municipio,
           },
+          // Coordenadas: sin ellas el MapModal mostraba "Mapa No Disponible".
+          latitud: prop.latitud != null ? Number(prop.latitud) : undefined,
+          longitud: prop.longitud != null ? Number(prop.longitud) : undefined,
+          coordinates:
+            prop.latitud != null && prop.longitud != null
+              ? { lat: Number(prop.latitud), lng: Number(prop.longitud) }
+              : undefined,
           images: propertyImages,
           features: {
             beds: prop.habitaciones,
             baths: prop.banos,
+            halfBaths: prop.medios_banos || 0,
             parking: prop.estacionamientos,
             constructionSqft: prop.metros_cuadrados_construccion,
             landSqft: prop.metros_cuadrados_terreno,
@@ -483,6 +524,7 @@ const Matches: React.FC = () => {
       currency={item.currency}
       matchCount={item.matchCount}
       similarCount={item.similarCount}
+      latestMatchDate={item.latestMatchDate}
       onPress={() => setSelectedLeadId(item.leadId)}
     />
   );
@@ -554,6 +596,29 @@ const Matches: React.FC = () => {
             </View>
           )
         }
+        ListFooterComponent={
+          leadGroups.length > 0 ? (
+            <View style={styles.banner}>
+              <View style={styles.bannerIconCircle}>
+                <Ionicons name="notifications" size={20} color={COLORS.white} />
+              </View>
+              <Text style={styles.bannerText}>
+                <Text style={styles.bannerTextStrong}>
+                  ILYROX busca propiedades 24/7
+                </Text>
+                {" para tus clientes y las clasifica en matches exactos o "}
+                {"similares. Contacta rápido a tus clientes antes que otros "}
+                {"asesores."}
+              </Text>
+              <Ionicons
+                name="people-outline"
+                size={26}
+                color={COLORS.primary}
+                style={styles.bannerPeopleIcon}
+              />
+            </View>
+          ) : null
+        }
         initialNumToRender={5}
         maxToRenderPerBatch={5}
         windowSize={5}
@@ -569,28 +634,63 @@ const Matches: React.FC = () => {
           leadPhone={selectedLead.leadPhone}
           leadEmail={selectedLead.leadEmail ?? ""}
           busquedaId={selectedLead.busquedaId}
+          busqueda={selectedLead.busquedaObject}
           coincidences={selectedLead.coincidences}
           similars={selectedLead.similars}
           searchCriteria={selectedLead.searchCriteria}
           onPropertyClick={(propertyId) => {
-            setSelectedPropertyId(propertyId);
+            // El detalle es una pantalla de stack. Si la abrimos con el modal
+            // del lead presentado, en iOS queda por detrás (no abre nada).
+            // Cerramos el modal y navegamos en el siguiente tick.
+            setSelectedLeadId(null);
+            setTimeout(
+              () =>
+                router.push({
+                  pathname: "/property/[id]",
+                  params: { id: propertyId },
+                }),
+              350,
+            );
           }}
           onUserClick={(user) => {
-            router.push({ pathname: "/user/[id]", params: { id: user.id } });
+            setSelectedLeadId(null);
+            setTimeout(
+              () =>
+                router.push({ pathname: "/user/[id]", params: { id: user.id } }),
+              350,
+            );
           }}
           onDeleteSearch={handleDeleteSearch}
           currentUserId={user?.id}
+          onEditSearch={
+            selectedLead.busquedaObject
+              ? () => {
+                  // SearchFiltersModal es otro <Modal> nativo. En iOS no se
+                  // puede presentar sobre el del lead (ambos desde la raíz):
+                  // falla en silencio. Cerramos primero el del lead y en un
+                  // tick posterior abrimos el de edición.
+                  const busqueda = selectedLead.busquedaObject;
+                  setSelectedLeadId(null);
+                  setTimeout(() => handleEditSearch(busqueda), 350);
+                }
+              : undefined
+          }
         />
       )}
 
-      {/* Modal de detalle de propiedad */}
-      {selectedPropertyId && (
-        <Modal visible={!!selectedPropertyId} animationType="slide">
-          <PropertyDetail
-            propertyId={selectedPropertyId}
-          />
-        </Modal>
-      )}
+      {/* Modal de filtros en modo edición */}
+      <SearchFiltersModal
+        visible={showEditFilters}
+        onClose={() => {
+          setShowEditFilters(false);
+          setEditingBusqueda(null);
+        }}
+        editBusquedaId={editingBusqueda?.id}
+        onUpdateSearch={handleUpdateDone}
+        filteredPropertiesCount={0}
+        userId={user?.id}
+      />
+
     </ScreenWrapper>
   );
 };
@@ -667,6 +767,36 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 15,
     color: COLORS.textPrimary,
+  },
+  banner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.successLight,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 8,
+  },
+  bannerIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  bannerText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: COLORS.textSecondary,
+  },
+  bannerTextStrong: {
+    color: COLORS.primary,
+    fontWeight: "700",
+  },
+  bannerPeopleIcon: {
+    marginLeft: 12,
   },
 });
 

@@ -59,8 +59,11 @@ const RecommendedUsersModal: React.FC<RecommendedUsersModalProps> = ({
                 <Text style={styles.recommendedModalName} numberOfLines={1}>
                   {item.name}
                 </Text>
+                {/* La etiqueta es la OCUPACIÓN, no `rol`: `rol` es el permiso
+                    en la app (cliente/admin/web) y nadie lo tiene en "agente",
+                    así que a todos les salía "Cliente". */}
                 <Text style={styles.recommendedModalRole} numberOfLines={1}>
-                  {item.role === "agente" ? "Agente" : "Cliente"}
+                  {item.ocupacion?.trim() || "Cliente"}
                 </Text>
               </View>
             </View>

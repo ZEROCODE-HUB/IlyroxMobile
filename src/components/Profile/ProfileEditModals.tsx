@@ -52,10 +52,15 @@ export const ProfileEditModals: React.FC<ProfileEditModalsProps> = ({
           animationType="slide"
           presentationStyle="pageSheet"
           onRequestClose={onCloseProperty}
+          // iOS: el swipe-down del pageSheet NO dispara onRequestClose; sin
+          // onDismiss el estado del padre queda en true con el modal ya cerrado
+          // (desincronizado, no reabre). onDismiss lo sincroniza.
+          onDismiss={onCloseProperty}
         >
           <PropertyDetail
             propertyId={selectedProperty.id}
             onRefresh={handleSilentRefresh}
+            onClose={onCloseProperty}
           />
         </Modal>
       )}
@@ -65,6 +70,7 @@ export const ProfileEditModals: React.FC<ProfileEditModalsProps> = ({
           animationType="slide"
           presentationStyle="pageSheet"
           onRequestClose={() => onCloseEditProperty(false)}
+          onDismiss={() => onCloseEditProperty(false)}
         >
           <CreateProperty
             onBack={(shouldRefresh) => onCloseEditProperty(shouldRefresh)}
@@ -93,6 +99,7 @@ export const ProfileEditModals: React.FC<ProfileEditModalsProps> = ({
           animationType="slide"
           presentationStyle="pageSheet"
           onRequestClose={onCloseOpenHouseModal}
+          onDismiss={onCloseOpenHouseModal}
         >
           <CreatePost
             post={openHousePost}

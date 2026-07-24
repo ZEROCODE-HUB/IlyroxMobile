@@ -4,17 +4,24 @@
  */
 
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
+import { ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { Avatar } from "../../../components/shared";
 import { SubmitButton } from "./SubmitButton";
 import { BackButton } from "./BackButton";
+import { LegalAcceptanceText } from "./LegalAcceptanceText";
+import { CareerStartDateField } from "./CareerStartDateField";
 import SelectionModal from "../../../components/modals/SelectionModal";
 import { PendingExternalUser, ExternalAuthFormData } from "../hooks/useExternalAuth";
-import { ESTADOS_MEXICO } from "../../../constants/locations";
+import { ESTADOS_MEXICO } from "../../../constants/estadosMexico";
 import { COLORS } from "../../../constants/colors";
 
 interface ExternalAuthFormProps {
@@ -38,13 +45,6 @@ const OCUPACIONES = [
 
 const MODALIDADES = ["Inmobiliaria", "Independiente"];
 
-const EXPERIENCIA_OPTIONS = [...Array(51).keys()].map((n) => ({
-  label: `${n} años`,
-  value: n.toString(),
-}));
-
-EXPERIENCIA_OPTIONS.push({ label: "+ 50 años", value: "50+" });
-
 export function ExternalAuthForm({
   pendingUser,
   formData,
@@ -56,7 +56,6 @@ export function ExternalAuthForm({
   const [showEstadoModal, setShowEstadoModal] = useState(false);
   const [showOcupacionModal, setShowOcupacionModal] = useState(false);
   const [showModalidadModal, setShowModalidadModal] = useState(false);
-  const [showExperienciaModal, setShowExperienciaModal] = useState(false);
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -72,16 +71,12 @@ export function ExternalAuthForm({
   };
 
   return (
-    <KeyboardAwareScrollView
-      extraScrollHeight={100}
-      extraHeight={120}
-      enableOnAndroid={true}
-      enableAutomaticScroll={true}
-      keyboardOpeningTime={0}
-      enableResetScrollToCoords={false}
-      keyboardShouldPersistTaps="handled"
+    <ScrollView
+      style={styles.scroll}
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
     >
       <Text style={styles.stepTitle}>Completa tu Registro</Text>
 
@@ -210,33 +205,15 @@ export function ExternalAuthForm({
         </>
       )}
 
-      {/* Años de experiencia */}
-      <TouchableOpacity
-        style={styles.selectButton}
-        onPress={() => setShowExperienciaModal(true)}
-        activeOpacity={0.7}
-      >
-        <Text
-          style={[
-            styles.selectText,
-            !formData.anosExperiencia && styles.selectPlaceholder,
-          ]}
-        >
-          {formData.anosExperiencia
-            ? `${formData.anosExperiencia} años`
-            : "Años de experiencia *"}
-        </Text>
-        <Ionicons name="chevron-down" size={20} color={COLORS.textSecondary} />
-      </TouchableOpacity>
-
-      <SelectionModal
-        visible={showExperienciaModal}
-        onClose={() => setShowExperienciaModal(false)}
-        onSelect={(v) => onUpdateField("anosExperiencia", v)}
-        title="Años de experiencia"
-        options={EXPERIENCIA_OPTIONS}
-        currentValue={formData.anosExperiencia}
+      {/* Fecha de inicio de carrera */}
+      <CareerStartDateField
+        value={formData.fechaInicioCarrera}
+        onChange={(iso) => onUpdateField("fechaInicioCarrera", iso)}
+        label="¿Cuándo iniciaste tu carrera? *"
+        buttonStyle={styles.selectButton}
       />
+
+      <LegalAcceptanceText />
 
       <SubmitButton
         loading={loading}
@@ -244,11 +221,14 @@ export function ExternalAuthForm({
         text="Guardar y Continuar"
       />
       <BackButton onPress={onCancel} text="Cancelar registro" />
-    </KeyboardAwareScrollView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flexShrink: 1,
+  },
   container: {
     flexGrow: 1,
     paddingBottom: 20,

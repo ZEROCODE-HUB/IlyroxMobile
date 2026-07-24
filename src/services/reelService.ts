@@ -4,7 +4,7 @@ import { logger } from "@/utils/logger";
 
 const log = logger.scoped("reelService");
 
-export interface ContextualReelRow {
+export interface ReelFeedRow {
   feed_item_id: string;
   reel_id: string;
   autor_id: string;
@@ -15,25 +15,24 @@ export interface ContextualReelRow {
   video_url?: string;
   likes_count?: number;
   comentarios_count?: number;
-  tipo_match: "actual" | "anterior" | "posterior";
 }
 
 export const reelService = {
-  async getContextualFeed(
-    targetReelId: string,
-    limitAround: number,
-  ): Promise<ContextualReelRow[]> {
-    const { data, error } = await supabase.rpc("get_reels_feed_contextual", {
-      p_target_reel_id: targetReelId,
-      p_limit_around: limitAround,
+  async getReelsFeed(
+    limit: number,
+    offset: number,
+  ): Promise<ReelFeedRow[]> {
+    const { data, error } = await supabase.rpc("get_reels_feed_paged", {
+      p_limit: limit,
+      p_offset: offset,
     });
 
     if (error) {
-      log.error("getContextualFeed failed", error);
+      log.error("getReelsFeed failed", error);
       return [];
     }
 
-    return (data ?? []) as ContextualReelRow[];
+    return (data ?? []) as ReelFeedRow[];
   },
 
   async reelsByUser(targetUserId: string) {

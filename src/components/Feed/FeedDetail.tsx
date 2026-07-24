@@ -9,6 +9,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 import { FeedItem, User } from "../../types";
+import { getCamposVisibles } from "../../constants/propertyData";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import UserHeader from "../UserHeader";
 import ActionButtons from "../ActionButtons";
@@ -45,6 +46,14 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
   const hasImages = images.length > 0;
   const isSearchPost = item.postType === "busqueda";
   const isShortContent = item.content.length < 100;
+
+  // Qué características mostrar según el tipo/subtipo de la propiedad.
+  const campos = item.propertyDetails
+    ? getCamposVisibles(
+        item.propertyDetails.subtype,
+        item.propertyDetails.type,
+      )
+    : null;
 
   // Ref para el estado de comentarios (para el PanResponder)
   const showCommentsRef = useRef(false);
@@ -109,6 +118,7 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
                 item.propertyDetails?.codigo_propiedad ||
                 item.propertyDetails?.code
               }
+              initialShares={item.shares}
             />
           </View>
         )}
@@ -116,7 +126,11 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
         {/* Área de contenido principal */}
         {isSpecialPost ? (
           <View style={styles.specialCardWrapper}>
-            <SpecialPostCard item={item} mode="detail" />
+            <SpecialPostCard
+              item={item}
+              mode="detail"
+              currentUserId={currentUserId}
+            />
           </View>
         ) : null}
 
@@ -140,24 +154,45 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
 
               {/* Stats de la propiedad */}
               <View style={styles.statsGrid}>
-                <View style={styles.statBox}>
-                  <Text style={styles.statValue}>
-                    {item.propertyDetails.features.beds}
-                  </Text>
-                  <Text style={styles.statLabel}>Recámaras</Text>
-                </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statValue}>
-                    {item.propertyDetails.features.baths}
-                  </Text>
-                  <Text style={styles.statLabel}>Baños</Text>
-                </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statValue}>
-                    {item.propertyDetails.features.constructionSqft}
-                  </Text>
-                  <Text style={styles.statLabel}>m²</Text>
-                </View>
+                {campos?.recamaras &&
+                  item.propertyDetails.features.beds > 0 && (
+                    <View style={styles.statBox}>
+                      <Text style={styles.statValue}>
+                        {item.propertyDetails.features.beds}
+                      </Text>
+                      <Text style={styles.statLabel}>Recámaras</Text>
+                    </View>
+                  )}
+                {campos?.banos && item.propertyDetails.features.baths > 0 && (
+                  <View style={styles.statBox}>
+                    <Text style={styles.statValue}>
+                      {item.propertyDetails.features.baths}
+                    </Text>
+                    <Text style={styles.statLabel}>Baños</Text>
+                  </View>
+                )}
+                {campos?.m2Construccion &&
+                  item.propertyDetails.features.constructionSqft > 0 && (
+                    <View style={styles.statBox}>
+                      <Text style={styles.statValue}>
+                        {item.propertyDetails.features.constructionSqft.toLocaleString(
+                          "es-MX",
+                        )}
+                      </Text>
+                      <Text style={styles.statLabel}>m² const.</Text>
+                    </View>
+                  )}
+                {campos?.m2Terreno &&
+                  item.propertyDetails.features.landSqft > 0 && (
+                    <View style={styles.statBox}>
+                      <Text style={styles.statValue}>
+                        {item.propertyDetails.features.landSqft.toLocaleString(
+                          "es-MX",
+                        )}
+                      </Text>
+                      <Text style={styles.statLabel}>m² terreno</Text>
+                    </View>
+                  )}
               </View>
             </View>
           )}
@@ -229,6 +264,7 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
                   item.propertyDetails?.codigo_propiedad ||
                   item.propertyDetails?.code
                 }
+                initialShares={item.shares}
               />
             </View>
           )}

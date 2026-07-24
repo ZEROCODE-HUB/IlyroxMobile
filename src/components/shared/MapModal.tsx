@@ -67,7 +67,13 @@ export const MapModal: React.FC<MapModalProps> = ({
               </View>
 
               <View style={styles.mapWrapper}>
-                {hasCoords ? (
+                {/* El MapView (Apple Maps en iOS) solo se monta cuando el modal
+                    está ABIERTO. Los hijos de un <Modal> de RN se montan aunque
+                    visible=false, así que sin este guard CADA PropertyCard de la
+                    lista instanciaba un mapa de Apple en segundo plano —
+                    carísimo en iPhone y causa de la lentitud al abrir listas con
+                    muchas tarjetas. Al abrir el modal se monta al instante. */}
+                {hasCoords && visible ? (
                   <MapDetails
                     property={property}
                     containerStyle={{
@@ -77,7 +83,7 @@ export const MapModal: React.FC<MapModalProps> = ({
                       borderWidth: 0,
                     }}
                   />
-                ) : (
+                ) : hasCoords ? null : (
                   <View style={styles.noLocation}>
                     <View style={styles.noLocationIcon}>
                       <Ionicons
@@ -123,11 +129,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.6)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: 12,
   },
   modalContent: {
-    width: SCREEN_WIDTH - 40,
-    maxWidth: 500,
+    width: SCREEN_WIDTH - 24,
+    maxWidth: 560,
     backgroundColor: COLORS.white,
     borderRadius: 24,
     overflow: "hidden",

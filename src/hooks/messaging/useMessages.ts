@@ -10,10 +10,15 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/utils/logger";
 import { RealtimeChannel } from "@supabase/supabase-js";
-import { Platform } from "react-native";
+import { Image as RNImage, Platform } from "react-native";
+import * as ImageManipulator from "expo-image-manipulator";
+
+/** Ancho máximo de una foto enviada por chat. Ver `compressImage`. */
+const MAX_IMAGE_WIDTH = 1600;
 
 const log = logger.scoped("useMessages");
 import { useModal } from "@/context/ModalContext";
@@ -51,6 +56,7 @@ const PAGE_SIZE = 20;
 export function useMessages(conversationId: string | null, userId?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const { showModal } = useModal();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +111,74 @@ export function useMessages(conversationId: string | null, userId?: string) {
   };
 
   /**
+   * Comprimir una foto antes de subirla al chat.
+   *
+   * La cámara del teléfono entrega originales de 2-4 MB (y en iPhone, HEIC, que
+   * Android ni siquiera sabe pintar). A ese peso la burbuja tardaba una eternidad
+   * o se quedaba en gris para siempre. 1600px de ancho con calidad 0.7 deja
+   * ~200-400 KB y salida JPEG garantizada.
+   *
+   * Solo aplica a fotos: los videos van por la misma carpeta `images` y el
+   * manipulador no los toca. Si la compresión falla, se sube el original.
+   */
+  const compressImage = async (fileUri: string): Promise<string> => {
+    if (/\.(mp4|mov|avi|mkv|m4v|webm)(\?|#|$)/i.test(fileUri)) return fileUri;
+
+    try {
+      // Solo se reescala si excede el ancho objetivo; sin esto, `resize` también
+      // AMPLÍA las imágenes pequeñas y acaban pesando más que el original.
+      const width = await new Promise<number>((resolve) =>
+        RNImage.getSize(
+          fileUri,
+          (w) => resolve(w),
+          () => resolve(0),
+        ),
+      );
+      const actions =
+        width > MAX_IMAGE_WIDTH ? [{ resize: { width: MAX_IMAGE_WIDTH } }] : [];
+
+      const result = await ImageManipulator.manipulateAsync(fileUri, actions, {
+        compress: 0.7,
+        format: ImageManipulator.SaveFormat.JPEG,
+      });
+      return result.uri;
+    } catch (err) {
+      log.warn("No se pudo comprimir la imagen, se sube el original:", err);
+      return fileUri;
+    }
+  };
+
+  /**
+   * Comprime un video ANTES de enviarlo por chat. Los videos de la galería
+   * llegan crudos (varios MB, hasta 48 MB) y saturan la subida móvil;
+   * react-native-compressor los transcodifica en el dispositivo (modo "auto":
+   * ~720p con bitrate razonable) y devuelve un `.mp4`, así que la detección de
+   * video por extensión (MessageBubble/MessageInput) sigue funcionando.
+   *
+   * Se carga con `require` PEREZOSO + try/catch: la compresión añade un módulo
+   * nativo (build nuevo). Un binario viejo que reciba este mismo bundle por OTA
+   * no lo tiene; en ese caso —o ante cualquier fallo— se sube el ORIGINAL.
+   * Comprimir nunca debe impedir enviar.
+   */
+  const compressVideo = async (fileUri: string): Promise<string> => {
+    if (!/\.(mp4|mov|avi|mkv|m4v|webm)(\?|#|$)/i.test(fileUri)) return fileUri;
+
+    try {
+      const { Video } = require("react-native-compressor");
+      const compressed = await Video.compress(fileUri, {
+        compressionMethod: "auto",
+        // Sin esto el modo "auto" limita el lado mayor a 640px (calidad pobre
+        // para video). 1280 = ~720p: buena calidad y aún muy por debajo de 48MB.
+        maxSize: 1280,
+      });
+      return compressed || fileUri;
+    } catch (err) {
+      log.warn("No se pudo comprimir el video, se sube el original:", err);
+      return fileUri;
+    }
+  };
+
+  /**
    * Subir archivo a Supabase Storage
    */
   const uploadFile = async (
@@ -115,6 +189,14 @@ export function useMessages(conversationId: string | null, userId?: string) {
       let fileContent: string | Blob | ArrayBuffer;
       let contentType: string | undefined;
       let uploadPath: string;
+
+      if (folder === "images") {
+        // La carpeta "images" transporta fotos Y videos del chat. Las fotos van
+        // por el manipulador (1600px/JPEG); los videos por el compresor nativo.
+        fileUri = /\.(mp4|mov|avi|mkv|m4v|webm)(\?|#|$)/i.test(fileUri)
+          ? await compressVideo(fileUri)
+          : await compressImage(fileUri);
+      }
 
       if (Platform.OS === "web") {
         const response = await fetch(fileUri);
@@ -165,14 +247,16 @@ export function useMessages(conversationId: string | null, userId?: string) {
         contentType?.startsWith("image/") ||
         fileUri.match(/\.(jpg|jpeg|png|gif|webp)$/i);
 
-      let limit = 20 * 1024 * 1024; // Default: 20MB (Files)
+      // Topes alineados con MessageInput y bajo el límite global de 50MB del
+      // bucket `fotos` (plan free). La imagen ya llega recomprimida aquí.
+      let limit = 45 * 1024 * 1024; // Default: 45MB (archivos)
       let typeLabel = "archivo";
 
       if (isVideo) {
-        limit = 40 * 1024 * 1024; // 40MB
+        limit = 48 * 1024 * 1024; // 48MB
         typeLabel = "video";
       } else if (isImage) {
-        limit = 5 * 1024 * 1024; // 5MB
+        limit = 25 * 1024 * 1024; // 25MB
         typeLabel = "imagen";
       }
 
@@ -247,6 +331,16 @@ export function useMessages(conversationId: string | null, userId?: string) {
         .single();
 
       if (createError) throw createError;
+
+      // Forzar refresh inmediato de las listas de conversaciones de ambos usuarios,
+      // sin esperar al debounce de realtime ni al trigger de agrupaciones.
+      queryClient.invalidateQueries({
+        queryKey: ["conversations", userId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["conversations", metadata.destinatario_id],
+      });
+
       return newConv.id;
     } catch (err: any) {
       log.error("Error ensuring conversation exists:", err);
@@ -360,6 +454,13 @@ export function useMessages(conversationId: string | null, userId?: string) {
           .eq("id", finalConversationId);
       }
 
+      // Reordenar la lista de conversaciones AL INSTANTE (que la conversación
+      // suba hasta arriba al volver a la lista) sin esperar al realtime/refetch,
+      // que puede tardar 30-60s.
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
+      }
+
       return data?.[0] || true;
     } catch (err: any) {
       log.error("Error sending message:", err);
@@ -466,6 +567,10 @@ export function useMessages(conversationId: string | null, userId?: string) {
           .eq("id", finalConversationId);
       }
 
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
+      }
+
       return true;
     } catch (err: any) {
       log.error("Error sending image:", err);
@@ -568,6 +673,10 @@ export function useMessages(conversationId: string | null, userId?: string) {
             ultimo_mensaje_en: new Date().toISOString(),
           })
           .eq("id", finalConversationId);
+      }
+
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
       }
 
       return true;
@@ -684,6 +793,10 @@ export function useMessages(conversationId: string | null, userId?: string) {
             ultimo_mensaje_en: new Date().toISOString(),
           })
           .eq("id", finalConversationId);
+      }
+
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
       }
 
       return true;

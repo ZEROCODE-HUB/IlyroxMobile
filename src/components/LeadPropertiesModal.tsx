@@ -5,16 +5,30 @@ import {
   Modal,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useModal } from "../context/ModalContext";
 import PropertyCard from "./cards/PropertyCard";
 import { AppHeader } from "./AppHeader";
 import { COLORS } from "../constants";
-import { FeedItem, User } from "../types";
+import { busquedas_guardadas, FeedItem, User } from "../types";
 import { ScreenWrapper } from "../screens/ScreenWrapper";
 import { CommentsBottomSheet } from "./modals";
+import { ConfirmationModal } from "./modals/ConfirmationModal";
+
+/** Tiempo relativo: "hace un momento" / "hace N min" / "hace N h" / "hace N días". */
+const formatRelative = (dateStr?: string): string => {
+  if (!dateStr) return "";
+  const then = new Date(dateStr).getTime();
+  if (isNaN(then)) return "";
+  const min = Math.floor((Date.now() - then) / 60000);
+  if (min < 1) return "hace un momento";
+  if (min < 60) return `hace ${min} min`;
+  const hours = Math.floor(min / 60);
+  if (hours < 24) return `hace ${hours} h`;
+  const days = Math.floor(hours / 24);
+  return `hace ${days} ${days === 1 ? "día" : "días"}`;
+};
 
 interface LeadPropertiesModalProps {
   visible: boolean;
@@ -48,6 +62,10 @@ interface LeadPropertiesModalProps {
   onUserClick: (user: User) => void;
   onDeleteSearch: (busquedaId: string) => void;
   currentUserId?: string;
+  /** Objeto completo de la búsqueda guardada (para pasar al flujo de edición) */
+  busqueda?: busquedas_guardadas;
+  /** Callback para abrir el flujo de edición de criterios */
+  onEditSearch?: () => void;
 }
 
 export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
@@ -64,8 +82,9 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
   onUserClick,
   onDeleteSearch,
   currentUserId,
+  busqueda,
+  onEditSearch,
 }) => {
-  const { showModal } = useModal();
   const [activeTab, setActiveTab] = useState<"coincidencia" | "similar">(
     "coincidencia",
   );
@@ -73,19 +92,16 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
     null,
   );
   const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const handleDeleteSearchInternal = () => {
-    showModal({
-      title: "Eliminar búsqueda",
-      message:
-        "¿Estás seguro de que deseas eliminar esta búsqueda guardada? Se eliminarán todos los matches asociados.",
-      confirmText: "Eliminar",
-      cancelText: "Cancelar",
-      onConfirm: () => {
-        onDeleteSearch(busquedaId);
-        onClose();
-      },
-    });
+  // El ConfirmationModal global de ModalContext se renderiza en la raíz de la
+  // app y queda invisible detrás de este <Modal> nativo (bug modal-dentro-de-
+  // modal en iOS). Usamos un ConfirmationModal LOCAL, hijo de este modal, que sí
+  // se presenta encima. Ver reference_ilyrox_modal_dentro_de_modal.
+  const handleConfirmDelete = () => {
+    setShowDeleteConfirm(false);
+    onDeleteSearch(busquedaId);
+    onClose();
   };
 
   const handleCommentClick = (feedItemId: string) => {
@@ -94,7 +110,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
   };
 
   const activeList = activeTab === "coincidencia" ? coincidences : similars;
-  const badgeColor = activeTab === "coincidencia" ? "#FF3B30" : "#8E8E93";
+  const badgeColor = activeTab === "coincidencia" ? COLORS.primary : "#8E8E93";
   const badgeText = activeTab === "coincidencia" ? "Match" : "Similar";
 
   const formatCompactPrice = (amount: number) => {
@@ -134,16 +150,30 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
               showBackButton
               onBack={onClose}
               rightComponent={
-                <TouchableOpacity
-                  onPress={handleDeleteSearchInternal}
-                  style={styles.deleteBtn}
-                >
-                  <Ionicons
-                    name="trash-outline"
-                    size={22}
-                    color={COLORS.error}
-                  />
-                </TouchableOpacity>
+                <View style={styles.headerActions}>
+                  {onEditSearch && (
+                    <TouchableOpacity
+                      onPress={onEditSearch}
+                      style={styles.headerBtn}
+                    >
+                      <Ionicons
+                        name="create-outline"
+                        size={22}
+                        color={COLORS.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => setShowDeleteConfirm(true)}
+                    style={styles.headerBtn}
+                  >
+                    <Ionicons
+                      name="trash-outline"
+                      size={22}
+                      color={COLORS.error}
+                    />
+                  </TouchableOpacity>
+                </View>
               }
             />
 
@@ -227,6 +257,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                   styles.tabText,
                   activeTab === "coincidencia" && styles.activeTabText,
                 ]}
+                numberOfLines={1}
               >
                 Coincidencias ({coincidences.length})
               </Text>
@@ -243,19 +274,69 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                   styles.tabText,
                   activeTab === "similar" && styles.activeTabText,
                 ]}
+                numberOfLines={1}
               >
                 Similares ({similars.length})
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Properties List */}
-          <ScrollView
+          {/* Properties List — FlatList VIRTUALIZADO.
+              Antes era un ScrollView con activeList.map(): instanciaba TODAS las
+              tarjetas (con sus imágenes) de una sola vez. Con muchos matches
+              (p.ej. 184) eso congelaba la UI ~15s en Android y más en iPhone.
+              El FlatList solo monta las visibles (+ un margen), así que abre al
+              instante sin importar el total. */}
+          <FlatList
+            data={activeList}
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
-          >
-            {activeList.length === 0 ? (
+            keyExtractor={(item, index) => item.id || String(index)}
+            initialNumToRender={4}
+            maxToRenderPerBatch={4}
+            windowSize={7}
+            renderItem={({ item: property }) => (
+              <View style={styles.propertyCardWrapper}>
+                <PropertyCard
+                  onUserClick={(user) => onUserClick(user)}
+                  item={property}
+                  onClick={() =>
+                    onPropertyClick(property.propertyDetails?.id || property.id)
+                  }
+                  onCommentClick={() => handleCommentClick(property.id)}
+                  currentUserId={currentUserId}
+                  // Cerrar este modal nativo antes de abrir la pantalla de
+                  // mensajes; si no, en iOS se abre por detrás.
+                  onBeforeNavigate={() =>
+                    new Promise<void>((resolve) => {
+                      onClose();
+                      setTimeout(resolve, 350);
+                    })
+                  }
+                />
+                {/* Badge Overlay */}
+                <View
+                  style={[styles.cardBadge, { backgroundColor: badgeColor }]}
+                >
+                  <Text style={styles.cardBadgeText}>{badgeText}</Text>
+                </View>
+                {/* Tiempo en que Ilyrox encontró el match */}
+                {property.matchedAt ? (
+                  <View style={styles.foundRow}>
+                    <Ionicons
+                      name="time-outline"
+                      size={12}
+                      color={COLORS.textTertiary}
+                    />
+                    <Text style={styles.foundText}>
+                      Encontrado {formatRelative(property.matchedAt)}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
+            ListEmptyComponent={
               <View style={styles.emptyState}>
                 <Ionicons
                   name="search-outline"
@@ -266,33 +347,8 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                   No hay propiedades en esta sección
                 </Text>
               </View>
-            ) : (
-              activeList.map((property, index) => (
-                <View
-                  key={property.id || index}
-                  style={styles.propertyCardWrapper}
-                >
-                  <PropertyCard
-                    onUserClick={(user) => onUserClick(user)}
-                    item={property}
-                    onClick={() =>
-                      onPropertyClick(
-                        property.propertyDetails?.id || property.id,
-                      )
-                    }
-                    onCommentClick={() => handleCommentClick(property.id)}
-                    currentUserId={currentUserId}
-                  />
-                  {/* Badge Overlay */}
-                  <View
-                    style={[styles.cardBadge, { backgroundColor: badgeColor }]}
-                  >
-                    <Text style={styles.cardBadgeText}>{badgeText}</Text>
-                  </View>
-                </View>
-              ))
-            )}
-          </ScrollView>
+            }
+          />
 
           {/* Comments Modal */}
           {selectedFeedItemId && (
@@ -306,6 +362,19 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
               currentUserId={currentUserId}
             />
           )}
+
+          {/* Confirmación de borrado — local, para que se presente encima del
+              <Modal> nativo y no detrás (ver handleConfirmDelete). */}
+          <ConfirmationModal
+            visible={showDeleteConfirm}
+            title="Eliminar búsqueda"
+            message="¿Estás seguro de que deseas eliminar esta búsqueda guardada? Se eliminarán todos los matches asociados."
+            confirmText="Eliminar"
+            cancelText="Cancelar"
+            confirmVariant="danger"
+            onConfirm={handleConfirmDelete}
+            onCancel={() => setShowDeleteConfirm(false)}
+          />
         </View>
       </ScreenWrapper>
     </Modal>
@@ -323,7 +392,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
   },
-  deleteBtn: {
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  headerBtn: {
     padding: 4,
   },
   searchInfoSection: {
@@ -444,6 +518,20 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textTransform: "uppercase",
     letterSpacing: 0.5,
+  },
+  foundRow: {
+    position: "absolute",
+    top: 16,
+    right: 14,
+    zIndex: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  foundText: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: COLORS.textTertiary,
   },
   emptyState: {
     alignItems: "center",

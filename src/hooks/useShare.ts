@@ -11,7 +11,6 @@
 import { useCallback } from "react";
 import { Share, Platform } from "react-native";
 import { supabase } from "../lib/supabase";
-import * as Linking from "expo-linking";
 import { logger } from "@/utils/logger";const log = logger.scoped("useShare");
 
 interface ShareOptions {
@@ -31,7 +30,7 @@ export function useShare() {
   const generateDeepLink = useCallback(
     (feedItemId: string, type: string, sinDatos?: boolean): string => {
       // URL base
-      const baseUrl = "https://feeds.ilyrox.com/";
+      const baseUrl = "https://ilyrox-posts.vercel.app/";
 
       let url = `${baseUrl}?type=${type}&id=${feedItemId}`;
       if (sinDatos) {
@@ -74,13 +73,14 @@ export function useShare() {
           title,
         });
 
-        // 4. Registrar share en BD (opcional, para analytics)
+        // 4. Registrar share en BD: incrementa compartidos_count vía RPC
+        //    (la función también registra la interacción en feed_visualizaciones
+        //    si hay usuario autenticado). No degradamos la UX si la RPC falla.
         if (result.action === Share.sharedAction) {
-          await supabase.from("feed_visualizaciones").insert({
-            usuario_id: null, // Anónimo si no hay usuario
-            feed_item_id: feedItemId,
-            tipo_interaccion: "share",
+          const { error } = await supabase.rpc("incrementar_compartidos", {
+            p_feed_item_id: feedItemId,
           });
+          if (error) log.warn("No se pudo registrar el compartido:", error);
 
           return true;
         }
@@ -94,39 +94,11 @@ export function useShare() {
     [generateDeepLink],
   );
 
-  /**
-   * Manejar deep link entrante (cuando alguien abre un link compartido)
-   */
-  const handleDeepLink = useCallback(
-    async (
-      url: string,
-    ): Promise<{ type: string; feedItemId: string } | null> => {
-      try {
-        const { queryParams } = Linking.parse(url);
-
-        if (!queryParams) return null;
-
-        const type = queryParams.type as string; // 'property' | 'post' | 'reel'
-        const feedItemId = queryParams.id as string; // id o codigo_propiedad
-
-        if (!type || !feedItemId) {
-          // Fallback para legacy links si es necesario
-          // Por ahora solo soportamos el nuevo formato
-          return null;
-        }
-
-        return { type, feedItemId };
-      } catch (error) {
-        log.error("Error parsing deep link:", error);
-        return null;
-      }
-    },
-    [],
-  );
+  // El link entrante lo resuelve `src/app/+native-intent.ts` con
+  // `parseSharedLink` (src/utils/deepLink.ts), que corre antes del ruteo.
 
   return {
     shareContent,
-    handleDeepLink,
     generateDeepLink,
   };
 }

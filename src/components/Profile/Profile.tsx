@@ -35,6 +35,7 @@ import ProfileReelItem from "./ProfileReelItem";
 import ProfilePostItem from "./ProfilePostItem";
 import ProfilePropertyItem from "./ProfilePropertyItem";
 import ConfirmDialog from "../shared/ConfirmDialog";
+import { ConfirmationModal } from "../modals/ConfirmationModal";
 import { supabase } from "../../lib/supabase";
 import { logger } from "@/utils/logger";
 
@@ -76,7 +77,11 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     loading,
     fetchProfileData,
     loadRecommendedByUsers,
+    loadNotRecommendedByUsers,
     updateProfilePhoto,
+    handleRecommendation,
+    userRecommendation,
+    submittingRecommendation,
     isMe,
   } = useProfile(userId);
 
@@ -86,15 +91,34 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   // Refresh control
   const [refreshing, setRefreshing] = useState(false);
 
+  /** Carga los propiedad_id que ya tienen un Open House activo (una sola query). */
+  const loadOpenHouseIds = useCallback(async () => {
+    if (!authUser?.id) return;
+    try {
+      const { data } = await supabase
+        .from("posts")
+        .select("propiedad_id")
+        .eq("publicado_por", authUser.id)
+        .eq("tipo", "openhouse")
+        .is("deleted_at", null)
+        .not("propiedad_id", "is", null);
+      if (data) {
+        setOpenHousePropertyIds(new Set(data.map((p) => p.propiedad_id as string)));
+      }
+    } catch {
+      // silencioso — el menú simplemente mostrará "Publicar" por defecto
+    }
+  }, [authUser?.id]);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchProfileData();
+    await Promise.all([fetchProfileData(), loadOpenHouseIds()]);
     setRefreshing(false);
-  }, [fetchProfileData]);
+  }, [fetchProfileData, loadOpenHouseIds]);
 
   const handleSilentRefresh = useCallback(async () => {
-    await fetchProfileData();
-  }, [fetchProfileData]);
+    await Promise.all([fetchProfileData(), loadOpenHouseIds()]);
+  }, [fetchProfileData, loadOpenHouseIds]);
 
   // Content tabs & filters
   const [activeTab, setActiveTab] = useState<ProfileContentType>("properties");
@@ -114,8 +138,16 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   const [showOpenHouseModal, setShowOpenHouseModal] = useState(false);
   const [openHousePost, setOpenHousePost] = useState<Post | null>(null);
 
+  // Set de propiedad_id que ya tienen un Open House activo — para saber si mostrar
+  // "Publicar" o "Editar" en el menú de cada propiedad sin hacer una query por card.
+  const [openHousePropertyIds, setOpenHousePropertyIds] = useState<Set<string>>(new Set());
+
   const [showRatingDetails, setShowRatingDetails] = useState(false);
+  // Confirmación tras recomendar / no recomendar a otro asesor.
+  const [showThanksModal, setShowThanksModal] = useState(false);
   const [showRecommendedByModal, setShowRecommendedByModal] = useState(false);
+  const [showNotRecommendedByModal, setShowNotRecommendedByModal] =
+    useState(false);
   const [selectedPost, setSelectedPost] = useState<FeedItem | null>(null);
   const [selectedReel, setSelectedReel] = useState<FeedItem | null>(null);
 
@@ -133,6 +165,11 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       setSelectedProperty(null);
     }, []),
   );
+
+  // Cargar Open House IDs al montar y cuando cambia el usuario
+  React.useEffect(() => {
+    loadOpenHouseIds();
+  }, [loadOpenHouseIds]);
 
   const handleDeleteItem = useCallback(async () => {
     if (!itemToDelete) return;
@@ -165,7 +202,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     () => ({
       name: formatFullName(profile),
       avatar: profile?.foto || undefined,
-      role: profile?.ocupacion || formatRole(profile?.rol || "cliente"),
+      role: profile?.ocupacion || (profile?.rol ? formatRole(profile?.rol) : ""),
       location: formatLocation(
         profile?.estado || null,
         profile?.pais || "México",
@@ -174,17 +211,20 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         profile?.prefijo_celular || null,
         profile?.celular || null,
       ),
-      anos_experiencia: profile?.anos_experiencia || 0,
+      anos_experiencia: profile?.fecha_inicio_carrera
+        ? new Date().getFullYear() -
+          new Date(profile.fecha_inicio_carrera).getFullYear()
+        : 0,
       rating: reviewStats?.calificacion_promedio || 0,
       reviewCount: reviewStats?.total_resenas || 0,
       positiveRecommendations: reviewStats?.total_recomiendan || 0,
       negativeRecommendations: reviewStats?.total_no_recomiendan || 0,
       biography: profile?.biografia,
       website: profile?.sitio_web,
-      disponibilidad: reviewStats?.promedio_disponibilidad || 0,
       profesionalismo: reviewStats?.promedio_profesionalismo || 0,
-      comunicacion: reviewStats?.promedio_comunicacion || 0,
-      conocimientoMercado: reviewStats?.promedio_conocimiento_mercado || 0,
+      eticaValores: reviewStats?.promedio_etica_valores || 0,
+      pagoComisiones: reviewStats?.promedio_pago_comisiones || 0,
+      comunicacionServicio: reviewStats?.promedio_comunicacion_servicio || 0,
     }),
     [profile, reviewStats],
   );
@@ -284,6 +324,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
           .single();
         if (error) throw error;
         setOpenHousePost(newPost as Post);
+        // Marcar esta propiedad como que ya tiene Open House para reflejar en el menú
+        setOpenHousePropertyIds((prev) => new Set([...prev, property.id]));
       }
       setShowOpenHouseModal(true);
     } catch (err: any) {
@@ -306,13 +348,29 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
 
   const handleReelPress = useCallback(
     (reel: Reel) => {
-      router.push({
-        pathname: "/(stack)/reel/[id]",
-        params: {
-          id: reel.feed_item_id || reel.id,
-          item: JSON.stringify(mapReelToFeedItem(reel, profile, targetUserId)),
-        },
+      console.log("[RDBG] Profile.handleReelPress", {
+        id: reel.id,
+        feed_item_id: reel.feed_item_id,
       });
+      try {
+        const payload = JSON.stringify(
+          mapReelToFeedItem(reel, profile, targetUserId),
+        );
+        console.log("[RDBG] Profile reel -> router.push", {
+          id: reel.feed_item_id || reel.id,
+          itemLen: payload.length,
+        });
+        router.push({
+          pathname: "/(stack)/reel/[id]",
+          params: {
+            id: reel.feed_item_id || reel.id,
+            item: payload,
+          },
+        });
+        console.log("[RDBG] Profile reel router.push OK");
+      } catch (e) {
+        console.log("[RDBG] Profile reel router.push ERROR", String(e));
+      }
     },
     [profile, targetUserId],
   );
@@ -327,6 +385,19 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     });
   }, [handleContact, targetUserId, profile]);
 
+  // Recomendar/No recomendar: el botón ya reacciona al instante (optimista en
+  // useProfile). Al registrarse el voto, mostramos la confirmación de gracias.
+  // Si el usuario alterna y quita su voto (resultado null), no se muestra.
+  const handleRecommendWithThanks = useCallback(
+    async (recomienda: boolean) => {
+      const result = await handleRecommendation(recomienda);
+      if (result === true || result === false) {
+        setShowThanksModal(true);
+      }
+    },
+    [handleRecommendation],
+  );
+
   const renderHeader = useCallback(
     () => (
       <ProfileInfoHeader
@@ -339,12 +410,18 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         onSettings={() => router.push("/settings")}
         onUpdatePhoto={updateProfilePhoto}
         onMessage={handleMessage}
+        onRecommend={handleRecommendWithThanks}
+        isRecommended={userRecommendation}
+        submittingRecommendation={submittingRecommendation}
         showRatingDetails={showRatingDetails}
         onToggleRatingDetails={() => setShowRatingDetails((v) => !v)}
         showRecommendedByModal={showRecommendedByModal}
         setShowRecommendedByModal={setShowRecommendedByModal}
+        showNotRecommendedByModal={showNotRecommendedByModal}
+        setShowNotRecommendedByModal={setShowNotRecommendedByModal}
         formatRole={formatRole}
         loadRecommendedByUsers={loadRecommendedByUsers}
+        loadNotRecommendedByUsers={loadNotRecommendedByUsers}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         contentCounts={contentCounts}
@@ -363,11 +440,16 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       handleMessage,
       showRatingDetails,
       showRecommendedByModal,
+      showNotRecommendedByModal,
       loadRecommendedByUsers,
+      loadNotRecommendedByUsers,
       activeTab,
       contentCounts,
       activeFilter,
       filteredProperties.length,
+      userRecommendation,
+      submittingRecommendation,
+      handleRecommendWithThanks,
     ],
   );
 
@@ -383,6 +465,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
               onEdit={handleEditProperty}
               onDelete={handleDeleteProperty}
               onPublishOpenHouse={handlePublishOpenHouse}
+              hasOpenHouse={openHousePropertyIds.has(item.id)}
               isLastInRow={(index + 1) % 3 === 0}
             />
           );
@@ -417,6 +500,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
       handlePropertyPress,
       handleEditProperty,
       handleDeleteProperty,
+      handlePublishOpenHouse,
+      openHousePropertyIds,
       userProfileMapped,
       handlePostPress,
       handleEditPost,
@@ -564,6 +649,16 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         onCancel={() => setItemToDelete(null)}
         danger
         loading={deleting}
+      />
+
+      {/* Confirmación tras recomendar / no recomendar (solo botón Aceptar) */}
+      <ConfirmationModal
+        visible={showThanksModal}
+        title="¡Gracias!"
+        message="Gracias por tu contribución, esta información será visible en todos los perfiles."
+        confirmText="Aceptar"
+        confirmVariant="primary"
+        onConfirm={() => setShowThanksModal(false)}
       />
     </ScreenWrapper>
   );

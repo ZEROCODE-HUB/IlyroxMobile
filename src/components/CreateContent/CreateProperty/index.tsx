@@ -3,7 +3,7 @@
 // Orquesta todos los sub-componentes y hooks
 // ============================================
 
-import React, { useState } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,13 +11,25 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Modal,
+  BackHandler,
+  Platform,
 } from "react-native";
+import { KeyboardAvoidingView, KeyboardProvider } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../../constants/colors";
 import { ScreenWrapper } from "../../../screens/ScreenWrapper";
 import { AppHeader } from "../../AppHeader";
 import { SelectionModal } from "../../modals";
 import { SaleContractModal } from "../../modals/SaleContractModal";
+import { ConfirmationModal } from "../../modals/ConfirmationModal";
+import { useRouter } from "expo-router";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
+import { useLocalModal } from "@/hooks/useLocalModal";
+import CreatePost from "../CreatePost/CreatePost";
+import type { Post } from "@/types";
 
 // Sub-componentes
 import { ImageGallerySection } from "./ImageGallerySection";
@@ -36,33 +48,266 @@ import { ProgressModal } from "./ProgressModal";
 
 // Hooks
 import { usePropertyForm } from "./usePropertyForm";
-import { usePublishProperty } from "./usePublishProperty";
+import { usePublishProperty, type OpenHousePrefill, type PublishSuccessInfo } from "./usePublishProperty";
 import { PropertyFormProvider } from "./PropertyFormContext";
+import { PropertyPublishedSheet } from "./PropertyPublishedSheet";
 
 // Types
 import type { CreatePropertyProps } from "./types";
+
+// Anclas de scroll a nivel de campo
+import { FieldAnchor, FieldAnchorContext } from "./fieldAnchors";
+
+// Cada clave de error apunta al ancla del CAMPO exacto (registrada con
+// <FieldAnchor name="...">), para hacer scroll justo a ese input y no a toda la
+// sección. Varias claves pueden compartir ancla (p. ej. m² o comisión).
+const ERROR_ANCHOR: Record<string, string> = {
+  images: "images",
+  descripcion: "descripcion",
+  subtipo: "subtipo",
+  tipoOperacion: "tipoOperacion",
+  precioVenta: "precioVenta",
+  precioRenta: "precioRenta",
+  estado: "estado",
+  municipio: "estado",
+  m2: "m2",
+  m2Terreno: "m2",
+  m2Construccion: "m2",
+  recamaras: "recamaras",
+  banos: "banos",
+  mediosBanos: "mediosBanos",
+  estacionamientos: "estacionamientos",
+  niveles: "niveles",
+  amueblado: "amueblado",
+  petFriendly: "petFriendly",
+  comision: "commission",
+  comisionRenta: "commission",
+  gravamen: "gravamen",
+  financiamiento: "financiamiento",
+  location: "location",
+};
 
 export default function CreateProperty({
   onBack,
   propertyId,
 }: CreatePropertyProps) {
-  const form = usePropertyForm(propertyId, onBack);
+  const { user } = useAuth();
+  const router = useRouter();
+
+  // Avisos (validación, sesión, comisión, timeout, éxito/error) como modal
+  // LOCAL: en edición esta pantalla vive dentro de un <Modal> nativo y el modal
+  // global de ModalContext quedaría invisible en iOS. Se inyecta a los hooks.
+  const { showModal: showLocalAlert, modalElement: localAlertModal } =
+    useLocalModal();
+  const form = usePropertyForm(propertyId, onBack, showLocalAlert);
+
+  // Confirmación de descarte: modal LOCAL (no el global de ModalContext). En
+  // edición, CreateProperty vive dentro de un <Modal> nativo; el modal global
+  // se monta en la raíz y en iOS no puede presentarse sobre un modal ya
+  // presentado → quedaba invisible y el botón Atrás parecía no hacer nada.
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+
+  // El formulario vive en estado local: salir de la pantalla lo destruye.
+  // Antes se perdía sin avisar, tanto por el botón atrás como por el gesto
+  // del sistema (ya desactivado en src/app/create/_layout.tsx).
+  const confirmDiscard = useCallback(() => {
+    if (!form.isDirty()) {
+      onBack(false);
+      return;
+    }
+    setShowDiscardModal(true);
+  }, [form, onBack]);
+
+  // Botón atrás de hardware / gesto de sistema en Android.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        confirmDiscard();
+        return true; // Se consume: la navegación la decide el modal.
+      },
+    );
+    return () => subscription.remove();
+  }, [confirmDiscard]);
+
+  // Estado para el flujo de Open House post-publicación
+  const [showOpenHouseModal, setShowOpenHouseModal] = useState(false);
+  const [openHousePost, setOpenHousePost] = useState<Post | null>(null);
+
+  // Estado del bottom sheet de éxito
+  const [showPublishedSheet, setShowPublishedSheet] = useState(false);
+  const [publishedInfo, setPublishedInfo] = useState<PublishSuccessInfo | null>(null);
+
+  // Callback que se invoca cuando se publica una propiedad nueva y el usuario
+  // elige "Crear Open House" desde el modal de éxito.
+  const handleOpenHousePrompt = useCallback(
+    async (prefill: OpenHousePrefill) => {
+      if (!user) return;
+      try {
+        // Verificar si ya existe un post de tipo openhouse para esta propiedad
+        const { data: existing } = await supabase
+          .from("posts")
+          .select("*")
+          .eq("propiedad_id", prefill.propertyId)
+          .eq("tipo", "openhouse")
+          .is("deleted_at", null)
+          .maybeSingle();
+
+        if (existing) {
+          setOpenHousePost(existing as Post);
+        } else {
+          // Crear el post con status "oculto" para que el usuario lo edite
+          const { data: newPost, error } = await supabase
+            .from("posts")
+            .insert({
+              publicado_por: user.id,
+              tipo: "openhouse",
+              propiedad_id: prefill.propertyId,
+              ubicacion: prefill.location,
+              foto_propiedad: prefill.firstPhoto ?? null,
+              contenido: "Open House",
+              fecha_hora: new Date().toISOString(),
+              status: "oculto",
+            })
+            .select()
+            .single();
+
+          if (error) throw error;
+          setOpenHousePost(newPost as Post);
+        }
+
+        setShowOpenHouseModal(true);
+      } catch (err: any) {
+        console.warn("[CreateProperty] handleOpenHousePrompt error:", err);
+        // Si falla, simplemente no abrimos el modal; el usuario ya tiene la propiedad guardada
+      }
+    },
+    [user],
+  );
+
+  const { showToast } = useToast();
+
+  // Callback de éxito. En EDICIÓN NO se apila el PropertyPublishedSheet: es un
+  // <Modal> nativo extra sobre el <Modal> de edición y, al desmontar ambos en
+  // cadena en iOS, quedaba un modal fantasma transparente que congelaba la
+  // pantalla al volver (p. ej. a Mi Perfil). Basta un toast y cerrar: un solo
+  // teardown de modal → sin race. En publicación NUEVA sí se muestra el sheet
+  // (ofrece "Ver propiedad" / "Crear Open House").
+  const handlePublishSuccess = useCallback(
+    (info: PublishSuccessInfo) => {
+      if (info.isUpdate) {
+        showToast("Propiedad actualizada", "success");
+        onBack?.(true);
+        return;
+      }
+      setPublishedInfo(info);
+      setShowPublishedSheet(true);
+    },
+    [onBack, showToast],
+  );
+
+  // Navega al feed reemplazando la pantalla de creación en el stack (igual que los
+  // posts), para que "atrás" no regrese al formulario "Crear propiedad".
+  const goToFeed = useCallback(() => {
+    setShowPublishedSheet(false);
+    router.replace({
+      pathname: "/(tabs)",
+      params: { refresh: String(Date.now()) },
+    });
+  }, [router]);
+
+  // Cierra el modal de Open House y lleva al feed (la propiedad ya se publicó),
+  // para no dejar al usuario de vuelta en el formulario "Crear propiedad".
+  const closeOpenHouseToFeed = useCallback(() => {
+    setShowOpenHouseModal(false);
+    setOpenHousePost(null);
+    goToFeed();
+  }, [goToFeed]);
+
   // 4. Hook de publicación (maneja guardado final y UI de load/error)
   const { publishState, handlePublish, cancelPublish, clearPublishError } = usePublishProperty(
     form,
     propertyId as string | undefined,
     onBack,
+    // Solo pasar el callback cuando es una propiedad nueva (no edición)
+    !propertyId ? handleOpenHousePrompt : undefined,
+    handlePublishSuccess,
+    showLocalAlert,
   );
 
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showSaleContractModal, setShowSaleContractModal] = useState(false);
 
-  // Manejar publicación con detección de modal de contrato
+  // Scroll automático al CAMPO inválido más alto (de arriba hacia abajo). Cada
+  // campo validable se registra con <FieldAnchor name="..."> (guarda su nodo).
+  // Medimos la posición de cada campo con measureInWindow (confiable en ambas
+  // arquitecturas), elegimos el más alto y lo dejamos ~⅓ desde arriba.
+  const scrollRef = useRef<ScrollView>(null);
+  const containerRef = useRef<View>(null);
+  const fieldRefs = useRef<Record<string, unknown>>({});
+  const viewportHeightRef = useRef(0);
+  const scrollYRef = useRef(0);
+  const registerField = useCallback(
+    (key: string) => (node: unknown) => {
+      if (node) fieldRefs.current[key] = node;
+      else delete fieldRefs.current[key];
+    },
+    [],
+  );
+  type Measurable = {
+    measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
+  };
+  const scrollToFirstError = useCallback((errs: Record<string, string>) => {
+    const scroll = scrollRef.current;
+    const container = containerRef.current as unknown as Measurable | null;
+    if (!scroll || !container?.measureInWindow) return;
+
+    const anchorKeys = Array.from(
+      new Set(
+        Object.keys(errs)
+          .map((k) => ERROR_ANCHOR[k])
+          .filter(Boolean),
+      ),
+    );
+    const nodes = anchorKeys
+      .map((k) => fieldRefs.current[k] as Measurable | undefined)
+      .filter((n): n is Required<Measurable> => !!n?.measureInWindow);
+    if (nodes.length === 0) return;
+
+    // Medimos el borde superior del área visible y la posición (en ventana) de
+    // cada campo con error; el delta nos dice cuánto desplazar el scroll para
+    // dejar el campo más alto a ~⅓ desde arriba.
+    container.measureInWindow!((_cx, containerTop) => {
+      const H = viewportHeightRef.current;
+      const offset = H > 0 ? H * 0.33 : 140;
+      const winYs: number[] = [];
+      let pending = nodes.length;
+      const finish = () => {
+        if (winYs.length === 0) return;
+        const minWinY = Math.min(...winYs);
+        const target = Math.max(
+          0,
+          scrollYRef.current + (minWinY - containerTop) - offset,
+        );
+        scroll.scrollTo({ y: target, animated: true });
+      };
+      nodes.forEach((node) => {
+        node.measureInWindow((_x, y) => {
+          winYs.push(y);
+          if (--pending === 0) finish();
+        });
+      });
+    });
+  }, []);
+
+  // Manejar publicación con detección de modal de contrato / errores de validación
   const onPublish = async () => {
     const result = await handlePublish();
     if (result === "SHOW_CONTRACT_MODAL") {
       setShowSaleContractModal(true);
+    } else if (result === "VALIDATION_FAILED") {
+      scrollToFirstError(form.getValidationErrors());
     }
   };
 
@@ -121,23 +366,47 @@ export default function CreateProperty({
   }
 
   return (
+    <>
     <PropertyFormProvider value={form}>
+    <KeyboardProvider>
     <ScreenWrapper withHeader={false} style={styles.container}>
       <AppHeader
         title={propertyId ? "Editar Propiedad" : "Crear Propiedad"}
         showBackButton={true}
-        onBack={() => onBack(false)}
+        onBack={confirmDiscard}
       />
 
+      {/* El footer va DENTRO del KeyboardAvoidingView para que suba con el
+          teclado; antes era `position:absolute` y quedaba tapado en iOS. */}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+      <FieldAnchorContext.Provider value={registerField}>
+      <View ref={containerRef} style={styles.scrollView} collapsable={false}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="always"
+        // "always" impedía cerrar el teclado: cualquier toque fuera del input lo
+        // mantenía abierto. Con "handled" los botones siguen respondiendo al
+        // primer toque y tocar el fondo lo cierra; "on-drag" lo baja al scrollear.
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         scrollEnabled={scrollEnabled}
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          scrollYRef.current = e.nativeEvent.contentOffset.y;
+        }}
+        onLayout={(e) => {
+          viewportHeightRef.current = e.nativeEvent.layout.height;
+        }}
       >
         {/* 1. GALERÍA DE IMÁGENES */}
-        <ImageGallerySection />
+        <FieldAnchor name="images">
+          <ImageGallerySection />
+        </FieldAnchor>
 
         {/* ESTADO (solo en edición) */}
         {propertyId && (
@@ -197,11 +466,15 @@ export default function CreateProperty({
         <GravamenFinancingSection />
 
         {/* 9. MAPA */}
-        <MapSection />
+        <FieldAnchor name="location">
+          <MapSection />
+        </FieldAnchor>
       </ScrollView>
+      </View>
+      </FieldAnchorContext.Provider>
 
       {/* FOOTER - BOTÓN PUBLICAR */}
-      <View style={[styles.footer, { paddingBottom: 50 }]}>
+      <View style={styles.footer}>
         <TouchableOpacity
           style={[
             styles.publishBtn,
@@ -229,6 +502,7 @@ export default function CreateProperty({
           )}
         </TouchableOpacity>
       </View>
+      </KeyboardAvoidingView>
 
       {/* MODAL DE PROGRESO MEJORADO */}
       <ProgressModal 
@@ -262,7 +536,77 @@ export default function CreateProperty({
         loading={publishState.uploading}
       />
     </ScreenWrapper>
+    </KeyboardProvider>
     </PropertyFormProvider>
+
+    {/* CONFIRMACIÓN DE DESCARTE — local, para verse encima del <Modal> de
+        edición en iOS. Al confirmar se cierra primero esta y, en un tick
+        posterior, se ejecuta onBack (que cierra el <Modal> externo): dos
+        transiciones de modal separadas evitan la race/pantalla negra de iOS. */}
+    <ConfirmationModal
+      visible={showDiscardModal}
+      title="Descartar cambios"
+      message="Perderás la información que has llenado. ¿Seguro que quieres salir?"
+      confirmText="Descartar"
+      cancelText="Seguir editando"
+      confirmVariant="danger"
+      onConfirm={() => {
+        setShowDiscardModal(false);
+        setTimeout(() => onBack(false), 250);
+      }}
+      onCancel={() => setShowDiscardModal(false)}
+    />
+
+    {/* Avisos locales de los hooks (validación, comisión, timeout, error…) */}
+    {localAlertModal}
+
+    {/* BOTTOM SHEET DE ÉXITO POST-PUBLICACIÓN */}
+    <PropertyPublishedSheet
+      visible={showPublishedSheet}
+      isUpdate={publishedInfo?.isUpdate ?? false}
+      newPropertyId={publishedInfo?.newPropertyId ?? null}
+      // "Ver propiedad" lleva al feed (reemplazando el formulario en el stack); la
+      // propiedad recién publicada aparece hasta arriba por el prepend optimista.
+      onViewProperty={goToFeed}
+      onCreateOpenHouse={
+        !propertyId && publishedInfo?.newPropertyId
+          ? () => {
+              setShowPublishedSheet(false);
+              void handleOpenHousePrompt({
+                propertyId: publishedInfo.newPropertyId!,
+                location: publishedInfo.location,
+                firstPhoto: publishedInfo.firstPhotoUrl,
+              });
+            }
+          : undefined
+      }
+      onDismiss={() => {
+        // Edición: cerrar el sheet y volver con refresh (comportamiento previo).
+        // Propiedad nueva: cualquier forma de cerrar el sheet (gesto, tap fuera o
+        // botón atrás) lleva al feed, para no quedar atrapado en "Crear propiedad".
+        if (publishedInfo?.isUpdate) {
+          setShowPublishedSheet(false);
+          // Cerrar el <Modal> de edición externo en un tick POSTERIOR: cerrarlo
+          // en el mismo commit que el sheet (dos modales nativos + teardown del
+          // MapView a la vez) provocaba la pantalla negra en iOS.
+          setTimeout(() => onBack?.(true), 350);
+        } else {
+          goToFeed();
+        }
+      }}
+    />
+
+    {/* MODAL OPEN HOUSE — fuera del ScreenWrapper para que ocupe toda la pantalla */}
+    {showOpenHouseModal && openHousePost && (
+      <Modal
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={closeOpenHouseToFeed}
+      >
+        <CreatePost post={openHousePost} onBack={closeOpenHouseToFeed} />
+      </Modal>
+    )}
+    </>
   );
 }
 
@@ -275,9 +619,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  flex: {
+    flex: 1,
+  },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100,
+    // El footer ya no flota sobre el scroll, así que no hace falta reservarle sitio.
+    paddingBottom: 24,
   },
   section: {
     backgroundColor: COLORS.white,
@@ -323,12 +671,9 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: COLORS.white,
     padding: 16,
+    paddingBottom: 28,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
   },

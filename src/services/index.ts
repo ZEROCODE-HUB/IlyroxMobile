@@ -1,6 +1,5 @@
 export * from "./appointmentService";
 export * from "./chartService";
-export * from "./geoService";
 export * from "./pdfService";
 export * from "./postsService";
 export * from "./profileService";

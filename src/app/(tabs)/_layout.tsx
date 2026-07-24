@@ -10,6 +10,8 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../context/AuthContext";
 import { useConversations } from "../../hooks/messaging/useConversations";
+import { usePendingAppointmentsCount } from "../../hooks/citas/usePendingAppointmentsCount";
+import { useUnseenMatchesCount } from "../../hooks/matches/useUnseenMatchesCount";
 
 const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
   const insets = useSafeAreaInsets();
@@ -75,6 +77,10 @@ export default function TabLayout() {
   const { user } = useAuth();
   // Tracker global de mensajes no leídos (actualiza el useChatStore internamente)
   useConversations(user?.id);
+  // Tracker global de citas próximas pendientes (actualiza useCitasStore)
+  usePendingAppointmentsCount(user?.id);
+  // Tracker global de matches sin ver (actualiza useMatchesStore)
+  useUnseenMatchesCount(user?.id);
 
   return (
     <Tabs

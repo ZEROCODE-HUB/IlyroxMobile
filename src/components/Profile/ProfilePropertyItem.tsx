@@ -25,11 +25,13 @@ interface ProfilePropertyItemProps {
   onEdit?: (item: Property) => void;
   onDelete?: (item: Property) => void;
   onPublishOpenHouse?: (item: Property) => void;
+  /** true = la propiedad ya tiene un Open House activo → mostrar "Editar Open House" */
+  hasOpenHouse?: boolean;
   isLastInRow?: boolean;
 }
 
 const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
-  ({ item, onPress, isOwnProfile, onEdit, onDelete, onPublishOpenHouse, isLastInRow }) => {
+  ({ item, onPress, isOwnProfile, onEdit, onDelete, onPublishOpenHouse, hasOpenHouse, isLastInRow }) => {
     const commissionText = formatCommission(item.commission);
 
     const menuOptions: MenuOption[] = [
@@ -38,13 +40,11 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
         label: "Editar",
         onPress: () => onEdit && onEdit(item),
       },
-      ...(item.es_easybroker
-        ? [{
-            icon: "home-outline" as const,
-            label: "Publicar OpenHouse",
-            onPress: () => onPublishOpenHouse && onPublishOpenHouse(item),
-          }]
-        : []),
+      {
+        icon: hasOpenHouse ? "create-outline" : "home-outline",
+        label: hasOpenHouse ? "Editar Open House" : "Publicar Open House",
+        onPress: () => onPublishOpenHouse && onPublishOpenHouse(item),
+      },
       {
         icon: "trash-outline",
         label: "Eliminar",
@@ -82,6 +82,15 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
           </View>
         )}
 
+        {isOwnProfile &&
+          !item.sin_comision &&
+          item.comparte_comision === false && (
+            <View style={[styles.statusBadge, styles.privadaBadge, { top: ITEM_SIZE - 24 }]}>
+              <Ionicons name="eye-off" size={10} color="#fff" />
+              <Text style={styles.statusText}> Solo tú</Text>
+            </View>
+          )}
+
         {isOwnProfile && (
           <View style={styles.menuContainer}>
             <ThreeDotsMenu options={menuOptions} />
@@ -96,7 +105,11 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
             <Text style={styles.propertyCurrency}>{item.currency}</Text>
           </View>
           <Text style={styles.propertyLocation} numberOfLines={1}>
-            {item.location.city}
+            {/* Colonia (la ubicación específica), no el municipio. Fallback a
+                municipio/ciudad si la propiedad no tiene colonia. */}
+            {item.location.colony ||
+              item.location.municipio ||
+              item.location.city}
           </Text>
 
           <View style={styles.propertyFeatures}>
@@ -173,11 +186,15 @@ const formatCommission = (commission?: {
   condition?: string;
 }): string | null => {
   if (!commission) return null;
-  if (commission.months) {
-    return `${commission.months} mes${commission.months !== 1 ? "es" : ""}`;
+  // Postgres devuelve NUMERIC como texto ("1.0"), así que normalizamos a número
+  // para mostrar "1 mes" y no "1.0 meses".
+  const meses = Number(commission.months);
+  if (meses) {
+    return `${meses} mes${meses !== 1 ? "es" : ""}`;
   }
-  if (commission.percentage) {
-    return `${commission.percentage}%`;
+  const pct = Number(commission.percentage);
+  if (pct) {
+    return `${pct}%`;
   }
   return null;
 };
@@ -217,6 +234,11 @@ const styles = StyleSheet.create({
   },
   sinComisionBadge: {
     backgroundColor: "#C53030cc",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  privadaBadge: {
+    backgroundColor: "#2D3748e6",
     flexDirection: "row",
     alignItems: "center",
   },

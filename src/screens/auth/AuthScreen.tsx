@@ -4,20 +4,24 @@
  * Refactorizada para modularidad y mejor UX con teclado
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Modal,
   Image,
+  Keyboard,
+  Platform,
+  useWindowDimensions,
 } from "react-native";
+import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/colors";
 import { useStableSafeInsets } from "@/context/SafeInsetsContext";
 import { Button } from "@/design-system/components";
+import { router } from "expo-router";
 
 // Hooks
 import { useAuthForm } from "./hooks/useAuthForm";
@@ -50,10 +54,43 @@ export default function AuthScreen() {
       ocupacion: "",
       modalidad: "",
       nombreInmobiliaria: "",
-      anosExperiencia: "",
+      fechaInicioCarrera: "",
     });
 
-  const { bottom } = useStableSafeInsets();
+  const { top, bottom } = useStableSafeInsets();
+  const { height: screenHeight } = useWindowDimensions();
+
+  // Altura real del teclado (0 si está cerrado). Con ella subimos el sheet justo
+  // por encima del teclado y limitamos su alto al espacio disponible, así se
+  // adapta al contenido: login queda compacto y registro hace scroll sin cortarse.
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  // Espejo por ref para no encoger el sheet mientras el teclado sigue abierto.
+  const keyboardHeightRef = useRef(0);
+  useEffect(() => {
+    const showEvt =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvt =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showSub = Keyboard.addListener(showEvt, (e) => {
+      const h = e.endCoordinates?.height ?? 0;
+      // Solo crecer, nunca encoger con el teclado abierto: en Android
+      // `keyboardDidShow` se re-emite con altura distinta al aparecer/ocultar la
+      // barra de sugerencias del teclado, y eso hacía saltar el sheet en cada
+      // tecla ("parpadea de posición"). Con Math.max el layout queda estable.
+      if (h > keyboardHeightRef.current) {
+        keyboardHeightRef.current = h;
+        setKeyboardHeight(h);
+      }
+    });
+    const hideSub = Keyboard.addListener(hideEvt, () => {
+      keyboardHeightRef.current = 0;
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Hooks de autenticación
   const authForm = useAuthForm();
@@ -95,7 +132,7 @@ export default function AuthScreen() {
             ocupacion: "",
             modalidad: "",
             nombreInmobiliaria: "",
-            anosExperiencia: "",
+            fechaInicioCarrera: "",
           });
           setAuthMethod("external");
         },
@@ -156,6 +193,20 @@ export default function AuthScreen() {
     }
   }, [authForm]);
 
+  // "Olvidé mi contraseña": en iOS un Modal nativo presentado tapa la navegación,
+  // así que cerramos primero el bottom sheet y luego navegamos.
+  const handleForgotPassword = useCallback(() => {
+    setModalVisible(false);
+    setAuthMethod("none");
+    authForm.resetForm();
+    const go = () => router.push("/forgot-password");
+    if (Platform.OS === "ios") {
+      setTimeout(go, 350);
+    } else {
+      go();
+    }
+  }, [authForm]);
+
   // Renderizar contenido del modal según el estado
   const renderModalContent = () => {
     // Auth externa - completar perfil
@@ -177,7 +228,10 @@ export default function AuthScreen() {
       return (
         <AuthProviderButtons
           onProviderPress={handleProviderAuth}
-          onEmailPress={() => setAuthMethod("email")}
+          onEmailPress={() => {
+            authForm.clearError();
+            setAuthMethod("email");
+          }}
           loading={externalAuth.loading}
         />
       );
@@ -192,7 +246,11 @@ export default function AuthScreen() {
             loading={authForm.loading}
             onUpdateField={authForm.updateField}
             onSubmit={handleLogin}
-            onBack={() => setAuthMethod("none")}
+            onBack={() => {
+              authForm.clearError();
+              setAuthMethod("none");
+            }}
+            onForgotPassword={handleForgotPassword}
           />
         );
       }
@@ -206,7 +264,10 @@ export default function AuthScreen() {
             onUpdateField={authForm.updateField}
             onValidateField={authForm.validateField}
             onNext={handleNextStep}
-            onBack={() => setAuthMethod("none")}
+            onBack={() => {
+              authForm.clearError();
+              setAuthMethod("none");
+            }}
           />
         );
       }
@@ -251,9 +312,9 @@ export default function AuthScreen() {
         <View style={styles.header}>
           <View style={styles.logoWrapper}>
             <Image
-              source={require("../../assets/Logo.jpeg")}
+              source={require("../../assets/Logo.png")}
               style={styles.logo}
-              resizeMode="cover"
+              resizeMode="contain"
             />
           </View>
         </View>
@@ -271,7 +332,7 @@ export default function AuthScreen() {
           />
 
           <Button
-            label="Registrarse"
+            label="Registrarme"
             onPress={() => handleOpenModal("register")}
             variant="outline"
             size="lg"
@@ -283,32 +344,45 @@ export default function AuthScreen() {
       </View>
 
       {/* Modal de autenticación */}
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={handleCloseModal}
-      >
-        <View style={[styles.modalOverlay, { paddingBottom: bottom }]}>
-          <View
-            style={[
-              styles.modalContent,
-              { paddingBottom: Math.max(30, bottom) },
-            ]}
-          >
-            {/* Header del modal */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{getModalTitle()}</Text>
-              <TouchableOpacity onPress={handleCloseModal} activeOpacity={0.7}>
-                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Contenido del modal */}
-            {renderModalContent()}
+      <AppBottomSheet visible={modalVisible} onClose={handleCloseModal}>
+        <View
+          style={[
+            styles.modalContent,
+            keyboardHeight > 0
+              ? {
+                  // Sube el sheet justo por encima del teclado y limita su alto
+                  // al espacio disponible; el contenido scrollea si hace falta.
+                  marginBottom: keyboardHeight,
+                  maxHeight: screenHeight - keyboardHeight - top - 12,
+                  paddingBottom: 16,
+                }
+              : {
+                  minHeight: "40%",
+                  maxHeight: "90%",
+                  paddingBottom: Math.max(30, bottom),
+                },
+          ]}
+        >
+          {/* Header del modal */}
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{getModalTitle()}</Text>
+            <TouchableOpacity onPress={handleCloseModal} activeOpacity={0.7}>
+              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+            </TouchableOpacity>
           </View>
+
+          {/* Banner de error inline (visible dentro del sheet en iOS y Android) */}
+          {authForm.error ? (
+            <View style={styles.errorBanner}>
+              <Ionicons name="alert-circle" size={18} color={COLORS.errorDark} />
+              <Text style={styles.errorText}>{authForm.error}</Text>
+            </View>
+          ) : null}
+
+          {/* Contenido del modal */}
+          {renderModalContent()}
         </View>
-      </Modal>
+      </AppBottomSheet>
     </View>
   );
 }
@@ -346,20 +420,11 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   logoWrapper: {
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 15,
-    borderRadius: 30,
     backgroundColor: "transparent",
   },
   logo: {
-    width: 160,
-    height: 160,
-    borderRadius: 26,
-    borderWidth: 5,
-    borderColor: "rgba(177, 165, 165, 0.2)",
+    width: 240,
+    height: 96,
   },
   buttonsContainer: {
     gap: 16,
@@ -387,20 +452,28 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: COLORS.blackTransparent50,
-    justifyContent: "flex-end",
-  },
   modalContent: {
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-
-    minHeight: "40%",
-    maxHeight: "90%",
     width: "100%",
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: COLORS.errorLight,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    flex: 1,
+    color: COLORS.errorDark,
+    fontSize: 14,
+    fontWeight: "500",
   },
   modalHeader: {
     flexDirection: "row",

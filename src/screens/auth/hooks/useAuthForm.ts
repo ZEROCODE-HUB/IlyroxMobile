@@ -6,10 +6,10 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { perfiles } from "@/types";
+import { collapseSpaces } from "@/utils/stringNormalizer";
 
 import { OneSignal } from "react-native-onesignal";
 import { useImageUpload } from "@/hooks";
-import { useModal } from "@/context/ModalContext";
 
 export interface AuthFormState {
   // Credenciales
@@ -28,7 +28,7 @@ export interface AuthFormState {
   ocupacion: string;
   modalidad: string;
   nombreInmobiliaria: string;
-  anosExperiencia: string;
+  fechaInicioCarrera: string;
   biografia: string;
 }
 
@@ -46,7 +46,7 @@ const initialFormState: AuthFormState = {
   ocupacion: "",
   modalidad: "",
   nombreInmobiliaria: "",
-  anosExperiencia: "",
+  fechaInicioCarrera: "",
   biografia: "",
 };
 
@@ -77,12 +77,25 @@ export function useAuthForm() {
   const [mode, setMode] = useState<"login" | "register">("login");
 
   const { uploadImage } = useImageUpload();
-  const { showModal } = useModal();
+
+  // Los errores de auth se muestran como banner INLINE dentro del bottom sheet:
+  // en iOS no se puede presentar el ConfirmationModal (Modal nativo) sobre el
+  // AppBottomSheet (otro Modal nativo), así que no aparecería. Reutilizamos la
+  // firma de showModal pero escribimos en este estado en vez de abrir el modal.
+  const [error, setError] = useState<string | null>(null);
+  const showModal = useCallback(
+    (opts: { title?: string; message: string; confirmText?: string }) => {
+      setError(opts.message);
+    },
+    [],
+  );
+  const clearError = useCallback(() => setError(null), []);
 
   // Actualizar campo individual
   const updateField = useCallback(
     <K extends keyof AuthFormState>(field: K, value: AuthFormState[K]) => {
       setFormState((prev) => ({ ...prev, [field]: value }));
+      setError(null);
     },
     [],
   );
@@ -110,6 +123,7 @@ export function useAuthForm() {
   const resetForm = useCallback(() => {
     setFormState(initialFormState);
     setStep(1);
+    setError(null);
   }, []);
 
   // Validación Paso 1 (datos básicos)
@@ -177,7 +191,7 @@ export function useAuthForm() {
         ocupacion,
         modalidad,
         nombreInmobiliaria,
-        anosExperiencia,
+        fechaInicioCarrera,
         biografia,
       } = formState;
 
@@ -215,10 +229,10 @@ export function useAuthForm() {
           return false;
         }
       }
-      if (anosExperiencia === "") {
+      if (!fechaInicioCarrera) {
         showModal({
           title: "Error",
-          message: "Selecciona tus años de experiencia",
+          message: "Selecciona la fecha en que iniciaste tu carrera",
           confirmText: "OK",
         });
         return false;
@@ -252,6 +266,7 @@ export function useAuthForm() {
 
   // Login con email
   const handleLogin = useCallback(async (): Promise<boolean> => {
+    setError(null);
     if (!validateLogin()) return false;
 
     setLoading(true);
@@ -281,6 +296,7 @@ export function useAuthForm() {
 
   // Registro con email
   const handleRegister = useCallback(async (): Promise<boolean> => {
+    setError(null);
     if (!validateStep1() || !validateProfessionalData()) return false;
 
     setLoading(true);
@@ -329,9 +345,9 @@ export function useAuthForm() {
 
         const newProfile: perfiles = {
           id: data.user.id,
-          nombre: formState.name,
-          apellido_paterno: formState.lastNamePaterno,
-          apellido_materno: formState.lastNameMaterno,
+          nombre: collapseSpaces(formState.name),
+          apellido_paterno: collapseSpaces(formState.lastNamePaterno),
+          apellido_materno: collapseSpaces(formState.lastNameMaterno),
           prefijo_celular: formState.phone.includes(" ")
             ? formState.phone.split(" ")[0]
             : "+52",
@@ -346,13 +362,15 @@ export function useAuthForm() {
           estado_registro: "pendiente",
           aprobaciones_recibidas: 0,
           aprobaciones_requeridas: 3,
-          anos_experiencia: formState.anosExperiencia,
+          fecha_inicio_carrera: formState.fechaInicioCarrera || undefined,
           ocupacion: formState.ocupacion,
           otro_ocupacion: undefined,
           modalidad: formState.modalidad || undefined,
           nombre_inmobiliaria: formState.nombreInmobiliaria || undefined,
           curso_certificacion: undefined,
-          nombre_completo: `${formState.name} ${formState.lastNamePaterno} ${formState.lastNameMaterno}`,
+          nombre_completo: collapseSpaces(
+            `${formState.name} ${formState.lastNamePaterno} ${formState.lastNameMaterno}`,
+          ),
           activado_en: undefined,
           deleted_at: undefined,
           biografia: formState.biografia,
@@ -397,6 +415,7 @@ export function useAuthForm() {
     loading,
     step,
     mode,
+    error,
     // Setters
     updateField,
     setStep,
@@ -412,5 +431,6 @@ export function useAuthForm() {
     handleLogin,
     handleRegister,
     setLoading,
+    clearError,
   };
 }

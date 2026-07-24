@@ -14,7 +14,7 @@ import {
   RefreshControl,
   Platform,
 } from "react-native";
-import { FlashList } from "@shopify/flash-list";
+import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { FeedItem, User } from "../../types";
 import UsersSlider from "../UsersSlider";
 import { ReelCard, PropertyCard, PostCard } from "../cards";
@@ -24,11 +24,11 @@ import {
   useNavigation,
   useIsFocused,
 } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { COLORS } from "../../constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import { useFeed, useUserApprovals } from "@/hooks";
-import { usePropertyFilters } from "@/hooks/usePropertyFilters";
 
 interface FeedProps {
   currentUserId?: string;
@@ -49,11 +49,12 @@ const Feed: React.FC<FeedProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const router = useRouter();
   const isFocused = useIsFocused();
   const [activeCommentItem, setActiveCommentItem] = useState<FeedItem | null>(
     null,
   );
-  const flatListRef = useRef<any>(null);
+  const flatListRef = useRef<FlashListRef<FeedItem>>(null);
 
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
 
@@ -66,10 +67,13 @@ const Feed: React.FC<FeedProps> = ({
     loadMore,
     refresh,
     refreshUserStats,
+    error,
   } = useFeed({
     userId: currentUserId,
     pageSize: 20,
-    enableAutoRefresh: true,
+    // El feed solo se actualiza por acción del usuario (pull-to-refresh, tocar la
+    // pestaña o reentrar). Sin auto-refresh periódico.
+    enableAutoRefresh: false,
   });
 
   useFocusEffect(
@@ -78,11 +82,19 @@ const Feed: React.FC<FeedProps> = ({
     }, [refreshUserStats]),
   );
 
+  const lastRefreshTimestampRef = useRef<number | null>(null);
   useEffect(() => {
-    if (refreshTimestamp) {
-      refresh();
+    if (refreshTimestamp && refreshTimestamp !== lastRefreshTimestampRef.current) {
+      lastRefreshTimestampRef.current = refreshTimestamp;
+      // La publicación recién creada ya está arriba en la cache (prepend optimista).
+      // Solo llevamos la vista al inicio. NO refetch aquí: reordenaría por
+      // engagement_score; ese orden se reaplica en pull-to-refresh / cambio de
+      // pestaña / auto-refresh / reentrar.
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      });
     }
-  }, [refreshTimestamp, refresh]);
+  }, [refreshTimestamp]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("tabPress", (e: any) => {
@@ -110,34 +122,9 @@ const Feed: React.FC<FeedProps> = ({
   const [bannerVisible, setBannerVisible] = useState(false);
   const bannerAnim = useRef(new Animated.Value(0)).current;
 
-  // Filtrar los items de Feed que pasen por el filtro global del mapa/propiedades
-  const extractedProperties = useMemo(() => {
-    return items
-      .filter((it) => it.type === "property" && it.propertyDetails)
-      .map((it) => it.propertyDetails!);
-  }, [items]);
-
-  const { filteredProperties, hasActiveFilters } = usePropertyFilters(
-    extractedProperties,
-    null // Geo bounds form MapSearch is handled elsewhere or via named search
-  );
-
-  const finalItems = useMemo(() => {
-    // Si no hay filtros activos, mostrar todo tal cual
-    if (!hasActiveFilters) {
-      return items;
-    }
-
-    const validPropertyIds = new Set(filteredProperties.map((p) => p.id));
-    return items.filter((it) => {
-      // Solo mostramos las propiedades que pasan el filtro y ocultamos posts/reels
-      if (it.type === "property" && it.propertyDetails) {
-        return validPropertyIds.has(it.propertyDetails.id);
-      }
-      // Ocultar posts y reels si hay una búsqueda o filtro de propiedades activo
-      return false; 
-    });
-  }, [items, filteredProperties, hasActiveFilters]);
+  // El feed home muestra siempre todo el contenido. El filtrado por búsqueda de
+  // propiedades (filtros del store global) vive en el mapa / map-results, no aquí:
+  // acoplarlo dejaba el feed vacío al volver tras publicar si quedaban filtros activos.
 
   // Viewability config
 
@@ -191,19 +178,36 @@ const Feed: React.FC<FeedProps> = ({
 
   const handleOpenDetail = useCallback(
     (item: FeedItem) => {
+      console.log("[RDBG] Feed.handleOpenDetail", {
+        id: item.id,
+        type: item.type,
+      });
       if (item.type === "property" && item.propertyDetails?.id) {
         navigation.navigate("(stack)", {
           screen: "property/[id]",
           params: { id: item.propertyDetails.id },
         });
       } else if (item.type === "reel") {
-        navigation.navigate("(stack)", {
-          screen: "reel/[id]",
-          params: {
+        // `router.push` siempre monta una pantalla nueva (a diferencia de
+        // `navigate`, que reutiliza una instancia previa de reel/[id] y dejaba
+        // el visor con el reel anterior). Coincide con cómo abre el perfil.
+        try {
+          const payload = JSON.stringify(item);
+          console.log("[RDBG] Feed reel -> router.push", {
             id: item.id,
-            item: JSON.stringify(item),
-          },
-        });
+            itemLen: payload.length,
+          });
+          router.push({
+            pathname: "/(stack)/reel/[id]",
+            params: {
+              id: item.id,
+              item: payload,
+            },
+          });
+          console.log("[RDBG] Feed reel router.push OK");
+        } catch (e) {
+          console.log("[RDBG] Feed reel router.push ERROR", String(e));
+        }
       } else if (item.type === "post") {
         navigation.push("(stack)", {
           screen: "post/[id]",
@@ -211,7 +215,7 @@ const Feed: React.FC<FeedProps> = ({
         });
       }
     },
-    [navigation],
+    [navigation, router],
   );
 
   const handleScroll = useCallback(
@@ -263,6 +267,7 @@ const Feed: React.FC<FeedProps> = ({
               onCommentClick={() => handleOpenComments(item)}
               isVisible={isVisible}
               currentUserId={currentUserId}
+              onReelUpdated={refresh}
             />
           );
         case "property":
@@ -275,6 +280,7 @@ const Feed: React.FC<FeedProps> = ({
               onUserClick={onUserClick}
               onCommentClick={() => handleOpenComments(item)}
               currentUserId={currentUserId}
+              onPropertyUpdated={refresh}
             />
           );
         default:
@@ -287,6 +293,7 @@ const Feed: React.FC<FeedProps> = ({
               onUserClick={onUserClick}
               onCommentClick={() => handleOpenComments(item)}
               currentUserId={currentUserId}
+              onPostUpdated={refresh}
             />
           );
       }
@@ -315,14 +322,14 @@ const Feed: React.FC<FeedProps> = ({
   );
 
   const ListFooter = useMemo(() => {
-    if (!hasMore && finalItems.length > 0) {
+    if (!hasMore && items.length > 0) {
       return (
         <View style={styles.endMessage}>
           <Text style={styles.endMessageText}>¡Has visto todo! 🎉</Text>
         </View>
       );
     }
-    if (loading && finalItems.length > 0) {
+    if (loading && items.length > 0) {
       return (
         <View style={styles.loadingMore}>
           <Text style={styles.loadingMoreText}>Cargando más...</Text>
@@ -330,9 +337,20 @@ const Feed: React.FC<FeedProps> = ({
       );
     }
     return null;
-  }, [hasMore, loading, finalItems.length]);
+  }, [hasMore, loading, items.length]);
 
   const ListEmpty = useMemo(() => {
+    if (error) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No se pudo cargar el feed</Text>
+          <Text style={styles.emptySubtext}>{error}</Text>
+          <Text style={styles.retryButton} onPress={refresh}>
+            Reintentar
+          </Text>
+        </View>
+      );
+    }
     if (loading) {
       return (
         <View style={styles.emptyContainer}>
@@ -346,19 +364,25 @@ const Feed: React.FC<FeedProps> = ({
         <Text style={styles.emptySubtext}>¡Sé el primero en publicar!</Text>
       </View>
     );
-  }, [loading]);
+  }, [loading, error, refresh]);
 
   return (
     <>
       <FlashList
         ref={flatListRef}
-        data={finalItems}
+        data={items}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         extraData={focusedItemId}
         ListHeaderComponent={ListHeader}
         ListFooterComponent={ListFooter}
         ListEmptyComponent={ListEmpty}
+        // FlashList v2 (New Arch) ancla por defecto la posición del contenido visible
+        // al insertar items arriba (maintainVisibleContentPosition). En un feed eso deja
+        // la publicación recién creada / lo recién refrescado FUERA de vista por arriba
+        // (había que hacer scroll hacia arriba para verlo). Lo desactivamos para que el
+        // contenido nuevo en index 0 se muestre desde el top.
+        maintainVisibleContentPosition={{ disabled: true }}
         contentContainerStyle={[
           styles.listContent,
           { paddingTop: dynamicPaddingTop },
@@ -472,6 +496,12 @@ const styles = StyleSheet.create({
   emptySubtext: {
     color: COLORS.textTertiary,
     fontSize: 14,
+  },
+  retryButton: {
+    marginTop: 16,
+    color: COLORS.primary,
+    fontSize: 15,
+    fontWeight: "600",
   },
 });
 

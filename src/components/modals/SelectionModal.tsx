@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { useDismissKeyboardWhenVisible } from "../../hooks/useDismissKeyboardWhenVisible";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
 import { Modal } from "@/design-system/components";
@@ -40,6 +41,8 @@ export default function SelectionModal({
   placeholder = "Buscar...",
 }: SelectionModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
+
+  useDismissKeyboardWhenVisible(visible);
 
   const filteredOptions = useMemo(() => {
     if (!searchable || !searchQuery) return options;

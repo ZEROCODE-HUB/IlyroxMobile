@@ -1,3 +1,4 @@
+import type { CountryCode } from "./lib/location/types";
 
 export type Post = {
   id: string;
@@ -38,8 +39,12 @@ export type FeedItem = {
   reelDetails?: Reel;
   likes: number;
   comments: number;
+  views?: number;
+  shares?: number;
   commentsList?: Comment[];
   timestamp: string;
+  /** Fecha (ISO) en que se encontró el match. Solo en la pantalla de coincidencias. */
+  matchedAt?: string;
   status?: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
   codigo_propiedad?: string;
   postType?: "post" | "busqueda" | "openhouse" | "aniversario" | "sold";
@@ -76,6 +81,7 @@ export type User = {
   avatar: string;
   isFollowing: boolean;
   role: "Agente" | "Cliente" | "Admin" | "Agent" | "User";
+  ocupacion?: string;
   rating?: number;
   totalRatings?: number;
   positiveRecommendations?: number;
@@ -111,6 +117,14 @@ export type LegalDetails = {
   institution?: string;
 };
 
+/** Bounding box geográfica (norte/sur/este/oeste en decimal degrees) */
+export type GeoBounds = {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+};
+
 export type Property = {
   id: string;
   code?: string;
@@ -128,6 +142,9 @@ export type Property = {
     colony: string;
     zip?: string;
   };
+  /** Código de país ISO (default: MX). Las columnas estado/municipio/colonia
+   *  se interpretan según este país vía la capa `@/lib/location`. */
+  pais?: CountryCode;
   coordinates?: { lat: number; lng: number };
   images: string[];
   features: {
@@ -141,6 +158,22 @@ export type Property = {
     landSqft: number;
     yearBuilt?: number;
     maintenanceFee?: number;
+    // Industrial
+    operationalAreaSqft?: number;
+    maneuveringYardSqft?: number;
+    clearHeight?: string;
+    energiaKva?: string[];
+    ubicacionIndustrial?: string;
+    // Comercial
+    frontMeters?: number;
+    backMeters?: number;
+    enEsquina?: boolean;
+    sobreAvenida?: boolean;
+    commercialLocation?: string;
+    // Agrícola
+    tieneAgua?: boolean;
+    electricidad?: boolean;
+    pieCarretera?: boolean;
   };
   amenities: string[];
   type: PropertyType;
@@ -149,10 +182,13 @@ export type Property = {
   status: "Publicada" | "Suspendida" | "Rentada" | "Reservada" | "Vendida";
   commission?: CommissionDetails;
   sin_comision?: boolean;
+  /** Denormalizado: true si alguna operación comparte comisión. */
+  comparte_comision?: boolean;
   es_easybroker?: boolean;
   legal?: LegalDetails;
-  longitud?: string;
-  latitud?: string;
+  /** Coordenada numérica directa de la BD (tipo numeric en Supabase) */
+  longitud?: number;
+  latitud?: number;
   municipio?: string;
   colonia?: string;
   subtipo?: string;
@@ -242,7 +278,7 @@ export type perfiles = {
   prefijo_celular?: string;
   biografia?: string;
   sitio_web?: string;
-  anos_experiencia?: string;
+  fecha_inicio_carrera?: string;
   ocupacion?: string;
   otro_ocupacion?: string;
   modalidad?: string;
@@ -260,10 +296,10 @@ export type EstadisticasResenas = {
   profesional_id: string;
   total_resenas: number;
   calificacion_promedio: number;
-  promedio_conocimiento_mercado: number;
-  promedio_comunicacion: number;
   promedio_profesionalismo: number;
-  promedio_disponibilidad: number;
+  promedio_etica_valores: number;
+  promedio_pago_comisiones: number;
+  promedio_comunicacion_servicio: number;
   total_recomiendan: number;
   total_no_recomiendan: number;
   total_5_estrellas: number;
@@ -334,6 +370,10 @@ export type busquedas_guardadas = {
   metros_terreno?: number;
   genero?: "Masculino" | "Femenino";
   polygon_coords?: { latitude: number; longitude: number }[];
+  /** Bounds geográficos para el filtro de zona (nuevo campo) */
+  bounds?: GeoBounds;
+  /** Nombre display de la zona buscada (ej: "Polanco, CDMX") */
+  place_name?: string;
 };
 
 export type agrupaciones_conversaciones = {

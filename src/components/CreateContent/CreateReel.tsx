@@ -4,14 +4,15 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
   ActivityIndicator,
   Modal,
   Image,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
+import {
+  KeyboardProvider,
+  KeyboardAwareScrollView,
+} from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../design-system/components/AppInput";
 import * as ImagePicker from "expo-image-picker";
@@ -19,7 +20,7 @@ import * as VideoThumbnails from "expo-video-thumbnails";
 import { useVideoPlayer, VideoView } from "expo-video"; // Asegúrate de tener expo-video instalado
 
 import { useAuth } from "../../context/AuthContext";
-import { useModal } from "@/context/ModalContext";
+import { useLocalModal } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
 import { COLORS } from "../../constants/colors";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
@@ -107,7 +108,7 @@ const VideoPreview = ({
 
 export default function CreateReel({ onBack, reelId }: CreateReelProps) {
   const { user } = useAuth();
-  const { showModal } = useModal();
+  const { showModal, modalElement } = useLocalModal();
   const { showToast } = useToast();
   const router = useRouter();
   const isEditing = !!reelId;
@@ -292,6 +293,7 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
   };
 
   return (
+    <KeyboardProvider>
     <ScreenWrapper withHeader={false} style={styles.container}>
       <AppHeader
         title={isEditing ? "Editar Reel" : "Nuevo Reel"}
@@ -299,66 +301,62 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
         onBack={onBack}
       />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      {/* KeyboardAwareScrollView sube automáticamente el input enfocado por
+          encima del teclado (la descripción es el último y más bajo elemento).
+          El footer va aparte, al fondo; al escribir queda tras el teclado, pero
+          el input siempre se ve. bottomOffset deja aire sobre el teclado. */}
+      <KeyboardAwareScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        bottomOffset={24}
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.card}>
-            <Text style={styles.label}>Video del Reel</Text>
+        <View style={styles.card}>
+          <Text style={styles.label}>Video del Reel</Text>
 
-            {videoUri ? (
-              /* CLAVE: Usamos 'key={videoUri}'. 
-                 Si el usuario cambia de video, React destruye el componente anterior 
-                 y crea uno nuevo, reiniciando el Player de expo-video sin errores de memoria o pantalla gris.
-              */
-              <VideoPreview
-                key={videoUri}
-                uri={videoUri}
-                thumbnail={thumbnailUri}
-                onRemove={() => setVideoUri("")}
-              />
-            ) : (
-              <TouchableOpacity
-                onPress={handlePickVideo}
-                style={[
-                  styles.uploadPlaceholder,
-                  errors.video && { borderColor: COLORS.error },
-                ]}
-              >
-                <Ionicons
-                  name="videocam"
-                  size={48}
-                  color={COLORS.textTertiary}
-                />
-                <Text style={styles.uploadText}>
-                  Presiona para elegir un video
-                </Text>
-              </TouchableOpacity>
-            )}
-            {errors.video && (
-              <Text style={styles.errorText}>{errors.video}</Text>
-            )}
-          </View>
-
-          <View style={styles.card}>
-            <AppInput
-              label="Descripción"
-              placeholder="Escribe algo sobre tu video..."
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              maxLength={2500}
-              numberOfLines={10}
-              helperText={`${description.length}/2500`}
+          {videoUri ? (
+            /* CLAVE: Usamos 'key={videoUri}'.
+               Si el usuario cambia de video, React destruye el componente anterior
+               y crea uno nuevo, reiniciando el Player de expo-video sin errores de memoria o pantalla gris.
+            */
+            <VideoPreview
+              key={videoUri}
+              uri={videoUri}
+              thumbnail={thumbnailUri}
+              onRemove={() => setVideoUri("")}
             />
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          ) : (
+            <TouchableOpacity
+              onPress={handlePickVideo}
+              style={[
+                styles.uploadPlaceholder,
+                errors.video && { borderColor: COLORS.error },
+              ]}
+            >
+              <Ionicons name="videocam" size={48} color={COLORS.textTertiary} />
+              <Text style={styles.uploadText}>
+                Presiona para elegir un video
+              </Text>
+            </TouchableOpacity>
+          )}
+          {errors.video && <Text style={styles.errorText}>{errors.video}</Text>}
+        </View>
+
+        <View style={styles.card}>
+          <AppInput
+            label="Descripción"
+            placeholder="Escribe algo sobre tu video..."
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            maxLength={2500}
+            numberOfLines={6}
+            helperText={`${description.length}/2500`}
+          />
+        </View>
+      </KeyboardAwareScrollView>
 
       <View style={styles.footer}>
         <TouchableOpacity
@@ -412,7 +410,9 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
           </View>
         </View>
       </Modal>
+      {modalElement}
     </ScreenWrapper>
+    </KeyboardProvider>
   );
 }
 
@@ -452,9 +452,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  flex: {
+    flex: 1,
+  },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100,
+    // El footer ya no flota sobre el scroll, así que no hace falta reservarle sitio.
+    paddingBottom: 24,
   },
   card: {
     backgroundColor: COLORS.white,
@@ -565,12 +569,9 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: COLORS.white,
     padding: 16,
+    paddingBottom: 28,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
     shadowColor: COLORS.black,
@@ -579,7 +580,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 20,
     zIndex: 100,
-    paddingBottom: 50,
   },
   publishBtn: {
     backgroundColor: COLORS.primary,

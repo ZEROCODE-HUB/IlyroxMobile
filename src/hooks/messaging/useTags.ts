@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/utils/logger";
 
@@ -21,6 +22,16 @@ export function useTags(userId?: string) {
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  // Marca la lista de conversaciones como obsoleta tras cambiar etiquetas, para
+  // que refresque al volver a ella (asignar/quitar toca `conversacion_etiquetas`,
+  // que NO dispara el realtime de `conversaciones`). Cubre también el asignado
+  // desde HeaderChat, no solo el long-press de la lista.
+  const invalidateConversations = () => {
+    if (!userId) return;
+    queryClient.invalidateQueries({ queryKey: ["conversations", userId] });
+  };
 
   /**
    * Cargar etiquetas del usuario
@@ -131,6 +142,7 @@ export function useTags(userId?: string) {
       if (error) throw error;
 
       setTags((prev) => prev.filter((tag) => tag.id !== tagId));
+      invalidateConversations();
       return true;
     } catch (err: any) {
       log.error("Error deleting tag:", err);
@@ -164,6 +176,7 @@ export function useTags(userId?: string) {
 
       if (error) throw error;
 
+      invalidateConversations();
       return true;
     } catch (err: any) {
       log.error("Error assigning tag:", err);
@@ -185,6 +198,7 @@ export function useTags(userId?: string) {
 
       if (error) throw error;
 
+      invalidateConversations();
       return true;
     } catch (err: any) {
       log.error("Error removing tag:", err);

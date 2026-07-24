@@ -12,6 +12,8 @@ import {
   useLocationSearchStore,
   LocationSuggestionWithCount,
 } from "../store/locationSearchStore";
+// getUniqueLocations fue removida en la migración a Google Places API
+// Las sugerencias precargadas ahora se omiten (el usuario busca por texto)
 
 interface PropertyCodeSuggestion {
   type: "property_code";
@@ -51,6 +53,7 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
   const [query, setQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [propertySuggestions, setPropertySuggestions] = useState<PropertyCodeSuggestion[]>([]);
+  const [preloadedSuggestions] = useState<LocationSuggestionWithCount[]>([]);
   const [showSearchOverlay, setShowSearchOverlay] = useState(false);
   const { selectedLocation } = useApp();
 
@@ -105,6 +108,12 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
     onSearchingChange?.(showSuggestions);
   }, [showSuggestions, onSearchingChange]);
 
+  // Sugerencias precargadas: ya no se cargan desde Supabase Geo.
+  // Con Google Places API la búsqueda es siempre por texto del usuario.
+  useEffect(() => {
+    // No-op: preloadedSuggestions permanece vacío en la nueva arquitectura
+  }, [showSuggestions, query]);
+
   // Cerrar sugerencias si el header desaparece
   useEffect(() => {
     if (!isHeaderVisible) {
@@ -156,7 +165,7 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
           activeOpacity={0.8}
         >
           <Ionicons name="search-outline" size={18} color={COLORS.textTertiary} />
-          <Text style={styles.searchButtonText}>Buscar usuarios, posts, reels...</Text>
+          <Text style={styles.searchButtonText}>Busca por zonas para encontrar propiedades</Text>
         </TouchableOpacity>
 
         {showMapButton && !showSuggestions && selectedLocation && (
@@ -170,15 +179,15 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
         )}
       </View>
 
-      {showSuggestions && query.trim() && (
+      {showSuggestions && (query.trim() ? (suggestions.length > 0 || propertySuggestions.length > 0) : preloadedSuggestions.length > 0) && (
         <View
           pointerEvents="auto"
           style={[styles.suggestionsContainer, { top: topOffset }]}
         >
           <FlatList<SearchSuggestion>
-            data={[...propertySuggestions, ...suggestions]}
+            data={query.trim() ? [...propertySuggestions, ...suggestions] : preloadedSuggestions}
             keyExtractor={(item, index) =>
-              `${item.type}-${item.name}-${index}`
+              `${item.type}-${item.name}-${(item as LocationSuggestionWithCount).estado_nombre ?? ""}-${index}`
             }
             keyboardShouldPersistTaps="always"
             nestedScrollEnabled={true}
@@ -197,23 +206,24 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
                   />
                 </View>
                 <View style={[styles.suggestionTextContainer, { flex: 1 }]}>
-                  <Text style={styles.suggestionName}>{item.name}</Text>
-                  <Text style={styles.suggestionType}>Propiedad</Text>
-                  {item.type === "colonia" && (
-                    <Text style={styles.propertyCountText}>
-                      {item.municipio_nombre
-                        ? `${item.municipio_nombre} • `
-                        : ""}
-                      {item.propertyCount || 0}{" "}
-                      {item.propertyCount === 1
-                        ? "propiedad"
-                        : "propiedades"}
-                    </Text>
-                  )}
-                  {item.type === "property_code" && (
-                    <Text style={styles.propertyCountText}>
-                      {item.subtipo} • {item.municipio}
-                    </Text>
+                  {item.type === "property_code" ? (
+                    <>
+                      <Text style={styles.suggestionName}>{item.name}</Text>
+                      <Text style={styles.propertyCountText}>
+                        {item.subtipo} • {item.municipio}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      {/* Descripción completa separada por comas, estilo Google Places. */}
+                      <Text style={styles.suggestionName} numberOfLines={2}>
+                        {item.fullDescription || item.name}
+                      </Text>
+                      <Text style={styles.propertyCountText}>
+                        {item.propertyCount || 0}{" "}
+                        {item.propertyCount === 1 ? "propiedad" : "propiedades"}
+                      </Text>
+                    </>
                   )}
                 </View>
                 {item.type === "property_code" && item.fotos && item.fotos.length > 0 && (

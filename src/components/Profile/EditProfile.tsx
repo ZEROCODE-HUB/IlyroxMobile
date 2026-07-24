@@ -10,7 +10,7 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from "react-native";
-import { useModal } from "@/context/ModalContext";
+import { useLocalModal } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
@@ -21,9 +21,10 @@ import { perfiles } from "../../types";
 import * as ImagePicker from "expo-image-picker";
 import { decode } from "base64-arraybuffer";
 import { SelectionModal } from "../modals";
-import { ESTADOS_MEXICO } from "../../constants/locations";
+import { ESTADOS_MEXICO } from "../../constants/estadosMexico";
 import { ScreenWrapper } from "../../screens/ScreenWrapper";
 import { logger } from "@/utils/logger";
+import { collapseSpaces } from "@/utils/stringNormalizer";
 
 const log = logger.scoped("EditProfile");
 
@@ -37,7 +38,7 @@ const EditProfile: React.FC<EditProfileProps> = ({
   onProfileUpdate,
 }) => {
   const { user, profile: authProfile, refreshProfile } = useAuth();
-  const { showModal } = useModal();
+  const { showModal, modalElement } = useLocalModal();
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [, setUploading] = useState(false);
@@ -147,15 +148,19 @@ const EditProfile: React.FC<EditProfileProps> = ({
       const updates: any = {
         ...formData,
         foto: photoUrl || "",
-        nombre_completo: `${formData.nombre} ${formData.apellido_paterno} ${
-          formData.apellido_materno || ""
-        }`.trim(),
+        // Nombres sin espacios dobles/sobrantes: se guardan limpios para que la
+        // búsqueda por apellido parcial y el display no se rompan.
+        nombre: collapseSpaces(formData.nombre),
+        apellido_paterno: collapseSpaces(formData.apellido_paterno),
+        nombre_completo: collapseSpaces(
+          `${formData.nombre} ${formData.apellido_paterno} ${formData.apellido_materno || ""}`,
+        ),
         modalidad: cleanValue(formData.modalidad),
         sitio_web: cleanValue(formData.sitio_web),
         nombre_inmobiliaria: cleanValue(formData.nombre_inmobiliaria),
         ocupacion: cleanValue(formData.ocupacion),
         biografia: cleanValue(formData.biografia),
-        apellido_materno: cleanValue(formData.apellido_materno),
+        apellido_materno: collapseSpaces(formData.apellido_materno) || null,
         estado: cleanValue(formData.estado),
       };
 
@@ -339,6 +344,7 @@ const EditProfile: React.FC<EditProfileProps> = ({
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      {modalElement}
     </ScreenWrapper>
   );
 };

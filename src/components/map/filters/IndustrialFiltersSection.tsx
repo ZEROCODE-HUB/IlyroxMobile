@@ -7,12 +7,27 @@ import {
   TIPOS_ENERGIA_KVA,
 } from "@/constants/propertyData";
 import { AppInput } from "@/design-system/components/AppInput";
-import RadioGroupSelector from "@/components/common/RadioGroupSelector";
-import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
+import {
+  usePropertyFiltersStore,
+  type IndustrialFilters,
+} from "@/store/propertyFiltersStore";
 
-export const IndustrialFiltersSection: React.FC = () => {
-  const { filters, updateIndustrialFilter } = usePropertyFiltersStore();
-  const inf = filters.industrialFilters;
+interface IndustrialFiltersSectionProps {
+  /** Si se pasan, el componente opera sobre este valor en lugar del store global. */
+  value?: IndustrialFilters;
+  onUpdate?: <K extends keyof IndustrialFilters>(
+    key: K,
+    value: IndustrialFilters[K],
+  ) => void;
+}
+
+export const IndustrialFiltersSection: React.FC<IndustrialFiltersSectionProps> = ({
+  value,
+  onUpdate,
+}) => {
+  const store = usePropertyFiltersStore();
+  const inf = value ?? store.filters.industrialFilters;
+  const updateIndustrialFilter = onUpdate ?? store.updateIndustrialFilter;
 
   const toggleEnergiaKva = (tipo: string) => {
     const current = inf.energiaKva ?? [];
@@ -22,17 +37,34 @@ export const IndustrialFiltersSection: React.FC = () => {
     updateIndustrialFilter("energiaKva", updated);
   };
 
+  const toggleUbicacion = (tipo: string) => {
+    const current = inf.ubicacion ?? [];
+    const updated = current.includes(tipo)
+      ? current.filter((t) => t !== tipo)
+      : [...current, tipo];
+    updateIndustrialFilter("ubicacion", updated);
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionLabel}>Características Industriales</Text>
 
-      {/* UBICACIÓN */}
-      <RadioGroupSelector
-        label="Ubicación"
-        options={[...TIPOS_UBICACION_INDUSTRIAL]}
-        selectedValue={inf.ubicacion}
-        onSelect={(v) => updateIndustrialFilter("ubicacion", v === inf.ubicacion ? "" : v)}
-      />
+      {/* UBICACIÓN (selección múltiple) */}
+      <Text style={styles.label}>Ubicación</Text>
+      <View style={styles.chipsWrap}>
+        {TIPOS_UBICACION_INDUSTRIAL.map((tipo) => {
+          const selected = inf.ubicacion?.includes(tipo);
+          return (
+            <TouchableOpacity
+              key={tipo}
+              style={[styles.chip, selected && styles.chipSelected]}
+              onPress={() => toggleUbicacion(tipo)}
+            >
+              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{tipo}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       {/* ALTURA LIBRE */}
       <Text style={styles.label}>Altura Libre Operativa</Text>

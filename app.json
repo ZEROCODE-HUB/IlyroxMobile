@@ -2,7 +2,8 @@
   "expo": {
     "name": "ilyrox",
     "slug": "ilyrox",
-    "version": "1.0.0",
+    "version": "1.0.3",
+    "runtimeVersion": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/Icon-size.png",
     "userInterfaceStyle": "light",
@@ -15,6 +16,10 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "updates": {
+      "url": "https://u.expo.dev/1cff47e7-484f-4918-a037-ec4fa89f7c6e",
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ilyrox.app",
@@ -23,7 +28,9 @@
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
         "UIBackgroundModes": [
           "remote-notification"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Ilyrox necesita acceder a tu galería para que puedas seleccionar fotos y videos al crear publicaciones, reels y propiedades, elegir tu foto de perfil y adjuntar archivos en mensajes."
       },
       "entitlements": {
         "aps-environment": "production",
@@ -31,12 +38,11 @@
           "group.com.ilyrox.app.onesignal"
         ]
       },
-      "config": {
-        "googleMapsApiKey": "AIzaSyCMns7F3TjXiJ4oswwws0USAgum-GcwM9A"
-      },
       "associatedDomains": [
         "applinks:ilyrox.app",
-        "applinks:*.ilyrox.app"
+        "applinks:*.ilyrox.app",
+        "applinks:ilyrox-posts.vercel.app",
+        "applinks:feeds.ilyrox.com"
       ]
     },
     "androidStatusBar": {
@@ -51,11 +57,6 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.ilyrox.app",
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyB2SD7BpH4ms3h3N4FiXcTv1CZdlElhRGg"
-        }
-      },
       "intentFilters": [
         {
           "action": "VIEW",
@@ -73,6 +74,26 @@
             },
             {
               "scheme": "ilyroxapp"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "ilyrox-posts.vercel.app",
+              "path": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "feeds.ilyrox.com",
+              "path": "/"
             }
           ],
           "category": [
@@ -108,7 +129,8 @@
       "@react-native-community/datetimepicker",
       "expo-web-browser",
       "expo-router",
-      "expo-font"
+      "expo-font",
+      "react-native-compressor"
     ],
     "extra": {
       "eas": {

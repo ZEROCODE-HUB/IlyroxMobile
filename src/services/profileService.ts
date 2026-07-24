@@ -39,12 +39,17 @@ export const profileService = {
     return data?.recomienda ?? null;
   },
 
-  async getRecommendedByUsers(targetUserId: string, from: number, to: number) {
+  async getRecommendedByUsers(
+    targetUserId: string,
+    from: number,
+    to: number,
+    recomienda: boolean = true,
+  ) {
     const { data: recsData, error: recsError } = await supabase
       .from("recomendaciones_usuarios")
       .select("recomendado_por")
       .eq("usuario_recomendado_id", targetUserId)
-      .eq("recomienda", true)
+      .eq("recomienda", recomienda)
       .range(from, to);
 
     if (recsError) throw recsError;
@@ -57,7 +62,7 @@ export const profileService = {
 
     const { data: profilesData, error: profilesError } = await supabase
       .from("perfiles")
-      .select("id,nombre,apellido_paterno,apellido_materno,foto,rol")
+      .select("id,nombre,apellido_paterno,apellido_materno,foto,rol,ocupacion")
       .in("id", recommendedByIds);
 
     if (profilesError) throw profilesError;
