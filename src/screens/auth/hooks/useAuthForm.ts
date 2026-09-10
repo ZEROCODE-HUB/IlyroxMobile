@@ -40,7 +40,7 @@ const initialFormState: AuthFormState = {
   name: "",
   lastNamePaterno: "",
   lastNameMaterno: "",
-  phone: "+52 ",
+  phone: "+52",
   pais: "Mexico",
   estado: "",
   avatarUri: null,
@@ -303,9 +303,7 @@ export function useAuthForm() {
     setLoading(true);
     try {
       // Verificar teléfono duplicado antes de crear la cuenta
-      const celularDigits = formState.phone.includes(" ")
-        ? formState.phone.split(" ").slice(1).join(" ")
-        : formState.phone;
+      const celularDigits = formState.phone.replace(/\D/g, "").slice(2);
 
       const { data: existingPhone } = await supabase
         .from("perfiles")
@@ -349,12 +347,8 @@ export function useAuthForm() {
           nombre: collapseSpaces(formState.name),
           apellido_paterno: collapseSpaces(formState.lastNamePaterno),
           apellido_materno: collapseSpaces(formState.lastNameMaterno),
-          prefijo_celular: formState.phone.includes(" ")
-            ? formState.phone.split(" ")[0]
-            : "+52",
-          celular: formState.phone.includes(" ")
-            ? formState.phone.split(" ").slice(1).join(" ")
-            : formState.phone,
+          prefijo_celular: "+52",
+          celular: formState.phone.replace(/\D/g, "").slice(2),
           email: formState.email,
           rol: "cliente",
           pais: "Mexico",

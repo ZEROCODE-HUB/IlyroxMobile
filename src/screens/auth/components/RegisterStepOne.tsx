@@ -10,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { SubmitButton } from "./SubmitButton";
 import { BackButton } from "./BackButton";
+import { CountryPrefixInput } from "./CountryPrefixInput";
 import SelectionModal from "../../../components/modals/SelectionModal";
 import { AuthFormState, getPasswordStrength } from "../hooks/useAuthForm";
 import { ESTADOS_MEXICO } from "../../../constants/estadosMexico";
@@ -97,14 +98,11 @@ export function RegisterStepOne({
         textContentType="emailAddress"
       />
 
-      <AppInput
-        placeholder="Celular *"
-        keyboardType="phone-pad"
+      <CountryPrefixInput
         value={formState.phone}
         onChangeText={(v) => onUpdateField("phone", v)}
         onBlur={() => onValidateField("phone", formState.phone)}
         error={fieldErrors.phone}
-        textContentType="telephoneNumber"
       />
 
       <TouchableOpacity

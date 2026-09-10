@@ -16,6 +16,8 @@ import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useModal } from "@/context/ModalContext";
+import { useToast } from "@/context/ToastContext";
+import { useAuth } from "@/context/AuthContext";
 import * as Linking from "expo-linking";
 import { Session } from "@supabase/supabase-js";
 import { Button } from "@/design-system/components";
@@ -52,6 +54,8 @@ const parseUrlParams = (url: string): Record<string, string> => {
 
 const ResetPasswordScreen: React.FC = () => {
   const { showModal } = useModal();
+  const { showToast } = useToast();
+  const { startPasswordResetProcessing, endPasswordResetProcessing } = useAuth();
   const localParams = useLocalSearchParams();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -218,6 +222,7 @@ const ResetPasswordScreen: React.FC = () => {
     if (!validateForm()) return;
 
     setIsSubmitting(true);
+    startPasswordResetProcessing();
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -232,26 +237,36 @@ const ResetPasswordScreen: React.FC = () => {
 
       if (error) throw error;
 
+      // ÉXITO: Cerrar sesión y mostrar modal
+      await supabase.auth.signOut();
       showModal({
-        title: "Contraseña actualizada",
-        message: "Tu contraseña ha sido cambiada con éxito. Ya puedes iniciar sesión.",
+        title: "¡Contraseña actualizada!",
+        message: "Tu contraseña ha sido cambiada con éxito. Inicia sesión con tu nueva contraseña.",
         confirmText: "Ir al Login",
-        onConfirm: () => {
-          // Cerrar sesión para forzar nuevo login
-          supabase.auth.signOut();
-          router.replace("/login");
-        },
+        onConfirm: () => router.replace("/login"),
       });
 
     } catch (error: any) {
       log.error("Error al actualizar contraseña:", error);
-      showModal({
-        title: "Error",
-        message: error.message || "Ocurrió un error inesperado.",
-        confirmText: "OK",
-      });
+
+      // Limpiar sesión
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        // Ignore signOut errors during cleanup
+      }
+
+      let errorMessage = error.message || "Ocurrió un error inesperado.";
+      if (
+        error.message?.includes("New password should be different") ||
+        error.message?.includes("new password")
+      ) {
+        errorMessage = "La nueva contraseña debe ser diferente a la actual.";
+      }
+      showToast(errorMessage, "error");
     } finally {
       setIsSubmitting(false);
+      endPasswordResetProcessing();
     }
   };
 

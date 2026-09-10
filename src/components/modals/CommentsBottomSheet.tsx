@@ -51,6 +51,7 @@ interface CommentsBottomSheetProps {
   onClose: () => void;
   feedItemId: string;
   currentUserId?: string;
+  highlightUserIds?: string[];
 }
 
 interface CommentItemProps {
@@ -59,6 +60,7 @@ interface CommentItemProps {
   isLiked: boolean;
   onLike: () => void;
   onReply: () => void;
+  highlightedUserIds?: string[];
 }
 
 // ============================================================================
@@ -71,81 +73,88 @@ interface CommentItemProps {
 // ============================================================================
 
 const CommentItem = React.memo<CommentItemProps>(
-  ({ comment, replies, isLiked, onLike, onReply }) => (
-    <ScreenWrapper withHeader={false}>
-      <View style={styles.commentContainer}>
-        {/* Comentario principal */}
-        <View style={styles.commentMain}>
-          <Avatar
-            uri={comment.user.avatar}
-            name={comment.user.nombre}
-            size={36}
-          />
-          <View style={styles.commentBody}>
-            <View style={styles.bubble}>
-              <View style={styles.bubbleHeader}>
-                <Text style={styles.userName}>{comment.user.nombre}</Text>
-                <Text style={styles.timestamp}>{comment.timestamp}</Text>
-              </View>
-              {!!comment.text && (
-                <Text style={styles.commentText}>{comment.text}</Text>
-              )}
-              {!!comment.imageUrl && (
-                <ViewImage
-                  src={comment.imageUrl}
-                  containerStyle={styles.commentImageContainer}
-                  imageStyle={styles.commentImage}
-                />
-              )}
-            </View>
+  ({ comment, replies, isLiked, onLike, onReply, highlightedUserIds }) => {
+    const isCommentHighlighted = highlightedUserIds?.includes(comment.user.id) || false;
 
-            <View style={styles.commentActions}>
-              <TouchableOpacity onPress={onLike} style={styles.actionButton}>
-                <Ionicons
-                  name={isLiked ? "heart" : "heart-outline"}
-                  size={16}
-                  color={isLiked ? COLORS.error : COLORS.textTertiary}
-                />
-                {isLiked && <Text style={styles.actionText}>Like</Text>}
-              </TouchableOpacity>
-              <TouchableOpacity onPress={onReply} style={styles.actionButton}>
-                <Text style={styles.actionText}>Responder</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+    return (
+      <ScreenWrapper withHeader={false}>
+        <View style={[styles.commentContainer, isCommentHighlighted && styles.highlightedComment]}>
+          {isCommentHighlighted && <View style={styles.highlightIndicator} />}
 
-        {/* Respuestas */}
-        {replies.map((reply) => (
-          <View key={reply.id} style={styles.replyContainer}>
+          <View style={styles.commentMain}>
             <Avatar
-              uri={reply.user.avatar}
-              name={reply.user.nombre}
-              size={28}
+              uri={comment.user.avatar}
+              name={comment.user.nombre}
+              size={36}
             />
             <View style={styles.commentBody}>
-              <View style={styles.bubble}>
+              <View style={[styles.bubble, isCommentHighlighted && styles.highlightedBubble]}>
                 <View style={styles.bubbleHeader}>
-                  <Text style={styles.userName}>{reply.user.nombre}</Text>
-                  <Text style={styles.timestamp}>{reply.timestamp}</Text>
+                  <Text style={styles.userName}>{comment.user.nombre}</Text>
+                  <Text style={styles.timestamp}>{comment.timestamp}</Text>
                 </View>
-                {!!reply.text && (
-                  <Text style={styles.commentText}>{reply.text}</Text>
+                {!!comment.text && (
+                  <Text style={styles.commentText}>{comment.text}</Text>
                 )}
-                {!!reply.imageUrl && (
+                {!!comment.imageUrl && (
                   <ViewImage
-                    src={reply.imageUrl}
+                    src={comment.imageUrl}
                     containerStyle={styles.commentImageContainer}
                     imageStyle={styles.commentImage}
                   />
                 )}
               </View>
+
+              <View style={styles.commentActions}>
+                <TouchableOpacity onPress={onLike} style={styles.actionButton}>
+                  <Ionicons
+                    name={isLiked ? "heart" : "heart-outline"}
+                    size={16}
+                    color={isLiked ? COLORS.error : COLORS.textTertiary}
+                  />
+                  {isLiked && <Text style={styles.actionText}>Like</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity onPress={onReply} style={styles.actionButton}>
+                  <Text style={styles.actionText}>Responder</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        ))}
-      </View>
-    </ScreenWrapper>
-  ),
+
+          {replies.map((reply) => {
+            const isReplyHighlighted = highlightedUserIds?.includes(reply.user.id) || false;
+            return (
+              <View key={reply.id} style={[styles.replyContainer, isReplyHighlighted && styles.highlightedReply]}>
+                <Avatar
+                  uri={reply.user.avatar}
+                  name={reply.user.nombre}
+                  size={28}
+                />
+                <View style={styles.commentBody}>
+                  <View style={[styles.bubble, isReplyHighlighted && styles.highlightedBubble]}>
+                    <View style={styles.bubbleHeader}>
+                      <Text style={styles.userName}>{reply.user.nombre}</Text>
+                      <Text style={styles.timestamp}>{reply.timestamp}</Text>
+                    </View>
+                    {!!reply.text && (
+                      <Text style={styles.commentText}>{reply.text}</Text>
+                    )}
+                    {!!reply.imageUrl && (
+                      <ViewImage
+                        src={reply.imageUrl}
+                        containerStyle={styles.commentImageContainer}
+                        imageStyle={styles.commentImage}
+                      />
+                    )}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      </ScreenWrapper>
+    );
+  },
 );
 
 CommentItem.displayName = "CommentItem";
@@ -159,12 +168,14 @@ export default function CommentsBottomSheet({
   onClose,
   feedItemId,
   currentUserId,
+  highlightUserIds,
 }: CommentsBottomSheetProps) {
   const { height: screenHeight } = useWindowDimensions();
   const modalHeight = screenHeight * 0.95;
 
   // State
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [highlightedUserIds, setHighlightedUserIds] = useState<string[]>([]);
 
   // Refs
   const inputRef = useRef<TextInput>(null);
@@ -186,6 +197,20 @@ export default function CommentsBottomSheet({
     [comments],
   );
 
+  // Display comments: highlighted users' comments FIRST, then others
+  const displayComments = useMemo(() => {
+    if (!highlightedUserIds || highlightedUserIds.length === 0) return parentComments;
+
+    const highlighted = parentComments.filter(
+      (c) => highlightedUserIds.includes(c.user.id)
+    );
+    const others = parentComments.filter(
+      (c) => !highlightedUserIds.includes(c.user.id)
+    );
+
+    return [...highlighted, ...others];
+  }, [parentComments, highlightedUserIds]);
+
   const replyToUser = useMemo(
     () => comments.find((c) => c.id === replyTo)?.user.nombre,
     [replyTo, comments],
@@ -206,6 +231,7 @@ export default function CommentsBottomSheet({
   useEffect(() => {
     if (!visible) {
       setReplyTo(null);
+      setHighlightedUserIds([]);
     } else if (visible && feedItemId && currentUserId) {
       // Marcar post como visto para cancelar notificaciones duplicadas
       supabase.rpc('mark_post_as_seen', {
@@ -214,6 +240,13 @@ export default function CommentsBottomSheet({
       });
     }
   }, [visible, feedItemId, currentUserId]);
+
+  // Set highlighted users when highlightUserIds prop changes
+  useEffect(() => {
+    if (highlightUserIds && highlightUserIds.length > 0) {
+      setHighlightedUserIds(highlightUserIds);
+    }
+  }, [highlightUserIds]);
 
   // ============================================================================
   // Handlers
@@ -261,9 +294,10 @@ export default function CommentsBottomSheet({
         isLiked={!!item.isLiked}
         onLike={() => handleLikeComment(item.id)}
         onReply={() => setReplyTo(item.id)}
+        highlightedUserIds={highlightedUserIds}
       />
     ),
-    [comments, handleLikeComment],
+    [comments, handleLikeComment, highlightedUserIds],
   );
 
   const ListEmptyComponent = useMemo(() => {
@@ -315,13 +349,13 @@ export default function CommentsBottomSheet({
               {/* Comments List */}
               <FlatList
                 ref={flatListRef}
-                data={parentComments}
+                data={displayComments}
                 renderItem={renderComment}
                 keyExtractor={(item) => item.id}
                 style={styles.list}
                 contentContainerStyle={[
                   styles.listContent,
-                  parentComments.length === 0 && styles.listContentEmpty,
+                  displayComments.length === 0 && styles.listContentEmpty,
                 ]}
                 ListEmptyComponent={ListEmptyComponent}
                 keyboardShouldPersistTaps="handled"
@@ -519,5 +553,43 @@ const styles = StyleSheet.create({
   },
   replyBadgeName: {
     fontWeight: "bold",
+  },
+
+  // Highlight styles for comment notifications
+  highlightedComment: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 12,
+    marginVertical: 4,
+  },
+  highlightIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    backgroundColor: '#3B82F6',
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+  },
+  highlightedBubble: {
+    backgroundColor: '#DBEAFE',
+  },
+  highlightedReply: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 8,
+    marginTop: 8,
+    padding: 4,
+  },
+  highlightBadge: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  highlightBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

@@ -215,6 +215,12 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
 
     // Navegar sin cerrar el search (la navegación cambia de screen)
     action();
+
+    // Para ubicaciones, cerrar el search DESPUÉS de seleccionar
+    // para que el usuario vea la navegación al mapa
+    if (tipo === TIPO_BUSQUEDA.UBICACION) {
+      onClose();
+    }
   };
 
   // â”€â”€ Contenido de cada tab â”€â”€

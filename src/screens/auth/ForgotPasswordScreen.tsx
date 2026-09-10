@@ -83,8 +83,7 @@ const ForgotPasswordScreen: React.FC = () => {
         <View style={styles.content}>
           <View style={styles.formContainer}>
             <Text style={styles.description}>
-              Ingresa tu correo electrónico y te enviaremos un código de
-              verificación para restablecer tu contraseña.
+              Si el correo está registrado, te enviaremos un código de verificación en unos minutos.
             </Text>
 
             <View style={styles.inputGroup}>

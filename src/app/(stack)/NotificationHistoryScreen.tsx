@@ -10,10 +10,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { supabase } from '../../lib/supabase';
-import { useNotifications } from '../../context/NotificationContext';
+import { useNotifications, NotificacionExtendida } from '../../context/NotificationContext';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
 import { useAuth } from '../../context/AuthContext';
+import { Avatar } from '../../components/shared';
 
 export default function NotificationHistoryScreen() {
   const router = useRouter();
@@ -28,54 +30,85 @@ export default function NotificationHistoryScreen() {
     // Notifications are fetched automatically by the context
   }, []);
   
-  const handleNotificationPress = async (notificationId: string, feedItemId: string | null) => {
+  const handleNotificationPress = async (notification: NotificacionExtendida) => {
+    const { id, feed_item_id, autores } = notification;
+
     if (user) {
-      await markAsRead(notificationId);
+      await markAsRead(id);
     }
 
-    if (!feedItemId) return;
+    if (!feed_item_id) return;
+
+    const firstAuthorId = autores[0]?.id || null;
 
     const { data: feedItem } = await supabase
       .from("feed_items")
       .select("contenido_id, tipo_contenido")
-      .eq("id", feedItemId)
+      .eq("id", feed_item_id)
       .single();
 
     if (!feedItem) return;
 
+    const highlightParam = firstAuthorId ? { highlightUserId: firstAuthorId } : {};
+
     switch (feedItem.tipo_contenido) {
       case "propiedad":
-        router.push({ pathname: "/(stack)/property/[id]", params: { id: feedItem.contenido_id } });
+        router.push({ pathname: "/(stack)/property/[id]", params: { id: feedItem.contenido_id, ...highlightParam } });
         break;
       case "post":
-        router.push({ pathname: "/(stack)/post/[id]", params: { id: feedItem.contenido_id } });
+        router.push({ pathname: "/(stack)/post/[id]", params: { id: feedItem.contenido_id, ...highlightParam } });
         break;
       case "reel":
-        router.push({ pathname: "/(stack)/reel/[id]", params: { id: feedItem.contenido_id } });
+        router.push({ pathname: "/(stack)/reel/[id]", params: { id: feedItem.contenido_id, ...highlightParam } });
         break;
       default:
-        router.push({ pathname: "/(stack)/property/[id]", params: { id: feedItem.contenido_id } });
+        router.push({ pathname: "/(stack)/property/[id]", params: { id: feedItem.contenido_id, ...highlightParam } });
     }
   };
   
-  const renderItem = ({ item }: { item: any }) => {
+  const renderItem = ({ item }: { item: NotificacionExtendida }) => {
     const isUnread = item.estado === 'pendiente';
-    
+    const firstAuthor = item.autores[0];
+    const extraCount = item.total_autores - 1;
+
     return (
       <TouchableOpacity
         style={[styles.notificationItem, isUnread && styles.unreadItem]}
-        onPress={() => handleNotificationPress(item.id, item.feed_item_id)}
+        onPress={() => handleNotificationPress(item)}
         activeOpacity={0.7}
       >
         <View style={styles.dotContainer}>
           <View style={[styles.dot, isUnread && styles.unreadDot]} />
         </View>
-        
-        <View style={styles.content}>
-          <Text style={[styles.message, !isUnread && styles.readMessage]}>
-            {item.mensaje}
-          </Text>
-          <Text style={styles.time}>{formatTimeAgo(item.created_at)}</Text>
+
+        <View style={styles.avatarContainer}>
+          <Avatar
+            uri={firstAuthor?.foto || undefined}
+            name={firstAuthor?.nombre || 'Usuario'}
+            size={44}
+          />
+          {extraCount > 0 && (
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeText}>+{extraCount}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.contentContainer}>
+          <View style={styles.content}>
+            <Text style={[styles.message, !isUnread && styles.readMessage]} numberOfLines={2}>
+              {item.mensaje}
+            </Text>
+            <Text style={styles.time}>{formatTimeAgo(item.created_at)}</Text>
+          </View>
+
+          {item.contenido?.thumbnail && (
+            <Image
+              source={{ uri: item.contenido.thumbnail }}
+              style={styles.thumbnail}
+              contentFit="cover"
+            />
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -176,10 +209,6 @@ const styles = StyleSheet.create({
   unreadDot: {
     backgroundColor: '#3B82F6',
   },
-  content: {
-    flex: 1,
-    marginLeft: 8,
-  },
   message: {
     fontSize: 15,
     color: '#111827',
@@ -214,5 +243,40 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginLeft: 8,
+  },
+  badgeContainer: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    backgroundColor: '#3B82F6',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  contentContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    marginLeft: 12,
+  },
+  content: {
+    flex: 1,
+  },
+  thumbnail: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    marginLeft: 8,
   },
 });

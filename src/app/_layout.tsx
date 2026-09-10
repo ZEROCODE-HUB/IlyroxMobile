@@ -8,10 +8,10 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import {
-  QueryClient,
   QueryClientProvider,
   focusManager,
 } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { OneSignal } from "react-native-onesignal";
 import { useFonts } from "expo-font";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -204,8 +204,6 @@ function takePendingNotificationClick() {
   return data;
 }
 
-const queryClient = new QueryClient();
-
 /**
  * React Query solo cablea `focusManager` a `visibilitychange` del navegador.
  * En React Native nadie lo hace, así que `refetchOnWindowFocus` nunca dispara
@@ -253,7 +251,7 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-  const { session, profile, loading: authLoading } = useAuth();
+  const { session, profile, loading: authLoading, isPasswordResetProcessing } = useAuth();
   const {
     updateRequired,
     versionInfo,
@@ -396,16 +394,20 @@ function RootLayoutNav() {
   useEffect(() => {
     if (loading) return;
 
+    if (isPasswordResetProcessing) return;
+
     const inAuthGroup = segments[0] === "(auth)";
 
-    const isResetPassword = segments.includes("reset-password");
+    const isResetPassword =
+      segments.includes("reset-password") ||
+      segments.includes("verify-password-reset");
 
     if (!session && !inAuthGroup) {
       router.replace("/login");
     } else if (session && inAuthGroup && !isResetPassword) {
       router.replace("/(tabs)");
     }
-  }, [session, loading, segments]);
+  }, [session, loading, segments, isPasswordResetProcessing]);
 
   /**
    * Ejecuta la navegación de una push tocada antes de que la app pudiera navegar.
