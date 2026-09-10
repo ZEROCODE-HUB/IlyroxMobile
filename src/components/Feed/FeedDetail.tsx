@@ -26,6 +26,8 @@ interface FeedDetailProps {
   onClose: () => void;
   onUserClick?: (user: User) => void;
   currentUserId?: string;
+  highlightUserIds?: string[];
+  autoOpenComments?: boolean;
 }
 
 const FeedDetail: React.FC<FeedDetailProps> = ({
@@ -33,6 +35,8 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
   onClose,
   onUserClick,
   currentUserId,
+  highlightUserIds,
+  autoOpenComments = false,
 }) => {
   const images = item.images || item.propertyDetails?.images || [];
   const [showComments, setShowComments] = useState(false);
@@ -60,6 +64,13 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
   useEffect(() => {
     showCommentsRef.current = showComments;
   }, [showComments]);
+
+  // Auto-open comments when navigating from notification with highlightUserId
+  useEffect(() => {
+    if (autoOpenComments) {
+      setShowComments(true);
+    }
+  }, [autoOpenComments]);
 
   return (
     <ScreenWrapper withHeader={false} style={styles.container}>
@@ -294,6 +305,7 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
         onClose={() => setShowComments(false)}
         feedItemId={item.id}
         currentUserId={currentUserId}
+        highlightUserIds={highlightUserIds}
       />
     </ScreenWrapper>
   );

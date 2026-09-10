@@ -19,10 +19,28 @@ export interface Notificacion {
   created_at: string;
 }
 
+export interface NotificacionAutor {
+  id: string;
+  nombre: string;
+  foto: string | null;
+}
+
+export interface NotificacionContenido {
+  id: string;
+  thumbnail: string | null;
+  tipo: "post" | "propiedad" | "reel";
+}
+
+export interface NotificacionExtendida extends Notificacion {
+  autores: NotificacionAutor[];
+  total_autores: number;
+  contenido: NotificacionContenido | null;
+}
+
 interface NotificationContextType {
-  notifications: Notificacion[];
+  notifications: NotificacionExtendida[];
   unreadCount: number;
-  lastNotification: Notificacion | null;
+  lastNotification: NotificacionExtendida | null;
   isLoading: boolean;
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
@@ -53,7 +71,7 @@ interface NotificationProviderProps {
 }
 
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children, userId }) => {
-  const [notifications, setNotifications] = useState<Notificacion[]>([]);
+  const [notifications, setNotifications] = useState<NotificacionExtendida[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
@@ -65,20 +83,65 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("user_notifications")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(50);
+      console.log('🔔 [Notifications] RPC call starting with userId:', userId);
+      const { data, error } = await supabase.rpc('get_enriched_notifications', {
+        p_user_id: userId,
+      });
 
-      if (!error && data) {
-        const unread = data.filter((n: Notificacion) => n.estado === "pendiente").length;
-        setNotifications(data);
+      console.log('🔔 [Notifications] RPC result:', { 
+        dataLength: data?.length, 
+        error,
+        firstRow: data?.[0]
+      });
+
+      if (error) {
+        console.error('🔔 [Notifications] RPC ERROR:', error);
+      }
+
+      if (!error && data && data.length > 0) {
+        console.log('🔔 [Notifications] Processing', data.length, 'notifications');
+        
+        const enrichedNotifications: NotificacionExtendida[] = data.map((row: any) => {
+          console.log('🔔 [Notifications] Row:', {
+            id: row.id,
+            tipo: row.tipo,
+            mensaje: row.mensaje?.substring(0, 50),
+            autores: row.autores,
+            thumbnail: row.thumbnail,
+            tipo_contenido: row.tipo_contenido
+          });
+          
+          return {
+            id: row.id,
+            tipo: row.tipo,
+            titulo: row.titulo || '',
+            mensaje: row.mensaje,
+            feed_item_id: row.feed_item_id,
+            data: row.data || {},
+            estado: row.estado as "pendiente" | "leida",
+            leida_en: row.leida_en,
+            created_at: row.created_at,
+            autores: row.autores || [],
+            total_autores: row.total_autores || 0,
+            contenido: row.thumbnail ? {
+              id: row.contenido_id,
+              thumbnail: row.thumbnail,
+              tipo: row.tipo_contenido,
+            } : null,
+          };
+        });
+
+        console.log('🔔 [Notifications] Enriched notifications:', enrichedNotifications.length);
+        const unread = enrichedNotifications.filter(n => n.estado === "pendiente").length;
+        console.log('🔔 [Notifications] Unread count:', unread);
+        
+        setNotifications(enrichedNotifications);
         setUnreadCount(unread);
+      } else {
+        console.log('🔔 [Notifications] No data or error - notifications list stays empty');
       }
     } catch (err) {
-      console.error("Error fetching notifications:", err);
+      console.error("🔔 [Notifications] Exception:", err);
     } finally {
       setIsLoading(false);
     }
@@ -158,7 +221,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
   // Realtime subscription
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      console.log('🔔 [Notifications] No userId, skipping fetch');
+      return;
+    }
+
+    console.log('🔔 [Notifications] Mounting with userId:', userId);
 
     // Fetch initial data
     fetchNotifications();
@@ -176,20 +244,31 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          console.log("Realtime notification update:", payload);
+          console.log('🔔 [Notifications] Realtime payload:', payload.eventType, payload.new || payload.old);
 
           if (payload.eventType === "INSERT") {
             const newNotification = payload.new as Notificacion;
+            console.log('🔔 [Notifications] INSERT event:', newNotification);
+            const extendedNotification: NotificacionExtendida = {
+              ...newNotification,
+              autores: [],
+              total_autores: ((newNotification.data?.author_ids as string[]) || []).length,
+              contenido: null,
+            };
             setNotifications((prev) => {
-              const updated = [newNotification, ...prev].slice(0, 50);
+              const updated = [extendedNotification, ...prev].slice(0, 50);
+              console.log('🔔 [Notifications] After INSERT, total notifications:', updated.length);
               return updated;
             });
             setUnreadCount((prev) => prev + 1);
           } else if (payload.eventType === "UPDATE") {
             const updatedNotification = payload.new as Notificacion;
+            console.log('🔔 [Notifications] UPDATE event:', updatedNotification);
             setNotifications((prev) =>
               prev.map((n) =>
-                n.id === updatedNotification.id ? updatedNotification : n
+                n.id === updatedNotification.id
+                  ? { ...n, estado: updatedNotification.estado as "pendiente" | "leida", leida_en: updatedNotification.leida_en as string | null }
+                  : n
               )
             );
             if (updatedNotification.estado === "leida") {
@@ -197,6 +276,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
             }
           } else if (payload.eventType === "DELETE") {
             const deletedId = payload.old.id;
+            console.log('🔔 [Notifications] DELETE event:', deletedId);
             setNotifications((prev) => prev.filter((n) => n.id !== deletedId));
           }
         }

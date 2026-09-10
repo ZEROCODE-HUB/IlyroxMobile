@@ -116,9 +116,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
         <LazyImage
           source={{ uri: item }}
           style={[styles.image, { width: containerWidth }]}
-          // `contain` respeta la forma original de cada foto en lugar de
-          // recortarla para llenar el contenedor.
-          resizeMode="contain"
+          resizeMode="cover"
         />
       </TouchableOpacity>
     ),

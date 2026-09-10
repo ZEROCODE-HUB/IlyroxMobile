@@ -215,6 +215,19 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
 
     // Navegar sin cerrar el search (la navegación cambia de screen)
     action();
+
+    // Para ubicaciones, cerrar el search DESPUÉS de seleccionar
+    // para que el usuario vea la navegación al mapa
+    if (tipo === TIPO_BUSQUEDA.UBICACION) {
+      if (isScreenMode) {
+        // Igual que handleSelectHistory: navega directo al mapa.
+        // No dependemos del listener pendingOpenMap del Feed (frágil en
+        // screen mode por la race con router.back).
+        router.push("/(stack)/map");
+      } else {
+        onClose();
+      }
+    }
   };
 
   // â”€â”€ Contenido de cada tab â”€â”€
@@ -421,7 +434,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
   };
 
   const renderSearchContent = () => (
-    <View style={[styles.container, { paddingTop: isScreenMode ? 0 : insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
 
       {/* â”€â”€ Header con buscador â”€â”€ */}
       <View style={styles.header}>
@@ -480,7 +493,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
       </View>
 
         {/* â”€â”€ Contenido â”€â”€ */}
-        <View style={styles.content}>
+        <View style={[styles.content, { paddingBottom: insets.bottom }]}>
           {/* Historial de bÃºsquedas (de BD) */}
           {query.length === 0 && (
             <HistorySearches

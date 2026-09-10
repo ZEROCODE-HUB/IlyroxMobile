@@ -16,6 +16,7 @@ import * as Haptics from "expo-haptics";
 import { Property } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
+import { useToast } from "@/context/ToastContext";
 import { SearchFiltersBar } from "./SearchFiltersBar";
 import { PropertyMap } from "./PropertyMap";
 import { CoincidentPropertiesSheet } from "./CoincidentPropertiesSheet";
@@ -50,6 +51,7 @@ interface MapSearchProps {
 const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   const { user, profile } = useAuth();
   const { selectedLocation } = useApp();
+  const { showToast } = useToast();
   const insets = useSafeAreaInsets();
 
   const [showFiltersModal, setShowFiltersModal] = useState(false);
@@ -206,20 +208,17 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
       };
       addLocationChip(chip);
 
-      // Guardar en BD cuando viene del SearchOverlay (Feed)
+      // Guardar en BD cuando viene del SearchOverlay (Feed) - FIRE-AND-FORGET
       const currentFilters = usePropertyFiltersStore.getState().filters;
       if (!currentSearchId && userId) {
-        try {
-          // Crear búsqueda desde mapa con ubicación
-          await createSearchFromMap(currentFilters, {
-            estado: sel.estado_nombre || (sel.type === "estado" ? sel.name : undefined),
-            municipio: sel.municipio_nombre || (sel.type === "municipio" ? sel.name : undefined),
-            colonia: sel.type === "colonia" ? sel.name : undefined,
-            placeName: sel.name,
-          }, userId);
-        } catch (e) {
+        createSearchFromMap(currentFilters, {
+          estado: sel.estado_nombre || (sel.type === "estado" ? sel.name : undefined),
+          municipio: sel.municipio_nombre || (sel.type === "municipio" ? sel.name : undefined),
+          colonia: sel.type === "colonia" ? sel.name : undefined,
+          placeName: sel.name,
+        }, userId).catch((e) => {
           log.warn('Error guardando ubicación en historial:', e);
-        }
+        });
       }
     };
 
@@ -366,28 +365,19 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     };
     addLocationChip(chip);
 
-    // Guardar en historial de búsquedas (bloque ubicación completado)
+    // Guardar en historial de búsquedas (FIRE-AND-FORGET)
+    // NO esperamos - la UI ya está actualizada con el chip
+    // El usuario no debe esperar por una operación de BD
     const currentFilters = usePropertyFiltersStore.getState().filters;
-    if (currentFilters.locationChips.length === 1) {
-      // Primera ubicación - crear búsqueda desde mapa con ubicación
-      try {
-        await createSearchFromMap(currentFilters, {
-          estado: loc.estado_nombre || (loc.type === "estado" ? loc.name : undefined),
-          municipio: loc.municipio_nombre || (loc.type === "municipio" ? loc.name : undefined),
-          colonia: loc.type === "colonia" ? loc.name : undefined,
-          placeName: loc.name,
-        }, userId);
-      } catch (e) {
-        log.warn('Error guardando en historial:', e);
-      }
-    } else if (currentSearchId && userId) {
-      // Ubicación adicional - actualizar búsqueda existente
-      try {
-        await updateSearchWithFilters(currentSearchId, currentFilters, userId);
-      } catch (e) {
-        log.warn('Error actualizando historial:', e);
-      }
-    }
+    createSearchFromMap(currentFilters, {
+      estado: loc.estado_nombre || (loc.type === "estado" ? loc.name : undefined),
+      municipio: loc.municipio_nombre || (loc.type === "municipio" ? loc.name : undefined),
+      colonia: loc.type === "colonia" ? loc.name : undefined,
+      placeName: loc.name,
+    }, userId).catch((e) => {
+      log.warn('Error guardando en historial:', e);
+      showToast('No se pudo guardar la búsqueda', 'error');
+    });
   };
 
   // ── Handlers de marker ──

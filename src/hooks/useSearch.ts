@@ -248,6 +248,7 @@ export function useSearch() {
   const [results, setResults] = useState<SearchResults>(EMPTY_RESULTS);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const currentQueryRef = useRef<string>("");
 
   const { profile, user } = useAuth();
   const { searchLocations, suggestions, isLoading: locLoading } = useLocationSearchStore();
@@ -264,8 +265,11 @@ export function useSearch() {
     const trimmed = query.trim();
     if (!trimmed) {
       setResults(EMPTY_RESULTS);
+      currentQueryRef.current = "";
       return;
     }
+
+    currentQueryRef.current = trimmed;
 
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
@@ -278,12 +282,14 @@ export function useSearch() {
           fetchProperties(trimmed, blockedUserIds),
         ]);
         if (!mountedRef.current) return;
+        if (currentQueryRef.current !== trimmed) return;
         searchLocations(trimmed, undefined, {
           restrictToRegions: false,
           withCounts: false,
           estado: profile?.estado,
         });
         if (!mountedRef.current) return;
+        if (currentQueryRef.current !== trimmed) return;
         setResults({ users, posts, reels, locations: [], properties });
       } catch (err) {
         log.warn("Error en búsqueda:", err);
@@ -299,11 +305,21 @@ export function useSearch() {
   }, [query, profile?.estado, user?.id]);
 
   // Sync location suggestions from store into results
+  // Only update if suggestions match current query (fixes stale suggestions race condition)
   useEffect(() => {
+    if (suggestions.length === 0) return;
+    
+    // Check if suggestions are for current query (fixes stale data)
+    const firstSuggestion = suggestions[0];
+    if (!firstSuggestion) return;
+    
+    // If query changed since suggestions were requested, ignore them
+    if (currentQueryRef.current && !firstSuggestion.name.toLowerCase().includes(currentQueryRef.current.toLowerCase())) {
+      return;
+    }
+    
     const locations: SearchLocation[] = suggestions.map((s, i) => ({
       id: `${s.type}-${i}`,
-      // `name` queda solo con la zona (se usa al seleccionar); la fila muestra
-      // `fullDescription` completa separada por comas, estilo Google.
       name: s.name,
       count: s.propertyCount ?? 0,
       type: s.type,

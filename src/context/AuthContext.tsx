@@ -28,6 +28,9 @@ interface AuthContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: (newData?: perfiles) => Promise<void>;
+  isPasswordResetProcessing: boolean;
+  startPasswordResetProcessing: () => void;
+  endPasswordResetProcessing: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -37,6 +40,9 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   signOut: async () => {},
   refreshProfile: async () => {},
+  isPasswordResetProcessing: false,
+  startPasswordResetProcessing: () => {},
+  endPasswordResetProcessing: () => {},
 });
 
 export const useAuth = () => {
@@ -56,6 +62,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<perfiles | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPasswordResetProcessing, setIsPasswordResetProcessing] = useState(false);
+
+  const startPasswordResetProcessing = useCallback(() => {
+    setIsPasswordResetProcessing(true);
+  }, []);
+
+  const endPasswordResetProcessing = useCallback(() => {
+    setIsPasswordResetProcessing(false);
+  }, []);
 
   // Hook personalizado para cargar perfiles con cache
   const { loadProfile, clearCache, updateCache } = useProfileLoader();
@@ -132,6 +147,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loading,
     signOut,
     refreshProfile,
+    isPasswordResetProcessing,
+    startPasswordResetProcessing,
+    endPasswordResetProcessing,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

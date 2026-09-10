@@ -6,7 +6,6 @@ export default function SearchScreen() {
 
   return (
     <SearchOverlay
-      visible={true}
       onClose={() => router.back()}
     />
   );

@@ -11,9 +11,11 @@ import { logger } from "@/utils/logger";
 const log = logger.scoped("[id]");
 
 export default function PostDetailScreen() {
-  const { id, item } = useLocalSearchParams();
+  const { id, item, highlightUserId } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
+
+  const highlightUserIds = highlightUserId ? [highlightUserId as string] : undefined;
 
   // 1. Try to get item from params (faster if already available)
   let initialItem: any = null;
@@ -53,6 +55,8 @@ export default function PostDetailScreen() {
     <FeedDetail
       item={postItem}
       currentUserId={user?.id}
+      highlightUserIds={highlightUserIds}
+      autoOpenComments={!!highlightUserId}
       onClose={() => {
         if (router.canGoBack()) {
           router.back();

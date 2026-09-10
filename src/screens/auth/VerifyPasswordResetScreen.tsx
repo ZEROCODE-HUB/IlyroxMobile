@@ -17,6 +17,8 @@ import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useModal } from "@/context/ModalContext";
+import { useToast } from "@/context/ToastContext";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/design-system/components";
 import { logger } from "@/utils/logger";
 
@@ -25,6 +27,8 @@ const log = logger.scoped("VerifyPasswordResetScreen");
 const VerifyPasswordResetScreen: React.FC = () => {
   const params = useLocalSearchParams();
   const { showModal } = useModal();
+  const { showToast } = useToast();
+  const { startPasswordResetProcessing, endPasswordResetProcessing } = useAuth();
   const email = (params.email as string) || "";
 
   const [otp, setOtp] = useState("");
@@ -77,12 +81,13 @@ const VerifyPasswordResetScreen: React.FC = () => {
     if (!validateForm()) return;
 
     setIsSubmitting(true);
+    startPasswordResetProcessing();
 
     try {
       // Verificar el código OTP
       const { error: verifyError } = await supabase.auth.verifyOtp({
         email,
-        token: otp.trim(), // Eliminar espacios en blanco
+        token: otp.trim(),
         type: "recovery",
       });
 
@@ -101,19 +106,23 @@ const VerifyPasswordResetScreen: React.FC = () => {
         throw updateError;
       }
 
-      // Cerrar sesión
+      // ÉXITO: Cerrar sesión y mostrar modal
       await supabase.auth.signOut();
-
-      // Mostrar mensaje de éxito
       showModal({
         title: "¡Contraseña actualizada!",
-        message:
-          "Tu contraseña ha sido cambiada con éxito. Inicia sesión con tu nueva contraseña.",
+        message: "Tu contraseña ha sido cambiada con éxito. Inicia sesión con tu nueva contraseña.",
         confirmText: "Ir al Login",
         onConfirm: () => router.replace("/login"),
       });
     } catch (error: any) {
       log.error("Error en el proceso:", error);
+
+      // Limpiar sesión si verifyOtp succeeded pero algo falló después
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        // Ignore signOut errors during cleanup
+      }
 
       let errorMessage = "Ocurrió un error inesperado. Intenta de nuevo.";
 
@@ -130,15 +139,17 @@ const VerifyPasswordResetScreen: React.FC = () => {
       } else if (error.message?.includes("not found")) {
         errorMessage =
           "No se encontró una solicitud de recuperación. Solicita un nuevo código.";
+      } else if (
+        error.message?.includes("New password should be different") ||
+        error.message?.includes("new password")
+      ) {
+        errorMessage = "La nueva contraseña debe ser diferente a la actual.";
       }
 
-      showModal({
-        title: "Error",
-        message: errorMessage,
-        confirmText: "OK",
-      });
+      showToast(errorMessage, "error");
     } finally {
       setIsSubmitting(false);
+      endPasswordResetProcessing();
     }
   };
 
