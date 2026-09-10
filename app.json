@@ -3,7 +3,9 @@
     "name": "ilyrox",
     "slug": "ilyrox",
     "version": "1.0.4",
-    "runtimeVersion": "1.0.4",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "orientation": "portrait",
     "icon": "./src/assets/icon_ilyrox.jpg",
     "userInterfaceStyle": "light",
@@ -20,9 +22,10 @@
       "**/*"
     ],
     "updates": {
-      "enabled": false,
+      "enabled": true,
       "url": "https://u.expo.dev/fc0a5782-4733-40f7-9c7e-efa6d3550f31",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
     },
     "ios": {
       "supportsTablet": true,
