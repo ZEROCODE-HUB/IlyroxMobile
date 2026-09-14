@@ -93,33 +93,37 @@ function countUnread(convs: any[], userId: string) {
 
 export const conversationsService = {
   async listConversations(userId: string): Promise<GroupedConversation[]> {
-    const { data: agrupaciones, error: fetchError } = await supabase
-      .from("agrupaciones_conversaciones")
-      .select(
-        `
-        *,
-        usuario1:perfiles!usuario1_id(id, nombre, apellido_paterno, foto),
-        usuario2:perfiles!usuario2_id(id, nombre, apellido_paterno, foto),
-        conversacion_mas_reciente:conversaciones!conversacion_mas_reciente_id(
-          ultimo_mensaje_preview,
-          ultimo_mensaje_en
+    const [agrupacionesRes, allConversationsRes] = await Promise.all([
+      supabase
+        .from("agrupaciones_conversaciones")
+        .select(
+          `
+          *,
+          usuario1:perfiles!usuario1_id(id, nombre, apellido_paterno, foto),
+          usuario2:perfiles!usuario2_id(id, nombre, apellido_paterno, foto),
+          conversacion_mas_reciente:conversaciones!conversacion_mas_reciente_id(
+            ultimo_mensaje_preview,
+            ultimo_mensaje_en
+          )
+        `,
         )
-      `,
-      )
-      .or(`usuario1_id.eq.${userId},usuario2_id.eq.${userId}`)
-      .order("ultima_actividad", { ascending: false });
+        .or(`usuario1_id.eq.${userId},usuario2_id.eq.${userId}`)
+        .order("ultima_actividad", { ascending: false }),
+      supabase
+        .from("conversaciones")
+        .select(
+          "id, usuario1_id, usuario2_id, mensajes_no_leidos_usuario1, mensajes_no_leidos_usuario2, ultimo_mensaje_en, ultimo_mensaje_preview",
+        )
+        .or(`usuario1_id.eq.${userId},usuario2_id.eq.${userId}`),
+    ]);
+
+    const { data: agrupaciones, error: fetchError } = agrupacionesRes;
+    const { data: allConversations } = allConversationsRes;
 
     if (fetchError) {
       log.error("listConversations failed", fetchError);
       throw fetchError;
     }
-
-    const { data: allConversations } = await supabase
-      .from("conversaciones")
-      .select(
-        "id, usuario1_id, usuario2_id, mensajes_no_leidos_usuario1, mensajes_no_leidos_usuario2, ultimo_mensaje_en, ultimo_mensaje_preview",
-      )
-      .or(`usuario1_id.eq.${userId},usuario2_id.eq.${userId}`);
 
     const conversationIds = (allConversations || []).map((c) => c.id);
 

@@ -3,10 +3,10 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Image,
   Platform,
 } from "react-native";
+import SafePressable from "@/design-system/components/SafePressable";
 import { Ionicons } from "@expo/vector-icons";
 import { HouseHeart } from "lucide-react-native";
 import { useRouter } from "expo-router";
@@ -94,7 +94,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
         <View style={styles.headerIcons}>
           {(["Matches", "Messages", "Requests", "Appointments"] as const).map(
             (screen, idx) => (
-              <TouchableOpacity
+              <SafePressable
                 key={idx}
                 onPress={() => handleNavigation(screen)}
                 style={styles.iconButton}
@@ -135,7 +135,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
                     </Text>
                   </View>
                 )}
-              </TouchableOpacity>
+              </SafePressable>
             ),
           )}
         </View>
@@ -191,6 +191,7 @@ const styles = StyleSheet.create({
   headerLogoContainer: {
     flexDirection: "row",
     alignItems: "center",
+
     gap: 10,
   },
   headerTopRow: {
@@ -200,8 +201,8 @@ const styles = StyleSheet.create({
     height: 60,
   },
   headerLogo: {
-    width: 140,
-    height: 56,
+    width: 90,
+    aspectRatio:1536/1024,
   },
   headerIcons: {
     flexDirection: "row",

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, Image, Pressable, StyleSheet } from "react-native";
+import { View, Text, Image, StyleSheet } from "react-native";
+import SafePressable from "@/design-system/components/SafePressable";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { COLORS } from "@/constants/colors";
@@ -75,7 +76,7 @@ export const ChatPropertyBanner: React.FC<ChatPropertyBannerProps> = ({
       : "";
 
   return (
-    <Pressable
+    <SafePressable
       style={styles.container}
       onPress={() =>
         router.push({
@@ -102,7 +103,7 @@ export const ChatPropertyBanner: React.FC<ChatPropertyBannerProps> = ({
         ) : null}
       </View>
       <Ionicons name="chevron-forward" size={18} color={COLORS.textTertiary} />
-    </Pressable>
+    </SafePressable>
   );
 };
 

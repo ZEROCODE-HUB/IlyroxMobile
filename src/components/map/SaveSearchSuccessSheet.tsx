@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   asesoresTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
     lineHeight: 19,
     marginBottom: 5,
   },

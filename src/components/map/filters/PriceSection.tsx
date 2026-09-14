@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { AppInput } from "@/design-system/components/AppInput";
 import { COLORS } from "@/constants/colors";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
+import { useShallow } from "zustand/react/shallow";
 
 interface PriceSectionProps {
   handleCurrencyChange: (text: string, setter: (val: string) => void) => void;
@@ -11,7 +12,14 @@ interface PriceSectionProps {
 export const PriceSection: React.FC<PriceSectionProps> = ({
   handleCurrencyChange,
 }) => {
-  const { filters, updateFilter: onUpdateFilter } = usePropertyFiltersStore();
+  const { precioMin, precioMax, moneda } = usePropertyFiltersStore(
+    useShallow((s) => ({
+      precioMin: s.filters.precioMin,
+      precioMax: s.filters.precioMax,
+      moneda: s.filters.moneda,
+    })),
+  );
+  const onUpdateFilter = usePropertyFiltersStore((s) => s.updateFilter);
   return (
     <View style={styles.formSection}>
       <View style={styles.sectionHeader}>
@@ -23,13 +31,13 @@ export const PriceSection: React.FC<PriceSectionProps> = ({
               onPress={() => onUpdateFilter("moneda", curr)}
               style={[
                 styles.currencyBtn,
-                filters.moneda === curr && styles.currencyBtnActive,
+                moneda === curr && styles.currencyBtnActive,
               ]}
             >
               <Text
                 style={[
                   styles.currencyText,
-                  filters.moneda === curr && styles.currencyTextActive,
+                  moneda === curr && styles.currencyTextActive,
                 ]}
               >
                 {curr}
@@ -41,9 +49,9 @@ export const PriceSection: React.FC<PriceSectionProps> = ({
 
       <View style={styles.row}>
         <View style={styles.halfWidth}>
-          <Text style={styles.label}>Mínimo ({filters.moneda})</Text>
+          <Text style={styles.label}>Mínimo ({moneda})</Text>
           <AppInput
-            value={filters.precioMin}
+            value={precioMin}
             onChangeText={(val) =>
               handleCurrencyChange(val, (v) => onUpdateFilter("precioMin", v))
             }
@@ -52,9 +60,9 @@ export const PriceSection: React.FC<PriceSectionProps> = ({
           />
         </View>
         <View style={styles.halfWidth}>
-          <Text style={styles.label}>Máximo ({filters.moneda})</Text>
+          <Text style={styles.label}>Máximo ({moneda})</Text>
           <AppInput
-            value={filters.precioMax}
+            value={precioMax}
             onChangeText={(val) =>
               handleCurrencyChange(val, (v) => onUpdateFilter("precioMax", v))
             }
@@ -64,8 +72,8 @@ export const PriceSection: React.FC<PriceSectionProps> = ({
         </View>
       </View>
       {(() => {
-        const min = parseFloat(filters.precioMin.replace(/,/g, "")) || 0;
-        const max = parseFloat(filters.precioMax.replace(/,/g, "")) || 0;
+        const min = parseFloat(precioMin.replace(/,/g, "")) || 0;
+        const max = parseFloat(precioMax.replace(/,/g, "")) || 0;
         if (min > 0 && max > 0 && min > max) {
           return (
             <Text style={styles.priceWarning}>
@@ -92,7 +100,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 16,
     fontWeight: "700",
-    color: COLORS.textPrimary,
+    color: COLORS.primaryDark,
   },
   currencyToggle: {
     flexDirection: "row",

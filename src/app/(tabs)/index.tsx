@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -14,6 +14,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 import { COLORS } from "../../constants/colors";
 import PushPermissionBanner from "../../components/PushPermissionBanner";
+import { queryClient } from "@/lib/queryClient";
+import { conversationsService } from "@/services/conversationsService";
 
 export default function FeedScreen() {
   const router = useRouter();
@@ -34,12 +36,24 @@ export default function FeedScreen() {
   const HEADER_CONTENT_HEIGHT = 130; // 60 top + 60 search + 10 padding
   const TOTAL_HEADER_HEIGHT = HEADER_CONTENT_HEIGHT + insets.top;
 
-  const handleUserClick = (user: User) => {
-    router.push({
-      pathname: "/(stack)/user/[id]",
-      params: { id: user.id },
-    });
-  };
+  const handleUserClick = useCallback(
+    (user: User) => {
+      const profileData = {
+        id: user.id,
+        nombre: user.nombre || user.name || "",
+        foto: user.avatar,
+        rol: user.role,
+        ocupacion: user.ocupacion,
+        rating: user.rating,
+        totalRatings: user.totalRatings,
+      };
+      router.push({
+        pathname: "/(stack)/user/[id]",
+        params: { id: user.id, profileData: JSON.stringify(profileData) },
+      });
+    },
+    [router],
+  );
 
   const resetHeader = () => {
     Animated.spring(headerTranslateY, {
@@ -87,6 +101,20 @@ export default function FeedScreen() {
       router.navigate("/(stack)/map");
     }
   }, [pendingOpenMap]);
+
+  // Prefetch en caliente: carga el JS chunk de mensajes y la lista de
+  // conversaciones APENAS el feed aparece. Cuando el usuario toca "Contactar",
+  // la ruta ya está parseada y la caché de React Query ya tiene datos → el tap
+  // se siente instantáneo.
+  useEffect(() => {
+    if (!profile?.id) return;
+    router.prefetch("(stack)/messages");
+    queryClient.prefetchQuery({
+      queryKey: ["conversations", profile.id],
+      queryFn: () => conversationsService.listConversations(profile.id),
+      staleTime: 30_000,
+    });
+  }, [profile?.id, router]);
 
   // Tras publicar (llega el param `refresh`), mostrar el header aunque estuviera
   // oculto: el scroll programático al top no dispara onScroll, así que el header

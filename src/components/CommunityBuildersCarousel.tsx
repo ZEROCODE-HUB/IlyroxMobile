@@ -302,7 +302,6 @@ const CommunityBuildersCarousel: React.FC<CommunityBuildersCarouselProps> = ({
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>CONSTRUCTORES DE COMUNIDAD</Text>
-        <Ionicons name="chevron-forward" size={22} color={COLORS.textPrimary} />
       </View>
       <FlatList
         data={displayItems}

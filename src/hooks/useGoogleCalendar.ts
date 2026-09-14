@@ -77,6 +77,11 @@ export function useGoogleCalendar(userId?: string | null) {
     }
 
     const stored = await googleCalendarService.getValidConnection(userId);
+    if (stored && !stored.serverSynced) {
+      await googleCalendarService.clearConnection(userId);
+      setConnection(null);
+      return null;
+    }
     setConnection(stored);
     return stored;
   }, [userId]);
@@ -147,18 +152,18 @@ export function useGoogleCalendar(userId?: string | null) {
       await GoogleSignin.addScopes({ scopes: CALENDAR_SCOPES });
       const tokens = await GoogleSignin.getTokens();
 
+      let serverSynced = false;
       const nextConnection: GoogleCalendarConnection = {
         accessToken: tokens.accessToken,
         expiresAt: getExpiresAt(),
         calendarId: "primary",
+        serverSynced,
       };
-
-      await googleCalendarService.saveConnection(userId, nextConnection);
 
       if (signInResponse.type === "success") {
         const serverAuthCode = signInResponse.data.serverAuthCode;
         if (serverAuthCode) {
-          const { error } = await supabase.functions.invoke(
+          const { data, error } = await supabase.functions.invoke(
             "google-calendar-connect",
             {
               body: {
@@ -174,6 +179,9 @@ export function useGoogleCalendar(userId?: string | null) {
               "Calendar conectado en este dispositivo, pero falta configurar la sincronización inversa en Supabase.",
               "info",
             );
+          } else if ((data as { ok?: boolean } | null)?.ok) {
+            serverSynced = true;
+            nextConnection.serverSynced = true;
           }
         } else {
           log.warn("Google Sign-In did not return serverAuthCode");
@@ -184,8 +192,18 @@ export function useGoogleCalendar(userId?: string | null) {
         }
       }
 
+      if (!serverSynced) {
+        await googleCalendarService.clearConnection(userId);
+        setConnection(null);
+        return null;
+      }
+
+      await googleCalendarService.saveConnection(userId, nextConnection);
       setConnection(nextConnection);
-      showToast("Google Calendar conectado", "success");
+      showToast(
+        "Google Calendar conectado",
+        "success",
+      );
       return nextConnection;
     } catch (error: unknown) {
       if (
@@ -222,7 +240,11 @@ export function useGoogleCalendar(userId?: string | null) {
 
   const ensureConnection = useCallback(async () => {
     const stored = await refreshConnectionState();
-    if (stored) return stored;
+    if (stored?.serverSynced) return stored;
+    if (stored && !stored.serverSynced) {
+      await googleCalendarService.clearConnection(userId!);
+      setConnection(null);
+    }
     return connect();
   }, [connect, refreshConnectionState]);
 

@@ -11,7 +11,7 @@ import { router } from "expo-router";
 import { AppHeader } from "./AppHeader";
 import { RatingModal } from "./RatingModal";
 import { COLORS } from "../constants/colors";
-import { ScreenWrapper } from "@/screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { useAppointments } from "../hooks/useAppointments";
@@ -20,6 +20,12 @@ import AppointmentList from "./Appointments/AppointmentList";
 import CreateAppointmentModal from "./Appointments/CreateAppointmentModal";
 
 const Appointments: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const safeStyle = {
+    paddingBottom: Math.max(insets.bottom, 10),
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
   const { profile } = useAuth();
   const {
     connect,
@@ -36,6 +42,7 @@ const Appointments: React.FC = () => {
     editingAppointment,
     handleMarkComplete,
     handleMarkCancel,
+        handleAcceptAppointment,
     handleOpenRating,
     handleEditAppointment,
     handleSyncCalendar,
@@ -50,7 +57,7 @@ const Appointments: React.FC = () => {
   } = useAppointments();
 
   return (
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View style={[styles.container, safeStyle]}>
       <AppHeader
         title="Citas"
         showBackButton
@@ -101,8 +108,8 @@ const Appointments: React.FC = () => {
           loading={loading}
           appointments={appointments}
           activeTab={activeTab}
-          onMarkComplete={handleMarkComplete}
           onMarkCancel={handleMarkCancel}
+                    onAcceptAppointment={handleAcceptAppointment}
           onOpenRating={handleOpenRating}
           onSyncCalendar={handleSyncCalendar}
           onContact={handleContactPress}
@@ -128,7 +135,7 @@ const Appointments: React.FC = () => {
         appointment={editingAppointment}
         onSaved={handleAppointmentUpdated}
       />
-    </ScreenWrapper>
+    </View>
   );
 };
 

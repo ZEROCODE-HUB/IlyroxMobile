@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
   reportClasificacion: {
     fontSize: 12,
     fontWeight: "700",
-    color: COLORS.textTertiary,
+    color: COLORS.primaryDark,
     textTransform: "uppercase",
     marginBottom: 2,
   },

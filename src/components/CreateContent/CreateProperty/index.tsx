@@ -18,7 +18,7 @@ import {
 import { KeyboardAvoidingView, KeyboardProvider } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../../constants/colors";
-import { ScreenWrapper } from "../../../screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppHeader } from "../../AppHeader";
 import { SelectionModal } from "../../modals";
 import { SaleContractModal } from "../../modals/SaleContractModal";
@@ -91,6 +91,12 @@ export default function CreateProperty({
   onBack,
   propertyId,
 }: CreatePropertyProps) {
+  const insets = useSafeAreaInsets();
+  const safeStyle = {
+    paddingBottom: Math.max(insets.bottom, 10),
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
   const { user } = useAuth();
   const router = useRouter();
 
@@ -316,7 +322,7 @@ export default function CreateProperty({
   // ============================================
   if (form.isLoadingProperty) {
     return (
-      <ScreenWrapper withHeader={false} style={styles.container}>
+      <View style={[styles.container, safeStyle]}>
         <AppHeader
           title={propertyId ? "Editar Propiedad" : "Crear Propiedad"}
           showBackButton={true}
@@ -326,7 +332,7 @@ export default function CreateProperty({
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Cargando propiedad...</Text>
         </View>
-      </ScreenWrapper>
+      </View>
     );
   }
 
@@ -335,7 +341,7 @@ export default function CreateProperty({
   // ============================================
   if (form.loadError && !form.isLoadingProperty) {
     return (
-      <ScreenWrapper withHeader={false} style={styles.container}>
+      <View style={[styles.container, safeStyle]}>
         <AppHeader
           title={propertyId ? "Editar Propiedad" : "Crear Propiedad"}
           showBackButton={true}
@@ -361,7 +367,7 @@ export default function CreateProperty({
             </TouchableOpacity>
           </View>
         </View>
-      </ScreenWrapper>
+      </View>
     );
   }
 
@@ -369,7 +375,7 @@ export default function CreateProperty({
     <>
     <PropertyFormProvider value={form}>
     <KeyboardProvider>
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View style={[styles.container, safeStyle]}>
       <AppHeader
         title={propertyId ? "Editar Propiedad" : "Crear Propiedad"}
         showBackButton={true}
@@ -535,7 +541,7 @@ export default function CreateProperty({
         }}
         loading={publishState.uploading}
       />
-    </ScreenWrapper>
+    </View>
     </KeyboardProvider>
     </PropertyFormProvider>
 

@@ -1,11 +1,7 @@
 import React, { useState, useCallback, useRef } from "react";
-import {
-  View,
-  StyleSheet,
-  useWindowDimensions,
-  StatusBar,
-  FlatList,
-} from "react-native";
+import { View, StyleSheet, useWindowDimensions, StatusBar, FlatList } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useIsFocused } from "@react-navigation/native";
 import ReelListItem from "./ReelListItem";
 import { useReelFeed } from "./useReelFeed";
 import { COLORS } from "../../constants";
@@ -31,6 +27,7 @@ const ReelFeedList: React.FC<ReelFeedListProps> = ({
   currentUserId,
 }) => {
   const { height, width } = useWindowDimensions();
+  const isFocused = useIsFocused();
   const { reels, fetchMoreReels } = useReelFeed(initialReelItem);
 
   // El reel abierto siempre queda en el índice 0, así que no hace falta
@@ -70,16 +67,18 @@ const ReelFeedList: React.FC<ReelFeedListProps> = ({
         <View style={{ height, width }}>
           <ReelListItem
             item={item}
-            isActive={index === currentIndex}
-            shouldInitialize={shouldInitialize}
+            isActive={index === currentIndex && isFocused}
+            shouldInitialize={shouldInitialize && isFocused}
             onClose={onClose}
             onUserClick={onUserClick}
             currentUserId={currentUserId}
+            width={width}
+            height={height}
           />
         </View>
       );
     },
-    [currentIndex, height, width, onClose, onUserClick, currentUserId],
+    [currentIndex, height, width, onClose, onUserClick, currentUserId, isFocused],
   );
 
   // La ruta `reel/[id]` ya se presenta como `fullScreenModal`, así que el visor
@@ -87,7 +86,7 @@ const ReelFeedList: React.FC<ReelFeedListProps> = ({
   // aquí, pero un Modal montado sobre una pantalla nativa-modal a veces no
   // aparece en Android — era la causa de que el reel "no abriera".)
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
@@ -115,7 +114,7 @@ const ReelFeedList: React.FC<ReelFeedListProps> = ({
           initialNumToRender={2}
         />
       ) : null}
-    </View>
+    </SafeAreaView>
   );
 };
 

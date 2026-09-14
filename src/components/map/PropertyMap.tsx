@@ -1086,8 +1086,8 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     position: "absolute",
-    top: "50%",
-    left: "50%",
+    top: "75%",
+    left: "45%",
     transform: [{ translateX: -100 }, { translateY: -20 }],
     backgroundColor: COLORS.white,
     paddingHorizontal: 20,

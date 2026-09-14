@@ -5,17 +5,17 @@ import {
   Image,
   TouchableOpacity,
   StyleSheet,
-  useWindowDimensions,
-  Platform,
   Pressable,
 } from "react-native";
 import { VideoView, useVideoPlayer as useExpoVideoPlayer } from "expo-video";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { FeedItem, User } from "../../types";
 import { COLORS, FALLBACKS } from "../../constants";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import ActionButtons from "../ActionButtons";
 import { Avatar } from "../shared";
+import SafePressable from "@/design-system/components/SafePressable";
 
 // ─── Sub-component: owns the native player lifecycle ─────────────────────────
 // Mounting this component creates the player; unmounting releases it cleanly.
@@ -49,6 +49,8 @@ const ReelVideoPlayer: React.FC<ReelVideoPlayerProps> = ({
   const player = useExpoVideoPlayer(videoSource, (p) => {
     p.loop = true;
     p.muted = false;
+    // Emitir timeUpdate cada 100ms — misma fluidez que el setInterval anterior, pero nativo
+    p.timeUpdateEventInterval = 0.1;
     if (isActive) p.play();
   });
 
@@ -62,25 +64,33 @@ const ReelVideoPlayer: React.FC<ReelVideoPlayerProps> = ({
     }
   }, [isActive, player]);
 
-  // Poll status, progress and playing state
+  // Listen to native player events instead of polling every 100ms
   React.useEffect(() => {
-    const interval = setInterval(() => {
+    if (!player) return;
+    const playingSub = player.addListener("playingChange", ({ isPlaying }) => {
+      onPlayingChange(isPlaying);
+    });
+    const statusSub = player.addListener("statusChange", ({ status }) => {
+      const ready = status === "readyToPlay";
+      setIsReady(ready);
+      onReadyChange(ready);
+    });
+    const timeSub = player.addListener("timeUpdate", ({ currentTime }) => {
       try {
-        if (!player) return;
-        onPlayingChange(player.playing);
-        const ready = player.status === "readyToPlay";
-        setIsReady(ready);
-        onReadyChange(ready);
         if (player.duration > 0) {
           onProgressChange(
-            Math.min(1, Math.max(0, player.currentTime / player.duration)),
+            Math.min(1, Math.max(0, currentTime / player.duration)),
           );
         }
       } catch {
-        // player released — interval will be cleared on unmount
+        // player released — listeners removed on unmount
       }
-    }, 100);
-    return () => clearInterval(interval);
+    });
+    return () => {
+      playingSub.remove();
+      statusSub.remove();
+      timeSub.remove();
+    };
   }, [player, onPlayingChange, onProgressChange, onReadyChange]);
 
   // Expose togglePlayPause to parent via ref
@@ -121,6 +131,8 @@ interface ReelListItemProps {
   onClose: () => void;
   onUserClick?: (user: User) => void;
   currentUserId?: string;
+  width: number;
+  height: number;
 }
 
 const ReelListItem: React.FC<ReelListItemProps> = ({
@@ -130,8 +142,10 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
   onClose,
   onUserClick,
   currentUserId,
+  width,
+  height,
 }) => {
-  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [showComments, setShowComments] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
   const [isPlaying, setIsPlaying] = useState(isActive);
@@ -144,7 +158,7 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
 
   const videoSource =
     item.videoUrl || FALLBACKS.VIDEO_URL;
-  const SAFE_BOTTOM = Platform.OS === "ios" ? 34 : 20;
+  const SAFE_BOTTOM = insets.bottom || 20;
 
   const handlePlayingChange = useCallback((v: boolean) => setIsPlaying(v), []);
   const handleProgressChange = useCallback((v: number) => setProgress(v), []);
@@ -186,7 +200,7 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
 
         <TouchableOpacity
           onPress={onClose}
-          style={[styles.backButton, { top: Platform.OS === "ios" ? 54 : 54 }]}
+          style={[styles.backButton, { top: insets.top + 14 }]}
         >
           <Ionicons name="chevron-back" size={28} color={COLORS.white} />
         </TouchableOpacity>
@@ -213,7 +227,7 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
             />
           </View>
 
-          <TouchableOpacity
+          <SafePressable
             style={styles.userInfo}
             onPress={() => onUserClick?.(item.user)}
           >
@@ -227,7 +241,7 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
                 {item.user.name || item.user.nombre || "Usuario"}
               </Text>
             </View>
-          </TouchableOpacity>
+          </SafePressable>
 
           {item.content && (
             <TouchableOpacity
@@ -272,12 +286,14 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
         </View>
       </View>
 
-      <CommentsBottomSheet
-        visible={showComments}
-        onClose={() => setShowComments(false)}
-        feedItemId={item.id}
-        currentUserId={currentUserId}
-      />
+      {showComments && (
+        <CommentsBottomSheet
+          visible={showComments}
+          onClose={() => setShowComments(false)}
+          feedItemId={item.id}
+          currentUserId={currentUserId}
+        />
+      )}
     </View>
   );
 };

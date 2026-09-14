@@ -6,6 +6,7 @@ import {
   usePropertyFiltersStore,
   type AgricolaFilters,
 } from "@/store/propertyFiltersStore";
+import { useShallow } from "zustand/react/shallow";
 
 interface AgricolaFiltersSectionProps {
   /** Si se pasan, el componente opera sobre este valor en lugar del store global. */
@@ -20,9 +21,13 @@ export const AgricolaFiltersSection: React.FC<AgricolaFiltersSectionProps> = ({
   value,
   onUpdate,
 }) => {
-  const store = usePropertyFiltersStore();
-  const ag = value ?? store.filters.agricolaFilters;
-  const updateAgricolaFilter = onUpdate ?? store.updateAgricolaFilter;
+  const agricolaFilters = usePropertyFiltersStore(
+    useShallow((s) => s.filters.agricolaFilters),
+  );
+  const updateAgricolaFilter = usePropertyFiltersStore(
+    (s) => s.updateAgricolaFilter,
+  );
+  const ag = value ?? agricolaFilters;
 
   const toggleTipoAgua = (tipo: string) => {
     const current = ag.tiposAgua ?? [];
@@ -172,7 +177,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 16,
     fontWeight: "700",
-    color: COLORS.textPrimary,
+    color: COLORS.primaryDark,
     marginBottom: 16,
   },
   label: {
@@ -202,8 +207,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   chipSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryDark,
+    borderColor: COLORS.primaryDark,
   },
   chipText: {
     fontSize: 13,

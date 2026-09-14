@@ -1,7 +1,9 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text,  StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "../../constants/colors";
+import { SafePressable } from "@/design-system";
 
 interface ProfileHeaderProps {
   isOwnProfile: boolean;
@@ -16,9 +18,10 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   onSettings,
   onSupport,
 }) => {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.headerInner}>
-      <TouchableOpacity
+    <View style={[styles.headerInner, { paddingTop: insets.top +4 }]}>
+      <SafePressable
         onPress={isOwnProfile ? undefined : onBack}
         style={styles.iconButton}
         disabled={isOwnProfile && !onBack}
@@ -30,11 +33,11 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             color={COLORS.textPrimary}
           />
         )}
-      </TouchableOpacity>
+      </SafePressable>
 
       <Text style={styles.title}>{isOwnProfile ? "Mi Perfil" : "Perfil"}</Text>
 
-      <TouchableOpacity
+      <SafePressable
         onPress={onSupport}
         style={styles.iconButton}
         disabled={!isOwnProfile}
@@ -46,9 +49,9 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             color={COLORS.textPrimary}
           />
         )}
-      </TouchableOpacity>
+      </SafePressable>
 
-      <TouchableOpacity
+      <SafePressable
         onPress={onSettings}
         style={styles.iconButton}
         disabled={!isOwnProfile}
@@ -60,7 +63,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             color={COLORS.textPrimary}
           />
         )}
-      </TouchableOpacity>
+      </SafePressable>
     </View>
   );
 };
@@ -78,7 +81,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
-    paddingTop: 16,
   },
   iconButton: {
     width: 44,

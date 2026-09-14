@@ -14,10 +14,10 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { OneSignal } from "react-native-onesignal";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
-import EditProfile from "@/components/Profile/EditProfile";
 import { useModal } from "@/context/ModalContext";
 import { supabase } from "@/lib/supabase";
 import * as WebBrowser from "expo-web-browser";
@@ -25,13 +25,13 @@ import { LEGAL_URLS } from "@/constants/legal";
 import Avatar from "@/components/shared/Avatar";
 import { blockService, BlockedUser } from "@/services/blockService";
 import { ConfirmationModal } from "@/components/modals/ConfirmationModal";
+import SafePressable from "@/design-system/components/SafePressable";
 
 import { router } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
 import Constants from "expo-constants";
-import { ScreenWrapper } from "@/screens/ScreenWrapper";
 import { logger } from "@/utils/logger";
 
 const log = logger.scoped("SettingsScreen");
@@ -40,12 +40,13 @@ const SettingsScreen: React.FC = () => {
   const { signOut, user } = useAuth();
   const { showModal } = useModal();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
 
   const handleLogout = () => {
     showModal({
-      title: "Cerrar Sesión",
+      title: "Cerrar sesión",
       message: "¿Estás seguro de que quieres cerrar sesión?",
-      confirmText: "Cerrar Sesión",
+      confirmText: "Salir",
       cancelText: "Cancelar",
       onConfirm: async () => {
         try {
@@ -95,14 +96,13 @@ const SettingsScreen: React.FC = () => {
       title: "Eliminar cuenta",
       message:
         "Esta acción es permanente. Se eliminarán tu perfil, propiedades, publicaciones, mensajes y toda tu información. No se puede deshacer.",
-      confirmText: "Eliminar mi cuenta",
+      confirmText: "Eliminar",
       cancelText: "Cancelar",
       confirmVariant: "danger",
       onConfirm: performDeleteAccount,
     });
   };
 
-  const [showEditProfile, setShowEditProfile] = React.useState(false);
   const [showBlockedUsers, setShowBlockedUsers] = React.useState(false);
   const [blockedUsers, setBlockedUsers] = React.useState<BlockedUser[]>([]);
   const [loadingBlockedUsers, setLoadingBlockedUsers] = React.useState(false);
@@ -242,7 +242,7 @@ const SettingsScreen: React.FC = () => {
       title: "Editar perfil",
       icon: "person-outline",
       onPress: () => {
-        setShowEditProfile(true);
+        router.push("/(stack)/edit-profile");
       },
     },
     {
@@ -312,7 +312,16 @@ const SettingsScreen: React.FC = () => {
     blockedUsers.length === 1 ? "1 usuario" : `${blockedUsers.length} usuarios`;
 
   return (
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingBottom: Math.max(insets.bottom, 10),
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+      ]}
+    >
       <AppHeader
         title="Configuración"
         showBackButton={true}
@@ -347,7 +356,7 @@ const SettingsScreen: React.FC = () => {
 
         <View style={styles.section}>
           {settingsOptions.map((option) => (
-            <TouchableOpacity
+            <SafePressable
               key={option.id}
               style={styles.optionItem}
               onPress={() => {
@@ -389,27 +398,15 @@ const SettingsScreen: React.FC = () => {
                   color={COLORS.textTertiary}
                 />
               )}
-            </TouchableOpacity>
+            </SafePressable>
           ))}
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.versionText}>Versión {appVersion} - Beta 1.1</Text>
+          <Text style={styles.versionText}>Versión {appVersion} - Beta 1.2</Text>
         </View>
 
       </ScrollView>
-
-      <Modal
-        visible={showEditProfile}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowEditProfile(false)}
-        // iOS: el swipe-down del pageSheet no dispara onRequestClose; onDismiss
-        // mantiene el estado sincronizado para que el modal pueda reabrirse.
-        onDismiss={() => setShowEditProfile(false)}
-      >
-        <EditProfile onBack={() => setShowEditProfile(false)} />
-      </Modal>
 
       <Modal
         visible={showBlockedUsers}
@@ -418,7 +415,16 @@ const SettingsScreen: React.FC = () => {
         onRequestClose={() => setShowBlockedUsers(false)}
         onDismiss={() => setShowBlockedUsers(false)}
       >
-        <ScreenWrapper withHeader={false} style={styles.modalContainer}>
+        <View
+          style={[
+            styles.modalContainer,
+            {
+              paddingBottom: Math.max(insets.bottom, 10),
+              paddingLeft: insets.left,
+              paddingRight: insets.right,
+            },
+          ]}
+        >
           <AppHeader
             title="Usuarios bloqueados"
             subtitle={blockedUsersCountLabel}
@@ -531,9 +537,9 @@ const SettingsScreen: React.FC = () => {
             loading={!!unblockingUserId}
             confirmVariant="primary"
           />
-        </ScreenWrapper>
+        </View>
       </Modal>
-    </ScreenWrapper>
+    </View>
   );
 };
 

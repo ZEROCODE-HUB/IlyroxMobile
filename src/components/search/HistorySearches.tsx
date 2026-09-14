@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { HistorialBusqueda } from '@/types';
+import type { PropertyFilters } from '@/store/propertyFiltersStore';
 
 interface HistorySearchesProps {
   historial: HistorialBusqueda[];
@@ -39,20 +40,26 @@ export const HistorySearches: React.FC<HistorySearchesProps> = ({
 
   const displayedItems = showAll ? historial : historial.slice(0, 5);
 
-  const formatPrice = (item: HistorialBusqueda): string => {
-    if (!item.precio_min && !item.precio_max) return '';
-    
-    const formatNum = (n: number): string => {
-      if (n >= 1000000) return `$${n / 1000000}M`;
-      if (n >= 1000) return `$${n / 1000}K`;
-      return `$${n}`;
-    };
-    
-    if (item.precio_min && item.precio_max) {
-      return `${formatNum(item.precio_min)}-${formatNum(item.precio_max)}`;
-    }
-    if (item.precio_min) return `Desde ${formatNum(item.precio_min)}`;
-    if (item.precio_max) return `Hasta ${formatNum(item.precio_max)}`;
+  const formatNum = (n: string | number): string => {
+    const val = Number(n);
+    if (!Number.isFinite(val) || val <= 0) return '';
+    if (val >= 1000000) return `$${val / 1000000}M`;
+    if (val >= 1000) return `$${val / 1000}K`;
+    return `$${val}`;
+  };
+
+  const formatPriceRange = (
+    min: string | number | null | undefined,
+    max: string | number | null | undefined,
+    moneda: string,
+  ): string => {
+    const symbol = moneda === 'USD' ? '$' : '$';
+    const minTxt = min != null && String(min) !== '' ? formatNum(Number(min)) : '';
+    const maxTxt = max != null && String(max) !== '' ? formatNum(Number(max)) : '';
+
+    if (minTxt && maxTxt) return `${symbol}${minTxt.slice(1)}-${maxTxt}`;
+    if (minTxt) return `Desde ${minTxt}`;
+    if (maxTxt) return `Hasta ${maxTxt}`;
     return '';
   };
 
@@ -69,6 +76,11 @@ export const HistorySearches: React.FC<HistorySearchesProps> = ({
   };
 
   const getTitulo = (item: HistorialBusqueda): string => {
+    // Los reels solo tenían "Reel" como título guardado; la query original
+    // es mucho más útil. Siempre priorizar query_original para reels.
+    if (item.tipo_busqueda === 'reel' && item.query_original) {
+      return item.query_original;
+    }
     if (item.resultado_titulo) return item.resultado_titulo;
     if (item.place_name) return item.place_name;
     if (item.query_original) return item.query_original;
@@ -77,6 +89,7 @@ export const HistorySearches: React.FC<HistorySearchesProps> = ({
   };
 
   const getSubtitulo = (item: HistorialBusqueda): string | null => {
+    if (item.tipo_busqueda === 'reel') return 'Reel';
     if (item.resultado_subtitulo) return item.resultado_subtitulo;
     return null;
   };
@@ -101,18 +114,73 @@ export const HistorySearches: React.FC<HistorySearchesProps> = ({
 
   const getFiltrosPreview = (item: HistorialBusqueda): string => {
     const parts: string[] = [];
-    
-    if (item.tipo_propiedad) parts.push(item.tipo_propiedad);
-    if (item.tipo_operacion === 'venta') parts.push('Venta');
-    else if (item.tipo_operacion === 'renta') parts.push('Renta');
-    
-    const price = formatPrice(item);
+    const f = item.filtros_completos as Partial<PropertyFilters> | undefined;
+
+    const tipoPropiedad = f?.tipoPropiedad || item.tipo_propiedad;
+    if (tipoPropiedad) parts.push(tipoPropiedad);
+
+    if (f?.subtipo && f.subtipo.length > 0) {
+      parts.push(f.subtipo.join(', '));
+    }
+
+    const op = f?.operacion || item.tipo_operacion || '';
+    if (op === 'venta') parts.push('Venta');
+    else if (op === 'renta') parts.push('Renta');
+
+    const price = formatPriceRange(
+      f?.precioMin != null ? f.precioMin : item.precio_min,
+      f?.precioMax != null ? f.precioMax : item.precio_max,
+      f?.moneda || item.moneda || 'MXN',
+    );
     if (price) parts.push(price);
-    
-    if (item.habitaciones) parts.push(`${item.habitaciones} rec`);
-    if (item.banos) parts.push(`${item.banos} baños`);
-    
-    return parts.join(' · ');
+
+    const habitaciones = f?.habitaciones || item.habitaciones;
+    if (habitaciones) parts.push(`${habitaciones} rec`);
+    const banos = f?.banos || item.banos;
+    if (banos) parts.push(`${banos} baños`);
+    if (f?.mediosBanos) parts.push(`${f.mediosBanos} m. baño`);
+    const estacionamientos = f?.estacionamientos || item.estacionamientos;
+    if (estacionamientos) parts.push(`${estacionamientos} cajones`);
+
+    if (f?.m2TerrenoMin) parts.push(`Terreno ${f.m2TerrenoMin} m²`);
+    if (f?.m2ConstruccionMin) parts.push(`Const. ${f.m2ConstruccionMin} m²`);
+    if (f?.antiguedad) parts.push(f.antiguedad);
+    if (f?.niveles) parts.push(`${f.niveles} niveles`);
+
+    const amenidades = f?.amenidades || [];
+    if (amenidades.length > 0) {
+      const shown = amenidades.slice(0, 3).join(', ');
+      const extra = amenidades.length - 3;
+      parts.push(extra > 0 ? `${shown} y ${extra} más` : shown);
+    }
+
+    if (f) {
+      const comercial = f.comercialFilters;
+      if (comercial?.tipoUbicacion?.length) {
+        parts.push(`Comercial: ${comercial.tipoUbicacion.join(', ')}`);
+      }
+      if (comercial?.frenteMin) parts.push(`Frente ${comercial.frenteMin} m`);
+      if (comercial?.nivel) parts.push(`Nivel ${comercial.nivel}`);
+      if (comercial?.sobreAvenidaPrincipal) parts.push('Sobre avenida');
+      if (comercial?.enEsquina) parts.push('En esquina');
+      if (comercial?.altaVisibilidad) parts.push('Alta visibilidad');
+      if (comercial?.altoFlujoVehicular) parts.push('Alto flujo vehicular');
+
+      const industrial = f.industrialFilters;
+      if (industrial?.alturaLibre) parts.push(`Altura ${industrial.alturaLibre} m`);
+      if (industrial?.areaOficinasMin) parts.push(`Oficinas ${industrial.areaOficinasMin} m²`);
+      if (industrial?.patioManiobrasMin) parts.push(`Patio ${industrial.patioManiobrasMin} m²`);
+      if (industrial?.energiaKva?.length) parts.push(`Energía ${industrial.energiaKva.join(', ')} KVA`);
+
+      const agricola = f.agricolaFilters;
+      if (agricola?.usoTerreno?.length) parts.push(`Uso: ${agricola.usoTerreno.join(', ')}`);
+      if (agricola?.tiposAgua?.length) parts.push(`Agua: ${agricola.tiposAgua.join(', ')}`);
+      if (agricola?.concesionAgua) parts.push('Con concesión de agua');
+      if (agricola?.electricidad) parts.push('Con electricidad');
+      if (agricola?.caminoAcceso) parts.push('Camino de acceso');
+    }
+
+    return parts.filter(Boolean).join(' · ');
   };
 
   const renderItem = ({ item }: { item: HistorialBusqueda }) => {
@@ -140,7 +208,7 @@ export const HistorySearches: React.FC<HistorySearchesProps> = ({
             </Text>
           )}
           {filtros ? (
-            <Text style={styles.filtros} numberOfLines={1}>
+            <Text style={styles.filtros} numberOfLines={2}>
               {filtros}
             </Text>
           ) : null}
@@ -169,7 +237,8 @@ export const HistorySearches: React.FC<HistorySearchesProps> = ({
         data={displayedItems}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
-        scrollEnabled={false}
+        scrollEnabled={showAll}
+        style={showAll ? styles.listExpanded : undefined}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
 
@@ -184,8 +253,12 @@ export const HistorySearches: React.FC<HistorySearchesProps> = ({
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     paddingHorizontal: 16,
     paddingTop: 16,
+  },
+  listExpanded: {
+    flex: 1,
   },
   loadingContainer: {
     padding: 20,

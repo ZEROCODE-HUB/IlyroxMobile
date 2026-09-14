@@ -1,7 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useNotifications } from '../../context/NotificationContext';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
+import { COLORS } from '../../constants';
+import SafePressable from '@/design-system/components/SafePressable';
 
 interface NotificationItemProps {
   onPress: () => void;
@@ -9,33 +12,26 @@ interface NotificationItemProps {
 
 export function NotificationItem({ onPress }: NotificationItemProps) {
   const { lastNotification, unreadCount } = useNotifications();
-  
+
   const hasNotifications = !!lastNotification;
   const displayText = hasNotifications
     ? lastNotification.mensaje
     : 'Sin notificaciones';
-  
+
   const displayTime = hasNotifications
     ? formatTimeAgo(lastNotification.created_at)
     : '';
-  
+
   return (
-    <TouchableOpacity
+    <SafePressable
       style={styles.container}
       onPress={onPress}
       activeOpacity={0.7}
     >
       <View style={styles.iconContainer}>
-        <Text style={styles.icon}>🔔</Text>
-        {unreadCount > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </Text>
-          </View>
-        )}
+        <Ionicons name="notifications-outline" size={22} color={COLORS.primary} />
       </View>
-      
+
       <View style={styles.content}>
         <Text
           style={[
@@ -46,12 +42,20 @@ export function NotificationItem({ onPress }: NotificationItemProps) {
         >
           {displayText}
         </Text>
-        
+
         {displayTime ? (
           <Text style={styles.time}>{displayTime}</Text>
         ) : null}
       </View>
-    </TouchableOpacity>
+
+      {unreadCount > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </Text>
+        </View>
+      )}
+    </SafePressable>
   );
 }
 
@@ -59,30 +63,24 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: COLORS.background,
     borderRadius: 12,
     padding: 12,
     marginHorizontal: 16,
     marginVertical: 6,
   },
   iconContainer: {
-    position: 'relative',
     marginRight: 12,
   },
-  icon: {
-    fontSize: 24,
-  },
   badge: {
-    position: 'absolute',
-    top: -4,
-    right: -8,
-    backgroundColor: '#EF4444',
+    backgroundColor: COLORS.primary,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
+    marginLeft: 8,
   },
   badgeText: {
     color: '#FFFFFF',
@@ -94,16 +92,17 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 14,
-    color: '#111827',
+    color: COLORS.textPrimary,
     fontWeight: '500',
   },
   noNotificationText: {
-    color: '#9CA3AF',
+    color: COLORS.textTertiary,
     fontStyle: 'italic',
   },
   time: {
     fontSize: 12,
-    color: '#6B7280',
+    color: COLORS.textTertiary,
     marginTop: 2,
   },
 });
+

@@ -12,7 +12,7 @@ import PropertyCard from "./cards/PropertyCard";
 import { AppHeader } from "./AppHeader";
 import { COLORS } from "../constants";
 import { busquedas_guardadas, FeedItem, User } from "../types";
-import { ScreenWrapper } from "../screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CommentsBottomSheet } from "./modals";
 import { ConfirmationModal } from "./modals/ConfirmationModal";
 
@@ -85,6 +85,14 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
   busqueda,
   onEditSearch,
 }) => {
+  const insets = useSafeAreaInsets();
+  const safeStyle = {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    paddingBottom: Math.max(insets.bottom, 10),
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
   const [activeTab, setActiveTab] = useState<"coincidencia" | "similar">(
     "coincidencia",
   );
@@ -110,7 +118,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
   };
 
   const activeList = activeTab === "coincidencia" ? coincidences : similars;
-  const badgeColor = activeTab === "coincidencia" ? COLORS.primary : "#8E8E93";
+  const badgeColor = activeTab === "coincidencia" ? COLORS.primaryDark : "#8E8E93";
   const badgeText = activeTab === "coincidencia" ? "Match" : "Similar";
 
   const formatCompactPrice = (amount: number) => {
@@ -141,7 +149,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <ScreenWrapper withHeader={false}>
+      <View style={safeStyle}>
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.headerContainer}>
@@ -376,7 +384,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
             onCancel={() => setShowDeleteConfirm(false)}
           />
         </View>
-      </ScreenWrapper>
+      </View>
     </Modal>
   );
 };

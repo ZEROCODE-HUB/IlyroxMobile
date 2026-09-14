@@ -138,7 +138,7 @@ export const propertyDetailStyles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: COLORS.textPrimary,
+    color: COLORS.primaryDark,
     marginBottom: 8,
     lineHeight: 30,
   },
@@ -190,7 +190,7 @@ export const propertyDetailStyles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: COLORS.textPrimary,
+    color: COLORS.primaryDark,
     marginBottom: 16,
   },
   statsGrid: {

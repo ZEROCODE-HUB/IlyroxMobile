@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from "react-native";
+import SafePressable from "@/design-system/components/SafePressable";
 import { FlashList } from "@shopify/flash-list";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +18,7 @@ import { useMapProperties, MapServerFilters } from "@/hooks/useMapProperties";
 import { usePropertyFilters } from "@/hooks/usePropertyFilters";
 import { useMapFeedItems } from "@/hooks/useMapFeedItems";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
+import { useShallow } from "zustand/react/shallow";
 import { usePropertyCacheStore } from "@/store/propertyCacheStore";
 import { extractServerFilters } from "@/utils/mapServerFilters";
 import { PropertyCard } from "@/components/cards";
@@ -31,7 +33,7 @@ const PAGE_SIZE = 20;
 
 // ── Resumen de filtros activos ────────────────────────────────────────────────
 function SearchSummaryBar({ hasActiveFilters }: { hasActiveFilters: boolean }) {
-  const { filters } = usePropertyFiltersStore();
+  const filters = usePropertyFiltersStore(useShallow((s) => s.filters));
   const pills: string[] = [];
 
   if (filters.operacion) {
@@ -161,7 +163,7 @@ const summaryStyles = StyleSheet.create({
 export default function MapResultsScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const storeFilters = usePropertyFiltersStore((s) => s.filters);
+  const storeFilters = usePropertyFiltersStore(useShallow((s) => s.filters));
   const [debouncedFilters, setDebouncedFilters] = useState<MapServerFilters>(
     () => extractServerFilters(storeFilters),
   );
@@ -219,7 +221,7 @@ export default function MapResultsScreen() {
     }
   }, [offset, propertyIds.length, isFetching]);
 
-  const handleOpenDetail = (item: FeedItem) => {
+  const handleOpenDetail = useCallback((item: FeedItem) => {
     if (item.propertyDetails?.id) {
       const cachedData = item.propertyDetails;
       usePropertyCacheStore.getState().setProperty(cachedData.id, cachedData);
@@ -228,11 +230,24 @@ export default function MapResultsScreen() {
         params: { id: cachedData.id },
       });
     }
-  };
+  }, []);
 
-  const handleUserClick = (u: User) => {
+  const handleUserClick = useCallback((u: User) => {
     router.push({ pathname: "/(stack)/user/[id]", params: { id: u.id } });
-  };
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item }: { item: FeedItem }) => (
+      <PropertyCard
+        item={item}
+        onClick={() => handleOpenDetail(item)}
+        onCommentClick={() => setActiveCommentItem(item)}
+        onUserClick={handleUserClick}
+        currentUserId={user?.id}
+      />
+    ),
+    [handleOpenDetail, handleUserClick, user?.id],
+  );
 
   const isInitialLoading = isLoading && allFeedItems.length === 0;
   const hasMore = offset + PAGE_SIZE < propertyIds.length;
@@ -241,9 +256,9 @@ export default function MapResultsScreen() {
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
+        <SafePressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
           <Ionicons name="arrow-back" size={22} color={COLORS.textPrimary} />
-        </Pressable>
+        </SafePressable>
         <Text style={styles.headerTitle}>
           {filteredProperties.length} propiedad{filteredProperties.length !== 1 ? "es" : ""}
         </Text>
@@ -262,15 +277,7 @@ export default function MapResultsScreen() {
         <FlashList
           data={allFeedItems}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <PropertyCard
-              item={item}
-              onClick={() => handleOpenDetail(item)}
-              onCommentClick={() => setActiveCommentItem(item)}
-              onUserClick={handleUserClick}
-              currentUserId={user?.id}
-            />
-          )}
+          renderItem={renderItem}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
           onEndReached={handleLoadMore}

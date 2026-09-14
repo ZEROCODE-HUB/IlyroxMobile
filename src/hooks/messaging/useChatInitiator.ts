@@ -1,10 +1,10 @@
 import { useCallback } from "react";
 import { useRouter } from "expo-router";
-import { supabase } from "@/lib/supabase";
 
 import { useAuth } from "@/context/AuthContext";
 import { useModal } from "@/context/ModalContext";
-import { logger } from "@/utils/logger";const log = logger.scoped("useChatInitiator");
+import { queryClient } from "@/lib/queryClient";
+import { GroupedConversation } from "@/services/conversationsService";
 
 interface OtherUser {
   id: string;
@@ -19,50 +19,44 @@ export function useChatInitiator() {
   const { showModal } = useModal();
 
   /**
-   * Busca si existe una conversación con estos parámetros
+   * Resuelve en CERO red si ya existe una conversación, consultando la caché
+   * de React Query (["conversations", userId]) que mantiene useConversations.
+   *
+   * La caché agrupada no expone `propiedad_id`, así que solo podemos resolver
+   * con certeza el chat GENERAL (sin propiedad). Para chats de una propiedad,
+   * se navega como "new" y MessagingScreen resuelve el id real en background:
+   * el historial se carga solo sin bloquear la navegación.
    */
-  const findExistingConversation = useCallback(
-    async (otherUserId: string, propertyId: string | null) => {
-      if (!user?.id) return null;
+  const resolveCachedConversation = useCallback(
+    (otherUserId: string, propertyId: string | null): string | null => {
+      if (!user?.id || propertyId) return null;
 
-      try {
-        let query = supabase
-          .from("conversaciones")
-          .select("id")
-          .or(
-            `and(usuario1_id.eq.${user.id},usuario2_id.eq.${otherUserId}),and(usuario1_id.eq.${otherUserId},usuario2_id.eq.${user.id})`,
-          );
+      const groups = queryClient.getQueryData<GroupedConversation[]>(
+        ["conversations", user.id],
+      );
+      if (!groups?.length) return null;
 
-        if (propertyId) {
-          query = query.eq("propiedad_id", propertyId);
-        } else {
-          query = query.is("propiedad_id", null);
-        }
+      const group = groups.find((g) => g.other_user?.id === otherUserId);
+      if (!group) return null;
 
-        const { data, error } = await query.maybeSingle();
-
-        if (error) {
-          log.error("Error finding conversation:", error);
-          return null;
-        }
-
-        return data?.id || null;
-      } catch (e) {
-        log.error("Exception finding conversation:", e);
-        return null;
-      }
+      // conversacion_mas_reciente_id es el id REAL; el `id` de la agrupación
+      // puede ser un fallback "usuario1_id_usuario2_id" sin conversación real.
+      return group.conversacion_mas_reciente_id || null;
     },
     [user?.id],
   );
 
   /**
-   * Inicia el proceso de chat:
-   * 1. Verifica si ya existe conversación.
+   * Inicia el proceso de chat ABIENDO LA NAVEGACIÓN AL INSTANTE:
+   * 1. Resuelve la conversación existente SÍNCRONICAMENTE desde la caché
+   *    (sin red) cuando es posible.
    * 2. Si existe -> Navega a ella.
-   * 3. Si no existe -> Navega a vista 'new' con params para crearla al enviar mensaje.
+   * 3. Si no existe -> Navega a 'new' al instante; el chat real se resuelve en
+   *    background en MessagingScreen y se evita duplicar conversación en
+   *    `useMessages.getOrCreateConversation`.
    */
   const handleContact = useCallback(
-    async (
+    (
       otherUserId: string,
       propertyId: string | null,
       otherUserData: OtherUser,
@@ -79,42 +73,26 @@ export function useChatInitiator() {
         return;
       }
 
-      try {
-        // Verificar existencia
-        const existingId = await findExistingConversation(
-          otherUserId,
-          propertyId,
-        );
+      // La existencia se resuelve desde caché (sincrónico, sin red). Si no hay
+      // certeza, "new" + resolución en background en MessagingScreen.
+      const existingId = resolveCachedConversation(otherUserId, propertyId);
 
-        // Standardize params to avoid objects that can't be stringified in the URL easily
-        // Expo router params work best as simple key-value pairs
-        const params: any = {
-          initialUser: JSON.stringify(otherUserData),
-          initialPropertyId: propertyId || "",
-          isAppointment: isAppointment ? "true" : "false",
-        };
+      // Standardize params to avoid objects that can't be stringified in the URL easily
+      // Expo router params work best as simple key-value pairs
+      const params: any = {
+        initialUser: JSON.stringify(otherUserData),
+        initialPropertyId: propertyId || "",
+        isAppointment: isAppointment ? "true" : "false",
+        conversationId: existingId || "new",
+      };
 
-        if (existingId) {
-          params.conversationId = existingId;
-        } else {
-          params.conversationId = "new";
-        }
-
-        router.push({
-          pathname: "/(stack)/messages",
-          params: params,
-        });
-      } catch (error) {
-        log.error("Nav error or check error:", error);
-        // Fallback genérico
-        showModal({ title: "Error", message: "No se pudo iniciar el chat", confirmText: "OK" });
-      }
+      router.push({
+        pathname: "/(stack)/messages",
+        params,
+      });
     },
-    [user?.id, router, findExistingConversation],
+    [user?.id, router, resolveCachedConversation],
   );
 
-  return {
-    handleContact,
-    findExistingConversation,
-  };
+  return { handleContact };
 }

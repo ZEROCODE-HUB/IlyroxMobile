@@ -20,6 +20,7 @@ import { COLORS, FALLBACKS } from "../../constants";
 import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import ActionButtons from "../ActionButtons";
 import { Avatar } from "../shared";
+import SafePressable from "@/design-system/components/SafePressable";
 
 interface ReelDetailProps {
   item: FeedItem;
@@ -214,7 +215,7 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
             </View>
 
             {/* User info - Bottom left (estilo TikTok) */}
-            <TouchableOpacity
+            <SafePressable
               style={styles.userInfo}
               onPress={() => onUserClick?.(item.user)}
             >
@@ -231,7 +232,7 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
                   {item.user.name || item.user.nombre || "Usuario"}
                 </Text>
               </View>
-            </TouchableOpacity>
+            </SafePressable>
             {item.content && (
               <TouchableOpacity
                 style={styles.contentContainer}

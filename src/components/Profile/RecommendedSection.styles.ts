@@ -24,7 +24,7 @@ export const stylesRecommendedSection = StyleSheet.create({
   recommendedByTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: COLORS.textPrimary,
+    color: COLORS.primaryDark,
   },
   recommendedByCount: {
     fontSize: 12,
@@ -93,7 +93,7 @@ export const stylesRecommendedSection = StyleSheet.create({
   recommendedByModalTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: COLORS.textPrimary,
+    color: COLORS.primaryDark,
   },
   recommendedByModalSubtitle: {
     marginTop: 2,
@@ -193,7 +193,7 @@ export const stylesRecommendedSection = StyleSheet.create({
   featuresTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: COLORS.textPrimary,
+    color: COLORS.primaryDark,
     marginBottom: 12,
   },
   featureRow: {

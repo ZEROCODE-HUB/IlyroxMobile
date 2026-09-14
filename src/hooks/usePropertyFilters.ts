@@ -2,6 +2,7 @@ import { useMemo, useEffect } from "react";
 import { Property } from "@/types";
 import { useExchangeRate } from "./useExchangeRate";
 import { normalizeStr } from "@/utils/stringNormalizer";
+import { useShallow } from "zustand/react/shallow";
 import {
   usePropertyFiltersStore,
   PropertyFilters,
@@ -168,18 +169,22 @@ export const usePropertyFilters = (
   const { convertPrice } = useExchangeRate();
   const { user } = useAuth();
 
-  const {
-    filters,
-    updateFilter,
-    updateLocationFilter,
-    addPolygon,
-    removePolygon,
-    clearPolygons,
-    addLocationChip,
-    removeLocationChip,
-    clearLocationChips,
-    clearFilters,
-  } = usePropertyFiltersStore();
+  const filters = usePropertyFiltersStore(useShallow((s) => s.filters));
+  const updateFilter = usePropertyFiltersStore((s) => s.updateFilter);
+  const updateLocationFilter = usePropertyFiltersStore(
+    (s) => s.updateLocationFilter,
+  );
+  const addPolygon = usePropertyFiltersStore((s) => s.addPolygon);
+  const removePolygon = usePropertyFiltersStore((s) => s.removePolygon);
+  const clearPolygons = usePropertyFiltersStore((s) => s.clearPolygons);
+  const addLocationChip = usePropertyFiltersStore((s) => s.addLocationChip);
+  const removeLocationChip = usePropertyFiltersStore(
+    (s) => s.removeLocationChip,
+  );
+  const clearLocationChips = usePropertyFiltersStore(
+    (s) => s.clearLocationChips,
+  );
+  const clearFilters = usePropertyFiltersStore((s) => s.clearFilters);
 
   const filteredProperties = useMemo(() => {
     return properties.filter((p) => {

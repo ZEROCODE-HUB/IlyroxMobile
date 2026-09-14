@@ -10,6 +10,7 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { useLocalModal } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,21 +23,22 @@ import * as ImagePicker from "expo-image-picker";
 import { decode } from "base64-arraybuffer";
 import { SelectionModal } from "../modals";
 import { ESTADOS_MEXICO } from "../../constants/estadosMexico";
-import { ScreenWrapper } from "../../screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { logger } from "@/utils/logger";
 import { collapseSpaces } from "@/utils/stringNormalizer";
+import SafePressable from "@/design-system/components/SafePressable";
 
 const log = logger.scoped("EditProfile");
 
-interface EditProfileProps {
-  onBack: () => void;
-  onProfileUpdate?: () => void;
-}
-
-const EditProfile: React.FC<EditProfileProps> = ({
-  onBack,
-  onProfileUpdate,
-}) => {
+const EditProfile = () => {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const safeStyle = {
+    flex: 1,
+    paddingBottom: Math.max(insets.bottom, 10),
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
   const { user, profile: authProfile, refreshProfile } = useAuth();
   const { showModal, modalElement } = useLocalModal();
   const { showToast } = useToast();
@@ -176,8 +178,7 @@ const EditProfile: React.FC<EditProfileProps> = ({
       await refreshProfile(updatedData); // Optimización: pasar datos directamente
 
       showToast("Perfil actualizado correctamente", "success");
-      if (onProfileUpdate) onProfileUpdate();
-      onBack();
+      router.back();
     } catch (error: any) {
       log.error("Error updating profile:", error);
       showToast(error.message || "No se pudo actualizar el perfil", "error");
@@ -188,15 +189,15 @@ const EditProfile: React.FC<EditProfileProps> = ({
   };
 
   return (
-    <ScreenWrapper withHeader={false}>
+    <View style={safeStyle}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.container}
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+          <SafePressable onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
-          </TouchableOpacity>
+          </SafePressable>
           <Text style={styles.headerTitle}>Editar Perfil</Text>
           <TouchableOpacity
             onPress={handleSave}
@@ -345,7 +346,7 @@ const EditProfile: React.FC<EditProfileProps> = ({
         </ScrollView>
       </KeyboardAvoidingView>
       {modalElement}
-    </ScreenWrapper>
+    </View>
   );
 };
 

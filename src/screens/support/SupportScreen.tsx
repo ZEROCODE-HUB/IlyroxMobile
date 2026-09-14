@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
-import { ScreenWrapper } from "@/screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import { router } from "expo-router";
 import { useModal } from "@/context/ModalContext";
@@ -21,6 +21,7 @@ const log = logger.scoped("SupportScreen");
 
 const SupportScreen: React.FC = () => {
   const { showModal } = useModal();
+  const insets = useSafeAreaInsets();
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
@@ -144,7 +145,16 @@ const SupportScreen: React.FC = () => {
   };
 
   return (
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingBottom: Math.max(insets.bottom, 10),
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+      ]}
+    >
       <AppHeader
         title="Soporte"
         showBackButton={true}
@@ -271,7 +281,7 @@ const SupportScreen: React.FC = () => {
           </View> */}
         </ScrollView>
       </KeyboardAvoidingView>
-    </ScreenWrapper>
+    </View>
   );
 };
 

@@ -7,6 +7,7 @@ import { COLORS } from "@/constants/colors";
 import { TipoPrincipal, getLabelRecamaras, formatNivelLabel, esTerreno } from "@/constants/propertyData";
 import { SelectionModal } from "@/components/modals";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
+import { useShallow } from "zustand/react/shallow";
 
 interface CharacteristicsSectionProps {
   camposVisibles: any;
@@ -43,7 +44,23 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
   openNumberInput,
   setShowNumberInput,
 }) => {
-  const { filters, updateFilter: onUpdateFilter } = usePropertyFiltersStore();
+  const filters = usePropertyFiltersStore(
+    useShallow((s) => ({
+      tipoPropiedad: s.filters.tipoPropiedad,
+      subtipo: s.filters.subtipo,
+      habitaciones: s.filters.habitaciones,
+      banos: s.filters.banos,
+      mediosBanos: s.filters.mediosBanos,
+      estacionamientos: s.filters.estacionamientos,
+      niveles: s.filters.niveles,
+      antiguedad: s.filters.antiguedad,
+      m2TerrenoMin: s.filters.m2TerrenoMin,
+      m2ConstruccionMin: s.filters.m2ConstruccionMin,
+      anchoTerrenoMin: s.filters.anchoTerrenoMin,
+      largoTerrenoMin: s.filters.largoTerrenoMin,
+    })),
+  );
+  const onUpdateFilter = usePropertyFiltersStore((s) => s.updateFilter);
 
   if (!filters.tipoPropiedad) return null;
 
@@ -310,7 +327,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 16,
     fontWeight: "700",
-    color: COLORS.textPrimary,
+    color: COLORS.primaryDark,
   },
   label: {
     fontSize: 14,

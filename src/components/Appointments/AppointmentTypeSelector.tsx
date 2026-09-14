@@ -95,14 +95,14 @@ const styles = StyleSheet.create({
     },
     typeButtonActive: {
         backgroundColor: "#F0FDFA",
-        borderColor: COLORS.primary,
+        borderColor: COLORS.primaryDark,
     },
     typeButtonText: {
         fontSize: 14,
         color: COLORS.textSecondary,
     },
     typeButtonTextActive: {
-        color: COLORS.primary,
+        color: COLORS.primaryDark,
         fontWeight: "600",
     },
 });

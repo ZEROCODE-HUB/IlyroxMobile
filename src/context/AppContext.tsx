@@ -4,6 +4,7 @@ import React, {
   useState,
   ReactNode,
   useEffect,
+  useMemo,
 } from "react";
 import { User, SavedSearch, Lead } from "@/types";
 import { useAuth } from "./AuthContext";
@@ -125,21 +126,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     setSavedSearches((prev) => [newSearch, ...prev]);
   };
 
-  const value = {
-    currentUser,
-    setCurrentUser,
-    isLoading: loading,
-    setIsLoading: () => {}, // Deprecated - controlled by AuthContext
-    error,
-    setError,
-    savedSearches,
-    leads,
-    saveSearch,
-    selectedLocation,
-    setSelectedLocation,
-    isGlobalMuted,
-    setIsGlobalMuted,
-  };
+  const value = useMemo(
+    () => ({
+      currentUser,
+      setCurrentUser,
+      isLoading: loading,
+      setIsLoading: () => {}, // Deprecated - controlled by AuthContext
+      error,
+      setError,
+      savedSearches,
+      leads,
+      saveSearch,
+      selectedLocation,
+      setSelectedLocation,
+      isGlobalMuted,
+      setIsGlobalMuted,
+    }),
+    [
+      currentUser,
+      loading,
+      error,
+      savedSearches,
+      leads,
+      selectedLocation,
+      isGlobalMuted,
+    ],
+  );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

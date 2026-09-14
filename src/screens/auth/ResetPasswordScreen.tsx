@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
-import { ScreenWrapper } from "@/screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -57,6 +57,12 @@ const ResetPasswordScreen: React.FC = () => {
   const { showToast } = useToast();
   const { startPasswordResetProcessing, endPasswordResetProcessing } = useAuth();
   const localParams = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
+  const safeStyle = {
+    paddingBottom: Math.max(insets.bottom, 10),
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState({
@@ -273,17 +279,17 @@ const ResetPasswordScreen: React.FC = () => {
   // RENDER: Loading
   if (isProcessingLink) {
     return (
-      <ScreenWrapper withHeader={false} style={[styles.container, styles.centerContent]}>
+      <View style={[styles.container, styles.centerContent, safeStyle]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Validando enlace...</Text>
-      </ScreenWrapper>
+      </View>
     );
   }
 
   // RENDER: Error de sesión
   if (sessionError) {
     return (
-      <ScreenWrapper withHeader={false} style={[styles.container, styles.centerContent]}>
+      <View style={[styles.container, styles.centerContent, safeStyle]}>
         <Ionicons name="alert-circle-outline" size={60} color={COLORS.error} />
         <Text style={styles.errorTitle}>Enlace inválido</Text>
         <Text style={styles.errorSubtitle}>{sessionError}</Text>
@@ -303,14 +309,14 @@ const ResetPasswordScreen: React.FC = () => {
           style={styles.backButton}
           labelStyle={styles.backButtonText}
         />
-      </ScreenWrapper>
+      </View>
     );
   }
 
   // RENDER: No hay sesión válida
   if (!currentSession) {
     return (
-      <ScreenWrapper withHeader={false} style={[styles.container, styles.centerContent]}>
+      <View style={[styles.container, styles.centerContent, safeStyle]}>
         <Ionicons name="link-outline" size={60} color={COLORS.textTertiary} />
         <Text style={styles.errorTitle}>Enlace no detectado</Text>
         <Text style={styles.errorSubtitle}>
@@ -332,13 +338,13 @@ const ResetPasswordScreen: React.FC = () => {
           style={styles.backButton}
           labelStyle={styles.backButtonText}
         />
-      </ScreenWrapper>
+      </View>
     );
   }
 
   // RENDER: Formulario de reset
   return (
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View style={[styles.container, safeStyle]}>
       <AppHeader
         title="Restablecer Contraseña"
         showBackButton={true}
@@ -453,7 +459,7 @@ const ResetPasswordScreen: React.FC = () => {
           </View>
         </View>
       </KeyboardAvoidingView>
-    </ScreenWrapper>
+    </View>
   );
 };
 

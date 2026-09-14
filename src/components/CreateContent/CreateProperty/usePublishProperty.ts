@@ -258,43 +258,52 @@ export function usePublishProperty(
         updateProgress(5, "Subiendo imágenes...");
         const uploadedUrls: string[] = [];
         let failedImages = 0;
+        let completedCount = 0;
 
-        for (let i = 0; i < form.images.length; i++) {
+        // Pool de concurrencia 4: sube hasta 4 imágenes en paralelo para
+        // reducir el wall-clock sin saturar la red móvil. Se procesan en
+        // chunks: cuando un chunk termina, se lanza el siguiente. Las URLs
+        // remotas se preservan tal cual (no se re-suben). El reporte de
+        // progreso se hace por imagen completada.
+        const IMAGE_UPLOAD_CONCURRENCY = 4;
+
+        const totalImages = form.images.length;
+        for (let chunkStart = 0; chunkStart < totalImages; chunkStart += IMAGE_UPLOAD_CONCURRENCY) {
           if (cancelledRef.current) {
             throw new Error("CANCELLED");
           }
 
-          // Si ya es URL remota, no subir de nuevo
-          if (form.images[i].startsWith("http")) {
-            uploadedUrls.push(form.images[i]);
-            updateProgress(
-              5 + ((i + 1) / form.images.length) * 35,
-              `Imágenes: ${i + 1}/${form.images.length}`,
-            );
-            continue;
-          }
-
-          try {
-            const url = await uploadImageWithTimeout(
-              form.images[i],
-              "propiedades",
-            );
-            if (url) {
-              uploadedUrls.push(url);
-            } else {
-              failedImages++;
+          const chunk = form.images.slice(chunkStart, chunkStart + IMAGE_UPLOAD_CONCURRENCY);
+          const chunkPromises = chunk.map(async (imageUri) => {
+            // Si ya es URL remota, no subir de nuevo
+            if (imageUri.startsWith("http")) {
+              uploadedUrls.push(imageUri);
+              return;
             }
-          } catch (imgError: any) {
-            log.warn(`Error subiendo imagen ${i + 1}:`, imgError.message);
-            failedImages++;
-            // Continuar con las demás imágenes en lugar de fallar todo
-          }
+            try {
+              const url = await uploadImageWithTimeout(imageUri, "propiedades");
+              if (url) {
+                uploadedUrls.push(url);
+              } else {
+                failedImages++;
+              }
+            } catch (imgError: any) {
+              log.warn(`Error subiendo imagen:`, imgError.message);
+              failedImages++;
+              // Continuar con las demás imágenes en lugar de fallar todo
+            } finally {
+              completedCount++;
+              updateProgress(
+                5 + (completedCount / totalImages) * 35,
+                `Imágenes: ${completedCount}/${totalImages}${failedImages > 0 ? ` (${failedImages} fallidas)` : ""}`,
+              );
+            }
+          });
 
-          updateProgress(
-            5 + ((i + 1) / form.images.length) * 35,
-            `Imágenes: ${i + 1}/${form.images.length}${failedImages > 0 ? ` (${failedImages} fallidas)` : ""}`,
-          );
+          await Promise.allSettled(chunkPromises);
         }
+
+        if (cancelledRef.current) throw new Error("CANCELLED");
 
         if (uploadedUrls.length === 0) {
           throw new Error(

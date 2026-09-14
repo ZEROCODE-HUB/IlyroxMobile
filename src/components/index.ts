@@ -9,6 +9,7 @@ export { default as PostCard } from "./cards/PostCard";
 // Componentes de detalle
 export { default as ReelDetail } from "./Reel/ReelDetail";
 export { default as FeedDetail } from "./Feed/FeedDetail";
+export { PostDetailShimmer } from "./Feed/PostDetailShimmer";
 
 // Componentes auxiliares
 export { default as UserHeader } from "./UserHeader";

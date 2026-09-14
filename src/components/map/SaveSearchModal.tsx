@@ -14,6 +14,7 @@ import { AppInput } from "@/design-system/components/AppInput";
 import { useSaveSearch } from "./filters/useSaveSearch";
 import { COLORS } from "@/constants/colors";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
+import { useShallow } from "zustand/react/shallow";
 
 interface SaveSearchModalProps {
   visible: boolean;
@@ -28,7 +29,7 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
   onSaveSuccessWithData,
   userId,
 }) => {
-  const { filters } = usePropertyFiltersStore();
+  const filters = usePropertyFiltersStore(useShallow((s) => s.filters));
   const {
     setCreateLead,
     leadName,
@@ -334,7 +335,7 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 12,
     fontWeight: "700",
-    color: COLORS.textTertiary,
+    color: COLORS.primaryDark,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },

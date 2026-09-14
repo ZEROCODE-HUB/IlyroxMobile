@@ -13,9 +13,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
-import { ScreenWrapper } from "@/screens/ScreenWrapper";
 import { useEasyBroker } from "@/hooks/useEasyBroker";
 import { EasyBrokerOnboarding } from "@/components/easy-broker/EasyBrokerOnboarding";
 import { EasyBrokerStats } from "@/components/easy-broker/EasyBrokerStats";
@@ -23,6 +23,12 @@ import { EasyBrokerSyncStatus } from "@/components/easy-broker/EasyBrokerSyncSta
 import { EasyBrokerHistory } from "@/components/easy-broker/EasyBrokerHistory";
 
 const EasyBrokerSettingsScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const safeStyle = {
+    paddingBottom: Math.max(insets.bottom, 10),
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
   const {
     apiKey,
     setApiKey,
@@ -48,7 +54,7 @@ const EasyBrokerSettingsScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <ScreenWrapper withHeader={false} style={styles.container}>
+      <View style={[styles.container, safeStyle]}>
         <AppHeader
           title="EasyBroker"
           showBackButton
@@ -57,14 +63,14 @@ const EasyBrokerSettingsScreen: React.FC = () => {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
-      </ScreenWrapper>
+      </View>
     );
   }
 
   // Vista de onboarding (sin API key)
   if (!hasApiKey) {
     return (
-      <ScreenWrapper withHeader={false} style={styles.container}>
+      <View style={[styles.container, safeStyle]}>
         <AppHeader
           title="EasyBroker"
           showBackButton
@@ -76,13 +82,13 @@ const EasyBrokerSettingsScreen: React.FC = () => {
           onSave={handleSaveAndSync}
           loading={loading}
         />
-      </ScreenWrapper>
+      </View>
     );
   }
 
   // Vista principal (con API key configurada)
   return (
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View style={[styles.container, safeStyle]}>
       <AppHeader
         title="EasyBroker"
         showBackButton
@@ -119,7 +125,7 @@ const EasyBrokerSettingsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </ScreenWrapper>
+    </View>
   );
 };
 

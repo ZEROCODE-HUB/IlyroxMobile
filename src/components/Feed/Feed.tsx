@@ -62,12 +62,12 @@ const Feed: React.FC<FeedProps> = ({
 
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [communityRefreshSignal, setCommunityRefreshSignal] = useState(0);
+  const [isUserRefreshing, setIsUserRefreshing] = useState(false);
 
   // Hooks de datos reales
   const {
     items,
     loading,
-    refreshing,
     hasMore,
     loadMore,
     refresh,
@@ -82,8 +82,10 @@ const Feed: React.FC<FeedProps> = ({
   });
 
   const handleRefresh = useCallback(async () => {
+    setIsUserRefreshing(true);
     setCommunityRefreshSignal((value) => value + 1);
     await refresh();
+    setIsUserRefreshing(false);
   }, [refresh]);
 
   useFocusEffect(
@@ -193,7 +195,18 @@ const Feed: React.FC<FeedProps> = ({
         type: item.type,
       });
       if (item.type === "property" && item.propertyDetails?.id) {
-        const cachedData = item.propertyDetails;
+        const cachedData = {
+          ...item.propertyDetails,
+          // feed_items parcial: el detalle lo necesita de inmediato para el
+          // contador de likes/comentarios/compartidos y el view tracking.
+          feed_items: {
+            id: item.id,
+            likes_count: item.likes,
+            comentarios_count: item.comments,
+            compartidos_count: item.shares,
+            vistas_count: item.views,
+          },
+        };
         usePropertyCacheStore.getState().setProperty(cachedData.id, cachedData);
         router.push({
           pathname: "/(stack)/property/[id]",
@@ -253,7 +266,7 @@ const Feed: React.FC<FeedProps> = ({
         showBanner("¡Aprobación enviada!");
       }
     },
-    [approveUser, showBanner, onUserClick],
+    [approveUser, showBanner],
   );
 
   const handleRejectUser = useCallback(
@@ -420,7 +433,7 @@ const Feed: React.FC<FeedProps> = ({
         onEndReachedThreshold={0.5}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={isUserRefreshing}
             onRefresh={handleRefresh}
             tintColor={COLORS.primary}
             colors={[COLORS.primary]}

@@ -8,7 +8,7 @@
  */
 
 import React, { useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { COLORS } from "../constants";
@@ -21,6 +21,7 @@ import { useCommentCount } from "@/hooks/useCommentCount";
 import { useShareCount } from "@/hooks/useShareCount";
 import { propertyService } from "../services/propertyService";
 import firstUpperCase from "@/utils/firstUpperCase";
+import { SafePressable } from "@/design-system";
 
 interface ActionButtonsProps {
   feedItemId: string;
@@ -149,7 +150,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     <View style={containerStyle}>
       <View style={leftStyle}>
         {/* Like Button */}
-        <TouchableOpacity
+        <SafePressable
           onPress={toggleLike}
           style={itemStyle}
           accessibilityLabel={isLiked ? "Quitar me gusta" : "Dar me gusta"}
@@ -164,10 +165,10 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           <Text style={[styles.iconCountText, { color: textColor }]}>
             {likes}
           </Text>
-        </TouchableOpacity>
+        </SafePressable>
 
         {/* Comment Button */}
-        <TouchableOpacity
+        <SafePressable
           onPress={onCommentClick}
           style={itemStyle}
           accessibilityLabel="Comentar publicación"
@@ -181,10 +182,10 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           <Text style={[styles.iconCountText, { color: textColor }]}>
             {currentCommentCount}
           </Text>
-        </TouchableOpacity>
+        </SafePressable>
 
         {/* Share Button */}
-        <TouchableOpacity
+        <SafePressable
           onPress={handleShare}
           style={itemStyle}
           accessibilityLabel="Compartir publicación"
@@ -198,10 +199,10 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           <Text style={[styles.iconCountText, { color: textColor }]}>
             {shareCount}
           </Text>
-        </TouchableOpacity>
+        </SafePressable>
 
         {feedItemType === "property" && userId !== propertyAuthorId && (
-          <TouchableOpacity
+          <SafePressable
             onPress={handleReport}
             style={itemStyle}
             accessibilityLabel="Reportar Propiedad"
@@ -215,20 +216,20 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             <Text style={[styles.iconCountText, { color: textColor }]}>
               {reportCount}
             </Text>
-          </TouchableOpacity>
+          </SafePressable>
         )}
       </View>
 
       <View style={styles.actionRight}>
         {showContactButton && !isVertical && (
-          <TouchableOpacity
+          <SafePressable
             style={styles.smallContactBtn}
             accessibilityLabel="Contactar asesor"
             accessibilityRole="button"
           >
             <Ionicons name="call" size={16} color={COLORS.white} />
             <Text style={styles.smallContactText}>Contactar</Text>
-          </TouchableOpacity>
+          </SafePressable>
         )}
       </View>
 

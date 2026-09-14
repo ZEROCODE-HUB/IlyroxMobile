@@ -1,8 +1,9 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../constants/colors";
 import { useStableSafeInsets } from "../context/SafeInsetsContext";
+import SafePressable from "@/design-system/components/SafePressable";
 
 interface AppHeaderProps {
   title: string;
@@ -10,6 +11,11 @@ interface AppHeaderProps {
   onBack?: () => void;
   showBackButton?: boolean;
   rightComponent?: React.ReactNode;
+  /**
+   * Si el padre ya aplica la safe area top, pasar 0 para que AppHeader
+   * no duplique el inset. Si no se pasa, usa el `top` de useStableSafeInsets.
+   */
+  topInset?: number;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -18,21 +24,23 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onBack,
   showBackButton = false,
   rightComponent,
+  topInset,
 }) => {
   const { top } = useStableSafeInsets();
+  const effectiveTopInset = topInset ?? top;
 
   return (
     <View
       style={[
         styles.header,
         {
-          paddingTop: top - 8,
+          paddingTop: effectiveTopInset + 12,
         },
       ]}
     >
       <View style={styles.headerTop}>
         {showBackButton && onBack ? (
-          <TouchableOpacity
+          <SafePressable
             onPress={onBack}
             style={styles.backButton}
             accessibilityLabel="Volver"
@@ -43,7 +51,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               size={24}
               color={COLORS.textPrimary}
             />
-          </TouchableOpacity>
+          </SafePressable>
         ) : (
           <View style={styles.backButton} />
         )}

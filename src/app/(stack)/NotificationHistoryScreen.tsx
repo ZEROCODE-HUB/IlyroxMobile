@@ -1,160 +1,229 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
-  FlatList,
-  TouchableOpacity,
+  SectionList,
   StyleSheet,
   ActivityIndicator
 } from 'react-native';
+import SafePressable from '@/design-system/components/SafePressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { supabase } from '../../lib/supabase';
-import { useNotifications, NotificacionExtendida } from '../../context/NotificationContext';
-import { formatTimeAgo } from '../../utils/formatTimeAgo';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import { Avatar } from '../../components/shared';
+import { buildFeedItemNavigation } from '../../utils/notificationNavigation';
+import {
+  useNotificationHistory,
+  groupNotificationsByDay,
+  type NotificationSection,
+} from '../../hooks/notifications/useNotificationHistory';
+import { useNotifications } from '../../context/NotificationContext';
+import { formatTimeAgo } from '../../utils/formatTimeAgo';
+import { COLORS } from '../../constants';
+import { logger } from '@/utils/logger';
+
+const log = logger.scoped("NotificationHistoryScreen");
 
 export default function NotificationHistoryScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { 
-    notifications, 
-    markAsRead, 
-    isLoading
-  } = useNotifications();
-  
+  const queryClient = useQueryClient();
+  const {
+    notifications,
+    loading,
+    loadingMore,
+    refreshing,
+    hasMore,
+    loadMore,
+    refresh,
+    error,
+  } = useNotificationHistory({ userId: user?.id, pageSize: 30 });
+
+  const { markAsRead } = useNotifications();
+
+  // Refrescar al entrar para ver notificaciones nuevas
   useEffect(() => {
-    // Notifications are fetched automatically by the context
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
-  const handleNotificationPress = async (notification: NotificacionExtendida) => {
-    const { id, feed_item_id, autores } = notification;
 
-    if (user) {
-      await markAsRead(id);
-    }
+  const sections = useMemo<NotificationSection[]>(
+    () => groupNotificationsByDay(notifications),
+    [notifications],
+  );
 
-    if (!feed_item_id) return;
+  const handleNotificationPress = useCallback(
+    async (notificationId: string, feedItemId: string | null, data: Record<string, unknown>) => {
+      // markAsRead en background: no bloquea la navegación. Si falla, el
+      // badge se reconcilia cuando el usuario vuelva a la lista.
+      if (user) {
+        markAsRead(notificationId).catch((err) =>
+          log.warn("markAsRead falló (no crítico):", err),
+        );
+      }
+      if (!feedItemId) return;
+      const go = await buildFeedItemNavigation({
+        router,
+        feedItemId,
+        data,
+        queryClient,
+        currentUserId: user?.id,
+      });
+      go?.();
+    },
+    [user, markAsRead, router, queryClient],
+  );
 
-    const firstAuthorId = autores[0]?.id || null;
+  const renderItem = useCallback(
+    ({ item }: { item: any }) => {
+      const isUnread = item.estado === 'pendiente';
+      const firstAuthor = item.autores?.[0];
+      const extraCount = (item.total_autores || 0) - 1;
 
-    const { data: feedItem } = await supabase
-      .from("feed_items")
-      .select("contenido_id, tipo_contenido")
-      .eq("id", feed_item_id)
-      .single();
-
-    if (!feedItem) return;
-
-    const highlightParam = firstAuthorId ? { highlightUserId: firstAuthorId } : {};
-
-    switch (feedItem.tipo_contenido) {
-      case "propiedad":
-        router.push({ pathname: "/(stack)/property/[id]", params: { id: feedItem.contenido_id, ...highlightParam } });
-        break;
-      case "post":
-        router.push({ pathname: "/(stack)/post/[id]", params: { id: feedItem.contenido_id, ...highlightParam } });
-        break;
-      case "reel":
-        router.push({ pathname: "/(stack)/reel/[id]", params: { id: feedItem.contenido_id, ...highlightParam } });
-        break;
-      default:
-        router.push({ pathname: "/(stack)/property/[id]", params: { id: feedItem.contenido_id, ...highlightParam } });
-    }
-  };
-  
-  const renderItem = ({ item }: { item: NotificacionExtendida }) => {
-    const isUnread = item.estado === 'pendiente';
-    const firstAuthor = item.autores[0];
-    const extraCount = item.total_autores - 1;
-
-    return (
-      <TouchableOpacity
-        style={[styles.notificationItem, isUnread && styles.unreadItem]}
-        onPress={() => handleNotificationPress(item)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.dotContainer}>
-          <View style={[styles.dot, isUnread && styles.unreadDot]} />
-        </View>
-
-        <View style={styles.avatarContainer}>
-          <Avatar
-            uri={firstAuthor?.foto || undefined}
-            name={firstAuthor?.nombre || 'Usuario'}
-            size={44}
-          />
-          {extraCount > 0 && (
-            <View style={styles.badgeContainer}>
-              <Text style={styles.badgeText}>+{extraCount}</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.contentContainer}>
-          <View style={styles.content}>
-            <Text style={[styles.message, !isUnread && styles.readMessage]} numberOfLines={2}>
-              {item.mensaje}
-            </Text>
-            <Text style={styles.time}>{formatTimeAgo(item.created_at)}</Text>
+      return (
+        <SafePressable
+          style={[styles.notificationItem, isUnread && styles.unreadItem]}
+          onPress={() =>
+            handleNotificationPress(item.id, item.feed_item_id, item.data)
+          }
+          activeOpacity={0.7}
+        >
+          <View style={styles.avatarContainer}>
+            <Avatar
+              uri={firstAuthor?.foto || undefined}
+              name={firstAuthor?.nombre || 'Usuario'}
+              size={44}
+            />
+            {extraCount > 0 && (
+              <View style={styles.badgeContainer}>
+                <Text style={styles.badgeText}>+{extraCount}</Text>
+              </View>
+            )}
           </View>
 
-          {item.contenido?.thumbnail && (
-            <Image
-              source={{ uri: item.contenido.thumbnail }}
-              style={styles.thumbnail}
-              contentFit="cover"
-            />
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-  
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyIcon}>🔔</Text>
-      <Text style={styles.emptyText}>No hay notificaciones</Text>
-    </View>
+          <View style={styles.contentContainer}>
+            <View style={styles.content}>
+              <Text
+                style={[styles.message, !isUnread && styles.readMessage]}
+                numberOfLines={2}
+              >
+                {item.mensaje}
+              </Text>
+              <Text style={styles.time}>{formatTimeAgo(item.created_at)}</Text>
+            </View>
+
+            {item.contenido?.thumbnail ? (
+              <Image
+                source={{ uri: item.contenido.thumbnail }}
+                style={styles.thumbnail}
+                contentFit="cover"
+              />
+            ) : null}
+          </View>
+        </SafePressable>
+      );
+    },
+    [handleNotificationPress],
   );
-  
-  if (isLoading && notifications.length === 0) {
+
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: NotificationSection }) => (
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionHeaderText}>{section.title}</Text>
+      </View>
+    ),
+    [],
+  );
+
+  const renderFooter = useCallback(() => {
+    if (loadingMore) {
+      return (
+        <View style={styles.footer}>
+          <ActivityIndicator size="small" color={COLORS.primary} />
+        </View>
+      );
+    }
+    if (!hasMore && notifications.length > 0) {
+      return (
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>No hay más notificaciones</Text>
+        </View>
+      );
+    }
+    return null;
+  }, [loadingMore, hasMore, notifications.length]);
+
+  const renderEmpty = useCallback(
+    () => (
+      <View style={styles.emptyContainer}>
+        <Ionicons
+          name="notifications-off-outline"
+          size={64}
+          color={COLORS.textTertiary}
+        />
+        <Text style={styles.emptyTitle}>No hay notificaciones</Text>
+        <Text style={styles.emptySubtitle}>
+          Cuando alguien comente tu publicación aparecerá aquí
+        </Text>
+      </View>
+    ),
+    [],
+  );
+
+  if (loading && notifications.length === 0) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="chevron-back" size={24} color="#111827" />
-          </TouchableOpacity>
+          <SafePressable onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color={COLORS.textPrimary} />
+          </SafePressable>
           <Text style={styles.headerTitle}>Notificaciones</Text>
           <View style={styles.placeholder} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3B82F6" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
       </SafeAreaView>
     );
   }
-  
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#111827" />
-        </TouchableOpacity>
+        <SafePressable onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color={COLORS.textPrimary} />
+        </SafePressable>
         <Text style={styles.headerTitle}>Notificaciones</Text>
         <View style={styles.placeholder} />
       </View>
-      
-      <FlatList
-        data={notifications}
-        keyExtractor={(item) => item.id}
+
+      <SectionList
+        sections={sections}
+        keyExtractor={(item, index) =>
+          `${(item as any).id ?? "item"}-${index}`
+        }
         renderItem={renderItem}
+        renderSectionHeader={renderSectionHeader}
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={notifications.length === 0 ? styles.emptyList : undefined}
+        ListFooterComponent={renderFooter}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        refreshing={refreshing}
+        onRefresh={refresh}
+        stickySectionHeadersEnabled
+        contentContainerStyle={
+          notifications.length === 0 ? styles.emptyList : undefined
+        }
       />
+
+      {error ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -162,7 +231,7 @@ export default function NotificationHistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
   },
   header: {
     flexDirection: 'row',
@@ -171,7 +240,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: COLORS.cardBorder,
   },
   backButton: {
     padding: 8,
@@ -179,80 +248,42 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.textPrimary,
   },
   placeholder: {
     width: 40,
   },
+  sectionHeader: {
+    backgroundColor: COLORS.background,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  sectionHeaderText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   notificationItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: COLORS.background,
   },
   unreadItem: {
-    backgroundColor: '#F0F9FF',
-  },
-  dotContainer: {
-    width: 20,
-    alignItems: 'center',
-    paddingTop: 6,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'transparent',
-  },
-  unreadDot: {
-    backgroundColor: '#3B82F6',
-  },
-  message: {
-    fontSize: 15,
-    color: '#111827',
-    lineHeight: 20,
-  },
-  readMessage: {
-    opacity: 0.6,
-  },
-  time: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#9CA3AF',
-  },
-  emptyList: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: COLORS.primaryTransparent,
   },
   avatarContainer: {
     position: 'relative',
-    marginLeft: 8,
   },
   badgeContainer: {
     position: 'absolute',
     bottom: -4,
     right: -4,
-    backgroundColor: '#3B82F6',
+    backgroundColor: COLORS.primary,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -268,15 +299,76 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     flexDirection: 'row',
-    marginLeft: 12,
+    marginLeft: 10,
   },
   content: {
     flex: 1,
+  },
+  message: {
+    fontSize: 15,
+    color: COLORS.textPrimary,
+    lineHeight: 20,
+  },
+  readMessage: {
+    opacity: 0.6,
+  },
+  time: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: 4,
   },
   thumbnail: {
     width: 56,
     height: 56,
     borderRadius: 8,
     marginLeft: 8,
+  },
+  footer: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: COLORS.textTertiary,
+    fontSize: 13,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 24,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginTop: 12,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: COLORS.textTertiary,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  emptyList: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorBanner: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
+    padding: 12,
+    backgroundColor: COLORS.error || '#EF4444',
+    borderRadius: 8,
+  },
+  errorText: {
+    color: COLORS.white,
+    fontSize: 13,
   },
 });

@@ -1,17 +1,25 @@
 import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useModal } from '@/context/ModalContext';
 import { useTokkoBroker } from '@/hooks/useTokkoBroker';
 import { COLORS } from '@/constants/colors';
 import { AppHeader } from '@/components/AppHeader';
-import { ScreenWrapper } from '@/screens/ScreenWrapper';
 import TkOnboarding from '@/components/tokko-broker/TkOnboarding';
 import TkDashboard from '@/components/tokko-broker/TkDashboard';
 
 export default function TokkoBrokerScreen() {
   const router = useRouter();
   const { showModal } = useModal();
+  const insets = useSafeAreaInsets();
+  const safeStyle = {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    paddingBottom: Math.max(insets.bottom, 10),
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
   const {
     apiKey,
     setApiKey,
@@ -59,17 +67,17 @@ export default function TokkoBrokerScreen() {
 
   if (loading) {
     return (
-      <ScreenWrapper withHeader={false} style={styles.container}>
+      <View style={safeStyle}>
         <AppHeader title="Toko Broker" showBackButton onBack={handleBack} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
-      </ScreenWrapper>
+      </View>
     );
   }
 
   return (
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View style={safeStyle}>
       <AppHeader title="Toko Broker" showBackButton onBack={handleBack} />
       {!hasApiKey ? (
         <TkOnboarding
@@ -88,7 +96,7 @@ export default function TokkoBrokerScreen() {
           onChangeApiKey={changeApiKey}
         />
       )}
-    </ScreenWrapper>
+    </View>
   );
 }
 

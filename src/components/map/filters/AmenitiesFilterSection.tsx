@@ -3,14 +3,15 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { COLORS } from "@/constants/colors";
 import { AMENIDADES } from "@/constants/propertyData";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
+import { useShallow } from "zustand/react/shallow";
 
 /**
  * Filtro de amenidades para el buscador. Selección múltiple: la propiedad debe
  * tener TODAS las amenidades seleccionadas (ver usePropertyFilters).
  */
 export const AmenitiesFilterSection: React.FC = () => {
-  const { filters, updateFilter } = usePropertyFiltersStore();
-  const selected = filters.amenidades;
+  const selected = usePropertyFiltersStore(useShallow((s) => s.filters.amenidades));
+  const updateFilter = usePropertyFiltersStore((s) => s.updateFilter);
 
   const toggle = (amenidad: string) => {
     updateFilter(
@@ -54,7 +55,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 16,
     fontWeight: "700",
-    color: COLORS.textPrimary,
+    color: COLORS.primaryDark,
     marginBottom: 16,
   },
   chipsWrap: {
@@ -71,8 +72,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   chipSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryDark,
+    borderColor: COLORS.primaryDark,
   },
   chipText: {
     fontSize: 13,

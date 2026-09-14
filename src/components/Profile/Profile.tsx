@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -14,7 +14,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { COLORS } from "../../constants/colors";
-import { ScreenWrapper } from "../../screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   FeedItem,
@@ -54,6 +54,7 @@ const log = logger.scoped("Profile");
 
 interface ProfileProps {
   userId?: string | null;
+  initialProfileData?: Record<string, any> | null;
   onBack?: () => void;
 }
 
@@ -66,7 +67,8 @@ const FILTER_OPTIONS = [
   "Vendida",
 ];
 
-const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
+const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack }) => {
+  const insets = useSafeAreaInsets();
   const { user: authUser } = useAuth();
   const { showToast } = useToast();
   const {
@@ -84,7 +86,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     userRecommendation,
     submittingRecommendation,
     isMe,
-  } = useProfile(userId);
+  } = useProfile(userId, initialProfileData);
 
   const { deletePost, deleteReel } = useGridProfile();
   const { handleContact } = useChatInitiator();
@@ -259,11 +261,14 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     }
   }, [activeTab, filteredProperties, posts, reels, isMe, isBlocked]);
 
-  const contentCounts = {
-    properties: !isMe && isBlocked ? 0 : properties.length,
-    posts: !isMe && isBlocked ? 0 : posts.length,
-    reels: !isMe && isBlocked ? 0 : reels.length,
-  };
+  const contentCounts = useMemo(
+    () => ({
+      properties: !isMe && isBlocked ? 0 : properties.length,
+      posts: !isMe && isBlocked ? 0 : posts.length,
+      reels: !isMe && isBlocked ? 0 : reels.length,
+    }),
+    [properties.length, posts.length, reels.length, isMe, isBlocked],
+  );
 
   const userProfileMapped = useMemo(
     () => (profile ? mapProfileToUser(profile) : undefined),
@@ -440,64 +445,100 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
     [handleRecommendation],
   );
 
+  const handleToggleRatingDetails = useCallback(
+    () => setShowRatingDetails((v) => !v),
+    [],
+  );
+
+  const handleOpenFilter = useCallback(
+    () => setShowFilterModal(true),
+    [],
+  );
+
+  const handleSupport = useCallback(() => router.push("/support"), []);
+  const handleSettings = useCallback(() => router.push("/settings"), []);
+
+  const headerStateRef = useRef<{
+    showRatingDetails: boolean;
+    showRecommendedByModal: boolean;
+    showNotRecommendedByModal: boolean;
+    activeTab: ProfileContentType;
+    activeFilter: string;
+    filteredPropertiesCount: number;
+    contentCounts: { properties: number; posts: number; reels: number };
+  }>(null!);
+  headerStateRef.current = {
+    showRatingDetails,
+    showRecommendedByModal,
+    showNotRecommendedByModal,
+    activeTab,
+    activeFilter,
+    filteredPropertiesCount: filteredProperties.length,
+    contentCounts,
+  };
+
   const renderHeader = useCallback(
-    () => (
-      <ProfileInfoHeader
-        profile={profile}
-        profileData={profileData}
-        targetUserId={targetUserId!}
-        isMe={isMe}
-        onBack={onBack}
-        onSupport={() => router.push("/support")}
-        onSettings={() => router.push("/settings")}
-        onUpdatePhoto={updateProfilePhoto}
-        onMessage={handleMessage}
-        onToggleBlock={handleToggleBlock}
-        isBlocked={isBlocked}
-        blockingUser={blockingUser}
-        onRecommend={handleRecommendWithThanks}
-        isRecommended={userRecommendation}
-        submittingRecommendation={submittingRecommendation}
-        showRatingDetails={showRatingDetails}
-        onToggleRatingDetails={() => setShowRatingDetails((v) => !v)}
-        showRecommendedByModal={showRecommendedByModal}
-        setShowRecommendedByModal={setShowRecommendedByModal}
-        showNotRecommendedByModal={showNotRecommendedByModal}
-        setShowNotRecommendedByModal={setShowNotRecommendedByModal}
-        formatRole={formatRole}
-        loadRecommendedByUsers={loadRecommendedByUsers}
-        loadNotRecommendedByUsers={loadNotRecommendedByUsers}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        contentCounts={contentCounts}
-        activeFilter={activeFilter}
-        onOpenFilter={() => setShowFilterModal(true)}
-        filteredPropertiesCount={filteredProperties.length}
-      />
-    ),
+    () => {
+      const s = headerStateRef.current;
+      return (
+        <ProfileInfoHeader
+          profile={profile}
+          profileData={profileData}
+          targetUserId={targetUserId!}
+          isMe={isMe}
+          onBack={onBack}
+          onSupport={handleSupport}
+          onSettings={handleSettings}
+          onUpdatePhoto={updateProfilePhoto}
+          onMessage={handleMessage}
+          onToggleBlock={handleToggleBlock}
+          isBlocked={isBlocked}
+          blockingUser={blockingUser}
+          onRecommend={handleRecommendWithThanks}
+          isRecommended={userRecommendation}
+          submittingRecommendation={submittingRecommendation}
+          showRatingDetails={s.showRatingDetails}
+          onToggleRatingDetails={handleToggleRatingDetails}
+          showRecommendedByModal={s.showRecommendedByModal}
+          setShowRecommendedByModal={setShowRecommendedByModal}
+          showNotRecommendedByModal={s.showNotRecommendedByModal}
+          setShowNotRecommendedByModal={setShowNotRecommendedByModal}
+          formatRole={formatRole}
+          loadRecommendedByUsers={loadRecommendedByUsers}
+          loadNotRecommendedByUsers={loadNotRecommendedByUsers}
+          activeTab={s.activeTab}
+          onTabChange={setActiveTab}
+          contentCounts={s.contentCounts}
+          activeFilter={s.activeFilter}
+          onOpenFilter={handleOpenFilter}
+          filteredPropertiesCount={s.filteredPropertiesCount}
+        />
+      );
+    },
     [
       profile,
       profileData,
       targetUserId,
       isMe,
       onBack,
+      handleSupport,
+      handleSettings,
       updateProfilePhoto,
       handleMessage,
       handleToggleBlock,
       isBlocked,
       blockingUser,
-      showRatingDetails,
-      showRecommendedByModal,
-      showNotRecommendedByModal,
-      loadRecommendedByUsers,
-      loadNotRecommendedByUsers,
-      activeTab,
-      contentCounts,
-      activeFilter,
-      filteredProperties.length,
+      handleRecommendWithThanks,
       userRecommendation,
       submittingRecommendation,
-      handleRecommendWithThanks,
+      handleToggleRatingDetails,
+      loadRecommendedByUsers,
+      loadNotRecommendedByUsers,
+      handleOpenFilter,
+      formatRole,
+      setShowRecommendedByModal,
+      setShowNotRecommendedByModal,
+      setActiveTab,
     ],
   );
 
@@ -604,13 +645,22 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
   }
 
   return (
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingBottom: Math.max(insets.bottom, 10),
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+      ]}
+    >
       <FlatList
         data={listData}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         numColumns={3}
-        key={activeTab}
+        extraData={activeTab}
         ListHeaderComponent={renderHeader}
         columnWrapperStyle={
           activeTab === "properties" ? styles.columnWrapper : undefined
@@ -728,7 +778,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, onBack }) => {
         confirmVariant="primary"
         onConfirm={() => setShowThanksModal(false)}
       />
-    </ScreenWrapper>
+    </View>
   );
 };
 

@@ -60,7 +60,7 @@ export interface ProfileInfoHeaderProps {
   filteredPropertiesCount: number;
 }
 
-export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = ({
+export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
   profileData,
   targetUserId,
   isMe,
@@ -357,7 +357,7 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = ({
       )}
     </>
   );
-};
+});
 
 const styles = StyleSheet.create({
   infoContainer: {
@@ -522,7 +522,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.cardBorder,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    marginHorizontal: 32,
+    marginHorizontal: 20,
     justifyContent: "space-between",
   },
   ratingInfoGroup: {

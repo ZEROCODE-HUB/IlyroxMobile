@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/utils/logger";
+import { getDeviceTimeZone } from "@/utils/timeZone";
 
 const log = logger.scoped("appointmentService");
 
@@ -19,6 +20,7 @@ export interface CreateAppointmentInput {
   hora: string;
   tipo: AppointmentType;
   descripcion?: string | null;
+  creatorTimeZone?: string | null;
 }
 
 export interface UpdateAppointmentInput {
@@ -70,21 +72,36 @@ export const appointmentService = {
   },
 
   async createAppointment(input: CreateAppointmentInput) {
-    const { data, error } = await supabase
-      .from("citas")
-      .insert({
-        propiedad_id: input.propertyId,
-        agente_id: input.agenteId,
-        cliente_id: input.clienteId,
-        created_by: input.createdBy,
-        fecha: input.fecha,
-        hora: input.hora,
-        tipo: input.tipo,
-        descripcion: input.descripcion ?? null,
-        estado: "pendiente" as AppointmentStatus,
-      })
-      .select()
-      .single();
+    const payload = {
+      propiedad_id: input.propertyId,
+      agente_id: input.agenteId,
+      cliente_id: input.clienteId,
+      created_by: input.createdBy,
+      fecha: input.fecha,
+      hora: input.hora,
+      tipo: input.tipo,
+      descripcion: input.descripcion ?? null,
+      estado: "pendiente" as AppointmentStatus,
+      creator_timezone: input.creatorTimeZone ?? getDeviceTimeZone(),
+    };
+
+    const create = (insertPayload: Record<string, unknown>) =>
+      supabase
+        .from("citas")
+        .insert(insertPayload)
+        .select()
+        .single();
+
+    let { data, error } = await create(payload);
+
+    if (
+      error &&
+      typeof error.message === "string" &&
+      error.message.includes("creator_timezone")
+    ) {
+      const { creator_timezone: _ignored, ...withoutTimeZone } = payload;
+      ({ data, error } = await create(withoutTimeZone));
+    }
 
     if (error) {
       log.error("createAppointment failed", error);

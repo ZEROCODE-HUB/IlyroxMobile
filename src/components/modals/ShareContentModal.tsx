@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   tabBtnActive: {
-    borderColor: COLORS.primary,
+    borderColor: COLORS.primaryDark,
     backgroundColor: COLORS.primaryTransparent,
   },
   tabText: {
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   tabTextActive: {
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
   },
   tabDescription: {
     fontSize: 12,

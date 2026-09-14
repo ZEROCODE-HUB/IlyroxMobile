@@ -83,15 +83,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
     setIsLoading(true);
     try {
-      console.log('🔔 [Notifications] RPC call starting with userId:', userId);
       const { data, error } = await supabase.rpc('get_enriched_notifications', {
         p_user_id: userId,
-      });
-
-      console.log('🔔 [Notifications] RPC result:', { 
-        dataLength: data?.length, 
-        error,
-        firstRow: data?.[0]
       });
 
       if (error) {
@@ -99,46 +92,29 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       }
 
       if (!error && data && data.length > 0) {
-        console.log('🔔 [Notifications] Processing', data.length, 'notifications');
-        
-        const enrichedNotifications: NotificacionExtendida[] = data.map((row: any) => {
-          console.log('🔔 [Notifications] Row:', {
-            id: row.id,
-            tipo: row.tipo,
-            mensaje: row.mensaje?.substring(0, 50),
-            autores: row.autores,
+        const enrichedNotifications: NotificacionExtendida[] = data.map((row: any) => ({
+          id: row.id,
+          tipo: row.tipo,
+          titulo: row.titulo || '',
+          mensaje: row.mensaje,
+          feed_item_id: row.feed_item_id,
+          data: row.data || {},
+          estado: row.estado as "pendiente" | "leida",
+          leida_en: row.leida_en,
+          created_at: row.created_at,
+          autores: row.autores || [],
+          total_autores: row.total_autores || 0,
+          contenido: row.thumbnail ? {
+            id: row.contenido_id,
             thumbnail: row.thumbnail,
-            tipo_contenido: row.tipo_contenido
-          });
-          
-          return {
-            id: row.id,
-            tipo: row.tipo,
-            titulo: row.titulo || '',
-            mensaje: row.mensaje,
-            feed_item_id: row.feed_item_id,
-            data: row.data || {},
-            estado: row.estado as "pendiente" | "leida",
-            leida_en: row.leida_en,
-            created_at: row.created_at,
-            autores: row.autores || [],
-            total_autores: row.total_autores || 0,
-            contenido: row.thumbnail ? {
-              id: row.contenido_id,
-              thumbnail: row.thumbnail,
-              tipo: row.tipo_contenido,
-            } : null,
-          };
-        });
+            tipo: row.tipo_contenido,
+          } : null,
+        }));
 
-        console.log('🔔 [Notifications] Enriched notifications:', enrichedNotifications.length);
         const unread = enrichedNotifications.filter(n => n.estado === "pendiente").length;
-        console.log('🔔 [Notifications] Unread count:', unread);
-        
+
         setNotifications(enrichedNotifications);
         setUnreadCount(unread);
-      } else {
-        console.log('🔔 [Notifications] No data or error - notifications list stays empty');
       }
     } catch (err) {
       console.error("🔔 [Notifications] Exception:", err);
@@ -175,14 +151,19 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       });
 
       if (!error) {
-        setNotifications((prev) =>
-          prev.map((n) =>
+        setNotifications((prev) => {
+          // Las notificaciones agrupadas representan N autores en un único
+          // row. Decrementar por 1 subestima el contador. Tomamos el
+          // `total_autores` real del state ANTES de mutar.
+          const target = prev.find((n) => n.id === notificationId);
+          const dec = Math.max(1, target?.total_autores ?? 1);
+          setUnreadCount((c) => Math.max(0, c - dec));
+          return prev.map((n) =>
             n.id === notificationId
               ? { ...n, estado: "leida" as const, leida_en: new Date().toISOString() }
               : n
-          )
-        );
-        setUnreadCount((prev) => Math.max(0, prev - 1));
+          );
+        });
       }
     } catch (err) {
       console.error("Error marking as read:", err);
@@ -222,11 +203,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   // Realtime subscription
   useEffect(() => {
     if (!userId) {
-      console.log('🔔 [Notifications] No userId, skipping fetch');
       return;
     }
-
-    console.log('🔔 [Notifications] Mounting with userId:', userId);
 
     // Fetch initial data
     fetchNotifications();
@@ -244,39 +222,42 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          console.log('🔔 [Notifications] Realtime payload:', payload.eventType, payload.new || payload.old);
-
           if (payload.eventType === "INSERT") {
-            const newNotification = payload.new as Notificacion;
-            console.log('🔔 [Notifications] INSERT event:', newNotification);
-            const extendedNotification: NotificacionExtendida = {
-              ...newNotification,
-              autores: [],
-              total_autores: ((newNotification.data?.author_ids as string[]) || []).length,
-              contenido: null,
-            };
-            setNotifications((prev) => {
-              const updated = [extendedNotification, ...prev].slice(0, 50);
-              console.log('🔔 [Notifications] After INSERT, total notifications:', updated.length);
-              return updated;
-            });
+            // En lugar de insertar la fila cruda (sin autores ni thumbnail),
+            // reusamos el RPC enrichment para tener la misma forma que la
+            // carga inicial. Esto garantiza que la notificación aparece con
+            // avatar, nombre, thumbnail y total_autores correctos desde el
+            // primer render. El coste es 1 roundtrip por INSERT nuevo.
+            fetchNotifications();
             setUnreadCount((prev) => prev + 1);
           } else if (payload.eventType === "UPDATE") {
             const updatedNotification = payload.new as Notificacion;
-            console.log('🔔 [Notifications] UPDATE event:', updatedNotification);
+            const newData = (updatedNotification.data as Record<string, unknown>) || null;
+            const newTotalAutor =
+              ((newData?.author_ids as string[] | undefined) || []).length;
             setNotifications((prev) =>
-              prev.map((n) =>
-                n.id === updatedNotification.id
-                  ? { ...n, estado: updatedNotification.estado as "pendiente" | "leida", leida_en: updatedNotification.leida_en as string | null }
-                  : n
-              )
+              prev.map((n) => {
+                if (n.id !== updatedNotification.id) return n;
+                // Si el server acumuló más autores en `data.author_ids`,
+                // sincronizamos el `data` y recalculamos `total_autores`.
+                const total = newTotalAutor || n.total_autores;
+                return {
+                  ...n,
+                  estado: updatedNotification.estado as "pendiente" | "leida",
+                  leida_en: updatedNotification.leida_en as string | null,
+                  data: newData || n.data,
+                  total_autores: total,
+                };
+              })
             );
             if (updatedNotification.estado === "leida") {
-              setUnreadCount((prev) => Math.max(0, prev - 1));
+              // El decremento agrupado se hace en `markAsRead` (vía state).
+              // Aquí, el cambio viene del server (otra pestaña / trigger
+              // externo), así que usamos el `total_autores` recalculado.
+              setUnreadCount((prev) => Math.max(0, prev - Math.max(1, newTotalAutor || 1)));
             }
           } else if (payload.eventType === "DELETE") {
             const deletedId = payload.old.id;
-            console.log('🔔 [Notifications] DELETE event:', deletedId);
             setNotifications((prev) => prev.filter((n) => n.id !== deletedId));
           }
         }

@@ -19,7 +19,7 @@ import { FeedItem, User } from "../types";
 import { LeadPropertiesModal } from "./LeadPropertiesModal";
 import { AppHeader } from "./AppHeader";
 import { COLORS, FALLBACKS } from "../constants";
-import { ScreenWrapper } from "../screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export type MatchType = "coincidencia" | "similar";
 
@@ -84,9 +84,17 @@ import { profileService } from "@/services/profileService";
 const log = logger.scoped("Matches");
 
 const Matches: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const safeStyle = {
+    paddingBottom: Math.max(insets.bottom, 10),
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
   const { user } = useAuth();
   const { showToast } = useToast();
-  const { setFiltersFromSearch } = usePropertyFiltersStore();
+  const setFiltersFromSearch = usePropertyFiltersStore(
+    (s) => s.setFiltersFromSearch,
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [matches, setMatches] = useState<MatchData[]>([]);
@@ -542,6 +550,23 @@ const Matches: React.FC = () => {
   const selectedLead =
     leadGroups.find((l) => l.leadId === selectedLeadId) || null;
 
+  const renderItem = useCallback(
+    ({ item }: { item: LeadGroup }) => (
+      <LeadMatchCard
+        leadName={item.leadName}
+        leadPhone={item.leadPhone}
+        minPrice={item.minPrice}
+        maxPrice={item.maxPrice}
+        currency={item.currency}
+        matchCount={item.matchCount}
+        similarCount={item.similarCount}
+        latestMatchDate={item.latestMatchDate}
+        onPress={() => setSelectedLeadId(item.leadId)}
+      />
+    ),
+    [setSelectedLeadId],
+  );
+
   if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
@@ -550,22 +575,8 @@ const Matches: React.FC = () => {
     );
   }
 
-  const renderItem = ({ item }: { item: LeadGroup }) => (
-    <LeadMatchCard
-      leadName={item.leadName}
-      leadPhone={item.leadPhone}
-      minPrice={item.minPrice}
-      maxPrice={item.maxPrice}
-      currency={item.currency}
-      matchCount={item.matchCount}
-      similarCount={item.similarCount}
-      latestMatchDate={item.latestMatchDate}
-      onPress={() => setSelectedLeadId(item.leadId)}
-    />
-  );
-
   return (
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View style={[styles.container, safeStyle]}>
       {/* Header */}
       <AppHeader
         title="Matches"
@@ -726,7 +737,7 @@ const Matches: React.FC = () => {
         userId={user?.id}
       />
 
-    </ScreenWrapper>
+    </View>
   );
 };
 
@@ -756,7 +767,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBorder,
   },
   activeTab: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.primaryDark,
   },
   tabText: {
     fontSize: 14,

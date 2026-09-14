@@ -5,13 +5,20 @@ import {
   TouchableOpacity,
   StyleSheet,
   Pressable,
+  Linking,
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { GoogleCalendarIcon } from "./shared/GoogleCalendarIcon";
 import { COLORS } from "../constants/colors";
 
-type AppointmentStatus = "pending" | "completed" | "cancelled" | "rated";
+type AppointmentStatus =
+  | "pendiente"
+  | "confirmada"
+  | "cancelada"
+  | "pending"
+  | "cancelled"
+  | "rated";
 
 interface AppointmentCardProps {
   appointment: {
@@ -37,10 +44,11 @@ interface AppointmentCardProps {
     rating?: number;
     hasUserRated?: boolean;
     google_event_id?: string | null;
+    google_meet_url?: string | null;
     created_by?: string | null;
   };
-  onMarkComplete: (id: string) => void;
   onMarkCancel: (id: string) => void;
+  onAcceptAppointment: (id: string) => void;
   onOpenRating: (id: string) => void;
   onSyncCalendar: (id: string) => void;
   onContact?: (id: string) => void;
@@ -54,8 +62,8 @@ interface AppointmentCardProps {
 export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
   ({
     appointment,
-    onMarkComplete,
     onMarkCancel,
+    onAcceptAppointment,
     onOpenRating,
     onSyncCalendar,
     onContact,
@@ -65,24 +73,30 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
     onPropertyPress,
     onUserPress,
   }) => {
-    // Verificar si la fecha y hora de la cita ya pasaron
-    const canMarkAsCompleted = () => {
-      if (appointment.estado !== "pendiente") return false;
-
-      // Combinar fecha y hora para comparar con el momento actual
-      const appointmentDateTime = new Date(
-        `${appointment.fecha}T${appointment.hora}`,
-      );
-      const now = new Date();
-
-      return appointmentDateTime <= now;
-    };
-
     const canEdit =
       activeTab === "upcoming" &&
       appointment.estado !== "cancelada" &&
       !!currentUserId &&
       appointment.created_by === currentUserId;
+    const canAccept =
+      activeTab === "upcoming" &&
+      appointment.estado === "pendiente" &&
+      !!currentUserId &&
+      appointment.created_by !== currentUserId;
+    const statusLabel =
+      appointment.estado === "pendiente"
+        ? "Pendiente"
+        : appointment.estado === "confirmada"
+          ? "Aceptada"
+          : appointment.estado === "cancelada"
+              ? "Cancelada"
+              : appointment.estado;
+    const isPending = appointment.estado === "pendiente";
+    const isCancelled = appointment.estado === "cancelada";
+    const canJoinMeet =
+      activeTab === "upcoming" &&
+      appointment.estado === "confirmada" &&
+      !!appointment.google_meet_url;
 
     return (
       <View style={styles.card}>
@@ -172,6 +186,29 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
                     appointment.propertyTitle.slice(1)}
                 </Text>
                 <View style={styles.appointmentActionsCol}>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      isCancelled
+                        ? styles.statusCancelled
+                        : isPending
+                          ? styles.statusPending
+                          : styles.statusConfirmed,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        isCancelled
+                          ? styles.statusCancelledText
+                          : isPending
+                          ? styles.statusPendingText
+                          : styles.statusConfirmedText,
+                      ]}
+                    >
+                      {statusLabel}
+                    </Text>
+                  </View>
                   {appointment.estado === "cancelada" ? (
                     <View style={styles.cancelBtn}>
                       <Text style={styles.completeBtnText}>Cita Cancelada</Text>
@@ -186,11 +223,26 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
                         size={16}
                         color={COLORS.white}
                       />
-                      <Text style={styles.completeBtnText}>Cancelar Cita</Text>
+                      <Text style={styles.completeBtnText}>
+                        {canAccept ? "Rechazar" : "Cancelar Cita"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {canAccept && (
+                    <TouchableOpacity
+                      onPress={() => onAcceptAppointment(appointment.id)}
+                      style={styles.acceptBtn}
+                    >
+                      <Ionicons
+                        name="checkmark-circle-outline"
+                        size={16}
+                        color={COLORS.white}
+                      />
+                      <Text style={styles.completeBtnText}>Aceptar Cita</Text>
                     </TouchableOpacity>
                   )}
                   {activeTab === "upcoming" &&
-                    appointment.estado !== "cancelada" && (
+                    appointment.estado === "confirmada" && (
                       <TouchableOpacity
                         style={styles.calendarBtn}
                         onPress={() => onSyncCalendar(appointment.id)}
@@ -211,31 +263,28 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = React.memo(
                         </Text>
                       </TouchableOpacity>
                     )}
+                  {canJoinMeet && (
+                    <TouchableOpacity
+                      style={styles.meetBtn}
+                      onPress={() => Linking.openURL(appointment.google_meet_url!)}
+                    >
+                      <Ionicons
+                        name="videocam-outline"
+                        size={16}
+                        color={COLORS.white}
+                      />
+                      <Text style={styles.completeBtnText}>Unirse</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             )}
           </View>
 
           <View style={styles.actions}>
-            {/* Mostrar botón "Marcar como completada" solo si está pendiente y fecha+hora ya pasaron */}
-            {canMarkAsCompleted() && (
-              <TouchableOpacity
-                onPress={() => onMarkComplete(appointment.id)}
-                style={styles.completeBtn}
-              >
-                <Ionicons
-                  name="checkmark-circle"
-                  size={16}
-                  color={COLORS.white}
-                />
-                <Text style={styles.completeBtnText}>
-                  Marcar como completada
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Mostrar botón "Calificar" si está completada y el usuario NO ha calificado */}
-            {appointment.estado === "completada" &&
+            {/* Mostrar botón "Calificar" si la cita ya fue aceptada y el usuario NO ha calificado */}
+            {appointment.estado === "confirmada" &&
+              activeTab === "past" &&
               !appointment.hasUserRated && (
                 <View style={styles.rateContainer}>
                   <Text style={styles.rateLabel}>Calificar:</Text>
@@ -299,6 +348,33 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 6,
     flexShrink: 0,
+  },
+  statusBadge: {
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  statusPending: {
+    backgroundColor: COLORS.warningLight,
+  },
+  statusConfirmed: {
+    backgroundColor: COLORS.successLight,
+  },
+  statusCancelled: {
+    backgroundColor: COLORS.errorLight,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  statusPendingText: {
+    color: COLORS.warningDark,
+  },
+  statusConfirmedText: {
+    color: COLORS.successDark,
+  },
+  statusCancelledText: {
+    color: COLORS.errorDark,
   },
   dateColumn: {
     backgroundColor: COLORS.primaryTransparent,
@@ -419,6 +495,17 @@ const styles = StyleSheet.create({
     gap: 6,
     flexShrink: 0,
   },
+  acceptBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primary,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    gap: 6,
+    flexShrink: 0,
+  },
   calendarBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -436,6 +523,17 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: 12,
     fontWeight: "600",
+  },
+  meetBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primaryDark,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    gap: 6,
+    flexShrink: 0,
   },
   completeBtnText: {
     color: COLORS.white,

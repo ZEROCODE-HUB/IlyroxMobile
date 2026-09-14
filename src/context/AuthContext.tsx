@@ -17,6 +17,8 @@ import { useAuthListener } from "./auth/useAuthListener";
 import { OneSignal } from "react-native-onesignal";
 import { Platform } from "react-native";
 import { router } from "expo-router";
+import { queryClient } from "@/lib/queryClient";
+import { useAuthProfileStore, useProfileStore } from "@/store/profileStore";
 import { logger } from "../utils/logger";
 
 const log = logger.scoped("AuthContext");
@@ -118,6 +120,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       setProfile(null);
       clearCache();
+      // Limpiar los stores de Zustand para evitar que datos de la cuenta
+      // anterior (perfil, propiedades, posts, reels, stats) persistan en
+      // memoria y aparezcan brevemente al iniciar sesión con otra cuenta.
+      useAuthProfileStore.getState().resetProfileState();
+      useProfileStore.getState().resetProfileState();
+      // Limpiar cache de TanStack Query para evitar que datos del usuario
+      // anterior persistan en memoria (privacy leak entre sesiones).
+      queryClient.clear();
 
       // Forzar navegación al login como medida extra
       router.replace("/login");

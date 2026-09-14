@@ -24,7 +24,41 @@ import { Image } from "react-native";
 export const MIN_ASPECT_RATIO = 2 / 3; // vertical
 export const MAX_ASPECT_RATIO = 1.91; // horizontal
 
-const ratioCache = new Map<string, number>();
+/**
+ * LRU cache con eviction por tamaño máximo. Implementado sin librerías
+ * externas para no añadir dependencias. Mantiene el orden de inserción y
+ * descarta la entrada más antigua cuando se supera el límite.
+ */
+const MAX_CACHE_ENTRIES = 500;
+
+class LruMap<K, V> {
+  private map = new Map<K, V>();
+
+  get(key: K): V | undefined {
+    return this.map.get(key);
+  }
+
+  has(key: K): boolean {
+    return this.map.has(key);
+  }
+
+  set(key: K, value: V): void {
+    // Si ya existe, refrescar posición eliminándolo primero.
+    if (this.map.has(key)) {
+      this.map.delete(key);
+    }
+    this.map.set(key, value);
+    // Evict la entrada más antigua si se supera el límite.
+    if (this.map.size > MAX_CACHE_ENTRIES) {
+      const oldestKey = this.map.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.map.delete(oldestKey);
+      }
+    }
+  }
+}
+
+const ratioCache = new LruMap<string, number>();
 
 function clampRatio(ratio: number): number {
   return Math.min(MAX_ASPECT_RATIO, Math.max(MIN_ASPECT_RATIO, ratio));
@@ -61,3 +95,4 @@ export function useImageAspectRatio(
   if (!uri) return fallback;
   return ratioCache.get(uri) ?? fallback;
 }
+

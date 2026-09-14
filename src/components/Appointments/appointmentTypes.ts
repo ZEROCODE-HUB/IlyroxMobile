@@ -1,4 +1,10 @@
-export type AppointmentStatus = "pending" | "completed" | "cancelled" | "rated";
+export type AppointmentStatus =
+    | "pendiente"
+    | "confirmada"
+    | "cancelada"
+    | "pending"
+    | "cancelled"
+    | "rated";
 
 export interface FeatureRatings {
     profesionalismo: number;
@@ -45,7 +51,9 @@ export interface AppointmentItem {
     featureRatings?: FeatureRatings;
     google_event_id?: string | null;
     google_calendar_id?: string | null;
+    google_meet_url?: string | null;
     google_last_synced_at?: string | null;
+    creator_timezone?: string | null;
     agente?: {
         id: string;
         nombre: string;

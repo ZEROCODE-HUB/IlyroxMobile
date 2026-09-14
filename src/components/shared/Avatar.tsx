@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { COLORS } from "../../constants/colors";
@@ -22,21 +22,29 @@ const getInitials = (fullName: string) => {
 
 export const Avatar: React.FC<AvatarProps> = React.memo(
   ({ uri, name = "U", size = 40, style }) => {
+    const hasImage =
+      uri && uri.trim() !== "" && !uri.includes("placehold.co");
+
+    const imageSource = useMemo(
+      () => (hasImage ? { uri } : null),
+      [hasImage, uri],
+    );
+
     const containerStyle = {
       width: size,
       height: size,
       borderRadius: size / 2,
-      backgroundColor: COLORS.primary, // Verde principal ilyrox
+      backgroundColor: COLORS.primary,
       justifyContent: "center" as const,
       alignItems: "center" as const,
       overflow: "hidden" as const,
     };
 
-    if (uri && uri.trim() !== "" && !uri.includes("placehold.co")) {
+    if (imageSource) {
       return (
         <View style={[containerStyle, style]}>
           <Image
-            source={{ uri }}
+            source={imageSource}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
             cachePolicy="memory-disk"
