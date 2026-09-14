@@ -11,6 +11,7 @@ import {
   usePropertyFiltersStore,
   type IndustrialFilters,
 } from "@/store/propertyFiltersStore";
+import { useShallow } from "zustand/react/shallow";
 
 interface IndustrialFiltersSectionProps {
   /** Si se pasan, el componente opera sobre este valor en lugar del store global. */
@@ -25,9 +26,13 @@ export const IndustrialFiltersSection: React.FC<IndustrialFiltersSectionProps> =
   value,
   onUpdate,
 }) => {
-  const store = usePropertyFiltersStore();
-  const inf = value ?? store.filters.industrialFilters;
-  const updateIndustrialFilter = onUpdate ?? store.updateIndustrialFilter;
+  const industrialFilters = usePropertyFiltersStore(
+    useShallow((s) => s.filters.industrialFilters),
+  );
+  const updateIndustrialFilter = usePropertyFiltersStore(
+    (s) => s.updateIndustrialFilter,
+  );
+  const inf = value ?? industrialFilters;
 
   const toggleEnergiaKva = (tipo: string) => {
     const current = inf.energiaKva ?? [];
@@ -132,7 +137,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 16,
     fontWeight: "700",
-    color: COLORS.textPrimary,
+    color: COLORS.primaryDark,
     marginBottom: 16,
   },
   label: {
@@ -162,8 +167,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   chipSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryDark,
+    borderColor: COLORS.primaryDark,
   },
   chipText: {
     fontSize: 13,

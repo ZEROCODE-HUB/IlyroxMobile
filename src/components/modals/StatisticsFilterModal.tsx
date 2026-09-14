@@ -338,8 +338,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.cardBorder,
   },
   chipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryDark,
+    borderColor: COLORS.primaryDark,
   },
   chipText: {
     color: COLORS.textSecondary,

@@ -1,6 +1,7 @@
 import React from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { View, ActivityIndicator, Text, TouchableOpacity } from "react-native";
+import { View, ActivityIndicator, Text } from "react-native";
+import SafePressable from "@/design-system/components/SafePressable";
 import ReelFeedList from "@/components/Reel/ReelFeedList";
 import { useAuth } from "@/context/AuthContext";
 import { useFeedItem } from "@/hooks";
@@ -13,13 +14,6 @@ export default function ReelDetailScreen() {
   const router = useRouter();
   const { user } = useAuth();
 
-  console.log("[RDBG] ReelDetailScreen render", {
-    id: params.id,
-    hasItem: !!params.item,
-    itemType: typeof params.item,
-    itemLen: typeof params.item === "string" ? params.item.length : undefined,
-  });
-
   // Handle 'item' parameter which might be a JSON string
   let reelItem: any = null;
   if (params.item) {
@@ -28,7 +22,6 @@ export default function ReelDetailScreen() {
         typeof params.item === "string" ? JSON.parse(params.item) : params.item;
     } catch (e) {
       log.error("Error parsing reel item:", e);
-      console.log("[RDBG] ReelDetailScreen parse ERROR", String(e));
     }
   }
 
@@ -41,14 +34,6 @@ export default function ReelDetailScreen() {
 
   // Priority to fetched item if it was requested, or the passed item
   const finalItem = reelItem || fetchedItem;
-
-  console.log("[RDBG] ReelDetailScreen state", {
-    hasReelItem: !!reelItem,
-    hasFetched: !!fetchedItem,
-    hasFinal: !!finalItem,
-    loading,
-    error,
-  });
 
   if (loading && !reelItem) {
     return (
@@ -78,14 +63,14 @@ export default function ReelDetailScreen() {
         <Text style={{ color: "#fff" }}>
           {error ? "Error al cargar" : "Reel no encontrado"}
         </Text>
-        <TouchableOpacity
+        <SafePressable
           onPress={() => router.back()}
           style={{ marginTop: 20 }}
         >
           <Text style={{ color: "#fff", textDecorationLine: "underline" }}>
             Volver
           </Text>
-        </TouchableOpacity>
+        </SafePressable>
       </View>
     );
   }

@@ -305,6 +305,7 @@ export default function ConversationsList({
         extraData={conversations} // Force update when conversations change
         keyExtractor={(item) => item.id}
         renderItem={renderConversation}
+        style={styles.list}
         contentContainerStyle={styles.listContent}
         onRefresh={refresh}
         refreshing={loading}
@@ -431,6 +432,9 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 20,
+  },
+  list: {
+    flex: 1,
   },
   conversationItem: {
     flexDirection: "row",

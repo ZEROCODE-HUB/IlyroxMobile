@@ -41,15 +41,29 @@ interface UseProfileReturn {
   updateProfilePhoto: (newUrl: string) => void;
 }
 
-export const useProfile = (userId?: string | null): UseProfileReturn => {
+export const useProfile = (userId?: string | null, initialData?: Record<string, any> | null): UseProfileReturn => {
   const { user: authUser, profile: authProfile, refreshProfile } = useAuth();
   const targetUserId = userId || authUser?.id;
   const isMe = !userId || targetUserId === authUser?.id;
 
-  // Use selectors for data to ensure stability of the hook itself
-  // and to only trigger re-renders on relevant data changes
+  // Use individual selectors to avoid re-rendering on unrelated store changes
   const activeStore = isMe ? useAuthProfileStore : useProfileStore;
-  const state = activeStore();
+  const profile = activeStore((s) => s.profile);
+  const reviewStats = activeStore((s) => s.reviewStats);
+  const userRecommendation = activeStore((s) => s.userRecommendation);
+  const properties = activeStore((s) => s.properties);
+  const posts = activeStore((s) => s.posts);
+  const reels = activeStore((s) => s.reels);
+  const recommendedByUsers = activeStore((s) => s.recommendedByUsers);
+  const recommendedByHasMore = activeStore((s) => s.recommendedByHasMore);
+  const loadingRecommendedBy = activeStore((s) => s.loadingRecommendedBy);
+  const recommendedByError = activeStore((s) => s.recommendedByError);
+  const notRecommendedByUsers = activeStore((s) => s.notRecommendedByUsers);
+  const notRecommendedByHasMore = activeStore((s) => s.notRecommendedByHasMore);
+  const loadingNotRecommendedBy = activeStore((s) => s.loadingNotRecommendedBy);
+  const notRecommendedByError = activeStore((s) => s.notRecommendedByError);
+  const loading = activeStore((s) => s.loading);
+  const submittingRecommendation = activeStore((s) => s.submittingRecommendation);
 
   // Prevents infinite loop by using a ref to check if a fetch is in progress
   // and by NOT depending on the whole 'state' object in callbacks
@@ -58,12 +72,19 @@ export const useProfile = (userId?: string | null): UseProfileReturn => {
 
   useEffect(() => {
     if (targetUserId !== prevUserId.current) {
-      if (!isMe) {
-        useProfileStore.getState().resetProfileState();
-      }
+      activeStore.getState().resetProfileState();
       prevUserId.current = targetUserId;
+      // Pre-poblar el store con los datos del cache del feed (si venimos de
+      // un post/card con datos precargados). El perfil se ve AL INSTANTE
+      // (sin spinner) mientras fetchProfileData lo refresca en background.
+      // Profile.tsx solo muestra spinner cuando `loading && !profile`, así
+      // que aunque fetchProfileData ponga loading=true, aquí no parpadea.
+      if (initialData) {
+        activeStore.getState().setProfile(initialData as perfiles);
+        activeStore.getState().setLoading(false);
+      }
     }
-  }, [targetUserId, isMe]);
+  }, [targetUserId, isMe, activeStore, initialData]);
 
   const fetchProfileData = useCallback(async () => {
     if (!targetUserId || isFetchingRef.current) return;
@@ -298,22 +319,22 @@ export const useProfile = (userId?: string | null): UseProfileReturn => {
   }, [fetchProfileData]);
 
   return {
-    profile: state.profile,
-    reviewStats: state.reviewStats,
-    userRecommendation: state.userRecommendation,
-    properties: state.properties,
-    posts: state.posts,
-    reels: state.reels,
-    recommendedByUsers: state.recommendedByUsers,
-    recommendedByHasMore: state.recommendedByHasMore,
-    loadingRecommendedBy: state.loadingRecommendedBy,
-    recommendedByError: state.recommendedByError,
-    notRecommendedByUsers: state.notRecommendedByUsers,
-    notRecommendedByHasMore: state.notRecommendedByHasMore,
-    loadingNotRecommendedBy: state.loadingNotRecommendedBy,
-    notRecommendedByError: state.notRecommendedByError,
-    loading: state.loading,
-    submittingRecommendation: state.submittingRecommendation,
+    profile,
+    reviewStats,
+    userRecommendation,
+    properties,
+    posts,
+    reels,
+    recommendedByUsers,
+    recommendedByHasMore,
+    loadingRecommendedBy,
+    recommendedByError,
+    notRecommendedByUsers,
+    notRecommendedByHasMore,
+    loadingNotRecommendedBy,
+    notRecommendedByError,
+    loading,
+    submittingRecommendation,
     isMe,
     fetchProfileData,
     handleRecommendation,

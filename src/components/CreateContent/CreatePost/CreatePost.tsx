@@ -25,7 +25,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useLocalModal } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
 import { COLORS } from "@/constants/colors";
-import { ScreenWrapper } from "@/screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ReordenableImages from "../ReordenableImages";
 import { Post } from "@/types";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -61,6 +61,12 @@ interface CreatePostProps {
 }
 
 export default function CreatePost({ post, onBack }: CreatePostProps) {
+  const insets = useSafeAreaInsets();
+  const safeStyle = {
+    paddingBottom: Math.max(insets.bottom, 10),
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
   const { user } = useAuth();
   const { showModal, modalElement } = useLocalModal();
   const { showToast } = useToast();
@@ -491,7 +497,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   };
 
   return (
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View style={[styles.container, safeStyle]}>
       {/* Header */}
       <AppHeader
         title={isEditing ? "Editar Post" : "Crear Post"}
@@ -686,7 +692,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
         </View>
       </Modal>
       {modalElement}
-    </ScreenWrapper>
+    </View>
   );
 }
 

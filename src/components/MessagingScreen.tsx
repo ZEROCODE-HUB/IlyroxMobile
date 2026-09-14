@@ -17,8 +17,7 @@ import { useConversations } from "../hooks/messaging/useConversations";
 import { AppHeader } from "./AppHeader";
 import { User } from "../types";
 import { COLORS } from "../constants";
-import { useStableSafeInsets } from "../context/SafeInsetsContext";
-import { ScreenWrapper } from "../screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HeaderChat from "./Messaging/HeaderChat";
 import { ChatPropertyBanner } from "./Messaging/ChatPropertyBanner";
 import { router } from "expo-router";
@@ -39,7 +38,7 @@ export default function MessagingScreen({
   onBack,
   isAppointment,
 }: MessagingScreenProps) {
-  const { top } = useStableSafeInsets();
+  const insets = useSafeAreaInsets();
   const { profile } = useAuth();
 
   const [activeConversationId, setActiveConversationId] = useState<
@@ -47,10 +46,13 @@ export default function MessagingScreen({
   >(null);
   const [activePropertyId, setActivePropertyId] = useState<string | null>(null);
   const [otherUser, setOtherUser] = useState<any>(null);
-  const [headerHeight, setHeaderHeight] = useState<number>(64);
+  const [headerHeight, setHeaderHeight] = useState<number>(120);
 
   const lastProcessedUserId = useRef<string | null>(null);
   const isInitializedRef = useRef(false);
+  // Token de resolución en background: invalida la respuesta si entre que se
+  // dispara la petición y termina llegan params nuevos (o se cierra la pantalla).
+  const resolveTokenRef = useRef(0);
 
   // FIX: Solo llamar useConversations cuando NO estamos en un chat activo
   const isInChatView = !!(activeConversationId && otherUser);
@@ -126,6 +128,35 @@ export default function MessagingScreen({
     };
   }, [isInChatView, handleBack]);
 
+  // Resolver en background el id real de una conversación abierta como "new".
+  // Mantiene la navegación instantánea: el chat ya se ve (vacío) y, si la
+  // conversación ya existía, se intercambia el id y se carga el historial.
+  const resolveExistingConversation = useCallback(
+    async (otherUserId: string) => {
+      if (!profile?.id || !getConversationsForUser) return;
+
+      const token = ++resolveTokenRef.current;
+      let specificConvs: any[] = [];
+      try {
+        specificConvs = await getConversationsForUser(otherUserId);
+      } catch {
+        specificConvs = [];
+      }
+      // Si llegaron params nuevos o la pantalla ya no está en este scope,
+      // descartar la resolución.
+      if (token !== resolveTokenRef.current) return;
+
+      const exists = initialPropertyId
+        ? specificConvs.find((conv) => conv.propiedad_id === initialPropertyId)
+        : specificConvs.find((conv) => !conv.propiedad_id);
+
+      if (exists) {
+        setActiveConversationId(exists.id);
+      }
+    },
+    [profile?.id, initialPropertyId, getConversationsForUser],
+  );
+
   // Manejar initialUser y navigation params
   useEffect(() => {
     // Si no hay usuario activo, no hacer nada
@@ -161,6 +192,12 @@ export default function MessagingScreen({
         foto: (initialUser as any).foto || (initialUser as any).avatar || null,
       });
       setActivePropertyId(initialPropertyId || null);
+
+      // Abierta como "new" del feed (Contactar): resolver el id real en
+      // background para que, si la conversación ya existía, cargue el historial.
+      if (targetConvId === "new") {
+        resolveExistingConversation(initialUser.id);
+      }
       return;
     }
 
@@ -174,7 +211,13 @@ export default function MessagingScreen({
         handleBack();
       }
     }
-  }, [initialUser?.id, initialPropertyId, profile?.id, conversationId]);
+  }, [
+    initialUser?.id,
+    initialPropertyId,
+    profile?.id,
+    conversationId,
+    resolveExistingConversation,
+  ]);
 
   const handleInitialUser = async (user: User) => {
     if (!profile?.id) return;
@@ -265,11 +308,17 @@ export default function MessagingScreen({
   // Loading state
   if (!profile?.id) {
     return (
-      <View style={styles.container}>
+      <View
+        style={[
+          styles.screen,
+          { paddingTop: insets.top, paddingBottom: insets.bottom },
+        ]}
+      >
         <AppHeader
           title="Mensajes"
           showBackButton
           onBack={handleNavigationBack}
+          topInset={0}
         />
         <View style={styles.content}>
           <Text style={styles.subtitle}>Cargando...</Text>
@@ -282,14 +331,21 @@ export default function MessagingScreen({
   if (isInChatView) {
     return (
       <KeyboardProvider>
-        <View style={styles.container}>
-          {/* Header fijo */}
+        <View
+          style={[
+            styles.screen,
+            { paddingBottom: insets.bottom },
+          ]}
+        >
+          {/* Header fijo — position: absolute top: 0, paddingTop: insets.top
+              para que el contenido del header arranque debajo del status bar.
+              onLayout mide la altura completa (incluyendo el paddingTop). */}
           <View
             onLayout={(e) => {
               const h = e.nativeEvent.layout.height;
               if (h && h !== headerHeight) setHeaderHeight(h);
             }}
-            style={[styles.headerFixed, { paddingTop: top }]}
+            style={[styles.headerFixed, { paddingTop: insets.top }]}
           >
             <HeaderChat
               onBack={handleBack}
@@ -303,7 +359,7 @@ export default function MessagingScreen({
             ) : null}
           </View>
 
-          {/* Contenido del chat */}
+          {/* Contenido del chat — debajo del header (headerHeight ya incluye insets.top) */}
           <View style={[styles.chatContent, { marginTop: headerHeight }]}>
             <ChatScreen
               conversationId={activeConversationId!}
@@ -312,7 +368,7 @@ export default function MessagingScreen({
               propertyId={activePropertyId}
               onBack={handleBack}
               onConversationCreated={handleConversationCreated}
-              keyboardOffset={headerHeight + top}
+              keyboardOffset={headerHeight}
             />
           </View>
         </View>
@@ -322,30 +378,34 @@ export default function MessagingScreen({
 
   // Conversations List View
   return (
-    <ScreenWrapper withHeader={false}>
-      <View style={styles.container}>
-        <AppHeader
-          title="Mensajes"
-          showBackButton
-          onBack={handleNavigationBack}
-        />
-        <ConversationsList
-          userId={profile.id}
-          onSelectConversation={handleSelectConversation}
-          conversations={conversations}
-          loading={conversationsHook.loading}
-          getConversationsForUser={getConversationsForUser}
-          refresh={conversationsHook.refresh}
-        />
-      </View>
-    </ScreenWrapper>
+    <View
+      style={[
+        styles.screen,
+        { paddingTop: insets.top, paddingBottom: insets.bottom },
+      ]}
+    >
+      <AppHeader
+        title="Mensajes"
+        showBackButton
+        onBack={handleNavigationBack}
+        topInset={0}
+      />
+      <ConversationsList
+        userId={profile.id}
+        onSelectConversation={handleSelectConversation}
+        conversations={conversations}
+        loading={conversationsHook.loading}
+        getConversationsForUser={getConversationsForUser}
+        refresh={conversationsHook.refresh}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   },
   content: {
     flex: 1,

@@ -14,7 +14,7 @@ import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import UserHeader from "../UserHeader";
 import ActionButtons from "../ActionButtons";
 import { ImageGallery, RichText } from "../shared";
-import { ScreenWrapper } from "../../screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppHeader } from "../AppHeader";
 import { commonStyles } from "styles";
 import { SpecialPostCard } from "./SpecialPostCard";
@@ -27,6 +27,7 @@ interface FeedDetailProps {
   onUserClick?: (user: User) => void;
   currentUserId?: string;
   highlightUserIds?: string[];
+  highlightCommentIds?: string[];
   autoOpenComments?: boolean;
 }
 
@@ -36,8 +37,15 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
   onUserClick,
   currentUserId,
   highlightUserIds,
+  highlightCommentIds,
   autoOpenComments = false,
 }) => {
+  const insets = useSafeAreaInsets();
+  const safeStyle = {
+    paddingBottom: Math.max(insets.bottom, 10),
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
   const images = item.images || item.propertyDetails?.images || [];
   const [showComments, setShowComments] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
@@ -73,7 +81,7 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
   }, [autoOpenComments]);
 
   return (
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View style={[styles.container, safeStyle]}>
       <AppHeader
         title={item.type === "property" ? "Propiedad" : "Publicación"}
         showBackButton={true}
@@ -306,8 +314,9 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
         feedItemId={item.id}
         currentUserId={currentUserId}
         highlightUserIds={highlightUserIds}
+        highlightCommentIds={highlightCommentIds}
       />
-    </ScreenWrapper>
+    </View>
   );
 };
 
@@ -445,7 +454,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: COLORS.textPrimary,
+    color: COLORS.primaryDark,
     marginBottom: 12,
   },
   amenitiesContainer: {

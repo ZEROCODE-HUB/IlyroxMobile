@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import SafePressable from "@/design-system/components/SafePressable";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { COLORS } from "@/constants";
@@ -80,7 +81,7 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
 
   return (
     <>
-      <TouchableOpacity
+      <SafePressable
         style={styles.profileSection}
         onPress={handleProfilePress}
         activeOpacity={0.7}
@@ -112,7 +113,7 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
             />
           </TouchableOpacity>
         )}
-      </TouchableOpacity>
+      </SafePressable>
 
       {isOwnProperty ? (
         <TouchableOpacity

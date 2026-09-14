@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "transparent",
   },
   tabActive: {
-    borderBottomColor: COLORS.primary,
+    borderBottomColor: COLORS.primaryDark,
   },
   tabLabel: {
     fontSize: 13,
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   tabLabelActive: {
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
   },
   badge: {
     backgroundColor: COLORS.background,
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   badgeTextActive: {
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
   },
 });
 

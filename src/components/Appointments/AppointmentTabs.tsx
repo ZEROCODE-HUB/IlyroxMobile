@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
     },
     activeTabText: {
-        color: COLORS.primary,
+        color: COLORS.primaryDark,
         fontWeight: "700",
     },
 });

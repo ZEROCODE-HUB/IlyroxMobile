@@ -9,8 +9,8 @@ interface AppointmentListProps {
     loading: boolean;
     appointments: AppointmentItem[];
     activeTab: "upcoming" | "past";
-    onMarkComplete: (id: string) => void;
     onMarkCancel: (id: string) => void;
+    onAcceptAppointment: (id: string) => void;
     onOpenRating: (id: string) => void;
     onSyncCalendar: (id: string) => void;
     onContact: (id: string) => void;
@@ -24,8 +24,8 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
     loading,
     appointments,
     activeTab,
-    onMarkComplete,
     onMarkCancel,
+    onAcceptAppointment,
     onOpenRating,
     onSyncCalendar,
     onContact,
@@ -65,8 +65,8 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
                 <AppointmentCard
                     key={appt.id}
                     appointment={appt}
-                    onMarkComplete={onMarkComplete}
                     onMarkCancel={onMarkCancel}
+                    onAcceptAppointment={onAcceptAppointment}
                     onOpenRating={onOpenRating}
                     onSyncCalendar={onSyncCalendar}
                     onContact={onContact}

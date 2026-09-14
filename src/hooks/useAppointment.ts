@@ -7,6 +7,12 @@ import { logger } from "@/utils/logger";
 
 const log = logger.scoped("useAppointment");
 
+const isMissingGoogleMeetColumn = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  "message" in error &&
+  String((error as { message?: unknown }).message).includes("google_meet_url");
+
 const useAppointment = (userId?: string | null) => {
   const { showModal } = useModal();
   const { showToast } = useToast();
@@ -18,17 +24,17 @@ const useAppointment = (userId?: string | null) => {
     googleOwnerId?: string | null,
   ): Promise<boolean> => {
     try {
-      if (googleEventId) {
-        try {
-          const result = await googleCalendarService.syncAppointmentOnServer(
-            "delete",
-            id,
-          );
-          if (!result?.ok) {
-            throw new Error(result?.skipped || "server_calendar_delete_skipped");
-          }
-        } catch (serverError) {
-          log.warn("Server Google Calendar delete failed", serverError);
+      try {
+        const result = await googleCalendarService.syncAppointmentOnServer(
+          "delete",
+          id,
+        );
+        if (!result?.ok) {
+          throw new Error(result?.skipped || "server_calendar_delete_skipped");
+        }
+      } catch (serverError) {
+        log.warn("Server Google Calendar delete failed", serverError);
+        if (googleEventId) {
           if (googleOwnerId && userId !== googleOwnerId) {
             showToast(
               "Cita cancelada en Ilyrox. El asesor debe reconectar Google Calendar para cancelar el evento externo.",
@@ -46,16 +52,37 @@ const useAppointment = (userId?: string | null) => {
               );
             }
           }
+        } else {
+          showToast(
+            "Cita cancelada en Ilyrox. No había evento de Google Calendar ligado para borrar.",
+            "info",
+          );
         }
       }
 
-      const { error } = await supabase
+      const update = {
+        estado: "cancelada",
+        google_event_id: null,
+        google_calendar_id: null,
+        google_meet_url: null,
+        google_sync_origin: "ilyrox",
+        google_last_synced_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      let { error } = await supabase
         .from("citas")
-        .update({
-          estado: "cancelada",
-          updated_at: new Date().toISOString(),
-        })
+        .update(update)
         .eq("id", id);
+
+      if (isMissingGoogleMeetColumn(error)) {
+        const { google_meet_url: _ignored, ...withoutMeetUrl } = update;
+        const retry = await supabase
+          .from("citas")
+          .update(withoutMeetUrl)
+          .eq("id", id);
+        error = retry.error;
+      }
 
       if (error) throw error;
 

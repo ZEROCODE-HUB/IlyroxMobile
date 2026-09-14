@@ -98,7 +98,7 @@ export default function CommunityWelcome() {
             <View style={styles.dividerContainer}>
               <View style={styles.line} />
               <View style={styles.iconCircle}>
-                <Ionicons name="people-outline" size={26} color="#007B99" />
+                <Ionicons name="people-outline" size={26} color={COLORS.primary} />
               </View>
               <View style={styles.line} />
             </View>
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#007B99",
+    color: COLORS.primaryDark,
     letterSpacing: 2,
     marginBottom: 8,
   },
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   titleBlue: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#007B99",
+    color: COLORS.primaryDark,
     textAlign: "center",
     lineHeight: 34,
   },
@@ -183,12 +183,12 @@ const styles = StyleSheet.create({
   invitedName: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#007B99",
+    color: COLORS.primaryDark,
     textAlign: "center",
     marginTop: 4,
   },
   dot: {
-    color: "#007B99",
+    color: COLORS.primary,
   },
   dividerContainer: {
     flexDirection: "row",
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   smallUnderline: {
     width: 32,
     height: 3,
-    backgroundColor: "#007B99",
+    backgroundColor: COLORS.primary,
     borderRadius: 2,
     marginTop: 12,
     marginBottom: 16,
@@ -230,10 +230,10 @@ const styles = StyleSheet.create({
   },
   highlightText: {
     fontWeight: "700",
-    color: "#007B99",
+    color: COLORS.primaryDark,
   },
   button: {
-    backgroundColor: "#007B99",
+    backgroundColor: COLORS.primary,
     width: "100%",
     height: 52,
     borderRadius: 12,

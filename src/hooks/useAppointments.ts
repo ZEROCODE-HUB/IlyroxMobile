@@ -17,6 +17,10 @@ import { formatPhoneNumber } from "../components/Profile/profileFormatters";
 import { googleCalendarService } from "@/services/googleCalendarService";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { logger } from "@/utils/logger";
+import {
+    formatAppointmentDateTimeForTimeZone,
+    getAppointmentViewerTimeZone,
+} from "@/utils/timeZone";
 
 const log = logger.scoped("useAppointments");
 
@@ -42,6 +46,149 @@ export const useAppointments = () => {
         }
     }, [profile?.id, activeTab]);
 
+    const buildCalendarPayload = (appointment: AppointmentItem) => ({
+        id: appointment.id,
+        fecha: appointment.fecha,
+        hora: appointment.hora,
+        tipo: appointment.tipo,
+        descripcion: appointment.descripcion,
+        propertyTitle: appointment.propertyTitle,
+        location: appointment.location,
+        otherUserName: appointment.user.name,
+        otherUserEmail: appointment.user.email,
+        creatorTimeZone: appointment.creator_timezone,
+    });
+
+    const wasAcceptedInGoogle = (
+        appointment: AppointmentItem,
+        attendees?: Array<{ email?: string; responseStatus?: string }>,
+    ) => {
+        const expectedEmail = appointment.user.email?.toLowerCase();
+        return (attendees ?? []).some((attendee) => {
+            if (attendee.responseStatus !== "accepted") return false;
+            if (!expectedEmail) return true;
+            return attendee.email?.toLowerCase() === expectedEmail;
+        });
+    };
+
+    const reconcilePendingGoogleResponses = async (
+        items: AppointmentItem[],
+    ) => {
+        if (!profile?.id || activeTab !== "upcoming") return;
+
+        const pendingWithGoogleEvent = items.filter(
+            (appointment) =>
+                appointment.estado === "pendiente" &&
+                !!appointment.google_event_id,
+        );
+
+        if (pendingWithGoogleEvent.length === 0) return;
+
+        let changed = false;
+
+        for (const appointment of pendingWithGoogleEvent) {
+            try {
+                const result = await googleCalendarService.syncAppointmentOnServer(
+                    "reconcile",
+                    appointment.id,
+                );
+                if (result?.changed) {
+                    changed = true;
+                }
+            } catch (error) {
+                log.warn("Server Google Calendar reconcile failed", {
+                    appointmentId: appointment.id,
+                    error,
+                });
+            }
+        }
+
+        if (changed) {
+            await loadAppointments();
+            return;
+        }
+
+        const connection = await googleCalendarService.getValidConnection(
+            profile.id,
+        );
+        if (!connection) return;
+
+        for (const appointment of pendingWithGoogleEvent) {
+            try {
+                const googleEvent = await googleCalendarService.getEvent(
+                    connection,
+                    appointment.google_event_id!,
+                );
+
+                if (googleEvent.status === "cancelled") {
+                    const { error } = await supabase
+                        .from("citas")
+                        .update({
+                            estado: "cancelada",
+                            google_event_id: null,
+                            google_calendar_id: null,
+                            google_meet_url: null,
+                            google_sync_origin: "google",
+                            google_last_synced_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString(),
+                        })
+                        .eq("id", appointment.id);
+
+                    if (error) throw error;
+                    changed = true;
+                    continue;
+                }
+
+                if (!wasAcceptedInGoogle(appointment, googleEvent.attendees)) {
+                    continue;
+                }
+
+                let meetUrl = appointment.google_meet_url ?? googleEvent.googleMeetUrl;
+                if (appointment.created_by === profile.id) {
+                    const eventWithMeet = await googleCalendarService.updateEvent(
+                        connection,
+                        appointment.google_event_id!,
+                        {
+                            ...buildCalendarPayload(appointment),
+                            createMeet: true,
+                        },
+                    );
+                    meetUrl = eventWithMeet.googleMeetUrl;
+                }
+
+                const { error } = await supabase
+                    .from("citas")
+                    .update({
+                        estado: "confirmada",
+                        google_event_id: googleEvent.id,
+                        google_calendar_id: "primary",
+                        google_meet_url: meetUrl ?? null,
+                        google_sync_origin: "google-local-reconcile",
+                        google_last_synced_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", appointment.id);
+
+                if (error) throw error;
+                await syncConfirmedAppointment({
+                    ...appointment,
+                    estado: "confirmada",
+                    google_meet_url: meetUrl ?? null,
+                });
+                changed = true;
+            } catch (error) {
+                log.warn("Could not reconcile Google Calendar response", {
+                    appointmentId: appointment.id,
+                    error,
+                });
+            }
+        }
+
+        if (changed) {
+            await loadAppointments();
+        }
+    };
+
     const loadAppointments = async () => {
         if (!profile?.id) return;
 
@@ -64,11 +211,11 @@ export const useAppointments = () => {
 
             if (activeTab === "upcoming") {
                 query = query
-                    .eq("estado", "pendiente")
+                    .in("estado", ["pendiente", "confirmada"])
                     .gte("fecha", new Date().toISOString().split("T")[0]);
             } else {
                 query = query.or(
-                    `estado.in.(completada,cancelada),fecha.lt.${new Date().toISOString().split("T")[0]
+                    `estado.eq.cancelada,fecha.lt.${new Date().toISOString().split("T")[0]
                     }`,
                 );
             }
@@ -90,6 +237,17 @@ export const useAppointments = () => {
                     );
 
                     const hasUserRated = !!userReview;
+                    const viewerTimeZone = getAppointmentViewerTimeZone(
+                        cita.creator_timezone,
+                        cita.created_by === profile.id,
+                    );
+                    const { dateLabel, timeLabel } =
+                        formatAppointmentDateTimeForTimeZone(
+                            cita.fecha,
+                            cita.hora,
+                            cita.creator_timezone,
+                            viewerTimeZone,
+                        );
 
                     return {
                         ...cita,
@@ -107,8 +265,8 @@ export const useAppointments = () => {
                             : undefined,
                         propertyImage: cita.propiedad?.fotos?.[0],
                         location: cita.propiedad?.ciudad || "No especificado",
-                        date: formatDate(cita.fecha),
-                        time: formatTime(cita.hora),
+                        date: dateLabel,
+                        time: timeLabel,
                         status: cita.estado as AppointmentStatus,
                         hasUserRated,
                         rating: userReview?.calificacion_general,
@@ -117,6 +275,7 @@ export const useAppointments = () => {
             );
 
             setAppointments(transformedData);
+            reconcilePendingGoogleResponses(transformedData);
         } catch (error: any) {
             log.error("Error loading appointments:", error);
             showToast(error.message || "Error al cargar las citas", "error");
@@ -165,62 +324,152 @@ export const useAppointments = () => {
         };
     }, [profile?.id, activeTab]);
 
-    const formatDate = (dateStr: string) => {
-        const date = new Date(dateStr);
-        date.setDate(date.getDate() + 1);
-        const today = new Date();
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        const dateOnly = date.toDateString();
-        const todayOnly = today.toDateString();
-        const tomorrowOnly = tomorrow.toDateString();
-
-        if (dateOnly === todayOnly) return "Hoy";
-        if (dateOnly === tomorrowOnly) return "Mañana";
-
-        return date.toLocaleDateString("es-MX", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-        });
-    };
-
-    const formatTime = (timeStr: string) => {
-        const [hours, minutes] = timeStr.split(":");
-        const hour = parseInt(hours, 10);
-        const ampm = hour >= 12 ? "PM" : "AM";
-        const hour12 = hour % 12 || 12;
-        return `${hour12}:${minutes} ${ampm}`;
-    };
-
-    const handleMarkComplete = (id: string) => {
-        handleOpenRating(id);
-    };
-
     const handleMarkCancel = (id: string) => {
+        const appointment = appointments.find((a) => a.id === id);
+        const isRejecting =
+            appointment?.estado === "pendiente" &&
+            !!profile?.id &&
+            appointment.created_by !== profile.id;
+
         showModal({
-            title: "Cancelar Cita",
-            message: "¿Estás seguro de que deseas cancelar esta cita? Esta acción no se puede deshacer.",
-            confirmText: "Sí, cancelar",
+            title: isRejecting ? "Rechazar Cita" : "Cancelar Cita",
+            message: isRejecting
+                ? "¿Estás seguro de que deseas rechazar esta cita? Se cancelará también para quien la creó."
+                : "¿Estás seguro de que deseas cancelar esta cita? Esta acción no se puede deshacer.",
+            confirmText: isRejecting ? "Sí, rechazar" : "Sí, cancelar",
             cancelText: "Volver",
             confirmVariant: "danger",
             // Pasar onCancel hace que el modal pinte el segundo botón ("Volver");
             // sin él, ConfirmationModal solo muestra el botón de confirmar.
             onCancel: () => {},
             onConfirm: async () => {
-                const appointment = appointments.find((a) => a.id === id);
                 const success = await handleCancelAppointment(
                     id,
                     appointment?.google_event_id,
-                    appointment?.agente_id,
+                    appointment?.created_by || appointment?.agente_id,
                 );
                 if (success) {
+                    setAppointments((current) =>
+                        current.map((item) =>
+                            item.id === id
+                                ? {
+                                    ...item,
+                                    estado: "cancelada",
+                                    status: "cancelada" as AppointmentStatus,
+                                    google_event_id: null,
+                                    google_meet_url: null,
+                                }
+                                : item,
+                        ),
+                    );
                     await loadAppointments();
-                    showToast("Cita cancelada correctamente", "success");
+                    showToast(
+                        isRejecting
+                            ? "Cita rechazada correctamente"
+                            : "Cita cancelada correctamente",
+                        "success",
+                    );
                 }
             },
         });
+    };
+
+    const syncConfirmedAppointment = async (appointment: AppointmentItem) => {
+        if (!profile?.id) return false;
+
+        try {
+            const result = await googleCalendarService.syncAppointmentOnServer(
+                appointment.google_event_id ? "update" : "create",
+                appointment.id,
+            );
+
+            if (result?.ok) return true;
+        } catch (serverError) {
+            log.warn("Server Google Calendar sync failed", serverError);
+        }
+
+        if (profile.id !== appointment.created_by) {
+            showToast(
+                "Cita aceptada. Quien envió la invitación debe tener Google Calendar conectado para crear el evento con Meet",
+                "info",
+            );
+            return false;
+        }
+
+        const connection = await ensureConnection();
+        if (!connection?.serverSynced) {
+            showToast(
+                "Conecta Google Calendar nuevamente para activar la sincronización con Supabase",
+                "info",
+            );
+            return false;
+        }
+
+        const payload = {
+            ...buildCalendarPayload(appointment),
+            createMeet: true,
+        };
+        const event = appointment.google_event_id
+            ? await googleCalendarService.updateEvent(
+                connection,
+                appointment.google_event_id,
+                payload,
+            )
+            : await googleCalendarService.createEvent(connection, payload);
+
+        await googleCalendarService.attachEventToAppointment(
+            appointment.id,
+            event.id,
+            event.googleMeetUrl,
+        );
+
+        return true;
+    };
+
+    const handleAcceptAppointment = async (id: string) => {
+        const appointment = appointments.find((a) => a.id === id);
+        if (!appointment || !profile?.id) return;
+
+        if (appointment.created_by === profile.id) {
+            showToast("Debe aceptar la cita la persona invitada", "info");
+            return;
+        }
+
+        try {
+            const result = await googleCalendarService.syncAppointmentOnServer(
+                "accept",
+                id,
+            );
+
+            if (!result?.ok) {
+                throw new Error(result?.skipped || "No se pudo aceptar la cita");
+            }
+
+            setAppointments((current) =>
+                current.map((item) =>
+                    item.id === id
+                        ? {
+                            ...item,
+                            estado: "confirmada",
+                            status: "confirmada" as AppointmentStatus,
+                            google_meet_url: result.meetUrl ?? item.google_meet_url,
+                            google_event_id: result.eventId ?? item.google_event_id,
+                        }
+                        : item,
+                ),
+            );
+
+            await loadAppointments();
+            showToast(
+                result.meetUrl
+                    ? "Cita aceptada y creada en Google Calendar con Meet"
+                    : "Cita aceptada correctamente",
+                "success",
+            );
+        } catch (error: any) {
+            log.warn("Error accepting appointment:", error);
+            showToast(error.message || "No se pudo aceptar la cita", "error");
+        }
     };
 
     const handleSyncCalendar = async (id: string) => {
@@ -228,54 +477,19 @@ export const useAppointments = () => {
         if (!appointment || !profile?.id) return;
 
         try {
-            if (profile.id === appointment.agente_id) {
-                await ensureConnection();
-            }
-
-            const result = await googleCalendarService.syncAppointmentOnServer(
-                appointment.google_event_id ? "update" : "create",
-                appointment.id,
-            );
-
-            if (!result?.ok && profile.id !== appointment.agente_id) {
+            if (appointment.estado !== "confirmada") {
                 showToast(
-                    "El asesor debe conectar Google Calendar para sincronizar esta cita",
+                    "La cita se sincroniza cuando la persona invitada la acepta",
                     "info",
                 );
                 return;
             }
 
-            if (!result?.ok) {
-                const connection = await ensureConnection();
-                if (!connection) return;
-
-const payload = {
-                    id: appointment.id,
-                    fecha: appointment.fecha,
-                    hora: appointment.hora,
-                    tipo: appointment.tipo,
-                    descripcion: appointment.descripcion,
-                    propertyTitle: appointment.propertyTitle,
-                    location: appointment.location,
-                    otherUserName: appointment.user.name,
-                    otherUserEmail: appointment.user.email,
-                };
-
-                const event = appointment.google_event_id
-                    ? await googleCalendarService.updateEvent(
-                        connection,
-                        appointment.google_event_id,
-                        payload,
-                    )
-                    : await googleCalendarService.createEvent(connection, payload);
-
-                await googleCalendarService.attachEventToAppointment(
-                    appointment.id,
-                    event.id,
-                );
-            }
+            const synced = await syncConfirmedAppointment(appointment);
             await loadAppointments();
-            showToast("Cita sincronizada con Google Calendar", "success");
+            if (synced) {
+                showToast("Cita sincronizada con Google Calendar", "success");
+            }
         } catch (error: any) {
             log.warn("Error syncing Google Calendar:", error);
             showToast(
@@ -367,19 +581,6 @@ const payload = {
                 }
             }
 
-            if (appointment.estado === "pendiente") {
-                const { error: updateError } = await supabase
-                    .from("citas")
-                    .update({
-                        estado: "completada",
-                        completado_en: new Date().toISOString(),
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq("id", rateApptId);
-
-                if (updateError) throw updateError;
-            }
-
             showToast("Calificación enviada exitosamente", "success");
             setShowRateModal(false);
             setRateApptId(null);
@@ -421,11 +622,11 @@ const payload = {
     };
 
     const handlePropertyPress = (id: string) => {
-        router.push(`/property/${id}`);
+        router.push(`/(stack)/property/${id}`);
     };
 
     const handleUserPress = (id: string) => {
-        router.push(`/user/${id}`);
+        router.push(`/(stack)/user/${id}`);
     };
 
     const closeRatingModal = () => {
@@ -468,8 +669,8 @@ const payload = {
         showRateModal,
         editingAppointment,
         rateTarget,
-        handleMarkComplete,
         handleMarkCancel,
+        handleAcceptAppointment,
         handleOpenRating,
         handleEditAppointment,
         handleSyncCalendar,

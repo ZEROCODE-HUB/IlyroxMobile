@@ -2,9 +2,10 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
+  TouchableOpacity,
 } from "react-native";
+import SafePressable from "@/design-system/components/SafePressable";
 import { FlatList } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../constants/colors";
@@ -153,23 +154,23 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
   return (
     <>
       <View style={styles.inputRow}>
-        <TouchableOpacity
+        <SafePressable
           style={[styles.searchButton, containerStyle]}
           onPress={() => router.push('/search')}
           activeOpacity={0.8}
         >
           <Ionicons name="search-outline" size={18} color={COLORS.textTertiary} />
           <Text style={styles.searchButtonText}>Busca por zonas para encontrar propiedades</Text>
-        </TouchableOpacity>
+        </SafePressable>
 
         {showMapButton && !showSuggestions && selectedLocation && (
-          <TouchableOpacity
+          <SafePressable
             onPress={onOpenMap}
             style={styles.mapSmallButton}
             activeOpacity={0.7}
           >
             <Ionicons name="map-outline" size={20} color={COLORS.primary} />
-          </TouchableOpacity>
+          </SafePressable>
         )}
       </View>
 

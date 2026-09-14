@@ -7,16 +7,16 @@
       "policy": "fingerprint"
     },
     "orientation": "portrait",
-    "icon": "./src/assets/icon_ilyrox.jpg",
+    "icon": "./src/assets/icon_ilyrox_ios.jpg",
     "userInterfaceStyle": "light",
   "scheme": [
       "ilyroxapp",
       "com.ilyrox.app"
     ],
     "splash": {
-      "image": "./src/assets/Icon-size.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#FFFFFF"
+      "image": "./src/assets/icon_ilyrox.jpg",
+      "resizeMode": "cover"
+      // "backgroundColor": "#FFFFFF"
     },
     "assetBundlePatterns": [
       "**/*"

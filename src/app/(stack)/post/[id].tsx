@@ -1,21 +1,40 @@
 import React from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 
 import { useAuth } from "@/context/AuthContext";
-import { FeedDetail } from "@/components";
+import { FeedDetail, PostDetailShimmer } from "@/components";
 import { useFeedItem } from "@/hooks";
-import { COLORS } from "@/constants/colors";
+import { findFeedItemInCache } from "@/utils/feedCacheLookup";
 import { logger } from "@/utils/logger";
 
 const log = logger.scoped("[id]");
 
 export default function PostDetailScreen() {
-  const { id, item, highlightUserId } = useLocalSearchParams();
+  const { id, item, highlightUserId, highlightUserIds, highlightCommentIds } =
+    useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
 
-  const highlightUserIds = highlightUserId ? [highlightUserId as string] : undefined;
+  // Soporta tanto el singular legacy (`highlightUserId`) como el CSV
+  // plural (`highlightUserIds`) que envía el helper de navegación cuando
+  // la notificación viene agrupada con varios autores. CSV es robusto
+  // ante las diferencias de deserialización de Expo Router.
+  const parseCsv = (v: unknown): string[] => {
+    if (Array.isArray(v)) return v.flatMap((x) => String(x).split(",")).map((s) => s.trim()).filter(Boolean);
+    if (typeof v === "string") return v.split(",").map((s) => s.trim()).filter(Boolean);
+    return [];
+  };
+  const pluralList = parseCsv(highlightUserIds);
+  const singularList = highlightUserId ? [highlightUserId as string] : [];
+  const mergedHighlightUserIds =
+    pluralList.length > 0 ? pluralList : singularList;
+  const highlightUserIdsFinal =
+    mergedHighlightUserIds.length > 0 ? mergedHighlightUserIds : undefined;
+
+  const parsedHighlightCommentIds = typeof highlightCommentIds === "string"
+    ? highlightCommentIds.split(",").filter(Boolean)
+    : undefined;
 
   // 1. Try to get item from params (faster if already available)
   let initialItem: any = null;
@@ -27,20 +46,18 @@ export default function PostDetailScreen() {
     }
   }
 
-  // 2. Fetch if not provided or if we only have the ID
+  // 2. Buscar en React Query cache del feed (patrón RTK Query - cache lookup)
+  const cachedPost = !initialItem ? findFeedItemInCache(id as string, user?.id) : null;
+
+  // 3. Fetch only if no cached item and no param item
   const { item: fetchedItem, loading } = useFeedItem(
-    initialItem ? "" : (id as string),
+    initialItem || cachedPost ? "" : (id as string),
   );
 
-  const postItem = initialItem || fetchedItem;
+  const postItem = initialItem || cachedPost || fetchedItem;
 
   if (loading && !postItem) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Cargando publicación...</Text>
-      </View>
-    );
+    return <PostDetailShimmer />;
   }
 
   if (!postItem) {
@@ -55,8 +72,9 @@ export default function PostDetailScreen() {
     <FeedDetail
       item={postItem}
       currentUserId={user?.id}
-      highlightUserIds={highlightUserIds}
-      autoOpenComments={!!highlightUserId}
+      highlightUserIds={highlightUserIdsFinal}
+      highlightCommentIds={parsedHighlightCommentIds}
+      autoOpenComments={!!highlightUserId || !!highlightUserIds}
       onClose={() => {
         if (router.canGoBack()) {
           router.back();
@@ -65,9 +83,18 @@ export default function PostDetailScreen() {
         }
       }}
       onUserClick={(user) => {
+        const profileData = {
+          id: user.id,
+          nombre: user.nombre || user.name || "",
+          foto: user.avatar,
+          rol: user.role,
+          ocupacion: user.ocupacion,
+          rating: user.rating,
+          totalRatings: user.totalRatings,
+        };
         router.push({
           pathname: "/(stack)/user/[id]",
-          params: { id: user.id },
+          params: { id: user.id, profileData: JSON.stringify(profileData) },
         });
       }}
     />
@@ -75,17 +102,6 @@ export default function PostDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: COLORS.white,
-  },
-  loadingText: {
-    marginTop: 12,
-    color: COLORS.textSecondary,
-    fontSize: 16,
-  },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
@@ -94,7 +110,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: COLORS.textSecondary,
+    color: "#6b7280",
     textAlign: "center",
   },
 });

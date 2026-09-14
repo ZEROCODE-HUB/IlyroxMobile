@@ -38,7 +38,6 @@ import { COLORS } from "../../constants";
 import { Avatar } from "../shared";
 import { ViewImage } from "./ViewImage";
 import { Comment } from "../../types";
-import { ScreenWrapper } from "../../screens/ScreenWrapper";
 import MessageInput from "../Messaging/MessageInput";
 import { supabase } from "../../lib/supabase";
 
@@ -52,6 +51,7 @@ interface CommentsBottomSheetProps {
   feedItemId: string;
   currentUserId?: string;
   highlightUserIds?: string[];
+  highlightCommentIds?: string[];
 }
 
 interface CommentItemProps {
@@ -61,6 +61,7 @@ interface CommentItemProps {
   onLike: () => void;
   onReply: () => void;
   highlightedUserIds?: string[];
+  highlightCommentIds?: string[];
 }
 
 // ============================================================================
@@ -73,12 +74,13 @@ interface CommentItemProps {
 // ============================================================================
 
 const CommentItem = React.memo<CommentItemProps>(
-  ({ comment, replies, isLiked, onLike, onReply, highlightedUserIds }) => {
-    const isCommentHighlighted = highlightedUserIds?.includes(comment.user.id) || false;
+  ({ comment, replies, isLiked, onLike, onReply, highlightedUserIds, highlightCommentIds }) => {
+    const isByHighlightedAuthor = highlightedUserIds?.includes(comment.user.id) || false;
+    const isExactHighlighted = highlightCommentIds?.includes(comment.id) || false;
+    const isCommentHighlighted = isByHighlightedAuthor || isExactHighlighted;
 
     return (
-      <ScreenWrapper withHeader={false}>
-        <View style={[styles.commentContainer, isCommentHighlighted && styles.highlightedComment]}>
+      <View style={[styles.commentContainer, isCommentHighlighted && styles.highlightedComment]}>
           {isCommentHighlighted && <View style={styles.highlightIndicator} />}
 
           <View style={styles.commentMain}>
@@ -88,7 +90,7 @@ const CommentItem = React.memo<CommentItemProps>(
               size={36}
             />
             <View style={styles.commentBody}>
-              <View style={[styles.bubble, isCommentHighlighted && styles.highlightedBubble]}>
+              <View style={styles.bubble}>
                 <View style={styles.bubbleHeader}>
                   <Text style={styles.userName}>{comment.user.nombre}</Text>
                   <Text style={styles.timestamp}>{comment.timestamp}</Text>
@@ -122,7 +124,9 @@ const CommentItem = React.memo<CommentItemProps>(
           </View>
 
           {replies.map((reply) => {
-            const isReplyHighlighted = highlightedUserIds?.includes(reply.user.id) || false;
+            const isReplyByAuthor = highlightedUserIds?.includes(reply.user.id) || false;
+            const isReplyExact = highlightCommentIds?.includes(reply.id) || false;
+            const isReplyHighlighted = isReplyByAuthor || isReplyExact;
             return (
               <View key={reply.id} style={[styles.replyContainer, isReplyHighlighted && styles.highlightedReply]}>
                 <Avatar
@@ -131,7 +135,7 @@ const CommentItem = React.memo<CommentItemProps>(
                   size={28}
                 />
                 <View style={styles.commentBody}>
-                  <View style={[styles.bubble, isReplyHighlighted && styles.highlightedBubble]}>
+                  <View style={styles.bubble}>
                     <View style={styles.bubbleHeader}>
                       <Text style={styles.userName}>{reply.user.nombre}</Text>
                       <Text style={styles.timestamp}>{reply.timestamp}</Text>
@@ -151,8 +155,7 @@ const CommentItem = React.memo<CommentItemProps>(
               </View>
             );
           })}
-        </View>
-      </ScreenWrapper>
+      </View>
     );
   },
 );
@@ -169,6 +172,7 @@ export default function CommentsBottomSheet({
   feedItemId,
   currentUserId,
   highlightUserIds,
+  highlightCommentIds,
 }: CommentsBottomSheetProps) {
   const { height: screenHeight } = useWindowDimensions();
   const modalHeight = screenHeight * 0.95;
@@ -176,20 +180,33 @@ export default function CommentsBottomSheet({
   // State
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [highlightedUserIds, setHighlightedUserIds] = useState<string[]>([]);
+  const [localHighlightCommentIds, setLocalHighlightCommentIds] = useState<string[]>([]);
 
   // Refs
   const inputRef = useRef<TextInput>(null);
   const flatListRef = useRef<FlatList>(null);
 
   // Data
-  const { comments, loading, posting, addComment, toggleCommentLike } =
-    useComments({
-      feedItemId,
-      userId: currentUserId,
-      userProfile: currentUserId
-        ? { id: currentUserId, nombre: "Tú", foto: null }
-        : undefined,
-    });
+  const {
+    comments,
+    totalCount,
+    loading,
+    loadingMore,
+    hasMore,
+    loadMore,
+    posting,
+    addComment,
+    toggleCommentLike,
+    highlightedRootIds,
+  } = useComments({
+    feedItemId,
+    userId: currentUserId,
+    userProfile: currentUserId
+      ? { id: currentUserId, nombre: "Tú", foto: null }
+      : undefined,
+    highlightUserIds,
+    highlightCommentIds,
+  });
 
   // Derived data
   const parentComments = useMemo(
@@ -197,19 +214,36 @@ export default function CommentsBottomSheet({
     [comments],
   );
 
-  // Display comments: highlighted users' comments FIRST, then others
+  // Display comments: destacados (por autor o por raíz de thread) ARRIBA.
+  // Cubre: (a) raíces de autores destacados, (b) raíces ancestrales de
+  // un comentario destacado (caso REPLY) gracias a highlightedRootIds.
   const displayComments = useMemo(() => {
-    if (!highlightedUserIds || highlightedUserIds.length === 0) return parentComments;
+    const authorSet = new Set(highlightedUserIds || []);
+    const rootSet = new Set(highlightedRootIds || []);
 
-    const highlighted = parentComments.filter(
-      (c) => highlightedUserIds.includes(c.user.id)
-    );
-    const others = parentComments.filter(
-      (c) => !highlightedUserIds.includes(c.user.id)
-    );
+    const isHighlighted = (c: Comment) =>
+      (!!c.parentId === false && rootSet.has(c.id)) ||
+      (authorSet.size > 0 && authorSet.has(c.user.id));
 
+    if (authorSet.size === 0 && rootSet.size === 0) return parentComments;
+
+    const highlighted = parentComments.filter(isHighlighted);
+    const others = parentComments.filter((c) => !isHighlighted(c));
     return [...highlighted, ...others];
-  }, [parentComments, highlightedUserIds]);
+  }, [parentComments, highlightedUserIds, highlightedRootIds]);
+
+  // Pre-computed map de respuestas por comment para evitar O(N²) en render
+  const repliesMap = useMemo(() => {
+    const map = new Map<string, Comment[]>();
+    for (const c of comments) {
+      if (c.parentId) {
+        const arr = map.get(c.parentId) || [];
+        arr.push(c);
+        map.set(c.parentId, arr);
+      }
+    }
+    return map;
+  }, [comments]);
 
   const replyToUser = useMemo(
     () => comments.find((c) => c.id === replyTo)?.user.nombre,
@@ -232,6 +266,7 @@ export default function CommentsBottomSheet({
     if (!visible) {
       setReplyTo(null);
       setHighlightedUserIds([]);
+      setLocalHighlightCommentIds([]);
     } else if (visible && feedItemId && currentUserId) {
       // Marcar post como visto para cancelar notificaciones duplicadas
       supabase.rpc('mark_post_as_seen', {
@@ -247,6 +282,13 @@ export default function CommentsBottomSheet({
       setHighlightedUserIds(highlightUserIds);
     }
   }, [highlightUserIds]);
+
+  // Set highlighted comment ids when highlightCommentIds prop changes
+  useEffect(() => {
+    if (highlightCommentIds && highlightCommentIds.length > 0) {
+      setLocalHighlightCommentIds(highlightCommentIds);
+    }
+  }, [highlightCommentIds]);
 
   // ============================================================================
   // Handlers
@@ -266,8 +308,9 @@ export default function CommentsBottomSheet({
 
       if (success) {
         setReplyTo(null);
+        // DESC: nuevo arriba -> scrollear al inicio
         setTimeout(
-          () => flatListRef.current?.scrollToEnd({ animated: true }),
+          () => flatListRef.current?.scrollToOffset({ offset: 0, animated: true }),
           100,
         );
       }
@@ -287,17 +330,25 @@ export default function CommentsBottomSheet({
   // ============================================================================
 
   const renderComment = useCallback(
-    ({ item }: { item: Comment }) => (
-      <CommentItem
-        comment={item}
-        replies={comments.filter((c) => c.parentId === item.id)}
-        isLiked={!!item.isLiked}
-        onLike={() => handleLikeComment(item.id)}
-        onReply={() => setReplyTo(item.id)}
-        highlightedUserIds={highlightedUserIds}
-      />
-    ),
-    [comments, handleLikeComment, highlightedUserIds],
+    ({ item }: { item: Comment }) => {
+      const isByHighlightedAuthor = highlightedUserIds?.includes(item.user.id) || false;
+      const isExactHighlighted = localHighlightCommentIds?.includes(item.id) || false;
+      const isItemHighlighted = isByHighlightedAuthor || isExactHighlighted;
+      return (
+        <View style={isItemHighlighted ? styles.listItemFullWidth : styles.listItemWrap}>
+          <CommentItem
+            comment={item}
+            replies={repliesMap.get(item.id) || []}
+            isLiked={!!item.isLiked}
+            onLike={() => handleLikeComment(item.id)}
+            onReply={() => setReplyTo(item.id)}
+            highlightedUserIds={highlightedUserIds}
+            highlightCommentIds={localHighlightCommentIds}
+          />
+        </View>
+      );
+    },
+    [repliesMap, handleLikeComment, highlightedUserIds, localHighlightCommentIds],
   );
 
   const ListEmptyComponent = useMemo(() => {
@@ -314,6 +365,28 @@ export default function CommentsBottomSheet({
       </View>
     );
   }, [loading]);
+
+  const ListFooterComponent = useMemo(() => {
+    if (loadingMore) {
+      return (
+        <View style={styles.footerContainer}>
+          <ActivityIndicator size="small" color={COLORS.primary} />
+        </View>
+      );
+    }
+    if (hasMore && displayComments.length > 0) {
+      return (
+        <TouchableOpacity
+          style={styles.loadMoreButton}
+          onPress={loadMore}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.loadMoreText}>Ver más comentarios</Text>
+        </TouchableOpacity>
+      );
+    }
+    return null;
+  }, [loadingMore, hasMore, loadMore, displayComments.length]);
 
   // ============================================================================
   // Render
@@ -336,7 +409,7 @@ export default function CommentsBottomSheet({
               {/* Header */}
               <View style={styles.header}>
                 <Text style={styles.title}>
-                  Comentarios ({comments.length})
+                  Comentarios ({totalCount})
                 </Text>
                 <TouchableOpacity
                   onPress={handleClose}
@@ -358,6 +431,9 @@ export default function CommentsBottomSheet({
                   displayComments.length === 0 && styles.listContentEmpty,
                 ]}
                 ListEmptyComponent={ListEmptyComponent}
+                ListFooterComponent={ListFooterComponent}
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.4}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               />
@@ -446,8 +522,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   listContent: {
-    padding: 16,
+    paddingTop: 16,
     paddingBottom: 8,
+  },
+  listItemWrap: {
+    paddingHorizontal: 16,
+  },
+  listItemFullWidth: {
+    paddingHorizontal: 0,
   },
   listContentEmpty: {
     flexGrow: 1,
@@ -460,6 +542,25 @@ const styles = StyleSheet.create({
   emptyText: {
     color: COLORS.textTertiary,
     fontSize: 15,
+  },
+
+  // Footer / load more
+  footerContainer: {
+    alignItems: "center",
+    paddingVertical: 16,
+  },
+  loadMoreButton: {
+    alignSelf: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: COLORS.background,
+    borderRadius: 20,
+    marginVertical: 12,
+  },
+  loadMoreText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: "600",
   },
 
   // Comment item
@@ -557,31 +658,26 @@ const styles = StyleSheet.create({
 
   // Highlight styles for comment notifications
   highlightedComment: {
-    backgroundColor: '#E3F2FD',
-    borderRadius: 12,
+    backgroundColor: COLORS.primaryTransparent,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     marginVertical: 4,
+    opacity: 0.85,
   },
   highlightIndicator: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-    backgroundColor: '#3B82F6',
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
-  },
-  highlightedBubble: {
-    backgroundColor: '#DBEAFE',
+    display: 'none',
   },
   highlightedReply: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: COLORS.primaryTransparent,
     borderRadius: 8,
     marginTop: 8,
-    padding: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    marginHorizontal: -16,
+    opacity: 0.85,
   },
   highlightBadge: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,

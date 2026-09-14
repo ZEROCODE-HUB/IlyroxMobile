@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 16,
     fontWeight: "700",
-    color: COLORS.textPrimary,
+    color: COLORS.primaryDark,
     marginBottom: 12,
   },
   label: {
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   },
   chipActive: {
     backgroundColor: COLORS.primaryTransparent,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.primaryDark,
   },
   chipText: {
     fontSize: 14,
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   chipTextActive: {
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
     fontWeight: "600",
   },
   selector: {

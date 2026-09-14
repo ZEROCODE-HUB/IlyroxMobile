@@ -12,6 +12,7 @@ import {
   Pressable,
   Modal,
 } from "react-native";
+import SafePressable from "@/design-system/components/SafePressable";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { FeedItem, User } from "../../types";
@@ -298,7 +299,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     <View style={commonStyles.card}>
       {/* Header y recomendaciones clickeables */}
       <View style={styles.headerRow}>
-        <TouchableOpacity
+        <SafePressable
           style={styles.headerFill}
           activeOpacity={0.9}
           onPress={onClick}
@@ -314,7 +315,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             showRecommendedPreview={false}
             feedItemType="property"
           />
-        </TouchableOpacity>
+        </SafePressable>
         {isOwner && (
           <View style={styles.headerMenuWrapper}>
             <ThreeDotsMenu
@@ -428,7 +429,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       </Pressable>
 
       {/* Información de la propiedad clickeable */}
-      <TouchableOpacity activeOpacity={0.9} onPress={onClick}>
+      <SafePressable activeOpacity={0.9} onPress={onClick}>
         <View style={[commonStyles.cardContent, styles.compactContent]}>
           <Text style={commonStyles.title} numberOfLines={1}>
             {title}
@@ -478,7 +479,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             </View>
 
             {userId !== item.user.id && (
-              <TouchableOpacity
+              <SafePressable
                 style={styles.smallContactBtn}
                 onPress={handleContactPress}
               >
@@ -488,26 +489,26 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                   color={COLORS.white}
                 />
                 <Text style={styles.smallContactText}>Contactar</Text>
-              </TouchableOpacity>
+              </SafePressable>
             )}
           </View>
         </View>
-      </TouchableOpacity>
+      </SafePressable>
 
       {stats.length > 0 && (
-        <TouchableOpacity activeOpacity={0.9} onPress={onClick}>
+        <SafePressable activeOpacity={0.9} onPress={onClick}>
           <View style={styles.statsRow}>
             {stats.map((s) => (
               <View key={s.key} style={styles.statItem}>
                 {s.icon}
                 <Text style={styles.statLabel}>{s.label}</Text>
                 {s.value ? (
-                  <Text style={styles.statValue}>{s.value}</Text>
+                  <Text style={s.value} />
                 ) : null}
               </View>
             ))}
           </View>
-        </TouchableOpacity>
+        </SafePressable>
       )}
 
       <MapModal

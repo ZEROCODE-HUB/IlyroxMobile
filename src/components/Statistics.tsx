@@ -31,14 +31,21 @@ import Chart10_SearchesByNeighborhood from "./charts/Chart10_SearchesByNeighborh
 import Chart11_TopAmenities from "./charts/Chart11_TopAmenities";
 import Chart12_SurfaceVsSaleTime from "./charts/Chart12_SurfaceVsSaleTime";
 import Chart13_PriceByRooms from "./charts/Chart13_PriceByRooms";
-import { ScreenWrapper } from "../screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const Statistics = () => {
+  const insets = useSafeAreaInsets();
+  const safeStyle = {
+    paddingBottom: Math.max(insets.bottom, 10),
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
+
   const isVisible = true;
 
   if (isVisible) {
     return (
-      <ScreenWrapper withHeader={false} style={styles.container}>
+      <View style={[styles.container, safeStyle]}>
         <AppHeader
           title="Dashboard ilyrox"
           showBackButton={false}
@@ -73,7 +80,7 @@ const Statistics = () => {
             Próximamente
           </Text>
         </View>
-      </ScreenWrapper>
+      </View>
     );
   }
 
@@ -238,7 +245,7 @@ const Statistics = () => {
   }, [filters]);
 
   return (
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View style={[styles.container, safeStyle]}>
       <AppHeader
         title="Dashboard ilyrox"
         showBackButton
@@ -379,7 +386,7 @@ const Statistics = () => {
           setShowFiltersModal(false);
         }}
       />
-    </ScreenWrapper>
+    </View>
   );
 };
 

@@ -1043,7 +1043,7 @@ const styles = StyleSheet.create({
   busquedaTagText: {
     fontSize: 12,
     fontWeight: "800",
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
     letterSpacing: 1.2,
   },
   clienteCard: {
@@ -1064,7 +1064,7 @@ const styles = StyleSheet.create({
   clienteHeaderText: {
     fontSize: 10,
     fontWeight: "700",
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
     letterSpacing: 0.6,
   },
   clienteNombre: {

@@ -38,8 +38,8 @@ function getToneStyles(tone: ChipTone, selected: boolean) {
   if (selected) {
     return {
       container: {
-        backgroundColor: COLORS.primary,
-        borderColor: COLORS.primary,
+        backgroundColor: COLORS.primaryDark,
+        borderColor: COLORS.primaryDark,
         borderWidth: 1,
       },
       text: { color: COLORS.white },

@@ -14,7 +14,6 @@
     "update:production": "eas update --channel production"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.975.0",
     "@expo/vector-icons": "^15.0.3",
     "@gorhom/bottom-sheet": "^5.2.8",
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -32,7 +31,6 @@
     "burnt": "^0.13.0",
     "expo": "~54.0.33",
     "expo-auth-session": "~7.0.10",
-    "expo-av": "^16.0.8",
     "expo-blur": "~15.0.8",
     "expo-clipboard": "~8.0.8",
     "expo-constants": "^18.0.13",

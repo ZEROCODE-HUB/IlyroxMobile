@@ -96,7 +96,9 @@ const Chart02_MarketOpportunities: React.FC<FilteredChartProps> = ({
           if (typeof search.criterios_busqueda === "string") {
             try {
               criteria = JSON.parse(search.criterios_busqueda);
-            } catch (e) {}
+            } catch (e) {
+              console.warn("Chart02: failed to parse criterios_busqueda", e);
+            }
           } else {
             criteria = search.criterios_busqueda;
           }

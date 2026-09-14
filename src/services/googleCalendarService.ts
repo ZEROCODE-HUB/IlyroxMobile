@@ -2,6 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/utils/logger";
 import { getSupabaseFunctionErrorDetail } from "../utils/supabaseFunctionError";
+import {
+  DEFAULT_APPOINTMENT_TIME_ZONE,
+  getDeviceTimeZone,
+} from "@/utils/timeZone";
 
 const log = logger.scoped("googleCalendarService");
 
@@ -10,10 +14,17 @@ const DEFAULT_CALENDAR_ID = "primary";
 const TOKEN_EXPIRY_GRACE_MS = 60 * 1000;
 const db = supabase as any;
 
+const isMissingGoogleMeetColumn = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  "message" in error &&
+  String((error as { message?: unknown }).message).includes("google_meet_url");
+
 export interface GoogleCalendarConnection {
   accessToken: string;
   expiresAt: number;
   calendarId: string;
+  serverSynced?: boolean;
 }
 
 export interface CalendarAppointmentInput {
@@ -26,14 +37,34 @@ export interface CalendarAppointmentInput {
   location?: string | null;
   otherUserName?: string | null;
   otherUserEmail?: string | null;
+  createMeet?: boolean;
+  creatorTimeZone?: string | null;
 }
 
 export interface GoogleCalendarEventResult {
   id: string;
+  status?: string;
   htmlLink?: string;
+  hangoutLink?: string;
+  attendees?: Array<{
+    email?: string;
+    responseStatus?: string;
+  }>;
+  conferenceData?: {
+    entryPoints?: Array<{
+      entryPointType?: string;
+      uri?: string;
+    }>;
+  };
+  googleMeetUrl?: string | null;
 }
 
-export type CalendarSyncAction = "create" | "update" | "delete";
+export type CalendarSyncAction =
+  | "create"
+  | "update"
+  | "delete"
+  | "reconcile"
+  | "accept";
 
 const getConnectionKey = (userId: string) =>
   `${CONNECTION_KEY_PREFIX}.${userId}`;
@@ -50,12 +81,42 @@ const padTime = (time: string) => {
   return `${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}:00`;
 };
 
-const addOneHour = (date: Date) => new Date(date.getTime() + 60 * 60 * 1000);
+const addOneHourLocal = (fecha: string, hora: string) => {
+  const [year, month, day] = fecha.split("-").map(Number);
+  const [hours, minutes, seconds] = padTime(hora).split(":").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
+  date.setUTCHours(date.getUTCHours() + 1);
+
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
+    2,
+    "0",
+  )}-${String(date.getUTCDate()).padStart(2, "0")}T${String(
+    date.getUTCHours(),
+  ).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(
+    date.getUTCSeconds(),
+  ).padStart(2, "0")}`;
+};
+
+const getMeetUrl = (event: GoogleCalendarEventResult) =>
+  event.hangoutLink ??
+  event.conferenceData?.entryPoints?.find(
+    (entryPoint) => entryPoint.entryPointType === "video",
+  )?.uri ??
+  null;
+
+const withMeetUrl = (event: GoogleCalendarEventResult) => ({
+  ...event,
+  googleMeetUrl: getMeetUrl(event),
+});
 
 const buildEventBody = (appointment: CalendarAppointmentInput) => {
   const typeLabel = typeLabels[appointment.tipo] ?? appointment.tipo;
-  const start = new Date(`${appointment.fecha}T${padTime(appointment.hora)}`);
-  const end = addOneHour(start);
+  const timeZone =
+    appointment.creatorTimeZone ||
+    getDeviceTimeZone() ||
+    DEFAULT_APPOINTMENT_TIME_ZONE;
+  const startDateTime = `${appointment.fecha}T${padTime(appointment.hora)}`;
+  const endDateTime = addOneHourLocal(appointment.fecha, appointment.hora);
   const titleBase = appointment.propertyTitle || "Cita Ilyrox";
   const summary = `${typeLabel} - ${titleBase}`;
   const details = [
@@ -66,15 +127,17 @@ const buildEventBody = (appointment: CalendarAppointmentInput) => {
     .filter(Boolean)
     .join("\n");
 
-  return {
+  const body: Record<string, unknown> = {
     summary,
     location: appointment.location || undefined,
     description: details,
     start: {
-      dateTime: start.toISOString(),
+      dateTime: startDateTime,
+      timeZone,
     },
     end: {
-      dateTime: end.toISOString(),
+      dateTime: endDateTime,
+      timeZone,
     },
     attendees: appointment.otherUserEmail
       ? [
@@ -93,6 +156,19 @@ const buildEventBody = (appointment: CalendarAppointmentInput) => {
       },
     },
   };
+
+  if (appointment.createMeet !== false) {
+    body.conferenceData = {
+      createRequest: {
+        requestId: `ilyrox-${appointment.id}`,
+        conferenceSolutionKey: {
+          type: "hangoutsMeet",
+        },
+      },
+    };
+  }
+
+  return body;
 };
 
 const calendarFetch = async <T>(
@@ -165,14 +241,15 @@ export const googleCalendarService = {
     const calendarId = encodeURIComponent(
       connection.calendarId || DEFAULT_CALENDAR_ID,
     );
-    return calendarFetch<GoogleCalendarEventResult>(
+    const event = await calendarFetch<GoogleCalendarEventResult>(
       connection.accessToken,
-      `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events?sendUpdates=all`,
+      `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events?sendUpdates=all&conferenceDataVersion=1`,
       {
         method: "POST",
         body: JSON.stringify(buildEventBody(appointment)),
       },
     );
+    return withMeetUrl(event);
   },
 
   async updateEvent(
@@ -183,16 +260,36 @@ export const googleCalendarService = {
     const calendarId = encodeURIComponent(
       connection.calendarId || DEFAULT_CALENDAR_ID,
     );
-    return calendarFetch<GoogleCalendarEventResult>(
+    const event = await calendarFetch<GoogleCalendarEventResult>(
       connection.accessToken,
       `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${encodeURIComponent(
         eventId,
-      )}?sendUpdates=all`,
+      )}?sendUpdates=all&conferenceDataVersion=1`,
       {
         method: "PATCH",
         body: JSON.stringify(buildEventBody(appointment)),
       },
     );
+    return withMeetUrl(event);
+  },
+
+  async getEvent(
+    connection: GoogleCalendarConnection,
+    eventId: string,
+  ): Promise<GoogleCalendarEventResult> {
+    const calendarId = encodeURIComponent(
+      connection.calendarId || DEFAULT_CALENDAR_ID,
+    );
+    const event = await calendarFetch<GoogleCalendarEventResult>(
+      connection.accessToken,
+      `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${encodeURIComponent(
+        eventId,
+      )}?conferenceDataVersion=1`,
+      {
+        method: "GET",
+      },
+    );
+    return withMeetUrl(event);
   },
 
   async deleteEvent(connection: GoogleCalendarConnection, eventId: string) {
@@ -217,16 +314,32 @@ export const googleCalendarService = {
     }
   },
 
-  async attachEventToAppointment(appointmentId: string, eventId: string) {
-    const { error } = await db
+  async attachEventToAppointment(
+    appointmentId: string,
+    eventId: string,
+    googleMeetUrl?: string | null,
+  ) {
+    const update = {
+      google_event_id: eventId,
+      google_calendar_id: DEFAULT_CALENDAR_ID,
+      google_meet_url: googleMeetUrl ?? null,
+      google_last_synced_at: new Date().toISOString(),
+      google_sync_origin: "ilyrox",
+    };
+
+    let { error } = await db
       .from("citas")
-      .update({
-        google_event_id: eventId,
-        google_calendar_id: DEFAULT_CALENDAR_ID,
-        google_last_synced_at: new Date().toISOString(),
-        google_sync_origin: "ilyrox",
-      })
+      .update(update)
       .eq("id", appointmentId);
+
+    if (isMissingGoogleMeetColumn(error)) {
+      const { google_meet_url: _ignored, ...withoutMeetUrl } = update;
+      const retry = await db
+        .from("citas")
+        .update(withoutMeetUrl)
+        .eq("id", appointmentId);
+      error = retry.error;
+    }
 
     if (error) {
       log.warn("Could not persist Google Calendar event id", {
@@ -238,15 +351,27 @@ export const googleCalendarService = {
   },
 
   async clearEventFromAppointment(appointmentId: string) {
-    const { error } = await db
+    const update = {
+      google_event_id: null,
+      google_calendar_id: null,
+      google_meet_url: null,
+      google_last_synced_at: new Date().toISOString(),
+      google_sync_origin: "ilyrox",
+    };
+
+    let { error } = await db
       .from("citas")
-      .update({
-        google_event_id: null,
-        google_calendar_id: null,
-        google_last_synced_at: new Date().toISOString(),
-        google_sync_origin: "ilyrox",
-      })
+      .update(update)
       .eq("id", appointmentId);
+
+    if (isMissingGoogleMeetColumn(error)) {
+      const { google_meet_url: _ignored, ...withoutMeetUrl } = update;
+      const retry = await db
+        .from("citas")
+        .update(withoutMeetUrl)
+        .eq("id", appointmentId);
+      error = retry.error;
+    }
 
     if (error) {
       log.warn("Could not clear Google Calendar event id", {
@@ -276,6 +401,13 @@ export const googleCalendarService = {
       throw new Error(JSON.stringify(detail));
     }
 
-    return data as { ok?: boolean; skipped?: string; eventId?: string };
+    return data as {
+      ok?: boolean;
+      skipped?: string;
+      changed?: boolean;
+      status?: string;
+      eventId?: string;
+      meetUrl?: string | null;
+    };
   },
 };

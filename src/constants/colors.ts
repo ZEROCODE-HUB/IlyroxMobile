@@ -7,10 +7,10 @@
 
 export const COLORS = {
   // Colores primarios
-  primary: "#45a0a5",
-  primaryDark: "#378084",
-  primaryLight: "#6eb8bc",
-  primaryTransparent: "rgba(69, 160, 165, 0.1)",
+  primary: "#06809D",
+  primaryDark: "#05677F",
+  primaryLight: "#3FA3BD",
+  primaryTransparent: "rgba(6, 128, 157, 0.1)",
 
   // Estados
   success: "#2d9a8a",
@@ -32,7 +32,7 @@ export const COLORS = {
   tagPink: "#ec4899",
   tagPurpleLight: "#f3e8ff",
   tagPinkLight: "#fce7f3",
-  openHouse: "#45a0a5",
+  openHouse: "#06809D",
 
   // Textos
   textPrimary: "#1a2e2f",

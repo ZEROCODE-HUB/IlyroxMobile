@@ -2,21 +2,31 @@ import React from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   ScrollView,
 } from "react-native";
+import SafePressable from "@/design-system/components/SafePressable";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppHeader } from "../AppHeader";
 import { COLORS } from "@/constants/colors";
-import { ScreenWrapper } from "@/screens/ScreenWrapper";
 
 export default function CreateContent() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingBottom: Math.max(insets.bottom, 10),
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+      ]}
+    >
       <AppHeader
         title="Crear contenido"
         showBackButton
@@ -30,7 +40,7 @@ export default function CreateContent() {
       >
         <View style={styles.optionsContainer}>
           {/* Opción: Post */}
-          <TouchableOpacity
+          <SafePressable
             style={styles.optionCard}
             onPress={() => router.push("/create/post")}
             accessibilityLabel="Publicar post"
@@ -55,10 +65,10 @@ export default function CreateContent() {
               size={20}
               color={COLORS.textTertiary}
             />
-          </TouchableOpacity>
+          </SafePressable>
 
           {/* Opción: Reel */}
-          <TouchableOpacity
+          <SafePressable
             style={styles.optionCard}
             onPress={() => router.push("/create/reel")}
             accessibilityLabel="Publicar reel"
@@ -83,10 +93,10 @@ export default function CreateContent() {
               size={20}
               color={COLORS.textTertiary}
             />
-          </TouchableOpacity>
+          </SafePressable>
 
           {/* Opción: Propiedad */}
-          <TouchableOpacity
+          <SafePressable
             style={styles.optionCard}
             onPress={() => router.push("/create/property")}
             accessibilityLabel="Publicar propiedad"
@@ -111,10 +121,10 @@ export default function CreateContent() {
               size={20}
               color={COLORS.textTertiary}
             />
-          </TouchableOpacity>
+          </SafePressable>
         </View>
       </ScrollView>
-    </ScreenWrapper>
+    </View>
   );
 }
 

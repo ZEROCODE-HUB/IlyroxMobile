@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, memo } from "react";
-import { Animated, StyleSheet, View, useWindowDimensions } from "react-native";
-import { COLORS } from "@/constants/colors";
+import { Animated, StyleSheet, View } from "react-native";
+import { COLORS, DIMENSIONS } from "@/constants";
+
+const ShimmerColor = "#e0e0e0";
 
 interface ShimmerProps {
   width: number | string;
@@ -41,7 +43,7 @@ const Shimmer = memo(function Shimmer({
           width,
           height,
           borderRadius,
-          backgroundColor: "#e0e0e0",
+          backgroundColor: ShimmerColor,
           opacity,
         },
         style,
@@ -50,67 +52,53 @@ const Shimmer = memo(function Shimmer({
   );
 });
 
-interface FeedShimmerCardProps {
-  type: "property" | "reel" | "post";
+interface PostShimmerCardProps {
+  showCaption?: boolean;
 }
 
-const FeedShimmerCard = memo(function FeedShimmerCard({ type }: FeedShimmerCardProps) {
-  const { width } = useWindowDimensions();
-  const cardWidth = width - 32;
-
-  const imageHeight = type === "property" ? 200 : type === "reel" ? 300 : 180;
+const PostShimmerCard = memo(function PostShimmerCard({ showCaption = true }: PostShimmerCardProps) {
+  const { width } = { width: DIMENSIONS.SCREEN_WIDTH };
+  const cardWidth = width;
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <View style={styles.avatarWrap}>
-          <Shimmer width={44} height={44} borderRadius={22} />
-        </View>
+        <Shimmer width={36} height={36} borderRadius={18} />
         <View style={styles.headerText}>
-          <Shimmer width={120} height={14} borderRadius={4} style={styles.nameShimmer} />
-          <Shimmer width={80} height={10} borderRadius={4} style={styles.timeShimmer} />
+          <View style={styles.nameRow}>
+            <Shimmer width={110} height={14} borderRadius={4} />
+            <Shimmer width={50} height={12} borderRadius={4} style={{ marginLeft: 6 }} />
+          </View>
+          <Shimmer width={80} height={10} borderRadius={4} style={{ marginTop: 4 }} />
         </View>
       </View>
 
-      <View style={styles.imageWrap}>
-        <Shimmer width={cardWidth - 16} height={imageHeight} borderRadius={8} />
-      </View>
+      <Shimmer width={cardWidth} height={cardWidth * DIMENSIONS.POST_ASPECT_RATIO} />
 
-      <View style={styles.content}>
-        <View style={styles.metricsRow}>
-          <View style={styles.metric}>
-            <Shimmer width={24} height={24} borderRadius={12} />
-            <Shimmer width={30} height={14} borderRadius={4} style={styles.metricText} />
-          </View>
-          <View style={styles.metric}>
-            <Shimmer width={24} height={24} borderRadius={12} />
-            <Shimmer width={30} height={14} borderRadius={4} style={styles.metricText} />
-          </View>
-          <View style={styles.metric}>
-            <Shimmer width={24} height={24} borderRadius={12} />
-            <Shimmer width={30} height={14} borderRadius={4} style={styles.metricText} />
-          </View>
+      <View style={styles.actionsRow}>
+        <View style={styles.actionItem}>
+          <Shimmer width={20} height={20} borderRadius={4} />
+          <Shimmer width={24} height={12} borderRadius={4} style={{ marginLeft: 6 }} />
         </View>
-
-        {type === "property" && (
-          <>
-            <Shimmer width="90%" height={16} borderRadius={4} style={styles.priceShimmer} />
-            <Shimmer width="70%" height={12} borderRadius={4} style={styles.addressShimmer} />
-            <View style={styles.featuresRow}>
-              <Shimmer width={60} height={24} borderRadius={12} />
-              <Shimmer width={60} height={24} borderRadius={12} />
-              <Shimmer width={60} height={24} borderRadius={12} />
-            </View>
-          </>
-        )}
-
-        {type === "post" && (
-          <>
-            <Shimmer width="95%" height={14} borderRadius={4} style={styles.titleShimmer} />
-            <Shimmer width="80%" height={14} borderRadius={4} />
-          </>
-        )}
+        <View style={styles.actionItem}>
+          <Shimmer width={20} height={20} borderRadius={4} />
+          <Shimmer width={24} height={12} borderRadius={4} style={{ marginLeft: 6 }} />
+        </View>
+        <View style={styles.actionItem}>
+          <Shimmer width={20} height={20} borderRadius={4} />
+          <Shimmer width={24} height={12} borderRadius={4} style={{ marginLeft: 6 }} />
+        </View>
       </View>
+
+      {showCaption && (
+        <View style={styles.captionArea}>
+          <View style={styles.captionLine}>
+            <Shimmer width={70} height={14} borderRadius={4} />
+            <Shimmer width="65%" height={14} borderRadius={4} style={{ marginLeft: 8 }} />
+          </View>
+          <Shimmer width="45%" height={14} borderRadius={4} style={{ marginTop: 4 }} />
+        </View>
+      )}
     </View>
   );
 });
@@ -118,70 +106,55 @@ const FeedShimmerCard = memo(function FeedShimmerCard({ type }: FeedShimmerCardP
 export const FeedShimmer = memo(function FeedShimmer() {
   return (
     <View style={styles.container}>
-      <FeedShimmerCard type="property" />
-      <FeedShimmerCard type="reel" />
-      <FeedShimmerCard type="post" />
-      <FeedShimmerCard type="post" />
+      <PostShimmerCard showCaption={true} />
+      <PostShimmerCard showCaption={true} />
+      <PostShimmerCard showCaption={true} />
+      <PostShimmerCard showCaption={false} />
     </View>
   );
 });
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    gap: 16,
+    width: "100%",
   },
   card: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    overflow: "hidden",
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
+    marginBottom: 10,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
-  },
-  avatarWrap: {
-    marginRight: 12,
+    gap: 12,
   },
   headerText: {
     flex: 1,
   },
-  nameShimmer: {
-    marginBottom: 6,
-  },
-  timeShimmer: {},
-  imageWrap: {
-    paddingHorizontal: 8,
-  },
-  content: {
-    padding: 12,
-  },
-  metricsRow: {
-    flexDirection: "row",
-    gap: 24,
-    marginBottom: 12,
-  },
-  metric: {
+  nameRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
   },
-  metricText: {},
-  priceShimmer: {
-    marginBottom: 8,
-  },
-  addressShimmer: {
-    marginBottom: 12,
-  },
-  featuresRow: {
+  actionsRow: {
     flexDirection: "row",
-    gap: 8,
+    alignItems: "center",
+    gap: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  titleShimmer: {
-    marginBottom: 8,
+  actionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  captionArea: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 4,
+  },
+  captionLine: {
+    flexDirection: "row",
+    alignItems: "center",
   },
 });

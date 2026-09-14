@@ -10,6 +10,7 @@ import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import {
   QueryClientProvider,
   focusManager,
+  useQueryClient,
 } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { OneSignal } from "react-native-onesignal";
@@ -41,6 +42,7 @@ import { VersionUpdateModal } from "@/components/modals/VersionUpdateModal";
 import { supabase } from "@/lib/supabase";
 import { storeInviteCodeFromUrl, captureInviteFromDeviceMatch, captureInviteFromFingerprint } from "@/services/communityService";
 import { logger } from "@/utils/logger";
+import { buildFeedItemNavigation } from "@/utils/notificationNavigation";
 
 if (Platform.OS !== "web") {
   OneSignal.initialize(process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID!);
@@ -123,9 +125,13 @@ if (typeof ErrorUtils !== "undefined") {
 function buildNotificationNavigation(
   data: any,
   router: ReturnType<typeof useRouter>,
+  queryClient?: any,
+  currentUserId?: string,
 ): (() => void) | null {
   if (!data) return null;
 
+  // Resolver screen conocido: el switch rápido cubre los casos que el
+  // backend etiqueta explícitamente.
   switch (data.screen) {
     case "ChatDetail":
       // Se pasa el emisor (no la conversación): MessagingScreen resuelve con él
@@ -159,17 +165,35 @@ function buildNotificationNavigation(
     case "ProfileReviews":
       // La reseña es sobre uno mismo → perfil propio.
       return () => router.push("/(tabs)/profile");
-
-    default:
-      if (data.type === "recordar_filtros") {
-        return () =>
-          router.navigate({
-            pathname: "/(stack)/map",
-            params: data.busqueda_id ? { busquedaId: String(data.busqueda_id) } : {},
-          });
-      }
-      return null;
   }
+
+  // Fallback: si la push referencia un feed_item (caso típico: comentario
+  // o respuesta), el backend NO manda `screen`. Resolvemos vía el helper
+  // compartido que extrae comment_ids / author_ids del `data` jsonb.
+  if (data.feed_item_id) {
+    return () => {
+      buildFeedItemNavigation({
+        router,
+        feedItemId: data.feed_item_id,
+        data,
+        queryClient,
+        currentUserId,
+      })
+        .then((go) => go?.())
+        .catch((err) => logger.warn("feed_item navigation failed:", err));
+    };
+  }
+
+  // Último recurso: filtros guardados.
+  if (data.type === "recordar_filtros") {
+    return () =>
+      router.navigate({
+        pathname: "/(stack)/map",
+        params: data.busqueda_id ? { busquedaId: String(data.busqueda_id) } : {},
+      });
+  }
+
+  return null;
 }
 
 /**
@@ -252,6 +276,7 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   const { session, profile, loading: authLoading, isPasswordResetProcessing } = useAuth();
+  const queryClient = useQueryClient();
   const {
     updateRequired,
     versionInfo,
@@ -379,15 +404,15 @@ function RootLayoutNav() {
     };
   }, [session]);
 
-  // Global StatusBar setup
+  // Global StatusBar setup — transparente para que se vea el BlurView en (tabs)
   useEffect(() => {
     StatusBar.setHidden(false);
     if (Platform.OS === "android") {
       StatusBar.setBackgroundColor("transparent");
       StatusBar.setTranslucent(true);
-      StatusBar.setBarStyle("dark-content"); // Default to dark content for light theme
+      StatusBar.setBarStyle("light-content");
     } else {
-      StatusBar.setBarStyle("dark-content");
+      StatusBar.setBarStyle("light-content");
     }
   }, []);
 
@@ -436,7 +461,12 @@ function RootLayoutNav() {
       segments[0] !== "(auth)";
     if (!ready) return;
 
-    const go = buildNotificationNavigation(notificationClick, router);
+    const go = buildNotificationNavigation(
+      notificationClick,
+      router,
+      queryClient,
+      profile?.id,
+    );
     setNotificationClick(null);
     if (!go) return;
 

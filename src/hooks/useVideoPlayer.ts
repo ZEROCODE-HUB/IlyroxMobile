@@ -45,6 +45,8 @@ export const useVideoPlayer = (
   const player = useExpoVideoPlayer(videoSource, (p) => {
     p.loop = loop;
     p.muted = muted;
+    // Emitir timeUpdate cada 100ms — misma fluidez que el polling, pero nativo
+    p.timeUpdateEventInterval = 0.1;
     if (autoPlay && isVisible) {
       p.play();
     }
@@ -94,25 +96,30 @@ export const useVideoPlayer = (
     }
   }, [muted, player]);
 
-  // Polling de progreso y estado
+  // Listen to native player events instead of polling every 100ms
   useEffect(() => {
-    const interval = setInterval(() => {
+    if (!player) return;
+    const playingSub = player.addListener("playingChange", ({ isPlaying }) => {
+      setIsPlaying(isPlaying);
+    });
+    const statusSub = player.addListener("statusChange", ({ status }) => {
+      setStatus(status);
+    });
+    const timeSub = player.addListener("timeUpdate", ({ currentTime }) => {
       try {
-        if (!player) return;
-        setIsPlaying(player.playing);
-        setStatus(player.status);
         if (player.duration > 0) {
           setProgress(
-            Math.min(1, Math.max(0, player.currentTime / player.duration)),
+            Math.min(1, Math.max(0, currentTime / player.duration)),
           );
         }
       } catch {
-        // player was released between ticks
+        // player was released between events
       }
-    }, 100);
-
+    });
     return () => {
-      clearInterval(interval);
+      playingSub.remove();
+      statusSub.remove();
+      timeSub.remove();
       try {
         player?.release();
       } catch {

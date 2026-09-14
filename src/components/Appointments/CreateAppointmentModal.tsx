@@ -24,6 +24,7 @@ import { appointmentService } from "@/services/appointmentService";
 import { googleCalendarService } from "@/services/googleCalendarService";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { logger } from "@/utils/logger";
+import { getDeviceTimeZone } from "@/utils/timeZone";
 import DatePickerField from "./DatePickerField";
 import TimePickerField from "./TimePickerField";
 import AppointmentTypeSelector from "./AppointmentTypeSelector";
@@ -65,6 +66,7 @@ export default function CreateAppointmentModal({
   const [descripcion, setDescripcion] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const isEditMode = mode === "edit";
+  const creatorTimeZone = getDeviceTimeZone();
 
   React.useEffect(() => {
     if (visible) {
@@ -123,6 +125,34 @@ export default function CreateAppointmentModal({
     setDescripcion("");
   };
 
+  const buildPendingCalendarPayload = async (
+    appointmentId: string,
+    participantId: string,
+  ) => {
+    const [propertyInfo, otherUser] = await Promise.all([
+      appointmentService.getPropertyCalendarInfo(propertyId ?? ""),
+      appointmentService.getUserBasicInfo(participantId),
+    ]);
+
+    const otherUserName = otherUser
+      ? `${otherUser.nombre || ""} ${otherUser.apellido_paterno || ""}`.trim()
+      : null;
+
+    return {
+      id: appointmentId,
+      fecha: fechaText,
+      hora: `${horaText}:00`,
+      tipo,
+      descripcion: descripcion.trim() || null,
+      propertyTitle: propertyInfo?.titulo ?? null,
+      location: propertyInfo?.location ?? null,
+      otherUserName,
+      otherUserEmail: otherUser?.email ?? null,
+      createMeet: false,
+      creatorTimeZone,
+    };
+  };
+
   const handleSaveAppointment = async () => {
     if (!validateDate(fechaText)) {
       showModal({
@@ -159,20 +189,27 @@ export default function CreateAppointmentModal({
           descripcion: descripcion.trim() || null,
         });
 
-        try {
-          await googleCalendarService.syncAppointmentOnServer(
-            "update",
-            appointment.id,
-          );
+        if (appointment.estado === "confirmada" || appointment.google_event_id) {
+          try {
+            await googleCalendarService.syncAppointmentOnServer(
+              "update",
+              appointment.id,
+            );
+            showToast(
+              "Cita actualizada y sincronizada con Google Calendar",
+              "success",
+            );
+          } catch (calendarError) {
+            log.warn("Could not sync updated appointment", calendarError);
+            showToast(
+              "Cita actualizada. No se pudo sincronizar Google Calendar",
+              "info",
+            );
+          }
+        } else {
           showToast(
-            "Cita actualizada y sincronizada con Google Calendar",
+            "Solicitud de cita actualizada. Se sincronizará cuando sea aceptada",
             "success",
-          );
-        } catch (calendarError) {
-          log.warn("Could not sync updated appointment", calendarError);
-          showToast(
-            "Cita actualizada. No se pudo sincronizar Google Calendar",
-            "info",
           );
         }
 
@@ -196,6 +233,8 @@ export default function CreateAppointmentModal({
         return;
       }
 
+      const connection = await ensureConnection();
+
       const createdAppointment = await appointmentService.createAppointment({
         propertyId,
         agenteId,
@@ -205,77 +244,71 @@ export default function CreateAppointmentModal({
         hora: horaStr,
         tipo,
         descripcion: descripcion.trim() || null,
+        creatorTimeZone,
       });
 
-      let propertyTitle = "";
-      let location = "";
-      let otherUserName = "";
-      let otherUserEmail = "";
+      let calendarInviteSent = false;
 
-      try {
-        const propInfo =
-          await appointmentService.getPropertyCalendarInfo(propertyId);
-        if (propInfo) {
-          propertyTitle = propInfo.titulo;
-          location = propInfo.location;
-        }
-
-        const userData = await appointmentService.getUserBasicInfo(otherUserId);
-        if (userData) {
-          otherUserName =
-            `${userData.nombre} ${userData.apellido_paterno}`.trim();
-          otherUserEmail = userData.email || "";
-        }
-      } catch (err) {
-        log.warn("Could not fetch details for calendar", err);
-      }
-
-      try {
-        if (currentUserId === agenteId) {
-          await ensureConnection();
-        }
-
+      if (connection?.serverSynced) {
+        try {
         const result = await googleCalendarService.syncAppointmentOnServer(
           "create",
           createdAppointment.id,
         );
-
-        if (result?.ok) {
-          showToast(
-            "Cita creada y sincronizada con Google Calendar",
-            "success",
-          );
-        } else if (currentUserId === agenteId) {
-          const connection = await ensureConnection();
-          if (connection) {
-            const event = await googleCalendarService.createEvent(connection, {
-              id: createdAppointment.id,
-              fecha: fechaText,
-              hora: horaStr,
-              tipo,
-              descripcion: descripcion.trim() || null,
-              propertyTitle,
-              location,
-              otherUserName,
-              otherUserEmail: otherUserEmail || null,
-            });
+        if (!result?.ok) {
+          log.warn("Pending Google Calendar event was not created", result);
+            const payload = await buildPendingCalendarPayload(
+              createdAppointment.id,
+              otherUserId,
+            );
+            const event = await googleCalendarService.createEvent(
+              connection,
+              payload,
+            );
             await googleCalendarService.attachEventToAppointment(
               createdAppointment.id,
               event.id,
+              event.googleMeetUrl,
             );
-            showToast(
-              "Cita creada y sincronizada con Google Calendar",
-              "success",
-            );
+            calendarInviteSent = true;
           } else {
-            showToast("Cita creada exitosamente", "success");
+            calendarInviteSent = true;
           }
-        } else {
-          showToast("Cita creada exitosamente", "success");
+        } catch (calendarError) {
+          log.warn("Could not create pending Google Calendar event", calendarError);
+          try {
+            const payload = await buildPendingCalendarPayload(
+              createdAppointment.id,
+              otherUserId,
+            );
+            const event = await googleCalendarService.createEvent(
+              connection,
+              payload,
+            );
+            await googleCalendarService.attachEventToAppointment(
+              createdAppointment.id,
+              event.id,
+              event.googleMeetUrl,
+            );
+            calendarInviteSent = true;
+          } catch (fallbackError) {
+            log.warn("Local Google Calendar fallback failed", fallbackError);
+          }
         }
-      } catch (calendarError) {
-        log.warn("Could not sync appointment with Google Calendar", calendarError);
-        showToast("Cita creada exitosamente", "success");
+      }
+
+      if (!calendarInviteSent) {
+        showToast(
+          connection?.serverSynced
+            ? "Solicitud creada. No se pudo enviar todavía la invitación de Google Calendar"
+            : "Solicitud creada en la app. Conecta Google Calendar para enviar invitación por email",
+          "info",
+        );
+      } else {
+        showToast(
+          "Solicitud de cita enviada por la app y Google Calendar. El Meet se agregará cuando sea aceptada",
+          "success",
+        );
       }
 
       onClose();

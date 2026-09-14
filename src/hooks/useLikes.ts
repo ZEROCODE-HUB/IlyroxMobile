@@ -60,7 +60,7 @@ export function useLikes(options: UseLikesOptions) {
   const { data, refetch } = useQuery({
     queryKey,
     queryFn: fetchLikeState,
-    staleTime: 0, // ⬅️ Siempre refetch
+    staleTime: 30_000, // 30s caché — evita refetch en cada montaje de reels
     gcTime: 5 * 60 * 1000, // 5 minutos en caché
   });
 

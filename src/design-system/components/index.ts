@@ -16,6 +16,7 @@ export { LoadingState } from "./LoadingState";
 export type { LoadingStateProps } from "./LoadingState";
 export { Modal } from "./Modal";
 export type { ModalProps, ModalVariant } from "./Modal";
+export { default as SafePressable } from "./SafePressable";
 export { ScreenHeader } from "./ScreenHeader";
 export type { ScreenHeaderProps } from "./ScreenHeader";
 export { SectionHeader } from "./SectionHeader";

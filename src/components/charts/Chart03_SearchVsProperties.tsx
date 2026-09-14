@@ -117,7 +117,9 @@ const Chart03_SearchVsProperties: React.FC<FilteredChartProps> = ({
           if (typeof item.criterios_busqueda === "string") {
             try {
               criteria = JSON.parse(item.criterios_busqueda);
-            } catch (e) {}
+            } catch (e) {
+              console.warn("Chart03: failed to parse criterios_busqueda", e);
+            }
           } else {
             criteria = item.criterios_busqueda;
           }

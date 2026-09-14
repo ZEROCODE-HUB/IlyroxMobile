@@ -920,7 +920,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11,
     fontWeight: "700",
-    color: COLORS.textTertiary,
+    color: COLORS.primaryDark,
     textTransform: "uppercase",
     letterSpacing: 0.6,
     marginBottom: 12,
@@ -939,8 +939,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   chipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryDark,
+    borderColor: COLORS.primaryDark,
   },
   chipText: {
     fontSize: 13,

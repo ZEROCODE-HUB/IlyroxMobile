@@ -1,5 +1,6 @@
 import React, { useCallback } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, FlatList } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
+import SafePressable from "@/design-system/components/SafePressable";
 import { Ionicons } from "@expo/vector-icons";
 import { User } from "../types";
 import { useWindowDimensions } from "react-native";
@@ -26,14 +27,14 @@ const UsersSlider: React.FC<UsersSliderProps> = ({
   const renderUser = useCallback(
     ({ item: user }: { item: User }) => (
       <View style={[styles.userCard, { width: cardWidth }]}>
-        <TouchableOpacity onPress={() => onUserClick?.(user)}>
+        <SafePressable onPress={() => onUserClick?.(user)}>
           <Avatar 
             uri={user.avatar} 
             name={user.name || user.nombre} 
             size={80} 
             style={styles.userCardAvatar} 
           />
-        </TouchableOpacity>
+        </SafePressable>
         <Text style={styles.userCardName} numberOfLines={1}>
           {user.name || user.nombre || "Usuario"}
         </Text>

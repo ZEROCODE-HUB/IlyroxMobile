@@ -12,7 +12,7 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
-import { ScreenWrapper } from "@/screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -28,6 +28,7 @@ const VerifyPasswordResetScreen: React.FC = () => {
   const params = useLocalSearchParams();
   const { showModal } = useModal();
   const { showToast } = useToast();
+  const insets = useSafeAreaInsets();
   const { startPasswordResetProcessing, endPasswordResetProcessing } = useAuth();
   const email = (params.email as string) || "";
 
@@ -187,7 +188,16 @@ const VerifyPasswordResetScreen: React.FC = () => {
   };
 
   return (
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingBottom: Math.max(insets.bottom, 10),
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+      ]}
+    >
       <AppHeader
         title="Verificar código"
         showBackButton={true}
@@ -356,7 +366,7 @@ const VerifyPasswordResetScreen: React.FC = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </ScreenWrapper>
+    </View>
   );
 };
 

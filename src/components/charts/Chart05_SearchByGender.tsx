@@ -40,7 +40,9 @@ const Chart05_SearchByGender: React.FC<Chart05Props> = ({
         if (typeof s.criterios_busqueda === "string") {
           try {
             criteria = JSON.parse(s.criterios_busqueda);
-          } catch (e) {}
+          } catch (e) {
+            console.warn("Chart05: failed to parse criterios_busqueda", e);
+          }
         } else {
           criteria = s.criterios_busqueda;
         }

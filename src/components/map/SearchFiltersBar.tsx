@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 import { LocationChip } from "@/store/propertyFiltersStore";
@@ -31,9 +32,10 @@ export const SearchFiltersBar: React.FC<SearchFiltersBarProps> = ({
   onBack,
 }) => {
   const hasChips = locationChips.length > 0 || polygonChips.length > 0;
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 10 }]}>
       <View style={styles.buttonsRow}>
         {onBack && (
           <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 0 }}>
@@ -111,7 +113,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.background,
-    paddingTop: 12,
     paddingBottom: 8,
     paddingHorizontal: 16,
     gap: 8,

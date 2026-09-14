@@ -35,8 +35,9 @@ export function formatPropertyAge(antiguedad?: string | number | null): string {
       return `${edad} año${edad === 1 ? "" : "s"}`;
     }
 
-    // 0 = recién terminada.
-    if (num === 0) return "A estrenar";
+    // 0 = 0 años (recién terminada). No es "A estrenar": Tokko lo indica con
+    // age nulo/ausente, 0 significa literalmente 0 años.
+    if (num === 0) return "0 años";
 
     // Número pequeño = ya es la edad en años.
     return `${num} año${num === 1 ? "" : "s"}`;

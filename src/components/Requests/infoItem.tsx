@@ -6,6 +6,7 @@ import {
   Pressable,
   View,
 } from "react-native";
+import SafePressable from "@/design-system/components/SafePressable";
 import { COLORS } from "@/constants/colors";
 import firstUpperCase from "@/utils/firstUpperCase";
 import { Image } from "expo-image";
@@ -209,13 +210,13 @@ export const InfoItem = ({
       <View style={styles.cardFooter}>
         <Text style={styles.dateText}>{formatDate(item.created_at)}</Text>
         {item.propiedad_id && (
-          <Pressable
+          <SafePressable
             onPress={() =>
               router.push(`/(stack)/property/${item.propiedad_id}`)
             }
           >
             <Text style={styles.viewDetailLink}>Ver propiedad</Text>
-          </Pressable>
+          </SafePressable>
         )}
       </View>
     </View>

@@ -5,6 +5,7 @@
 
 import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from "react-native";
+import SafePressable from "@/design-system/components/SafePressable";
 import { FeedItem, User } from "../../types";
 
 import { DIMENSIONS, COLORS } from "../../constants";
@@ -119,7 +120,7 @@ const PostCard: React.FC<PostCardProps> = ({
     <View style={commonStyles.card}>
       <View style={styles.contentCard}>
         <View style={styles.headerRow}>
-          <TouchableOpacity style={styles.headerFill} activeOpacity={0.9} onPress={onClick}>
+          <SafePressable style={styles.headerFill} activeOpacity={0.9} onPress={onClick}>
             <UserHeader
               user={item.user}
               timestamp={item.timestamp}
@@ -130,7 +131,7 @@ const PostCard: React.FC<PostCardProps> = ({
               totalRatings={item.user.totalRatings}
               showRecommendedPreview={false}
             />
-          </TouchableOpacity>
+          </SafePressable>
           {isOwner && (
             <View style={styles.headerMenuWrapper}>
               <ThreeDotsMenu
@@ -174,11 +175,11 @@ const PostCard: React.FC<PostCardProps> = ({
         {/* Imágenes o Contenido de Texto */}
         <View style={styles.contentContainer}>
           {isSpecialPost ? (
-            <TouchableOpacity activeOpacity={0.95} onPress={onClick}>
+            <SafePressable activeOpacity={0.95} onPress={onClick}>
               <SpecialPostCard item={item} mode="preview" />
-            </TouchableOpacity>
+            </SafePressable>
           ) : !hasImages ? (
-            <TouchableOpacity activeOpacity={0.95} onPress={onClick}>
+            <SafePressable activeOpacity={0.95} onPress={onClick}>
               <View
                 style={[
                   styles.textPostContainer,
@@ -199,7 +200,7 @@ const PostCard: React.FC<PostCardProps> = ({
                   content={item.content}
                 />
               </View>
-            </TouchableOpacity>
+            </SafePressable>
           ) : (
             <ImageGallery
               images={images}

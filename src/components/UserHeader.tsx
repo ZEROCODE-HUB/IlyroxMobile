@@ -8,6 +8,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from "react-native";
+import SafePressable from "@/design-system/components/SafePressable";
 import { User } from "../types";
 import Avatar from "./shared/Avatar";
 import { COLORS } from "../constants/colors";
@@ -110,7 +111,7 @@ const UserHeader: React.FC<UserHeaderProps> = ({
   };
   return (
     <View style={styles.cardHeader}>
-      <TouchableOpacity
+      <SafePressable
         style={styles.userInfo}
         onPress={() => onUserClick?.(user)}
         accessibilityLabel={`Ver perfil de ${displayName}`}
@@ -166,7 +167,7 @@ const UserHeader: React.FC<UserHeaderProps> = ({
             </TouchableOpacity>
           )}
         </View>
-      </TouchableOpacity>
+      </SafePressable>
 
       {showRecommendedModal && (
         <Modal visible transparent animationType="fade">

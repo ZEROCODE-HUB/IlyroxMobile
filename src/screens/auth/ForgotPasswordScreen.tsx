@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
-import { ScreenWrapper } from "@/screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import { router } from "expo-router";
 import { Button } from "@/design-system/components";
@@ -18,6 +18,7 @@ import { logger } from "@/utils/logger";
 const log = logger.scoped("ForgotPasswordScreen");
 
 const ForgotPasswordScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,7 +70,16 @@ const ForgotPasswordScreen: React.FC = () => {
   };
 
   return (
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingBottom: Math.max(insets.bottom, 10),
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+      ]}
+    >
       <AppHeader
         title="Recuperar Contraseña"
         showBackButton={true}
@@ -122,7 +132,7 @@ const ForgotPasswordScreen: React.FC = () => {
           </View>
         </View>
       </KeyboardAvoidingView>
-    </ScreenWrapper>
+    </View>
   );
 };
 

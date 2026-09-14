@@ -15,6 +15,7 @@ import {
 import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 import { Ionicons } from "@expo/vector-icons";
 import { usePropertyFiltersStore } from "../../store/propertyFiltersStore";
+import { useShallow } from "zustand/react/shallow";
 import { useSaveSearch } from "./filters/useSaveSearch";
 import { useToast } from "../../context/ToastContext";
 
@@ -54,7 +55,8 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   editBusquedaId,
   onUpdateSearch,
 }) => {
-  const { filters, updateFilter: onUpdateFilter } = usePropertyFiltersStore();
+  const filters = usePropertyFiltersStore(useShallow((s) => s.filters));
+  const onUpdateFilter = usePropertyFiltersStore((s) => s.updateFilter);
   const { updateSearchInDatabase } = useSaveSearch(userId);
   const { showToast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
@@ -384,8 +386,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   operacionChipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryDark,
+    borderColor: COLORS.primaryDark,
   },
   operacionChipText: {
     fontSize: 14,
@@ -404,7 +406,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 16,
     fontWeight: "700",
-    color: COLORS.textPrimary,
+    color: COLORS.primaryDark,
   },
   currencyToggle: {
     flexDirection: "row",

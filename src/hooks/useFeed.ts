@@ -18,7 +18,7 @@ import { FeedItem, RecommendedByPreviewUser, User } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { feedService } from "@/services/feedService";
 import { profileService } from "@/services/profileService";
-import { PAGINATION, TIMEOUTS } from "@/constants/config";
+import { PAGINATION } from "@/constants/config";
 import { logger } from "@/utils/logger";
 
 const log = logger.scoped("useFeed");
@@ -274,7 +274,11 @@ export function useFeedItem(feedItemId: string) {
     queryKey: feedKeys.item(feedItemId, currentUserId),
     queryFn: () => feedService.getFeedItem(feedItemId, currentUserId),
     enabled: Boolean(feedItemId),
-    staleTime: TIMEOUTS.SESSION_REFRESH_MS,
+    // Cache más largo para que clicks repetidos al mismo post sean
+    // instantáneos (no hay fetch si el cache está fresco). SESSION_REFRESH
+    // sigue controlando el refetch en background cuando el usuario vuelve.
+    staleTime: 10 * 60 * 1000, // 10 min
+    gcTime: 15 * 60 * 1000, // 15 min
   });
 
   return {

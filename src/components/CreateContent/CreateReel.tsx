@@ -23,7 +23,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useLocalModal } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
 import { COLORS } from "../../constants/colors";
-import { ScreenWrapper } from "../../screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
 import { useCreateContent } from "@/hooks/useCreateContent";
 import { useVideoUpload } from "@/hooks";
@@ -107,6 +107,12 @@ const VideoPreview = ({
 };
 
 export default function CreateReel({ onBack, reelId }: CreateReelProps) {
+  const insets = useSafeAreaInsets();
+  const safeStyle = {
+    paddingBottom: Math.max(insets.bottom, 10),
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
   const { user } = useAuth();
   const { showModal, modalElement } = useLocalModal();
   const { showToast } = useToast();
@@ -294,7 +300,7 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
 
   return (
     <KeyboardProvider>
-    <ScreenWrapper withHeader={false} style={styles.container}>
+    <View style={[styles.container, safeStyle]}>
       <AppHeader
         title={isEditing ? "Editar Reel" : "Nuevo Reel"}
         showBackButton
@@ -411,7 +417,7 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
         </View>
       </Modal>
       {modalElement}
-    </ScreenWrapper>
+    </View>
     </KeyboardProvider>
   );
 }

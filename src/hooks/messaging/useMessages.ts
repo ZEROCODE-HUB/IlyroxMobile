@@ -344,10 +344,28 @@ export function useMessages(conversationId: string | null, userId?: string) {
       return newConv.id;
     } catch (err: any) {
       log.error("Error ensuring conversation exists:", err);
-      // Si falla por unique constraint race condition, intentar buscar de nuevo
+      // Si falla por unique constraint race condition, re-buscar la conversación
+      // recién creada por el otro cliente y devolver su id.
       if (err.code === "23505") {
-        // Unique violation
-        // Retry logic could go here, for now return null/throw
+        try {
+          // Reconstruir el query (la variable `query` original no está
+          // disponible en el catch).
+          let retryQuery = supabase
+            .from("conversaciones")
+            .select("id")
+            .or(
+              `and(usuario1_id.eq.${userId},usuario2_id.eq.${metadata.destinatario_id}),and(usuario1_id.eq.${metadata.destinatario_id},usuario2_id.eq.${userId})`,
+            );
+          if (metadata.propiedad_id) {
+            retryQuery = retryQuery.eq("propiedad_id", metadata.propiedad_id);
+          } else {
+            retryQuery = retryQuery.is("propiedad_id", null);
+          }
+          const { data: retryExisting } = await retryQuery.maybeSingle();
+          if (retryExisting) return retryExisting.id;
+        } catch (retryErr: any) {
+          log.error("Retry lookup after 23505 failed:", retryErr);
+        }
       }
       return null;
     }
@@ -466,8 +484,6 @@ export function useMessages(conversationId: string | null, userId?: string) {
       log.error("Error sending message:", err);
       // Revertir optimistic update
       if (isMountedRef.current) {
-        setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-        // Mostrar alerta
         setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
         // Mostrar alerta
         showModal({
@@ -927,10 +943,6 @@ export function useMessages(conversationId: string | null, userId?: string) {
     }
   };
 
-  /**
-   * Configurar suscripción Realtime
-   * FIX: Solo se crea UNA vez por conversación
-   */
   /**
    * Configurar suscripción Realtime
    * FIX: Solo se crea UNA vez por conversación y maneja reconexiones

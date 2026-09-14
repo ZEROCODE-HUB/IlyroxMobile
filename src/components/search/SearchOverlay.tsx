@@ -255,8 +255,8 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
   const getReelData = (feedItemId: string) => {
     const reel = results.reels.find(r => r.feed_item_id === feedItemId);
     return {
-      resultadoTitulo: 'Reel',
-      resultadoSubtitulo: reel?.views || '',
+      resultadoTitulo: query || 'Reel',
+      resultadoSubtitulo: reel?.views ? `Reel · ${reel.views}` : 'Reel',
       resultadoTipoId: feedItemId,
     };
   };
@@ -893,7 +893,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   tabActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.primaryDark,
   },
   tabText: {
     fontSize: 13,

@@ -287,68 +287,84 @@ export const propertyService = {
       if (error) throw error;
     }
 
-    // Amenidades - Need to fetch IDs first? assuming names are passed, we need IDs.
-    // Wait, the previous code was doing:
-    // const { data: catAmenidad } = await supabase.from("cat_amenidades").select("id").eq("nombre", amenidad).single();
-    // It's better to optimize this. But for now let's reuse the logic or expect IDs?
-    // The component was doing it one by one. I should probably move that logic here.
-
-    // Actually, to make it efficient, let's process them here.
+    // Amenidades - batch lookup + batch insert (reemplaza N+1).
+    // Antes: por cada amenidad: SELECT WHERE nombre + INSERT = 2 round-trips.
+    // Ahora: 1 SELECT .in() + 1 INSERT en bloque = 2 round-trips totales.
     if (amenidades && amenidades.length > 0) {
-      for (const amenidad of amenidades) {
-        // Assuming we need to look up ID by name if not provided.
-        // Ideally the UI should provide IDs, but the UI uses names.
-        // We'll look up IDs.
-        const { data: catAmenidad } = await supabase
-          .from("catalogo_amenidades")
-          .select("id")
-          .eq("nombre", amenidad)
-          .single();
+      const { data: catAmenidades, error: amenidadLookupError } = await supabase
+        .from("catalogo_amenidades")
+        .select("id, nombre")
+        .in("nombre", amenidades);
 
-        if (catAmenidad) {
-          await supabase.from("propiedad_amenidades").insert({
-            propiedad_id: propiedadId,
-            amenidad_id: catAmenidad.id,
-          });
-        }
+      if (amenidadLookupError) throw amenidadLookupError;
+
+      const amenidadIds = (catAmenidades || []).map((c) => c.id);
+      if (amenidadIds.length > 0) {
+        const { error: amenidadInsertError } = await supabase
+          .from("propiedad_amenidades")
+          .insert(
+            amenidadIds.map((id) => ({
+              propiedad_id: propiedadId,
+              amenidad_id: id,
+            })),
+          );
+        if (amenidadInsertError) throw amenidadInsertError;
       }
     }
 
-    // Financiamientos
+    // Financiamientos - batch lookup + batch insert.
     if (financiamientos && financiamientos.length > 0) {
-      for (const tipo of financiamientos) {
-        const { data: catFin } = await supabase
-          .from("catalogo_tipos_financiamiento")
-          .select("id")
-          .eq("nombre", tipo)
-          .single();
+      const { data: catFin, error: finLookupError } = await supabase
+        .from("catalogo_tipos_financiamiento")
+        .select("id, nombre")
+        .in("nombre", financiamientos);
 
-        if (catFin) {
-          await supabase.from("propiedad_financiamientos").insert({
-            propiedad_id: propiedadId,
-            tipo_financiamiento_id: catFin.id,
-          });
-        }
+      if (finLookupError) throw finLookupError;
+
+      const finIds = (catFin || []).map((c) => c.id);
+      if (finIds.length > 0) {
+        const { error: finInsertError } = await supabase
+          .from("propiedad_financiamientos")
+          .insert(
+            finIds.map((id) => ({
+              propiedad_id: propiedadId,
+              tipo_financiamiento_id: id,
+            })),
+          );
+        if (finInsertError) throw finInsertError;
       }
     }
 
-    // Gravamenes
+    // Gravamenes - batch lookup + batch insert.
+    // gravenes es array de objetos { institucion: string, monto: number }.
     if (gravamenes && gravamenes.length > 0) {
-      // Assuming gravamenes is array of objects { institucion: string, monto: number }
-      for (const grav of gravamenes) {
-        const { data: catInst } = await supabase
-          .from("catalogo_instituciones_financieras")
-          .select("id")
-          .eq("nombre", grav.institucion)
-          .single();
+      const instituciones = gravamenes
+        .map((g: { institucion: string }) => g.institucion)
+        .filter(Boolean);
 
-        if (catInst) {
-          await supabase.from("propiedad_gravamenes").insert({
-            propiedad_id: propiedadId,
-            institucion_id: catInst.id,
-            monto: grav.monto,
-          });
-        }
+      const { data: catInst, error: instLookupError } = await supabase
+        .from("catalogo_instituciones_financieras")
+        .select("id, nombre")
+        .in("nombre", instituciones);
+
+      if (instLookupError) throw instLookupError;
+
+      // Mapear monto por nombre de institución.
+      const montoByNombre = new Map<string, number>();
+      for (const g of gravamenes) {
+        if (g.institucion) montoByNombre.set(g.institucion, g.monto);
+      }
+
+      const instRows = (catInst || []).map((c: { id: string; nombre: string }) => ({
+        propiedad_id: propiedadId,
+        institucion_id: c.id,
+        monto: montoByNombre.get(c.nombre) ?? null,
+      }));
+      if (instRows.length > 0) {
+        const { error: instInsertError } = await supabase
+          .from("propiedad_gravamenes")
+          .insert(instRows);
+        if (instInsertError) throw instInsertError;
       }
     }
   },

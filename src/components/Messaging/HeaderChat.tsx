@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import SafePressable from "@/design-system/components/SafePressable";
 import { Avatar } from "../shared";
 import { useToast } from "../../context/ToastContext";
 import { COLORS } from "../../constants";
@@ -89,7 +90,7 @@ export default function HeaderChat({
         />
       </TouchableOpacity>
 
-      <TouchableOpacity
+      <SafePressable
         style={styles.headerUser}
         onPress={() =>
           router.push({
@@ -127,7 +128,7 @@ export default function HeaderChat({
             </View>
           )}
         </View>
-      </TouchableOpacity>
+      </SafePressable>
 
       <TouchableOpacity
         onPress={() => setShowTagsModal(true)}
@@ -183,11 +184,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: COLORS.white,
     paddingHorizontal: 16,
-    paddingVertical: 15,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
     gap: 8,
-    marginTop: 10,
   },
   backButton: {
     width: 40,

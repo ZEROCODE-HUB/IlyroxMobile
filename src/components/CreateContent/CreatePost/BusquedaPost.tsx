@@ -459,8 +459,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   chipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryDark,
+    borderColor: COLORS.primaryDark,
   },
   chipText: {
     fontSize: 13,

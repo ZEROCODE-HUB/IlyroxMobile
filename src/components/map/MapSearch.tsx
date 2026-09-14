@@ -25,6 +25,7 @@ import PolygonDrawingOverlay from "./PolygonDrawingOverlay";
 import {
   usePropertyFilters,
 } from "@/hooks/usePropertyFilters";
+import { useShallow } from "zustand/react/shallow";
 import { router } from "expo-router";
 import {
   PolygonCoord,
@@ -93,7 +94,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
 
   // Actualizar búsqueda en BD cuando los filtros cambian (con debounce)
   const filtersUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const currentFilters = usePropertyFiltersStore((s) => s.filters);
+  const currentFilters = usePropertyFiltersStore(useShallow((s) => s.filters));
 
   useEffect(() => {
     if (!currentSearchId || !userId) return;
@@ -746,7 +747,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   refineSearchTitle: {
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
     fontSize: 15,
     fontWeight: "700",
   },

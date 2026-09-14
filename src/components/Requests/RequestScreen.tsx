@@ -1,4 +1,4 @@
-import { ScreenWrapper } from "@/screens/ScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import React, { useEffect, useState, useRef } from "react";
 import { logger } from "@/utils/logger";
 
@@ -29,6 +29,12 @@ import { useToast } from "@/context/ToastContext";
 const { width } = Dimensions.get("window");
 
 const RequestScreen = () => {
+  const insets = useSafeAreaInsets();
+  const safeStyle = {
+    paddingBottom: Math.max(insets.bottom, 10),
+    paddingLeft: insets.left,
+    paddingRight: insets.right,
+  };
   const { user } = useAuth();
   const router = useRouter();
   const { showToast } = useToast();
@@ -172,7 +178,7 @@ const RequestScreen = () => {
   ];
 
   return (
-    <ScreenWrapper withHeader={false}>
+    <View style={[styles.content, safeStyle]}>
       <AppHeader
         title="Solicitudes"
         showBackButton
@@ -307,7 +313,7 @@ const RequestScreen = () => {
           />
         )}
       </View>
-    </ScreenWrapper>
+    </View>
   );
 };
 
@@ -334,7 +340,7 @@ const styles = StyleSheet.create({
   subtitleHighlight: {
     fontSize: 13,
     fontWeight: "700",
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
   },
   subtitleText: {
     fontSize: 13,
@@ -358,7 +364,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "transparent",
   },
   activeTab: {
-    borderBottomColor: COLORS.primary,
+    borderBottomColor: COLORS.primaryDark,
   },
   tabTopRow: {
     flexDirection: "row",
@@ -372,7 +378,7 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
   },
   activeTabText: {
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
   },
   tabSubtext: {
     fontSize: 11,
@@ -380,7 +386,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   activeTabSubtext: {
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
   },
   badge: {
     backgroundColor: COLORS.primaryLight,

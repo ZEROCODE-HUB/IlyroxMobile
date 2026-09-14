@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { COLORS } from "@/constants/colors";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
+import { useShallow } from "zustand/react/shallow";
 
 const THUMB = 22;
 const TRACK_H = 6;
@@ -106,13 +107,21 @@ interface CommissionFilterSectionProps {
 }
 
 export function CommissionFilterSection({ onScrollLock }: CommissionFilterSectionProps) {
-  const { filters, updateFilter } = usePropertyFiltersStore();
+  const { operacion, comisionVentaMin, comisionRentaMin } =
+    usePropertyFiltersStore(
+      useShallow((s) => ({
+        operacion: s.filters.operacion,
+        comisionVentaMin: s.filters.comisionVentaMin,
+        comisionRentaMin: s.filters.comisionRentaMin,
+      })),
+    );
+  const updateFilter = usePropertyFiltersStore((s) => s.updateFilter);
 
-  const isRentaOnly = filters.operacion === "renta";
-  const isVentaOnly = filters.operacion === "venta";
+  const isRentaOnly = operacion === "renta";
+  const isVentaOnly = operacion === "venta";
 
-  const ventaVal = parseFloat(filters.comisionVentaMin) || 0;
-  const rentaVal = parseFloat(filters.comisionRentaMin) || 0;
+  const ventaVal = parseFloat(comisionVentaMin) || 0;
+  const rentaVal = parseFloat(comisionRentaMin) || 0;
 
   return (
     <View>
@@ -160,7 +169,7 @@ const styles = StyleSheet.create({
   sliderValue: {
     fontSize: 20,
     fontWeight: "700",
-    color: COLORS.primary,
+    color: COLORS.primaryDark,
   },
   sliderValueEmpty: {
     fontSize: 14,

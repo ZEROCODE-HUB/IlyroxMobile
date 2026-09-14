@@ -7,6 +7,7 @@ import {
   usePropertyFiltersStore,
   type ComercialFilters,
 } from "@/store/propertyFiltersStore";
+import { useShallow } from "zustand/react/shallow";
 
 interface ComercialFiltersSectionProps {
   /** Si se pasan, el componente opera sobre este valor en lugar del store global. */
@@ -21,9 +22,13 @@ export const ComercialFiltersSection: React.FC<ComercialFiltersSectionProps> = (
   value,
   onUpdate,
 }) => {
-  const store = usePropertyFiltersStore();
-  const cf = value ?? store.filters.comercialFilters;
-  const updateComercialFilter = onUpdate ?? store.updateComercialFilter;
+  const comercialFilters = usePropertyFiltersStore(
+    useShallow((s) => s.filters.comercialFilters),
+  );
+  const updateComercialFilter = usePropertyFiltersStore(
+    (s) => s.updateComercialFilter,
+  );
+  const cf = value ?? comercialFilters;
 
   return (
     <View style={styles.container}>
@@ -127,7 +132,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 16,
     fontWeight: "700",
-    color: COLORS.textPrimary,
+    color: COLORS.primaryDark,
     marginBottom: 16,
   },
   label: {
@@ -153,8 +158,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   chipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryDark,
+    borderColor: COLORS.primaryDark,
   },
   chipText: {
     fontSize: 13,

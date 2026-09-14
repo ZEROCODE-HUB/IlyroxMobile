@@ -11,7 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants";
 import { Avatar } from "../shared";
-import { EmptyState, LoadingState } from "@/design-system/components";
+import { EmptyState, LoadingState, SafePressable } from "@/design-system/components";
 import { useProfileStore, useAuthProfileStore } from "@/store/profileStore";
 import { router } from "expo-router";
 
@@ -132,7 +132,7 @@ export const RecommendedModal = ({
                 .trim();
 
               return (
-                <TouchableOpacity
+                <SafePressable
                   style={stylesRecommendedSection.recommendedByModalItem}
                   onPress={() => {
                     setShowModal(false);
@@ -164,7 +164,7 @@ export const RecommendedModal = ({
                       {u.ocupacion?.trim() || formatRole(u.rol)}
                     </Text>
                   </View>
-                </TouchableOpacity>
+                </SafePressable>
               );
             }}
             ListFooterComponent={
