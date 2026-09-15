@@ -29,6 +29,9 @@ interface TagsModalProps {
   onClose: () => void;
   availableTags: Tag[];
   assignedTags: Tag[];
+  /** Mientras se cargan las etiquetas asignadas en background, deshabilita los
+      toggles para no operar sobre un estado incompleto. */
+  loadingAssigned?: boolean;
   onAssignTag?: (tagId: string) => Promise<boolean>;
   onRemoveTag?: (tagId: string) => Promise<boolean>;
   onCreateTag?: (name: string, color: string) => Promise<Tag | null>;
@@ -56,6 +59,7 @@ export default function TagsModal({
   onClose,
   availableTags,
   assignedTags,
+  loadingAssigned = false,
   onAssignTag,
   onRemoveTag,
   onCreateTag,
@@ -162,7 +166,12 @@ export default function TagsModal({
             {/* Etiquetas disponibles - Solo mostrar si onAssignTag existe */}
             {onAssignTag && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Asignar etiquetas</Text>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionHeaderText}>Asignar etiquetas</Text>
+                  {loadingAssigned && (
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                  )}
+                </View>
                 {availableTags.length === 0 ? (
                   <Text style={styles.emptyText}>
                     No hay etiquetas disponibles
@@ -173,10 +182,11 @@ export default function TagsModal({
                       <TouchableOpacity
                         style={[
                           styles.tagItem,
-                          togglingTagId === tag.id && styles.tagItemDisabled,
+                          (togglingTagId === tag.id || loadingAssigned) &&
+                            styles.tagItemDisabled,
                         ]}
                         onPress={() => handleToggleTag(tag)}
-                        disabled={togglingTagId !== null}
+                        disabled={togglingTagId !== null || loadingAssigned}
                       >
                         <View
                           style={[
@@ -392,7 +402,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: 16,
     maxHeight: "80%",
-    height: "80%",
     padding: 20,
   },
   header: {
@@ -407,7 +416,7 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
   },
   section: {
     marginBottom: 24,
@@ -417,6 +426,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.textSecondary,
     marginBottom: 12,
+    textTransform: "uppercase",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  sectionHeaderText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
     textTransform: "uppercase",
   },
   formTitle: {

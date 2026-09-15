@@ -2,7 +2,6 @@ import React from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   Modal,
   StyleSheet,
   FlatList,
@@ -138,7 +137,7 @@ const UserHeader: React.FC<UserHeaderProps> = ({
               : `${formatDateShort(timestamp)}, ${formatTime(timestamp)}`}
           </Text>
           {showRecommendedPreview && positiveRecommendations > 0 && (
-            <TouchableOpacity
+            <SafePressable
               style={styles.recommendedRow}
               onPress={openRecommendedModal}
               activeOpacity={0.8}
@@ -164,14 +163,14 @@ const UserHeader: React.FC<UserHeaderProps> = ({
               <Text style={styles.recommendedText}>
                 {recommendedText}
               </Text>
-            </TouchableOpacity>
+            </SafePressable>
           )}
         </View>
       </SafePressable>
 
       {showRecommendedModal && (
         <Modal visible transparent animationType="fade">
-          <TouchableOpacity
+          <SafePressable
             style={styles.modalOverlay}
             activeOpacity={1}
             onPress={() => setShowRecommendedModal(false)}
@@ -226,7 +225,7 @@ const UserHeader: React.FC<UserHeaderProps> = ({
                 />
               )}
             </View>
-          </TouchableOpacity>
+          </SafePressable>
         </Modal>
       )}
     </View>

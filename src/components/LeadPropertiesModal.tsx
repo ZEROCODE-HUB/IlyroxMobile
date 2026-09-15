@@ -15,6 +15,7 @@ import { busquedas_guardadas, FeedItem, User } from "../types";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CommentsBottomSheet } from "./modals";
 import { ConfirmationModal } from "./modals/ConfirmationModal";
+import { closeThenNavigate } from "@/utils/closeThenNavigate";
 
 /** Tiempo relativo: "hace un momento" / "hace N min" / "hace N h" / "hace N días". */
 const formatRelative = (dateStr?: string): string => {
@@ -318,8 +319,9 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                   // mensajes; si no, en iOS se abre por detrás.
                   onBeforeNavigate={() =>
                     new Promise<void>((resolve) => {
-                      onClose();
-                      setTimeout(resolve, 350);
+                      // Cerrar este modal nativo antes de navegar (iOS: si se
+                      // abre con el modal presentado queda por detrás).
+                      closeThenNavigate(onClose, resolve);
                     })
                   }
                 />

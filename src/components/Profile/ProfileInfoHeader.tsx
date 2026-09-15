@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text,  View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/colors";
 import { ProfileHeader } from "./ProfileHeader";
@@ -7,6 +7,7 @@ import ProfileAvatarPicker from "./ProfileAvatarPicker";
 import ProfileTabs from "./ProfileTabs";
 import { RecommendedSection } from "./RecommendedSection";
 import { ProfileContentType, perfiles } from "@/types";
+import { SafePressable } from "@/design-system";
 
 export interface ProfileData {
   name: string;
@@ -153,7 +154,7 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
         {!isMe && (
           <View style={styles.actionsWrap}>
             <View style={styles.primaryActionsRow}>
-              <TouchableOpacity
+              <SafePressable
                 style={[
                   styles.messageBtn,
                   isBlocked && styles.messageBtnDisabled,
@@ -176,9 +177,9 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
                 >
                   Mensaje
                 </Text>
-              </TouchableOpacity>
+              </SafePressable>
               {!!onToggleBlock && (
-                <TouchableOpacity
+                <SafePressable
                   style={[
                     styles.blockBtn,
                     isBlocked && styles.blockBtnActive,
@@ -200,7 +201,7 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
                   >
                     {isBlocked ? "Desbloquear" : "Bloquear"}
                   </Text>
-                </TouchableOpacity>
+                </SafePressable>
               )}
             </View>
             {isBlocked && (
@@ -210,7 +211,7 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
             )}
             {onRecommend && !isBlocked && (
               <View style={styles.recommendRow}>
-                <TouchableOpacity
+                <SafePressable
                   style={[
                     styles.recommendBtn,
                     isRecommended === true && styles.recommendBtnActive,
@@ -234,8 +235,8 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
                   >
                     {isRecommended === true ? "Recomendado" : "Recomendar"}
                   </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+                </SafePressable>
+                <SafePressable
                   style={[
                     styles.recommendBtn,
                     styles.notRecommendBtn,
@@ -263,7 +264,7 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
                   >
                     {isRecommended === false ? "No recomendado" : "No recomendar"}
                   </Text>
-                </TouchableOpacity>
+                </SafePressable>
               </View>
             )}
           </View>
@@ -271,7 +272,7 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
       </View>
 
       <View style={styles.ratingSection}>
-        <TouchableOpacity
+        <SafePressable
           activeOpacity={0.7}
           onPress={onToggleRatingDetails}
           style={styles.ratingCard}
@@ -316,7 +317,7 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
               style={styles.chevronIcon}
             />
           </View>
-        </TouchableOpacity>
+        </SafePressable>
 
         {showRatingDetails && (
           <RecommendedSection
@@ -340,7 +341,7 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
 
       {activeTab === "properties" && (
         <View style={styles.toolbar}>
-          <TouchableOpacity onPress={onOpenFilter} style={styles.filterBtn}>
+          <SafePressable onPress={onOpenFilter} style={styles.filterBtn}>
             <Ionicons name="funnel" size={16} color={COLORS.textPrimary} />
             <Text style={styles.filterBtnText}>{activeFilter}</Text>
             <Ionicons
@@ -348,7 +349,7 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
               size={16}
               color={COLORS.textPrimary}
             />
-          </TouchableOpacity>
+          </SafePressable>
           <Text style={styles.countText}>
             {filteredPropertiesCount}{" "}
             {filteredPropertiesCount === 1 ? "Propiedad" : "Propiedades"}

@@ -8,7 +8,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Pressable,
   Modal,
 } from "react-native";
@@ -329,7 +328,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       </View>
 
       {positiveRecommendations > 0 && (
-        <TouchableOpacity
+        <SafePressable
           style={styles.recommendedRow}
           onPress={openRecommendedModal}
           activeOpacity={0.85}
@@ -355,7 +354,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           <Text style={styles.recommendedText}>
             {recommendedText}
           </Text>
-        </TouchableOpacity>
+        </SafePressable>
       )}
 
       {/* Galería de imágenes - independiente para evitar conflictos de gestos */}
@@ -464,7 +463,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                     {item.content}
                   </Text>
                   {isLongDesc && (
-                    <TouchableOpacity
+                    <SafePressable
                       onPress={() => setDescExpanded((v) => !v)}
                       hitSlop={8}
                       activeOpacity={0.7}
@@ -472,7 +471,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
                       <Text style={styles.verMasText}>
                         {descExpanded ? "Ver menos" : "Ver más"}
                       </Text>
-                    </TouchableOpacity>
+                    </SafePressable>
                   )}
                 </>
               ) : null}

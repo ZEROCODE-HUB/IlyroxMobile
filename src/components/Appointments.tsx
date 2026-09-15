@@ -1,14 +1,15 @@
 import React from "react";
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { AppHeader } from "./AppHeader";
+import { GoogleCalendarIcon } from "./shared/GoogleCalendarIcon";
 import { RatingModal } from "./RatingModal";
 import { COLORS } from "../constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,6 +19,7 @@ import { useAppointments } from "../hooks/useAppointments";
 import AppointmentTabs from "./Appointments/AppointmentTabs";
 import AppointmentList from "./Appointments/AppointmentList";
 import CreateAppointmentModal from "./Appointments/CreateAppointmentModal";
+import { SafePressable } from "@/design-system";
 
 const Appointments: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -40,9 +42,8 @@ const Appointments: React.FC = () => {
     loading,
     showRateModal,
     editingAppointment,
-    handleMarkComplete,
     handleMarkCancel,
-        handleAcceptAppointment,
+    handleAcceptAppointment,
     handleOpenRating,
     handleEditAppointment,
     handleSyncCalendar,
@@ -61,7 +62,7 @@ const Appointments: React.FC = () => {
       <AppHeader
         title="Citas"
         showBackButton
-        onBack={() => router.push("/(tabs)")}
+        onBack={() => router.back()}
       />
 
       <ScrollView
@@ -70,36 +71,59 @@ const Appointments: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.calendarPanel}>
-          <View style={styles.calendarPanelText}>
-            <Text style={styles.calendarTitle}>Google Calendar</Text>
-            <Text style={styles.calendarSubtitle}>
-              {isConnected
-                ? "Tus citas pueden sincronizarse con tu calendario."
-                : "Conecta tu cuenta para guardar tus citas en Calendar."}
-            </Text>
+          <View style={styles.calendarHeader}>
+            <View style={styles.calendarIconBox}>
+              <GoogleCalendarIcon size={22} />
+            </View>
+            <View style={styles.calendarPanelText}>
+              <Text style={styles.calendarTitle}>Google Calendar</Text>
+              <Text style={styles.calendarSubtitle}>
+                {isConnected
+                  ? "Tus citas se sincronizan automáticamente con tu calendario."
+                  : "Conecta tu cuenta para guardar tus citas y crear enlaces de Meet."}
+              </Text>
+            </View>
           </View>
-          <TouchableOpacity
-            style={[
-              styles.calendarButton,
-              isConnected && styles.calendarButtonConnected,
-            ]}
-            onPress={isConnected ? disconnect : connect}
-            disabled={calendarLoading}
-          >
-            <Ionicons
-              name={isConnected ? "checkmark-circle" : "link-outline"}
-              size={16}
-              color={isConnected ? COLORS.primaryDark : COLORS.white}
-            />
-            <Text
+
+          {isConnected ? (
+            <View style={styles.connectedRow}>
+              <View style={styles.connectedPill}>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={16}
+                  color={COLORS.successDark}
+                />
+                <Text style={styles.connectedPillText}>Conectado</Text>
+              </View>
+              <SafePressable
+                onPress={disconnect}
+                disabled={calendarLoading}
+                hitSlop={8}
+              >
+                <Text style={styles.disconnectText}>Desconectar</Text>
+              </SafePressable>
+            </View>
+          ) : (
+            <SafePressable
               style={[
-                styles.calendarButtonText,
-                isConnected && styles.calendarButtonTextConnected,
+                styles.connectButton,
+                calendarLoading && styles.connectButtonDisabled,
               ]}
+              onPress={() => {
+                  void connect();
+                }}
+              disabled={calendarLoading}
             >
-              {isConnected ? "Conectado" : "Conectar"}
-            </Text>
-          </TouchableOpacity>
+              {calendarLoading ? (
+                <ActivityIndicator size="small" color={COLORS.white} />
+              ) : (
+                <Ionicons name="link-outline" size={18} color={COLORS.white} />
+              )}
+              <Text style={styles.connectButtonText}>
+                Conectar Google Calendar
+              </Text>
+            </SafePressable>
+          )}
         </View>
 
         <AppointmentTabs activeTab={activeTab} onTabChange={setActiveTab} />
@@ -109,7 +133,7 @@ const Appointments: React.FC = () => {
           appointments={appointments}
           activeTab={activeTab}
           onMarkCancel={handleMarkCancel}
-                    onAcceptAppointment={handleAcceptAppointment}
+          onAcceptAppointment={handleAcceptAppointment}
           onOpenRating={handleOpenRating}
           onSyncCalendar={handleSyncCalendar}
           onContact={handleContactPress}
@@ -158,43 +182,76 @@ const styles = StyleSheet.create({
     borderColor: COLORS.cardBorder,
     padding: 16,
     marginBottom: 16,
+  },
+  calendarHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+  },
+  calendarIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: COLORS.primaryTransparent,
+    alignItems: "center",
+    justifyContent: "center",
   },
   calendarPanelText: {
     flex: 1,
   },
   calendarTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     color: COLORS.textPrimary,
   },
   calendarSubtitle: {
-    marginTop: 4,
-    fontSize: 13,
+    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 18,
     color: COLORS.textSecondary,
   },
-  calendarButton: {
+  connectButton: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  connectButtonDisabled: {
+    opacity: 0.6,
+  },
+  connectButtonText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  connectedRow: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  connectedPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
+    backgroundColor: COLORS.successLight,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
   },
-  calendarButtonConnected: {
-    backgroundColor: COLORS.primaryTransparent,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-  calendarButtonText: {
-    color: COLORS.white,
+  connectedPillText: {
+    color: COLORS.successDark,
+    fontSize: 13,
     fontWeight: "700",
   },
-  calendarButtonTextConnected: {
-    color: COLORS.primaryDark,
+  disconnectText: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    fontWeight: "600",
   },
 });
 

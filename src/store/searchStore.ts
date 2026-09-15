@@ -34,6 +34,7 @@ interface SearchStore {
   startSearch: (query: string, userId: string) => Promise<string>;
   createSearchFromMap: (filtros: PropertyFilters, ubicacion?: { estado?: string; municipio?: string; colonia?: string; placeName?: string }, userId?: string) => Promise<string>;
   updateSearchWithResult: (id: string, resultData: ResultData, userId: string) => Promise<void>;
+  createSearchFromResult: (resultData: ResultData, userId: string) => Promise<void>;
   updateSearchWithFilters: (id: string, filtros: PropertyFilters, userId: string) => Promise<void>;
   touchTimestamp: (id: string, userId: string) => Promise<void>;
   completeSearch: (id: string, userId: string) => Promise<void>;
@@ -50,6 +51,62 @@ const extractPreview = (filtros: PropertyFilters) => ({
   habitaciones: filtros.habitaciones || null,
   banos: filtros.banos || null,
   estacionamientos: filtros.estacionamientos || null,
+});
+
+const buildDefaultFilters = (
+  estado: string,
+  municipio: string,
+  colonia: string
+): PropertyFilters => ({
+  tipoPropiedad: '',
+  subtipo: [],
+  precioMin: '',
+  precioMax: '',
+  moneda: 'MXN',
+  operacion: '',
+  locationFilter: { estado, ciudad: '', municipio, colonia },
+  habitaciones: '',
+  banos: '',
+  mediosBanos: '',
+  estacionamientos: '',
+  antiguedad: '',
+  niveles: '',
+  m2TerrenoMin: '',
+  m2ConstruccionMin: '',
+  anchoTerrenoMin: '',
+  largoTerrenoMin: '',
+  comisionVentaMin: '',
+  comisionRentaMin: '',
+  amenidades: [],
+  polygons: [],
+  locationChips: [],
+  comercialFilters: {
+    tipoUbicacion: [],
+    frenteMin: '',
+    nivel: '',
+    sobreAvenidaPrincipal: false,
+    enEsquina: false,
+    altaVisibilidad: false,
+    altoFlujoVehicular: false,
+  },
+  industrialFilters: {
+    ubicacion: [],
+    alturaLibre: '',
+    energiaKva: [],
+    areaOficinasMin: '',
+    patioManiobrasMin: '',
+  },
+  agricolaFilters: {
+    tiposAgua: [],
+    concesionAgua: false,
+    usoTerreno: [],
+    tipoRiego: [],
+    electricidad: false,
+    caminoAcceso: false,
+    cercado: false,
+    pieCarretera: false,
+    accesCamiones: false,
+  },
 });
 
 export const useSearchStore = create<SearchStore>((set, get) => ({
@@ -102,13 +159,13 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
         ['searchHistory', userId],
         (old) => old?.map(item => 
           item.id === state.currentSearchId 
-            ? { ...item, completa: true, updated_at: now }
+            ? { ...item, completa: true }
             : item
         )
       );
       await supabase
         .from('historial_busquedas')
-        .update({ completa: true, updated_at: now })
+        .update({ completa: true })
         .eq('id', state.currentSearchId)
         .eq('usuario_id', userId);
     }
@@ -418,6 +475,121 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
     set({ isUpdating: false });
   },
 
+  createSearchFromResult: async (resultData: ResultData, userId: string): Promise<void> => {
+    set({ isUpdating: true });
+
+    const estado = resultData.estado || '';
+    const municipio = resultData.municipio || '';
+    const colonia = resultData.type === 'colonia' ? (resultData.name || '') : '';
+    const placeName = resultData.name || '';
+    const now = new Date().toISOString();
+    const tempId = `temp_result_${Date.now()}`;
+
+    const filtrosParciales: PropertyFilters =
+      resultData.filtros || buildDefaultFilters(estado, municipio, colonia);
+
+    const resultadoTitulo = resultData.resultadoTitulo || resultData.name || null;
+
+    // 1. IMMEDIATAMENTE agregar al caché (optimistic update)
+    const optimistic: HistorialBusqueda = {
+      id: tempId,
+      usuario_id: userId,
+      query_original: resultadoTitulo,
+      tipo_busqueda: resultData.tipo || null,
+      resultado_titulo: resultadoTitulo,
+      resultado_subtitulo: resultData.resultadoSubtitulo || null,
+      resultado_tipo_id: resultData.resultadoTipoId || null,
+      estado: estado || null,
+      ciudad: null,
+      municipio: municipio || null,
+      colonia: colonia || null,
+      place_name: placeName || null,
+      tipo_propiedad: null,
+      tipo_operacion: null,
+      precio_min: null,
+      precio_max: null,
+      moneda: 'MXN',
+      habitaciones: null,
+      banos: null,
+      estacionamientos: null,
+      filtros_completos: filtrosParciales as any,
+      completa: true,
+      created_at: now,
+      updated_at: now,
+      deleted_at: null,
+    };
+
+    queryClient.setQueryData<HistorialBusqueda[]>(
+      ['searchHistory', userId],
+      (old) => old ? [optimistic, ...old] : [optimistic]
+    );
+
+    // Cerrar el draft pendiente anterior (si es draft) para no dejar
+    // búsquedas "incompletas" huérfanas en el historial
+    const prevId = get().currentSearchId;
+    if (prevId && prevId !== tempId) {
+      const prev = queryClient.getQueryData<HistorialBusqueda[]>(['searchHistory', userId])
+        ?.find((i) => i.id === prevId);
+      if (prev && (!prev.tipo_busqueda || prev.tipo_busqueda === TIPO_BUSQUEDA.DRAFT)) {
+        queryClient.setQueryData<HistorialBusqueda[]>(
+          ['searchHistory', userId],
+          (old) => old?.map((item) =>
+            item.id === prevId ? { ...item, completa: true } : item
+          )
+        );
+        supabase
+          .from('historial_busquedas')
+          .update({ completa: true })
+          .eq('id', prevId)
+          .eq('usuario_id', userId)
+          .then(() => undefined, () => undefined);
+      }
+    }
+
+    // 2. Guardar como NUEVO registro en Supabase (no sobreescribe el anterior)
+    const { data, error } = await supabase
+      .from('historial_busquedas')
+      .insert({
+        usuario_id: userId,
+        query_original: resultadoTitulo,
+        tipo_busqueda: resultData.tipo || 'propiedad',
+        resultado_titulo: resultData.resultadoTitulo || null,
+        resultado_subtitulo: resultData.resultadoSubtitulo || null,
+        resultado_tipo_id: resultData.resultadoTipoId || null,
+        estado: estado || null,
+        municipio: municipio || null,
+        colonia: colonia || null,
+        place_name: placeName || null,
+        filtros_completos: filtrosParciales as any,
+        completa: true,
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('🔍 [SearchStore] Error creating search from result:', error);
+      // Rollback: quitar el optimistic update
+      queryClient.setQueryData<HistorialBusqueda[]>(
+        ['searchHistory', userId],
+        (old) => old?.filter((item) => item.id !== tempId)
+      );
+      set({ isUpdating: false });
+      return;
+    }
+
+    // 3. Reemplazar temp ID con real ID en caché
+    queryClient.setQueryData<HistorialBusqueda[]>(
+      ['searchHistory', userId],
+      (old) => old?.map((item) =>
+        item.id === tempId ? { ...item, id: data.id } : item
+      )
+    );
+
+    queryClient.invalidateQueries({ queryKey: ['searchHistory', userId] });
+
+    set({ isUpdating: false });
+  },
+
   updateSearchWithFilters: async (id: string, filtros: PropertyFilters, userId: string): Promise<void> => {
     const preview = extractPreview(filtros);
     const updateData = {
@@ -459,7 +631,6 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       .from('historial_busquedas')
       .update({
         completa: true,
-        updated_at: new Date().toISOString(),
       })
       .eq('id', id)
       .eq('usuario_id', userId);

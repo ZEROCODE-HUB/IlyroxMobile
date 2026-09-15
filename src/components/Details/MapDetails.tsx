@@ -40,6 +40,10 @@ export const MapDetails: React.FC<PropertyMapProps> = ({
     if (url) Linking.openURL(url).catch(() => {});
   };
 
+  const recenterMap = () => {
+    nativeMapRef.current?.animateToRegion(initialRegion, 600);
+  };
+
   if (!lat || !lng || isNaN(Number(lat)) || isNaN(Number(lng))) {
     return (
       <View style={styles.container}>
@@ -128,6 +132,13 @@ export const MapDetails: React.FC<PropertyMapProps> = ({
         <Ionicons name="navigate-outline" size={14} color={COLORS.white} />
         <Text style={styles.openMapsText}>Abrir en mapa</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.recenterButton}
+        onPress={recenterMap}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="locate" size={16} color={COLORS.textPrimary} />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -189,5 +200,21 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 11,
     fontWeight: "600",
+  },
+  recenterButton: {
+    position: "absolute",
+    bottom: 12,
+    right: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.white,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 3,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   },
 });

@@ -13,7 +13,6 @@ import {
   ViewToken,
   RefreshControl,
   Platform,
-  TouchableOpacity,
 } from "react-native";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { FeedItem, User } from "../../types";

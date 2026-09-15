@@ -4,7 +4,6 @@ import {
   RefreshControl,
   ScrollView,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,6 +27,7 @@ import { formatDateShort } from "@/utils/dateFormatter";
 import { formatPropertyAge } from "@/utils/propertyAge";
 import { router } from "expo-router";
 import { CachedPropertyData } from "@/store/propertyCacheStore";
+import { closeThenNavigate } from "@/utils/closeThenNavigate";
 
 import { PropertyDetailImages } from "./PropertyDetailImages";
 import { PropertyFinancialSection } from "./PropertyFinancialSection";
@@ -37,6 +37,7 @@ import { PropertyPrivateOwner } from "./PropertyPrivateOwner";
 import { PropertyDetailShimmer } from "./PropertyDetailShimmer";
 import { propertyDetailStyles as styles } from "./propertyDetailStyles";
 import { getCamposVisibles } from "@/constants/propertyData";
+import { SafePressable } from "@/design-system";
 
 const log = logger.scoped("PropertyDetail");
 
@@ -75,8 +76,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
         go();
         return;
       }
-      onClose();
-      setTimeout(go, 350);
+      closeThenNavigate(onClose, go);
     },
     [onClose],
   );
@@ -139,12 +139,12 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
     return (
       <View style={styles.errorContainer}>
         <Text>No se encontró la propiedad</Text>
-        <TouchableOpacity
+        <SafePressable
           onPress={handleClose}
           style={styles.backButton}
         >
           <Text style={styles.backButtonText}>Regresar</Text>
-        </TouchableOpacity>
+        </SafePressable>
       </View>
     );
   }
@@ -220,7 +220,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           {/* Header Principal */}
           <View style={styles.headerInfo}>
             <View style={styles.metaRowContent}>
-              <TouchableOpacity
+              <SafePressable
                 activeOpacity={0.7}
                 onPress={() =>
                   copyToClipboard(
@@ -238,7 +238,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                   color={COLORS.textSecondary}
                   style={styles.copyIcon}
                 />
-              </TouchableOpacity>
+              </SafePressable>
 
               <Text style={styles.metaSeparator}>•</Text>
 

@@ -36,7 +36,7 @@ const AppointmentTabs: React.FC<AppointmentTabsProps> = ({
                         activeTab === "past" && styles.activeTabText,
                     ]}
                 >
-                    Historial
+                    Anteriores
                 </Text>
             </TouchableOpacity>
         </View>

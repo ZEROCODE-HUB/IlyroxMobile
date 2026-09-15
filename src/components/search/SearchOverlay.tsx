@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   TextInput,
   Dimensions,
   FlatList,
@@ -28,6 +27,7 @@ import { useAuth } from "@/context/AuthContext";
 import type { TipoBusqueda } from "@/types";
 import { HistorySearches } from "@/components/search/HistorySearches";
 import { formatPriceShort } from "@/utils/priceFormatter";
+import { SafePressable } from "@/design-system";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const COL3 = (SCREEN_WIDTH - 2) / 3;
@@ -81,7 +81,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
     navigateToProperty,
   } = useSearch();
 
-  const { startSearch, updateSearchWithResult, touchTimestamp, currentSearchId, setCurrentSearchId } = useSearchStore();
+  const { startSearch, createSearchFromResult, touchTimestamp, setCurrentSearchId } = useSearchStore();
 
   // Search history from database (only for listing and deleting)
   const {
@@ -175,6 +175,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
     setQuery("");
     setActiveTab("todos");
     setExpandedSections(new Set());
+    setCurrentSearchId(null);
     onClose();
   };
 
@@ -199,18 +200,16 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
     });
   };
 
-  // Handler: actualizar búsqueda existente cuando selecciona resultado y navegar
+  // Handler: guardar el resultado como NUEVA búsqueda en el historial y navegar
   const handleNavigate = (
     action: () => void,
     tipo: TipoBusqueda,
     resultData?: ResultData
   ) => {
-    if (currentSearchId && userId) {
-      if (resultData?.name || resultData?.resultadoTitulo) {
-        updateSearchWithResult(currentSearchId, { ...resultData, tipo }, userId).catch((e) => {
-          console.error('🔍 [SearchOverlay] Error updating search:', e);
-        });
-      }
+    if (userId && (resultData?.name || resultData?.resultadoTitulo)) {
+      createSearchFromResult({ ...resultData, tipo }, userId).catch((e) => {
+        console.error('🔍 [SearchOverlay] Error creating search from result:', e);
+      });
     }
 
     // Navegar sin cerrar el search (la navegación cambia de screen)
@@ -439,14 +438,14 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
       {/* â”€â”€ Header con buscador â”€â”€ */}
       <View style={styles.header}>
         {isScreenMode && (
-          <TouchableOpacity onPress={handleClose} style={styles.backBtn} hitSlop={8}>
+          <SafePressable onPress={handleClose} style={styles.backBtn} hitSlop={8}>
             <Ionicons name="close" size={24} color={COLORS.textPrimary} />
-          </TouchableOpacity>
+          </SafePressable>
         )}
         {!isScreenMode && (
-          <TouchableOpacity onPress={handleClose} style={styles.backBtn} hitSlop={8}>
+          <SafePressable onPress={handleClose} style={styles.backBtn} hitSlop={8}>
             <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
-          </TouchableOpacity>
+          </SafePressable>
         )}
 
         <View style={styles.inputWrapper}>
@@ -466,9 +465,9 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
           />
           {loading && <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 4 }} />}
           {!loading && query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery("")} hitSlop={8}>
+            <SafePressable onPress={() => setQuery("")} hitSlop={8}>
               <Ionicons name="close-circle" size={18} color={COLORS.textSecondary} />
-            </TouchableOpacity>
+            </SafePressable>
           )}
         </View>
       </View>
@@ -477,7 +476,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
       <View style={styles.tabsContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
           {TABS.map((tab) => (
-            <TouchableOpacity
+            <SafePressable
               key={tab.key}
               onPress={() => setActiveTab(tab.key)}
               style={[styles.tab, activeTab === tab.key && styles.tabActive]}
@@ -486,7 +485,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
               <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
                 {tab.label}
               </Text>
-            </TouchableOpacity>
+            </SafePressable>
           ))}
         </ScrollView>
         <View style={styles.tabsBorder} />
@@ -551,7 +550,7 @@ function SectionHeader({ title, style }: { title: string; style?: object }) {
 
 function UserRow({ user, onPress }: { user: SearchUser; onPress: () => void }) {
   return (
-    <TouchableOpacity style={userStyles.row} activeOpacity={0.7} onPress={onPress}>
+    <SafePressable style={userStyles.row} activeOpacity={0.7} onPress={onPress}>
       <View style={userStyles.avatarWrapper}>
         {user.avatar ? (
           <Image source={{ uri: user.avatar }} style={userStyles.avatar} contentFit="cover" />
@@ -569,13 +568,13 @@ function UserRow({ user, onPress }: { user: SearchUser; onPress: () => void }) {
         )}
       </View>
       <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
-    </TouchableOpacity>
+    </SafePressable>
   );
 }
 
 function ToggleButton({ isExpanded, count, onPress }: { isExpanded: boolean; count: number; onPress: () => void }) {
   return (
-    <TouchableOpacity
+    <SafePressable
       style={sectionStyles.toggleBtn}
       onPress={onPress}
       activeOpacity={0.7}
@@ -583,7 +582,7 @@ function ToggleButton({ isExpanded, count, onPress }: { isExpanded: boolean; cou
       <Text style={sectionStyles.toggleText}>
         {isExpanded ? `Ver menos` : `Ver todos (${count})`}
       </Text>
-    </TouchableOpacity>
+    </SafePressable>
   );
 }
 
@@ -645,7 +644,7 @@ const ScaledSpecialCard = React.memo(function ScaledSpecialCard({
   const offsetY = -(cardHeight * (1 - SCALE)) / 2;
 
   return (
-    <TouchableOpacity
+    <SafePressable
       activeOpacity={0.9}
       onPress={onPress}
       style={[gridStyles.specialCell, { height: cardHeight * SCALE }]}
@@ -662,7 +661,7 @@ const ScaledSpecialCard = React.memo(function ScaledSpecialCard({
       >
         <SpecialPostCard item={feedItem} mode="preview" />
       </View>
-    </TouchableOpacity>
+    </SafePressable>
   );
 });
 
@@ -681,13 +680,13 @@ function PostGrid({ items, onPress }: { items: SearchPost[]; onPress: (feedItemI
             const showGap = ci < row.length - 1;
             if (isImage) {
               return (
-                <TouchableOpacity key={item.id} activeOpacity={0.9} onPress={() => onPress(item.feed_item_id)}>
+                <SafePressable key={item.id} activeOpacity={0.9} onPress={() => onPress(item.feed_item_id)}>
                   <Image
                     source={{ uri: item.img }}
                     style={[gridStyles.postCell, showGap && gridStyles.postCellGap]}
                     contentFit="cover"
                   />
-                </TouchableOpacity>
+                </SafePressable>
               );
             }
             return (
@@ -717,7 +716,7 @@ function ReelGrid({ items, onPress }: { items: SearchReel[]; onPress: (feedItemI
       {rows.map((row, ri) => (
         <View key={ri} style={gridStyles.row}>
           {row.map((item, ci) => (
-            <TouchableOpacity
+            <SafePressable
               key={item.id}
               style={[gridStyles.reelCell, ci === 0 && gridStyles.reelCellGap]}
               activeOpacity={0.9}
@@ -734,7 +733,7 @@ function ReelGrid({ items, onPress }: { items: SearchReel[]; onPress: (feedItemI
                 <Ionicons name="play" size={20} color="#fff" />
                 {item.views && <Text style={gridStyles.reelViews}>{item.views}</Text>}
               </View>
-            </TouchableOpacity>
+            </SafePressable>
           ))}
         </View>
       ))}
@@ -774,7 +773,7 @@ function PropertyFichaCard({ property, onPress }: { property: SearchProperty; on
     : property.metros_cuadrados_terreno;
 
   return (
-    <TouchableOpacity style={fichaStyles.card} activeOpacity={0.85} onPress={onPress}>
+    <SafePressable style={fichaStyles.card} activeOpacity={0.85} onPress={onPress}>
       {imgUri ? (
         <Image source={{ uri: imgUri }} style={fichaStyles.image} contentFit="cover" />
       ) : (
@@ -817,7 +816,7 @@ function PropertyFichaCard({ property, onPress }: { property: SearchProperty; on
           )}
         </View>
       </View>
-    </TouchableOpacity>
+    </SafePressable>
   );
 }
 
@@ -827,7 +826,7 @@ function LocationRow({ location, onPress }: { location: SearchLocation; onPress:
     location.fullDescription ||
     [location.name, location.municipio, location.estado].filter(Boolean).join(", ");
   return (
-    <TouchableOpacity style={locStyles.row} activeOpacity={0.7} onPress={onPress}>
+    <SafePressable style={locStyles.row} activeOpacity={0.7} onPress={onPress}>
       <View style={locStyles.iconWrapper}>
         <Ionicons name="location" size={22} color={COLORS.primary} />
       </View>
@@ -835,7 +834,7 @@ function LocationRow({ location, onPress }: { location: SearchLocation; onPress:
         <Text style={locStyles.name} numberOfLines={2}>{fullText}</Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={COLORS.cardBorder} />
-    </TouchableOpacity>
+    </SafePressable>
   );
 }
 
