@@ -41,6 +41,7 @@ import { logger } from "@/utils/logger";
 import { getPlaceDetails, boundsToRegion, boundsCenter } from "@/lib/geocodingService";
 import { useSearchHistory } from "@/hooks/useSearchHistory";
 import { useSearchStore } from "@/store/searchStore";
+import { usePropertyCacheStore } from "@/store/propertyCacheStore";
 
 const log = logger.scoped("MapSearch");
 
@@ -56,7 +57,6 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   const insets = useSafeAreaInsets();
 
   const [showFiltersModal, setShowFiltersModal] = useState(false);
-  const [highlightedPropertyId, setHighlightedPropertyId] = useState<string | null>(null);
   // Propiedades que comparten una misma coordenada (selector de "N en este punto").
   const [stackPropertyIds, setStackPropertyIds] = useState<string[] | null>(null);
 
@@ -383,17 +383,19 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
 
   // ── Handlers de marker ──
   const handleMarkerPress = (propertyId: string, _property: Property) => {
-    setHighlightedPropertyId(propertyId);
-    setTimeout(() => {
-      setHighlightedPropertyId(null);
-      router.push({ pathname: "/property/[id]", params: { id: propertyId } });
-    }, 1000);
+    // Pre-cache del shape del mapa (normalizePropertyData lo convierte a crudo
+    // en el detalle → render instantáneo sin shimmer en fotos/precio/stats).
+    if (_property?.id) {
+      usePropertyCacheStore.getState().setProperty(_property.id, _property);
+    }
+    router.push({ pathname: "/property/[id]", params: { id: propertyId } });
   };
 
   // Varias propiedades en la misma coordenada: abrir el selector para elegir.
   const handleStackPress = (propertyIds: string[]) => {
     if (propertyIds.length === 1) {
-      handleMarkerPress(propertyIds[0], undefined as any);
+      const single = properties.find((p) => p.id === propertyIds[0]);
+      handleMarkerPress(propertyIds[0], single as Property);
       return;
     }
     setStackPropertyIds(propertyIds);
@@ -523,7 +525,6 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           onMarkerPress={drawingMode ? () => {} : handleMarkerPress}
           onStackPress={drawingMode ? undefined : handleStackPress}
           googleApiKey={googleApiKey}
-          highlightedPropertyId={highlightedPropertyId}
           focusRegion={focusRegion}
           searchedLocationPins={locationPins}
           drawingMode={drawingMode}
@@ -551,6 +552,9 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         onClose={() => setStackPropertyIds(null)}
         onSelect={(p) => {
           setStackPropertyIds(null);
+          if (p?.id) {
+            usePropertyCacheStore.getState().setProperty(p.id, p);
+          }
           router.push({ pathname: "/property/[id]", params: { id: p.id } });
         }}
       />
@@ -670,20 +674,26 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         <SearchFiltersModal
         visible={showFiltersModal}
         onClose={() => setShowFiltersModal(false)}
-        onViewResults={async () => {
+        onViewResults={() => {
           setShowFiltersModal(false);
-          
-          // Marcar búsqueda como completa en historial
-          if (currentSearchId && userId) {
-            try {
-              await completeSearch(currentSearchId, userId);
-              useSearchStore.getState().clearSearch();
-            } catch (e) {
-              log.warn('Error completando búsqueda en historial:', e);
-            }
-          }
-          
+
           router.push({ pathname: "/map-results" } as any);
+
+          // Marcar búsqueda como completa en historial: fire-and-forget para no
+          // bloquear la navegación. Se limpia SOLO si sigue siendo la búsqueda
+          // actual (evita que un .then() tardío borre una búsqueda nueva).
+          if (currentSearchId && userId) {
+            const searchId = currentSearchId;
+            completeSearch(searchId, userId)
+              .then(() => {
+                if (useSearchStore.getState().currentSearchId === searchId) {
+                  useSearchStore.getState().clearSearch();
+                }
+              })
+              .catch((e: Error) => {
+                log.warn('Error completando búsqueda en historial:', e);
+              });
+          }
         }}
         filteredPropertiesCount={filteredProperties.length}
         userId={user?.id}

@@ -3,7 +3,7 @@
  * Lista de conversaciones con soporte de etiquetas
  */
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -54,6 +54,14 @@ export default function ConversationsList({
   const [longPressedGrouping, setLongPressedGrouping] = useState<any>(null);
   const [longPressedConvTags, setLongPressedConvTags] = useState<any[]>([]);
   const [showTagsAssignModal, setShowTagsAssignModal] = useState(false);
+  // Loading de las consultas en background: el modal se abre al instante y estos
+  // flags muestran un spinner mientras llegan las conversaciones / etiquetas.
+  const [loadingSpecificConversations, setLoadingSpecificConversations] = useState(false);
+  const [loadingAssignedTags, setLoadingAssignedTags] = useState(false);
+  // Anti-stale: si el usuario cierra/reabre un modal mientras una consulta está
+  // en vuelo, el token invalida la respuesta para que no pise data nueva.
+  const selectionTokenRef = useRef(0);
+  const tagsTokenRef = useRef(0);
   // Override optimista de etiquetas por agrupación: la fila muestra la etiqueta
   // al instante sin esperar el refetch completo de la lista (3 consultas). Se
   // limpia cuando `refresh()` reconcilia con la data real.
@@ -114,26 +122,52 @@ export default function ConversationsList({
     return result;
   }, [conversations, searchQuery, selectedTagIds, optimisticTags]);
 
-  const handleGroupingPress = async (grouping: any) => {
+  const handleGroupingPress = (grouping: any) => {
     const otherUserId = grouping.other_user?.id;
     if (!otherUserId) return;
 
-    // Obtener las conversaciones específicas con este usuario
-    const specificConvs = await getConversationsForUser(otherUserId);
-
-    setSpecificConversations(specificConvs);
+    // Abrir el modal al instante y resolver las conversaciones en background.
+    const token = ++selectionTokenRef.current;
+    setSpecificConversations([]);
+    setLoadingSpecificConversations(true);
     setSelectedGroupingUser(grouping.other_user);
     setShowSelectionModal(true);
+
+    getConversationsForUser(otherUserId)
+      .then((specificConvs) => {
+        if (token !== selectionTokenRef.current) return;
+        setSpecificConversations(specificConvs);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (token === selectionTokenRef.current) {
+          setLoadingSpecificConversations(false);
+        }
+      });
   };
 
-  const handleGroupingLongPress = async (item: any) => {
+  const handleGroupingLongPress = (item: any) => {
     const recentConvId = item.conversacion_mas_reciente_id;
     if (!recentConvId) return;
 
-    const convTags = await getConversationTags(recentConvId);
+    // Abrir el modal al instante y resolver las etiquetas en background.
+    const token = ++tagsTokenRef.current;
     setLongPressedGrouping(item);
-    setLongPressedConvTags(convTags);
+    setLongPressedConvTags([]);
+    setLoadingAssignedTags(true);
     setShowTagsAssignModal(true);
+
+    getConversationTags(recentConvId)
+      .then((convTags) => {
+        if (token !== tagsTokenRef.current) return;
+        setLongPressedConvTags(convTags);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (token === tagsTokenRef.current) {
+          setLoadingAssignedTags(false);
+        }
+      });
   };
 
   const handleToggleTag = (tagId: string) => {
@@ -337,11 +371,14 @@ export default function ConversationsList({
         <ConversationsSelectionModal
           visible={showSelectionModal}
           onClose={() => {
+            selectionTokenRef.current++;
+            setLoadingSpecificConversations(false);
             setShowSelectionModal(false);
             setSelectedGroupingUser(null);
           }}
           conversations={specificConversations}
           otherUserName={selectedGroupingUser.nombre}
+          loading={loadingSpecificConversations}
           onSelectConversation={(conv) => {
             setShowSelectionModal(false);
             onSelectConversation(
@@ -368,12 +405,15 @@ export default function ConversationsList({
       <TagsModal
         visible={showTagsAssignModal}
         onClose={() => {
+          tagsTokenRef.current++;
+          setLoadingAssignedTags(false);
           setShowTagsAssignModal(false);
           setLongPressedGrouping(null);
           setLongPressedConvTags([]);
         }}
         availableTags={tags}
         assignedTags={longPressedConvTags}
+        loadingAssigned={loadingAssignedTags}
         onAssignTag={async (tagId) => {
           const grouping = longPressedGrouping;
           const recentConvId = grouping?.conversacion_mas_reciente_id;

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   FlatList,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { AppBottomSheet } from '@/design-system/components/AppBottomSheet';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +30,8 @@ interface ConversationsSelectionModalProps {
   visible: boolean;
   onClose: () => void;
   conversations: ConversationItem[];
+  /** Mientras se resuelven las conversaciones en background, mostrar spinner. */
+  loading?: boolean;
   onSelectConversation: (conversation: ConversationItem) => void;
   otherUserName: string;
 }
@@ -37,6 +40,7 @@ export default function ConversationsSelectionModal({
   visible,
   onClose,
   conversations,
+  loading = false,
   onSelectConversation,
   otherUserName,
 }: ConversationsSelectionModalProps) {
@@ -112,9 +116,15 @@ export default function ConversationsSelectionModal({
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No se encontraron conversaciones</Text>
-              </View>
+              loading ? (
+                <View style={styles.emptyContainer}>
+                  <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No se encontraron conversaciones</Text>
+                </View>
+              )
             }
           />
       </View>

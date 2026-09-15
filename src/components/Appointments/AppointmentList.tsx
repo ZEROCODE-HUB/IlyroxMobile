@@ -53,29 +53,50 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
                 />
                 <Text style={styles.emptyText}>
                     No hay citas{" "}
-                    {activeTab === "upcoming" ? "próximas" : "en el historial"}
+                    {activeTab === "upcoming" ? "próximas" : "anteriores"}
                 </Text>
             </View>
         );
     }
 
+    const groups = appointments.reduce<Record<string, AppointmentItem[]>>(
+        (acc, appt) => {
+            const key = appt.date;
+            (acc[key] = acc[key] || []).push(appt);
+            return acc;
+        },
+        {},
+    );
+
+    const sectionTitle = (key: string): string => {
+        if (activeTab !== "upcoming") return key;
+        if (key === "Hoy") return "Para hoy";
+        if (key === "Mañana") return "Mañana";
+        return key;
+    };
+
     return (
         <View style={styles.list}>
-            {appointments.map((appt) => (
-                <AppointmentCard
-                    key={appt.id}
-                    appointment={appt}
-                    onMarkCancel={onMarkCancel}
-                    onAcceptAppointment={onAcceptAppointment}
-                    onOpenRating={onOpenRating}
-                    onSyncCalendar={onSyncCalendar}
-                    onContact={onContact}
-                    onEdit={onEdit}
-                    activeTab={activeTab}
-                    currentUserId={currentUserId}
-                    onPropertyPress={onPropertyPress}
-                    onUserPress={onUserPress}
-                />
+            {Object.entries(groups).map(([key, items]) => (
+                <View key={key} style={styles.section}>
+                    <Text style={styles.sectionTitle}>{sectionTitle(key)}</Text>
+                    {items.map((appt) => (
+                        <AppointmentCard
+                            key={appt.id}
+                            appointment={appt}
+                            onMarkCancel={onMarkCancel}
+                            onAcceptAppointment={onAcceptAppointment}
+                            onOpenRating={onOpenRating}
+                            onSyncCalendar={onSyncCalendar}
+                            onContact={onContact}
+                            onEdit={onEdit}
+                            activeTab={activeTab}
+                            currentUserId={currentUserId}
+                            onPropertyPress={onPropertyPress}
+                            onUserPress={onUserPress}
+                        />
+                    ))}
+                </View>
             ))}
         </View>
     );
@@ -107,7 +128,17 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     list: {
-        gap: 16,
+        gap: 20,
+    },
+    section: {
+        gap: 12,
+    },
+    sectionTitle: {
+        fontSize: 12,
+        fontWeight: "700",
+        color: COLORS.textSecondary,
+        textTransform: "uppercase",
+        letterSpacing: 0.4,
     },
 });
 

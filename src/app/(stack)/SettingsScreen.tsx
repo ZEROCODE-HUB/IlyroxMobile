@@ -403,7 +403,7 @@ const SettingsScreen: React.FC = () => {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.versionText}>Versión {appVersion} - Beta 1.2</Text>
+          <Text style={styles.versionText}>Versión {appVersion} - Beta 1.3</Text>
         </View>
 
       </ScrollView>

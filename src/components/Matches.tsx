@@ -20,6 +20,8 @@ import { LeadPropertiesModal } from "./LeadPropertiesModal";
 import { AppHeader } from "./AppHeader";
 import { COLORS, FALLBACKS } from "../constants";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { usePropertyCacheStore } from "@/store/propertyCacheStore";
+import { closeThenNavigate } from "@/utils/closeThenNavigate";
 
 export type MatchType = "coincidencia" | "similar";
 
@@ -685,25 +687,40 @@ const Matches: React.FC = () => {
           similars={selectedLead.similars}
           searchCriteria={selectedLead.searchCriteria}
           onPropertyClick={(propertyId) => {
+            // Pre-cache del detalle desde el FeedItem del lead → render
+            // instantáneo sin shimmer. Incluimos el user para que normalize
+            // derive el perfil del dueño en la sección de contacto.
+            const match = [
+              ...selectedLead.coincidences,
+              ...selectedLead.similars,
+            ].find((it) => it.propertyDetails?.id === propertyId);
+            if (match?.propertyDetails?.id) {
+              usePropertyCacheStore.getState().setProperty(
+                match.propertyDetails.id,
+                { ...match.propertyDetails, user: match.user },
+              );
+            }
             // El detalle es una pantalla de stack. Si la abrimos con el modal
             // del lead presentado, en iOS queda por detrás (no abre nada).
-            // Cerramos el modal y navegamos en el siguiente tick.
-            setSelectedLeadId(null);
-            setTimeout(
+            // closeThenNavigate cierra el modal y navega cuando el dismiss
+            // terminó (iOS) o casi al instante (Android).
+            closeThenNavigate(
+              () => setSelectedLeadId(null),
               () =>
                 router.push({
                   pathname: "/property/[id]",
                   params: { id: propertyId },
                 }),
-              350,
             );
           }}
           onUserClick={(user) => {
-            setSelectedLeadId(null);
-            setTimeout(
+            closeThenNavigate(
+              () => setSelectedLeadId(null),
               () =>
-                router.push({ pathname: "/user/[id]", params: { id: user.id } }),
-              350,
+                router.push({
+                  pathname: "/user/[id]",
+                  params: { id: user.id },
+                }),
             );
           }}
           onDeleteSearch={handleDeleteSearch}

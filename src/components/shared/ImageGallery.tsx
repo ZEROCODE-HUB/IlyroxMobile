@@ -22,7 +22,6 @@ import {
   Dimensions,
   ViewToken,
   LayoutChangeEvent,
-  TouchableOpacity,
 } from "react-native";
 import { FlatList } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,6 +30,7 @@ import { COLORS } from "../../constants";
 import LazyImage from "../LazyImage";
 import { commonStyles } from "../../../styles";
 import { useImageAspectRatio } from "../../hooks/useImageAspectRatio";
+import { SafePressable } from "@/design-system";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -105,7 +105,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
   // Renderizado de cada item de la galería
   const renderItem = useCallback(
     ({ item }: { item: string }) => (
-      <TouchableOpacity
+      <SafePressable
         activeOpacity={1}
         onPress={onImagePress}
         style={{ width: containerWidth }}
@@ -118,7 +118,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
           style={[styles.image, { width: containerWidth }]}
           resizeMode="cover"
         />
-      </TouchableOpacity>
+      </SafePressable>
     ),
     [containerWidth, onImagePress],
   );

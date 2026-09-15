@@ -18,7 +18,6 @@ import React, {
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   Platform,
@@ -26,6 +25,8 @@ import {
   TextInput,
   useWindowDimensions,
 } from "react-native";
+import { SafePressable } from "@/design-system";
+
 import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -108,17 +109,17 @@ const CommentItem = React.memo<CommentItemProps>(
               </View>
 
               <View style={styles.commentActions}>
-                <TouchableOpacity onPress={onLike} style={styles.actionButton}>
+                <SafePressable onPress={onLike} style={styles.actionButton}>
                   <Ionicons
                     name={isLiked ? "heart" : "heart-outline"}
                     size={16}
                     color={isLiked ? COLORS.error : COLORS.textTertiary}
                   />
                   {isLiked && <Text style={styles.actionText}>Like</Text>}
-                </TouchableOpacity>
-                <TouchableOpacity onPress={onReply} style={styles.actionButton}>
+                </SafePressable>
+                <SafePressable onPress={onReply} style={styles.actionButton}>
                   <Text style={styles.actionText}>Responder</Text>
-                </TouchableOpacity>
+                </SafePressable>
               </View>
             </View>
           </View>
@@ -376,13 +377,13 @@ export default function CommentsBottomSheet({
     }
     if (hasMore && displayComments.length > 0) {
       return (
-        <TouchableOpacity
+        <SafePressable
           style={styles.loadMoreButton}
           onPress={loadMore}
           activeOpacity={0.7}
         >
           <Text style={styles.loadMoreText}>Ver más comentarios</Text>
-        </TouchableOpacity>
+        </SafePressable>
       );
     }
     return null;
@@ -411,12 +412,12 @@ export default function CommentsBottomSheet({
                 <Text style={styles.title}>
                   Comentarios ({totalCount})
                 </Text>
-                <TouchableOpacity
+                <SafePressable
                   onPress={handleClose}
                   style={styles.closeButton}
                 >
                   <Ionicons name="close" size={24} color={COLORS.textPrimary} />
-                </TouchableOpacity>
+                </SafePressable>
               </View>
 
               {/* Comments List */}
@@ -446,13 +447,13 @@ export default function CommentsBottomSheet({
                       Respondiendo a:{" "}
                       <Text style={styles.replyBadgeName}>{replyToUser}</Text>
                     </Text>
-                    <TouchableOpacity onPress={() => setReplyTo(null)}>
+                    <SafePressable onPress={() => setReplyTo(null)}>
                       <Ionicons
                         name="close"
                         size={20}
                         color={COLORS.textSecondary}
                       />
-                    </TouchableOpacity>
+                    </SafePressable>
                   </View>
                 </View>
               )}
