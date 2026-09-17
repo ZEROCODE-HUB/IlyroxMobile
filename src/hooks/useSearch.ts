@@ -17,6 +17,7 @@ export interface SearchUser {
   avatar?: string;
   ocupacion?: string;
   rating?: number;
+  is_blocked?: boolean;
 }
 
 export interface SearchPost {
@@ -101,13 +102,13 @@ async function fetchUsers(
   const { data } = await supabase.rpc("buscar_perfiles", { q, lim: 10 });
 
   return ((data as any[]) ?? [])
-    .filter((p) => isNotBlocked(p.id, blockedUserIds))
     .map((p) => ({
       id: p.id,
       name: p.nombre_completo || [p.nombre, p.apellido_paterno].filter(Boolean).join(" ") || "Usuario",
       avatar: p.foto || undefined,
       ocupacion: p.ocupacion || undefined,
       rating: p.calificacion_promedio ? parseFloat(p.calificacion_promedio) : undefined,
+      is_blocked: blockedUserIds.includes(p.id),
     }));
 }
 

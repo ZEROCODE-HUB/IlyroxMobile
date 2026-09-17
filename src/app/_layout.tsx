@@ -335,6 +335,10 @@ function RootLayoutNav() {
 
     const captureUrl = async (url: string | null) => {
       if (!url) return false;
+      if (session) {
+        logger.info("[invites] captureUrl: Usuario ya logueado, omitiendo invitación");
+        return false;
+      }
       try {
         const code = await storeInviteCodeFromUrl(url);
         if (code) {

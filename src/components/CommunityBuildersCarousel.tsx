@@ -30,7 +30,7 @@ import {
   buildAdvisorInviteLink,
   bulkRecordConstructorViews,
   CommunityBuilder,
-  getCommunityBuildersV2,
+  getCommunityBuildersV3,
   getOrCreateAdvisorInviteCode,
 } from "@/services/communityService";
 import { useViewTracker } from "@/hooks/useCommunityBuilderViewTracker";
@@ -112,7 +112,7 @@ const CommunityBuildersCarousel: React.FC<CommunityBuildersCarouselProps> = ({
     offsetRef.current = 0;
 
     try {
-      const result = await getCommunityBuildersV2(PAGE_SIZE, 0);
+      const result = await getCommunityBuildersV3(PAGE_SIZE, 0, currentUserId);
       if (!isMountedRef.current) return;
       if (refreshSignalRef.current !== refreshSignal) return;
       setBuilders(result.builders);
@@ -133,7 +133,7 @@ const CommunityBuildersCarousel: React.FC<CommunityBuildersCarouselProps> = ({
     setLoadingMore(true);
     try {
       offsetRef.current += PAGE_SIZE;
-      const result = await getCommunityBuildersV2(PAGE_SIZE, offsetRef.current);
+      const result = await getCommunityBuildersV3(PAGE_SIZE, offsetRef.current, currentUserId);
       if (!isMountedRef.current) return;
       setBuilders((prev) => [...prev, ...result.builders]);
       setHasMore(result.hasMore);
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 13,
     fontWeight: "800",
-    color: COLORS.backgroundDeep,
+    color: COLORS.primaryDark,
     letterSpacing: 0,
   },
   summary: {

@@ -19,10 +19,20 @@ interface InvitadorInfo {
   foto: string | null;
 }
 
+interface ValidacionResultado {
+  valido: boolean;
+  mensaje: string;
+  invitador_id: string | null;
+  nombre: string | null;
+  apellido_paterno: string | null;
+  foto: string | null;
+}
+
 export default function CommunityWelcome() {
   const router = useRouter();
   const [invitador, setInvitador] = useState<InvitadorInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [linkExpirado, setLinkExpirado] = useState(false);
 
   useEffect(() => {
     async function loadInvitador() {
@@ -30,14 +40,25 @@ export default function CommunityWelcome() {
         const code = await AsyncStorage.getItem(STORED_INVITE_CODE_KEY);
         if (code) {
           log.info("communityWelcome: Codigo encontrado", { code });
-          const { data, error } = await supabase.rpc("get_invitador_info", {
+          const { data, error } = await supabase.rpc("validar_codigo_invitacion", {
             p_codigo: code,
           });
           if (error) {
-            log.warn("communityWelcome: Error al obtener invitador", error);
+            log.warn("communityWelcome: Error al validar codigo", error);
           } else if (data) {
-            log.info("communityWelcome: Invitador info", data);
-            setInvitador(data);
+            const validacion = data as ValidacionResultado;
+            log.info("communityWelcome: Validacion resultado", validacion);
+            if (validacion.valido) {
+              setInvitador({
+                invitador_id: validacion.invitador_id || "",
+                nombre: validacion.nombre,
+                apellido_paterno: validacion.apellido_paterno,
+                foto: validacion.foto,
+              });
+            } else {
+              log.info("communityWelcome: Link expirado o invalido");
+              setLinkExpirado(true);
+            }
           }
         } else {
           log.info("communityWelcome: No hay codigo en storage");
@@ -82,7 +103,12 @@ export default function CommunityWelcome() {
           <>
             <View style={styles.section}>
               <Text style={styles.subtitle}>BIENVENIDO.</Text>
-              {invitador ? (
+              {linkExpirado ? (
+                <>
+                  <Text style={styles.titleDark}>Link</Text>
+                  <Text style={styles.titleBlue}>expirado.</Text>
+                </>
+              ) : invitador ? (
                 <>
                   <Text style={styles.invitedText}>Fuiste invitado por</Text>
                   <Text style={styles.invitedName}>{getNombreCompleto()}</Text>
