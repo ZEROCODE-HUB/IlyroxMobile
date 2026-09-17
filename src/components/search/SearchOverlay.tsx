@@ -1,4 +1,4 @@
-﻿import React, { useRef, useEffect, useState } from "react";
+﻿import React, { useRef, useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -28,6 +28,10 @@ import type { TipoBusqueda } from "@/types";
 import { HistorySearches } from "@/components/search/HistorySearches";
 import { formatPriceShort } from "@/utils/priceFormatter";
 import { SafePressable } from "@/design-system";
+import { ConfirmationModal } from "@/components/modals/ConfirmationModal";
+import { blockService } from "@/services/blockService";
+import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/context/ToastContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const COL3 = (SCREEN_WIDTH - 2) / 3;
@@ -68,6 +72,10 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
   const { user } = useAuth();
   const userId = user?.id;
   const router = useRouter();
+  const { showToast } = useToast();
+
+  const [unblockUserToConfirm, setUnblockUserToConfirm] = useState<string | null>(null);
+  const [unblocking, setUnblocking] = useState(false);
 
   const {
     query,
@@ -80,6 +88,26 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
     navigateToReel,
     navigateToProperty,
   } = useSearch();
+
+  const desbloquearUser = useCallback(async () => {
+    if (!unblockUserToConfirm || !userId) return;
+    const q = query;
+    setUnblocking(true);
+    try {
+      await blockService.unblockUser(userId, unblockUserToConfirm);
+      setUnblockUserToConfirm(null);
+      showToast("Usuario desbloqueado", "success");
+      queryClient.invalidateQueries({ queryKey: ["user-blocks"] });
+      if (q) {
+        setQuery("");
+        setTimeout(() => setQuery(q), 50);
+      }
+    } catch (e) {
+      showToast("No se pudo desbloquear", "error");
+    } finally {
+      setUnblocking(false);
+    }
+  }, [unblockUserToConfirm, userId, showToast]);
 
   const { startSearch, createSearchFromResult, touchTimestamp, setCurrentSearchId } = useSearchStore();
 
@@ -206,6 +234,14 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
     tipo: TipoBusqueda,
     resultData?: ResultData
   ) => {
+    if (tipo === TIPO_BUSQUEDA.USUARIO && resultData?.resultadoTipoId) {
+      const isBlocked = results.users.find(u => u.id === resultData.resultadoTipoId)?.is_blocked;
+      if (isBlocked) {
+        showToast("No puedes visitar perfiles bloqueados", "info");
+        return;
+      }
+    }
+
     if (userId && (resultData?.name || resultData?.resultadoTitulo)) {
       createSearchFromResult({ ...resultData, tipo }, userId).catch((e) => {
         console.error('🔍 [SearchOverlay] Error creating search from result:', e);
@@ -290,7 +326,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
           <>
             <SectionHeader title="Usuarios" />
             {s.displayItems.map((u) => (
-              <UserRow key={u.id} user={u} onPress={() => handleNavigate(() => navigateToUser(u.id), TIPO_BUSQUEDA.USUARIO, { resultadoTitulo: u.name, resultadoSubtitulo: u.ocupacion, resultadoTipoId: u.id })} />
+              <UserRow key={u.id} user={u} onPress={() => handleNavigate(() => navigateToUser(u.id), TIPO_BUSQUEDA.USUARIO, { resultadoTitulo: u.name, resultadoSubtitulo: u.ocupacion, resultadoTipoId: u.id })} onUnblock={(id) => setUnblockUserToConfirm(id)} />
             ))}
             {s.showToggle && <ToggleButton isExpanded={s.isExpanded} count={results.users.length} onPress={s.toggle} />}
           </>
@@ -367,7 +403,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
     <FlatList
       data={results.users}
       keyExtractor={(i) => i.id}
-      renderItem={({ item }) => <UserRow user={item} onPress={() => handleNavigate(() => navigateToUser(item.id), TIPO_BUSQUEDA.USUARIO)} />}
+      renderItem={({ item }) => <UserRow user={item} onPress={() => handleNavigate(() => navigateToUser(item.id), TIPO_BUSQUEDA.USUARIO)} onUnblock={(id) => setUnblockUserToConfirm(id)} />}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
       ListEmptyComponent={!loading ? <EmptyResults query={query} /> : null}
@@ -518,14 +554,42 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
 
   // Screen mode: renderizar directo sin Modal
   if (isScreenMode) {
-    return renderSearchContent();
+    return (
+      <>
+        {renderSearchContent()}
+        <ConfirmationModal
+          visible={unblockUserToConfirm !== null}
+          title="Desbloquear usuario"
+          message="Este usuario podrá volver a aparecer en tu búsqueda y ver tu contenido."
+          confirmText="Desbloquear"
+          cancelText="Cancelar"
+          loading={unblocking}
+          confirmVariant="primary"
+          onConfirm={desbloquearUser}
+          onCancel={() => setUnblockUserToConfirm(null)}
+        />
+      </>
+    );
   }
 
   // Modal mode: usar Modal
   return (
-    <Modal visible={isVisible} animationType="fade" transparent={false} statusBarTranslucent onRequestClose={handleClose}>
-      {renderSearchContent()}
-    </Modal>
+    <>
+      <Modal visible={isVisible} animationType="fade" transparent={false} statusBarTranslucent onRequestClose={handleClose}>
+        {renderSearchContent()}
+      </Modal>
+      <ConfirmationModal
+        visible={unblockUserToConfirm !== null}
+        title="Desbloquear usuario"
+        message="Este usuario podrá volver a aparecer en tu búsqueda y ver tu contenido."
+        confirmText="Desbloquear"
+        cancelText="Cancelar"
+        loading={unblocking}
+        confirmVariant="primary"
+        onConfirm={desbloquearUser}
+        onCancel={() => setUnblockUserToConfirm(null)}
+      />
+    </>
   );
 }
 
@@ -548,7 +612,38 @@ function SectionHeader({ title, style }: { title: string; style?: object }) {
   );
 }
 
-function UserRow({ user, onPress }: { user: SearchUser; onPress: () => void }) {
+function UserRow({ user, onPress, onUnblock }: { user: SearchUser; onPress: () => void; onUnblock?: (userId: string) => void }) {
+  if (user.is_blocked) {
+    return (
+      <View style={userStyles.row}>
+        <View style={userStyles.avatarWrapper}>
+          {user.avatar ? (
+            <Image source={{ uri: user.avatar }} style={userStyles.avatar} contentFit="cover" />
+          ) : (
+            <View style={[userStyles.avatar, userStyles.avatarPlaceholder]}>
+              <Ionicons name="person" size={24} color={COLORS.textSecondary} />
+            </View>
+          )}
+          <View style={userStyles.blockedBadge}>
+            <Ionicons name="lock-closed" size={10} color="#fff" />
+          </View>
+        </View>
+        <View style={userStyles.info}>
+          <Text style={userStyles.name} numberOfLines={1}>{user.name}</Text>
+          {user.ocupacion && <Text style={userStyles.username}>{user.ocupacion}</Text>}
+        </View>
+        {onUnblock && (
+          <SafePressable
+            style={userStyles.unblockBtn}
+            onPress={() => onUnblock(user.id)}
+          >
+            <Text style={userStyles.unblockBtnText}>Desbloquear</Text>
+          </SafePressable>
+        )}
+      </View>
+    );
+  }
+
   return (
     <SafePressable style={userStyles.row} activeOpacity={0.7} onPress={onPress}>
       <View style={userStyles.avatarWrapper}>
@@ -1005,6 +1100,30 @@ const userStyles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
     opacity: 0.8,
+  },
+  blockedBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: COLORS.error,
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: COLORS.white,
+  },
+  unblockBtn: {
+    backgroundColor: COLORS.error,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  unblockBtnText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: "700",
   },
 });
 

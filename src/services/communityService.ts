@@ -141,6 +141,39 @@ export async function getCommunityBuildersV2(
   };
 }
 
+export async function getCommunityBuildersV3(
+  limit: number = 4,
+  offset: number = 0,
+  currentUserId?: string
+): Promise<PaginatedBuilders> {
+  const [{ data, error }, { data: countData }] = await Promise.all([
+    supabase.rpc("get_constructores_comunidad_v3", {
+      p_limit: limit,
+      p_offset: offset,
+      p_blocked_by: currentUserId ?? null,
+    }),
+    supabase.rpc("get_constructores_comunidad_v3_count", {
+      p_blocked_by: currentUserId ?? null,
+    }),
+  ]);
+
+  if (error) {
+    log.warn("get_constructores_comunidad_v3 unavailable", error);
+    return { builders: [], total: 0, hasMore: false };
+  }
+
+  const total = Number(countData) || 0;
+  const builders = ((data || []) as CommunityBuilderV2Row[]).map(
+    normalizeBuilderV2
+  );
+
+  return {
+    builders,
+    total,
+    hasMore: offset + builders.length < total,
+  };
+}
+
 export async function getOrCreateAdvisorInviteCode(userId: string) {
   const { data: existing, error: selectError } = await supabase
     .from("asesor_invitacion_codigos")

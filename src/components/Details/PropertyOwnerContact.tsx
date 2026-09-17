@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Linking,
   Text,
   TouchableOpacity,
   View,
+  StyleSheet,
 } from "react-native";
 import SafePressable from "@/design-system/components/SafePressable";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +15,7 @@ import { useModal } from "@/context/ModalContext";
 import { Avatar } from "../shared";
 import { OwnerRecommendations } from "./OwnerRecommendations";
 import { propertyDetailStyles as styles } from "./propertyDetailStyles";
+import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 
 export interface PropertyOwnerContactProps {
   profile: any;
@@ -42,6 +44,7 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
 }) => {
   const { showModal } = useModal();
   const navigate = onNavigateAway ?? ((go: () => void) => go());
+  const [showContactSheet, setShowContactSheet] = useState(false);
 
   if (sinDatos || !profile) return null;
 
@@ -77,6 +80,30 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
         "Este usuario no cuenta con un número registrado para llamadas directas.",
       confirmText: "OK",
     });
+  };
+
+  const handleWhatsApp = () => {
+    setShowContactSheet(false);
+    const phone = `${profile.prefijo_celular || ""}${profile.celular || ""}`.replace(/\s/g, "");
+    if (phone && phone.length > 0) {
+      Linking.openURL(`https://wa.me/${phone}`);
+    } else {
+      showModal({
+        title: "Sin número de contacto",
+        message:
+          "Este usuario no cuenta con un número registrado para mensajes de WhatsApp.",
+        confirmText: "OK",
+      });
+    }
+  };
+
+  const handleContactSheetCall = () => {
+    setShowContactSheet(false);
+    handleCall();
+  };
+
+  const openContactSheet = () => {
+    setShowContactSheet(true);
   };
 
   return (
@@ -135,7 +162,7 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
           )}
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity style={styles.mainContactBtn} onPress={handleCall}>
+        <TouchableOpacity style={styles.mainContactBtn} onPress={openContactSheet}>
           <Ionicons
             name="call"
             size={20}
@@ -145,6 +172,69 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
           <Text style={styles.mainContactBtnText}>Contactar ahora</Text>
         </TouchableOpacity>
       )}
+
+      <AppBottomSheet visible={showContactSheet} onClose={() => setShowContactSheet(false)}>
+        <View style={contactSheetStyles.container}>
+          <Text style={contactSheetStyles.title}>Contactar ahora</Text>
+
+          <TouchableOpacity style={contactSheetStyles.option} onPress={handleWhatsApp}>
+            <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
+            <Text style={contactSheetStyles.optionText}>Mandar mensaje por WhatsApp</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={contactSheetStyles.option} onPress={handleContactSheetCall}>
+            <Ionicons name="call" size={24} color={COLORS.primary} />
+            <Text style={contactSheetStyles.optionText}>Llamar ahora</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={contactSheetStyles.cancelBtn}
+            onPress={() => setShowContactSheet(false)}
+          >
+            <Text style={contactSheetStyles.cancelText}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      </AppBottomSheet>
     </>
   );
 };
+
+const contactSheetStyles = StyleSheet.create({
+  container: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: COLORS.black,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  option: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+  },
+  optionText: {
+    fontSize: 16,
+    color: COLORS.black,
+    marginLeft: 16,
+  },
+  cancelBtn: {
+    marginTop: 16,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  cancelText: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    fontWeight: "500",
+  },
+});
