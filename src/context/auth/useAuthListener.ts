@@ -127,10 +127,15 @@ export const useAuthListener = ({
           // sin el lock contenido, responde en ms y el backoff solo actúa
           // ante fallos de red reales.
           const profileData = await loadProfile(userId);
-          // Solo se propaga un perfil válido. Poner `profile` a null con la
-          // sesión viva hace que RootLayoutNav sustituya el <Stack> por
-          // <InitialLoading>, desmontando la pantalla actual: un TOKEN_REFRESHED
-          // con mala red borraba el formulario que el usuario estaba llenando.
+
+          if (!profileData) {
+            log.warn("Profile not found for logged-in user, signing out");
+            await supabase.auth.signOut();
+            onProfileChange(null);
+            finishLoading();
+            return;
+          }
+
           if (mounted && profileData) onProfileChange(profileData);
 
           // ✅ REALTIME DESHABILITADO
