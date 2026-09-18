@@ -14,7 +14,7 @@
  * />
  */
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -49,6 +49,8 @@ export interface ImageGalleryProps {
   onImagePress?: () => void;
   /** Notifica el índice de la imagen visible (para badges "1/N" externos). */
   onIndexChange?: (index: number) => void;
+  /** Índice inicial para posicionar el carousel al montarse. */
+  initialIndex?: number;
 }
 
 const ImageGallery: React.FC<ImageGalleryProps> = ({
@@ -59,9 +61,10 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
   showImageCount = false,
   onImagePress,
   onIndexChange,
+  initialIndex = 0,
 }) => {
   const [containerWidth, setContainerWidth] = useState(SCREEN_WIDTH);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
   // La primera imagen marca la forma de la galería; el resto se ajusta dentro
   // sin recortarse (`contain`), como en Instagram.
@@ -86,6 +89,16 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
   // (FlatList no admite cambiarlo), pero el callback puede variar entre renders.
   const onIndexChangeRef = useRef(onIndexChange);
   onIndexChangeRef.current = onIndexChange;
+
+  // Scroll inicial al índice proporcionado (para sincronizar con feed)
+  useEffect(() => {
+    if (initialIndex > 0 && flatListRef.current && containerWidth > 0) {
+      flatListRef.current.scrollToIndex({
+        index: initialIndex,
+        animated: false,
+      });
+    }
+  }, [initialIndex, containerWidth]);
 
   // Manejo optimizado del índice actual usando viewabilityConfig
   const onViewableItemsChanged = useRef(
@@ -157,11 +170,20 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
         removeClippedSubviews={true}
         nestedScrollEnabled={true}
         style={styles.scroll}
+        initialScrollIndex={initialIndex}
         getItemLayout={(_, index) => ({
           length: containerWidth,
           offset: containerWidth * index,
           index,
         })}
+        onScrollToIndexFailed={({ index }) => {
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({
+              index,
+              animated: false,
+            });
+          }, 100);
+        }}
       />
 
       {/* Indicadores de carousel (Dots) */}

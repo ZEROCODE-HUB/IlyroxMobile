@@ -50,6 +50,8 @@ interface PropertyDetailProps {
   /** Cerrar la pantalla cuando se abre dentro de un <Modal> (Perfil, Matches):
       ahí `router.back()` no cierra el modal. Si no se pasa, cae a router.back(). */
   onClose?: () => void;
+  /** Índice inicial del carrusel de imágenes (para sincronizar con el feed). */
+  imageIndex?: number;
 }
 
 
@@ -60,6 +62,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   sinDatos,
   initialData,
   onClose,
+  imageIndex,
 }) => {
   const handleClose = onClose ?? (() => router.back());
 
@@ -87,7 +90,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
     { initialData },
   );
   const [, setProperty] = useState<any>(null);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState(imageIndex ?? 0);
   const [showComments, setShowComments] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [propertyIdModal, setPropertyIdModal] = useState<string | null>(null);
@@ -214,6 +217,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           }
           onCommentClick={() => setShowComments(true)}
           onTrackInteraction={trackInteraction as (kind: string) => void}
+          initialIndex={currentImageIndex}
         />
 
         <View style={styles.content}>

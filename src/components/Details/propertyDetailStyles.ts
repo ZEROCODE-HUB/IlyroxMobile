@@ -35,6 +35,7 @@ export const propertyDetailStyles = StyleSheet.create({
   imageContainer: {
     width: "100%",
     backgroundColor: COLORS.white,
+    overflow: "hidden",
   },
   image: {
     width,

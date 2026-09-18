@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { AppointmentCard } from "../AppointmentCard";
+import AppointmentCard from "../AppointmentCard";
 import { COLORS } from "../../constants/colors";
 import { AppointmentItem } from "./appointmentTypes";
 
@@ -68,18 +68,38 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
         {},
     );
 
-    const sectionTitle = (key: string): string => {
-        if (activeTab !== "upcoming") return key;
-        if (key === "Hoy") return "Para hoy";
-        if (key === "Mañana") return "Mañana";
-        return key;
+    const formatDate = (dateStr: string): string => {
+        const date = new Date(dateStr + "T00:00:00");
+        const day = date.getDate();
+        const months = [
+            "enero", "febrero", "marzo", "abril", "mayo", "junio",
+            "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+        ];
+        return `${day} de ${months[date.getMonth()]}`;
     };
+
+    const sectionTitle = (key: string, items: AppointmentItem[]): string => {
+        if (activeTab !== "upcoming") return formatDate(items[0]?.fecha || key);
+        if (key === "Hoy") {
+            const fecha = items[0]?.fecha;
+            return fecha ? `Hoy · ${formatDate(fecha)}` : "Hoy";
+        }
+        if (key === "Mañana") {
+            const fecha = items[0]?.fecha;
+            return fecha ? `Mañana · ${formatDate(fecha)}` : "Mañana";
+        }
+        return formatDate(key);
+    };
+
+    const isToday = (key: string): boolean => key === "Hoy";
 
     return (
         <View style={styles.list}>
             {Object.entries(groups).map(([key, items]) => (
                 <View key={key} style={styles.section}>
-                    <Text style={styles.sectionTitle}>{sectionTitle(key)}</Text>
+                    <Text style={[styles.sectionTitle, isToday(key) && styles.sectionTitleToday]}>
+                        {sectionTitle(key, items)}
+                    </Text>
                     {items.map((appt) => (
                         <AppointmentCard
                             key={appt.id}
@@ -135,10 +155,15 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 12,
-        fontWeight: "700",
+        fontWeight: "600",
         color: COLORS.textSecondary,
         textTransform: "uppercase",
         letterSpacing: 0.4,
+    },
+    sectionTitleToday: {
+        fontSize: 15,
+        fontWeight: "700",
+        color: COLORS.primary,
     },
 });
 

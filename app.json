@@ -46,7 +46,6 @@
         ]
       },
       "associatedDomains": [
-        "applinks:posts.ilyrox.com",
         "applinks:ilyrox.app",
         "applinks:*.ilyrox.app",
         "applinks:www.ilyrox.com"
@@ -78,10 +77,6 @@
               "scheme": "https",
               "host": "www.ilyrox.com",
               "pathPrefix": "/invite"
-            },
-            {
-              "scheme": "https",
-              "host": "posts.ilyrox.com"
             },
             {
               "scheme": "https",

@@ -16,6 +16,7 @@ import { Avatar } from "../shared";
 import { OwnerRecommendations } from "./OwnerRecommendations";
 import { propertyDetailStyles as styles } from "./propertyDetailStyles";
 import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
+import { useChatInitiator } from "@/hooks/messaging/useChatInitiator";
 
 export interface PropertyOwnerContactProps {
   profile: any;
@@ -45,6 +46,7 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
   const { showModal } = useModal();
   const navigate = onNavigateAway ?? ((go: () => void) => go());
   const [showContactSheet, setShowContactSheet] = useState(false);
+  const { handleContact } = useChatInitiator();
 
   if (sinDatos || !profile) return null;
 
@@ -82,19 +84,18 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
     });
   };
 
-  const handleWhatsApp = () => {
+  const handleOpenChat = () => {
     setShowContactSheet(false);
-    const phone = `${profile.prefijo_celular || ""}${profile.celular || ""}`.replace(/\s/g, "");
-    if (phone && phone.length > 0) {
-      Linking.openURL(`https://wa.me/${phone}`);
-    } else {
-      showModal({
-        title: "Sin número de contacto",
-        message:
-          "Este usuario no cuenta con un número registrado para mensajes de WhatsApp.",
-        confirmText: "OK",
-      });
-    }
+    handleContact(
+      profile.id,
+      propertyId,
+      {
+        id: profile.id,
+        nombre: profile.nombre,
+        foto: profile.foto,
+        apellido_paterno: profile.apellido_paterno || "",
+      },
+    );
   };
 
   const handleContactSheetCall = () => {
@@ -177,9 +178,9 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
         <View style={contactSheetStyles.container}>
           <Text style={contactSheetStyles.title}>Contactar ahora</Text>
 
-          <TouchableOpacity style={contactSheetStyles.option} onPress={handleWhatsApp}>
-            <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
-            <Text style={contactSheetStyles.optionText}>Mandar mensaje por WhatsApp</Text>
+          <TouchableOpacity style={contactSheetStyles.option} onPress={handleOpenChat}>
+            <Ionicons name="chatbubble-ellipses" size={24} color={COLORS.primary} />
+            <Text style={contactSheetStyles.optionText}>Enviar mensaje</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={contactSheetStyles.option} onPress={handleContactSheetCall}>

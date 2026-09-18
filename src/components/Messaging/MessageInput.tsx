@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Image,
+  Text,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -47,21 +48,26 @@ export default React.forwardRef<TextInput, MessageInputProps>(
     const [text, setText] = useState("");
     const [uploading, setUploading] = useState(false);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [selectedFile, setSelectedFile] = useState<{ uri: string; name: string } | null>(null);
 
     const handleSend = async () => {
       if (sending) return;
 
       const messageText = text.trim();
       const imageToSend = selectedImage;
+      const fileToSend = selectedFile;
 
-      if (!messageText && !imageToSend) return;
+      if (!messageText && !imageToSend && !fileToSend) return;
 
       setText("");
       setSelectedImage(null);
+      setSelectedFile(null);
       setUploading(true);
 
       try {
-        if (onSendCombined) {
+        if (fileToSend && onSendFile) {
+          await onSendFile(fileToSend.uri, fileToSend.name);
+        } else if (onSendCombined) {
           await onSendCombined(messageText, imageToSend || undefined);
         } else {
           if (messageText && onSendText) await onSendText(messageText);
@@ -71,6 +77,7 @@ export default React.forwardRef<TextInput, MessageInputProps>(
         log.error("Error sending message:", error);
         setText(messageText);
         setSelectedImage(imageToSend);
+        setSelectedFile(fileToSend);
         showToast("No se pudo enviar el mensaje", "error");
       } finally {
         setUploading(false);
@@ -162,13 +169,10 @@ export default React.forwardRef<TextInput, MessageInputProps>(
             return;
           }
 
-          setUploading(true);
-          await onSendFile(file.uri, file.name);
-          setUploading(false);
+          setSelectedFile({ uri: file.uri, name: file.name });
         }
       } catch (error) {
         log.error("Error picking file:", error);
-        setUploading(false);
         showToast("No se pudo cargar el archivo", "error");
       }
     };
@@ -184,7 +188,7 @@ export default React.forwardRef<TextInput, MessageInputProps>(
     // para no cerrar el teclado.
     const isInputDisabled = uploading;
     const isButtonDisabled =
-      (!text.trim() && !selectedImage && !uploading) || uploading;
+      (!text.trim() && !selectedImage && !selectedFile && !uploading) || uploading;
 
     return (
       <View style={styles.outerContainer}>
@@ -211,6 +215,22 @@ export default React.forwardRef<TextInput, MessageInputProps>(
             )}
             <TouchableOpacity
               onPress={() => setSelectedImage(null)}
+              style={styles.removePreviewBtn}
+            >
+              <Ionicons name="close" size={16} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
+        )}
+        {selectedFile && (
+          <View style={styles.previewContainer}>
+            <View style={[styles.previewFile, { backgroundColor: COLORS.background }]}>
+              <Ionicons name="document-text" size={28} color={COLORS.primary} />
+              <Text style={styles.previewFileName} numberOfLines={1}>
+                {selectedFile.name}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setSelectedFile(null)}
               style={styles.removePreviewBtn}
             >
               <Ionicons name="close" size={16} color={COLORS.white} />
@@ -304,10 +324,25 @@ const styles = StyleSheet.create({
   removePreviewBtn: {
     position: "absolute",
     top: 6,
-    left: 80, // Next to the image
+    left: 80,
     backgroundColor: COLORS.error,
     padding: 4,
     borderRadius: 12,
+  },
+  previewFile: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 4,
+  },
+  previewFileName: {
+    fontSize: 10,
+    color: COLORS.textPrimary,
+    marginTop: 4,
+    textAlign: "center",
+    maxWidth: 70,
   },
   container: {
     flexDirection: "row",
