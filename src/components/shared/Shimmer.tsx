@@ -9,7 +9,7 @@ interface ShimmerProps {
   style?: object;
 }
 
-const Shimmer = memo(function Shimmer({
+export const Shimmer = memo(function Shimmer({
   width,
   height,
   borderRadius = 4,
