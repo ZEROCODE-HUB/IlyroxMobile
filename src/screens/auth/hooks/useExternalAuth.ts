@@ -207,7 +207,9 @@ export function useExternalAuth() {
           nombre: collapseSpaces(formData.name || pendingUser.fullName || "Usuario"),
           apellido_paterno: collapseSpaces(formData.lastNamePaterno),
           apellido_materno: collapseSpaces(formData.lastNameMaterno),
-          celular: formData.phone || "",
+          celular: formData.phone && formData.phone.replace(/\D/g, "").slice(2).length >= 10 
+          ? formData.phone.replace(/\D/g, "").slice(2) 
+          : null,
           prefijo_celular: undefined,
           rol: "cliente",
           pais: "Mexico",

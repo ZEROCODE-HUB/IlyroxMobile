@@ -8,7 +8,7 @@ import {
 import { normalizePropertyData } from "@/utils/normalizePropertyData";
 
 export default function PropertyDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, imageIndex } = useLocalSearchParams();
   const cache = usePropertyCacheStore((state) => state.cache);
 
   // Cache lookup síncrono durante el render (mismo patrón que los posts):
@@ -22,10 +22,13 @@ export default function PropertyDetailScreen() {
     ? (normalizePropertyData(cached) as CachedPropertyData)
     : null;
 
+  const parsedImageIndex = imageIndex ? parseInt(imageIndex as string, 10) : undefined;
+
   return (
     <PropertyDetail
       propertyId={id as string}
       initialData={initialData}
+      imageIndex={parsedImageIndex}
     />
   );
 }

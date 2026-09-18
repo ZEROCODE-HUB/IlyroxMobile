@@ -13,6 +13,7 @@ interface AvatarProps {
 }
 
 const getInitials = (fullName: string) => {
+  if (!fullName) return "U";
   const parts = fullName.trim().split(/\s+/);
   if (parts.length === 0) return "U";
   if (parts.length === 1)
@@ -23,7 +24,7 @@ const getInitials = (fullName: string) => {
 export const Avatar: React.FC<AvatarProps> = React.memo(
   ({ uri, name = "U", size = 40, style }) => {
     const hasImage =
-      uri && uri.trim() !== "" && !uri.includes("placehold.co");
+      uri && uri?.trim() !== "" && !uri?.includes("placehold.co");
 
     const imageSource = useMemo(
       () => (hasImage ? { uri } : null),
@@ -108,7 +109,7 @@ export const CircularImageWithRays = ({
       },
     ];
 
-    if (uri && uri.trim() !== "" && !uri.includes("placehold.co")) {
+    if (uri && uri?.trim() !== "" && !uri?.includes("placehold.co")) {
       return <Image source={{ uri }} style={contentStyle} contentFit="cover" />;
     }
 

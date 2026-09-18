@@ -41,6 +41,9 @@ const FEED_SELECT = `
   perfiles!feed_items_publicado_por_fkey (
     id,
     nombre,
+    apellido_paterno,
+    apellido_materno,
+    nombre_completo,
     foto,
     rol,
     ocupacion
@@ -156,27 +159,32 @@ export function formatTimestamp(timestamp: string): string {
   });
 }
 
-const buildUser = (perfil: any, stats?: ReviewStatsRow | null): User => ({
-  id: perfil?.id || "",
-  nombre: perfil?.nombre || "Usuario",
-  name: perfil?.nombre || "Usuario",
-  avatar: perfil?.foto || "https://placehold.co/100x100",
-  isFollowing: false,
-  role: (perfil?.rol === "agente" ? "Agent" : "User") as any,
-  ocupacion: perfil?.ocupacion || undefined,
-  rating:
-    typeof stats?.calificacion_promedio === "number"
-      ? stats.calificacion_promedio
-      : 0,
-  totalRatings:
-    typeof stats?.total_resenas === "number" ? stats.total_resenas : 0,
-  positiveRecommendations:
-    typeof stats?.total_recomiendan === "number" ? stats.total_recomiendan : 0,
-  negativeRecommendations:
-    typeof stats?.total_no_recomiendan === "number"
-      ? stats.total_no_recomiendan
-      : 0,
-});
+const buildUser = (perfil: any, stats?: ReviewStatsRow | null): User => {
+  const fullName = [perfil?.nombre, perfil?.apellido_paterno, perfil?.apellido_materno]
+    .filter(Boolean)
+    .join(" ");
+  return {
+    id: perfil?.id || "",
+    nombre: perfil?.nombre || "Usuario",
+    name: perfil?.nombre_completo || fullName || "Usuario",
+    avatar: perfil?.foto || "https://placehold.co/100x100",
+    isFollowing: false,
+    role: (perfil?.rol === "agente" ? "Agent" : "User") as any,
+    ocupacion: perfil?.ocupacion || undefined,
+    rating:
+      typeof stats?.calificacion_promedio === "number"
+        ? stats.calificacion_promedio
+        : 0,
+    totalRatings:
+      typeof stats?.total_resenas === "number" ? stats.total_resenas : 0,
+    positiveRecommendations:
+      typeof stats?.total_recomiendan === "number" ? stats.total_recomiendan : 0,
+    negativeRecommendations:
+      typeof stats?.total_no_recomiendan === "number"
+        ? stats.total_no_recomiendan
+        : 0,
+  };
+};
 
 const normalizePostType = (tipo?: string) =>
   tipo

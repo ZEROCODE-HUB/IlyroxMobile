@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   ListRenderItem,
   RefreshControl,
@@ -49,6 +48,7 @@ import {
 import { mapPostToFeedItem, mapProfileToUser, mapReelToFeedItem } from "./profileMappers";
 import { ProfileInfoHeader } from "./ProfileInfoHeader";
 import { ProfileEditModals } from "./ProfileEditModals";
+import ProfileSkeleton from "./ProfileSkeleton";
 
 const log = logger.scoped("Profile");
 
@@ -636,12 +636,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
   };
 
   if (loading && !refreshing && !profile) {
-    return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Cargando perfil...</Text>
-      </View>
-    );
+    return <ProfileSkeleton />;
   }
 
   return (
@@ -786,15 +781,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.white,
-  },
-  loadingContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 16,
-    color: COLORS.textSecondary,
-    fontSize: 14,
   },
   scrollContent: {
     paddingBottom: 100,

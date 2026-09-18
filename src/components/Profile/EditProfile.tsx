@@ -191,7 +191,8 @@ const EditProfile = () => {
   return (
     <View style={safeStyle}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
         style={styles.container}
       >
         <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
@@ -212,7 +213,10 @@ const EditProfile = () => {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Photo Section */}
           <View style={styles.photoContainer}>
             <TouchableOpacity

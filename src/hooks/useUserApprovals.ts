@@ -79,19 +79,24 @@ export function useUserApprovals(
       });
 
       // 4. Transformar a formato User
-      const users: PendingUser[] = filtered.map((u) => ({
-        id: u.id,
-        nombre: u.nombre,
-        name: u.nombre,
-        avatar: u.foto || "https://placehold.co/100x100",
-        isFollowing: false,
-        role: u.rol === "agente" ? "Agent" : "User",
-        location: u.estado ? `${u.estado}, México` : "México",
-        phone: u.celular,
-        aprobaciones_recibidas: u.aprobaciones_recibidas || 0,
-        aprobaciones_requeridas: u.aprobaciones_requeridas || 3,
-        estado: u.estado,
-      }));
+      const users: PendingUser[] = filtered.map((u) => {
+        const fullName = [u.nombre, u.apellido_paterno, u.apellido_materno]
+          .filter(Boolean)
+          .join(" ");
+        return {
+          id: u.id,
+          nombre: u.nombre,
+          name: fullName || "Usuario",
+          avatar: u.foto || "https://placehold.co/100x100",
+          isFollowing: false,
+          role: u.rol === "agente" ? "Agent" : "User",
+          location: u.estado ? `${u.estado}, México` : "México",
+          phone: u.celular,
+          aprobaciones_recibidas: u.aprobaciones_recibidas || 0,
+          aprobaciones_requeridas: u.aprobaciones_requeridas || 3,
+          estado: u.estado,
+        };
+      });
 
       setPendingUsers(users);
     } catch (error) {

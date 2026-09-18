@@ -3,7 +3,7 @@
  * ACTUALIZADO: Usa hooks reales para likes y share + navegación correcta a Messages
  */
 
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -47,7 +47,7 @@ import { getCamposVisibles, esTerreno } from "@/constants/propertyData";
 
 interface PropertyCardProps {
   item: FeedItem;
-  onClick: () => void;
+  onClick: (imageIndex?: number) => void;
   onUserClick?: (user: User) => void;
   onCommentClick: () => void;
   showContactButton?: boolean;
@@ -72,6 +72,12 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   onPropertyUpdated,
   onBeforeNavigate,
 }) => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const handleImagePress = () => {
+    onClick(currentImageIndex);
+  };
+
   const {
     showOptions,
     showReportModal,
@@ -301,7 +307,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         <SafePressable
           style={styles.headerFill}
           activeOpacity={0.9}
-          onPress={onClick}
+          onPress={() => onClick()}
         >
           <UserHeader
             user={item.user}
@@ -364,7 +370,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           aspectRatio={DIMENSIONS.POST_ASPECT_RATIO}
           showDots={true}
           showImageCount={false}
-          onImagePress={onClick}
+          onImagePress={handleImagePress}
+          onIndexChange={setCurrentImageIndex}
         />
 
         {/* Velo lateral para que los iconos blancos se lean sobre fotos
@@ -428,7 +435,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       </Pressable>
 
       {/* Información de la propiedad clickeable */}
-      <SafePressable activeOpacity={0.9} onPress={onClick}>
+      <SafePressable activeOpacity={0.9} onPress={() => onClick()}>
         <View style={[commonStyles.cardContent, styles.compactContent]}>
           <Text style={commonStyles.title} numberOfLines={1}>
             {title}
@@ -495,14 +502,14 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       </SafePressable>
 
       {stats.length > 0 && (
-        <SafePressable activeOpacity={0.9} onPress={onClick}>
+        <SafePressable activeOpacity={0.9} onPress={() => onClick()}>
           <View style={styles.statsRow}>
             {stats.map((s) => (
               <View key={s.key} style={styles.statItem}>
                 {s.icon}
                 <Text style={styles.statLabel}>{s.label}</Text>
                 {s.value ? (
-                  <Text style={s.value} />
+                  <Text style={styles.statValue}>{s.value}</Text>
                 ) : null}
               </View>
             ))}

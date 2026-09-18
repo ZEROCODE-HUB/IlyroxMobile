@@ -145,7 +145,6 @@ export function useAuthForm() {
       !lastNamePaterno ||
       !lastNameMaterno ||
       !email ||
-      !phone ||
       !password ||
       !estado
     ) {
@@ -302,33 +301,58 @@ export function useAuthForm() {
 
     setLoading(true);
     try {
-      // Verificar teléfono duplicado antes de crear la cuenta
+      // Verificar teléfono duplicado solo si se proporcionó
       const celularDigits = formState.phone.replace(/\D/g, "").slice(2);
+      if (celularDigits.length >= 10) {
+        const { data: existingPhone } = await supabase
+          .from("perfiles")
+          .select("id")
+          .eq("celular", celularDigits)
+          .maybeSingle();
 
-      const { data: existingPhone } = await supabase
-        .from("perfiles")
-        .select("id")
-        .eq("celular", celularDigits)
-        .maybeSingle();
-
-      if (existingPhone) {
-        showModal({
-          title: "Número ya registrado",
-          message: "Ya existe una cuenta registrada con este número de teléfono.",
-          confirmText: "OK",
-        });
-        setLoading(false);
-        return false;
+        if (existingPhone) {
+          showModal({
+            title: "Número ya registrado",
+            message: "Ya existe una cuenta registrada con este número de teléfono.",
+            confirmText: "OK",
+          });
+          setLoading(false);
+          return false;
+        }
       }
+
+      // Preparar metadata del usuario para el trigger
+      const userMetadata = {
+        nombre: collapseSpaces(formState.name),
+        apellido_paterno: collapseSpaces(formState.lastNamePaterno),
+        apellido_materno: collapseSpaces(formState.lastNameMaterno),
+        prefijo_celular: "+52",
+        celular: celularDigits.length >= 10 ? celularDigits : null,
+        pais: "Mexico",
+        estado: formState.estado,
+        rol: "cliente",
+        nombre_completo: collapseSpaces(
+          `${formState.name} ${formState.lastNamePaterno} ${formState.lastNameMaterno}`,
+        ),
+        ocupacion: formState.ocupacion,
+        modalidad: formState.modalidad || null,
+        nombre_inmobiliaria: formState.nombreInmobiliaria || null,
+        fecha_inicio_carrera: formState.fechaInicioCarrera || null,
+        biografia: formState.biografia || null,
+      };
 
       const { data, error } = await supabase.auth.signUp({
         email: formState.email,
         password: formState.password,
+        options: {
+          data: userMetadata,
+        },
       });
 
       if (error) throw error;
 
       if (data.user) {
+        // Subir foto si existe (después del registro para no bloquear)
         let finalAvatarUrl = "";
         if (formState.avatarUri) {
           const url = await uploadImage(
@@ -336,52 +360,18 @@ export function useAuthForm() {
             "fotos",
             "fotoperfil",
           );
-          if (url) finalAvatarUrl = url;
+          if (url) {
+            finalAvatarUrl = url;
+            // Actualizar foto en el perfil
+            await supabase
+              .from("perfiles")
+              .update({ foto: finalAvatarUrl })
+              .eq("id", data.user.id);
+          }
         }
 
         OneSignal.login(data.user.id);
         OneSignal.User.addTag("email", data.user.email ?? "");
-
-        const newProfile: perfiles = {
-          id: data.user.id,
-          nombre: collapseSpaces(formState.name),
-          apellido_paterno: collapseSpaces(formState.lastNamePaterno),
-          apellido_materno: collapseSpaces(formState.lastNameMaterno),
-          prefijo_celular: "+52",
-          celular: formState.phone.replace(/\D/g, "").slice(2),
-          email: formState.email,
-          rol: "cliente",
-          pais: "Mexico",
-          estado: formState.estado,
-          foto: finalAvatarUrl,
-          estado_registro: "pendiente",
-          aprobaciones_recibidas: 0,
-          aprobaciones_requeridas: 3,
-          fecha_inicio_carrera: formState.fechaInicioCarrera || undefined,
-          ocupacion: formState.ocupacion,
-          otro_ocupacion: undefined,
-          modalidad: formState.modalidad || undefined,
-          nombre_inmobiliaria: formState.nombreInmobiliaria || undefined,
-          curso_certificacion: undefined,
-          nombre_completo: collapseSpaces(
-            `${formState.name} ${formState.lastNamePaterno} ${formState.lastNameMaterno}`,
-          ),
-          activado_en: undefined,
-          deleted_at: undefined,
-          biografia: formState.biografia,
-          sitio_web: undefined,
-          calificacion_promedio: undefined,
-          total_calificaciones: undefined,
-          total_recomendaciones_positivas: undefined,
-          total_recomendaciones_negativas: undefined,
-        };
-
-        const { error: profileError } = await supabase
-          .from("perfiles")
-          .upsert(newProfile)
-          .select();
-
-        if (profileError) throw profileError;
 
         await applyStoredAdvisorInvite(data.user.id);
       }

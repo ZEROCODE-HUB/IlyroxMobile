@@ -221,13 +221,17 @@ export default function MapResultsScreen() {
     }
   }, [offset, propertyIds.length, isFetching]);
 
-  const handleOpenDetail = useCallback((item: FeedItem) => {
+  const handleOpenDetail = useCallback((item: FeedItem, imageIndex?: number) => {
     if (item.propertyDetails?.id) {
       const cachedData = item.propertyDetails;
       usePropertyCacheStore.getState().setProperty(cachedData.id, cachedData);
+      const params: any = { id: cachedData.id };
+      if (imageIndex !== undefined && imageIndex > 0) {
+        params.imageIndex = String(imageIndex);
+      }
       router.push({
         pathname: "/property/[id]",
-        params: { id: cachedData.id },
+        params,
       });
     }
   }, []);
@@ -240,7 +244,7 @@ export default function MapResultsScreen() {
     ({ item }: { item: FeedItem }) => (
       <PropertyCard
         item={item}
-        onClick={() => handleOpenDetail(item)}
+        onClick={(imageIndex) => handleOpenDetail(item, imageIndex)}
         onCommentClick={() => setActiveCommentItem(item)}
         onUserClick={handleUserClick}
         currentUserId={user?.id}

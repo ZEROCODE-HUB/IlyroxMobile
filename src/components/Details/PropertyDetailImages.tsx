@@ -24,6 +24,7 @@ export interface PropertyDetailImagesProps {
   shareCode?: string;
   onCommentClick: () => void;
   onTrackInteraction: (kind: string) => void;
+  initialIndex?: number;
 }
 
 export const PropertyDetailImages: React.FC<PropertyDetailImagesProps> = ({
@@ -42,6 +43,7 @@ export const PropertyDetailImages: React.FC<PropertyDetailImagesProps> = ({
   shareCode,
   onCommentClick,
   onTrackInteraction,
+  initialIndex,
 }) => {
   const hasImages = images.length > 0;
   const galleryImages = hasImages ? images : [FALLBACK_IMAGE];
@@ -55,6 +57,7 @@ export const PropertyDetailImages: React.FC<PropertyDetailImagesProps> = ({
         showDots={galleryImages.length > 1}
         showImageCount={false}
         onIndexChange={onImageIndexChange}
+        initialIndex={initialIndex}
       />
 
       {/* Velo lateral para legibilidad de los iconos blancos. */}

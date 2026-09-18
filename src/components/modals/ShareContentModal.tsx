@@ -150,7 +150,7 @@ const ShareContentModal: React.FC<ShareContentModalProps> = ({
                 activeTab === "con" && styles.tabTextActive,
               ]}
             >
-              Con datos
+              Con mis datos
             </Text>
           </TouchableOpacity>
           <TouchableOpacity

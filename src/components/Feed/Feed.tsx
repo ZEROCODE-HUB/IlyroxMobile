@@ -188,10 +188,11 @@ const Feed: React.FC<FeedProps> = ({
   );
 
   const handleOpenDetail = useCallback(
-    (item: FeedItem) => {
+    (item: FeedItem, imageIndex?: number) => {
       console.log("[RDBG] Feed.handleOpenDetail", {
         id: item.id,
         type: item.type,
+        imageIndex,
       });
       if (item.type === "property" && item.propertyDetails?.id) {
         const cachedData = {
@@ -207,9 +208,13 @@ const Feed: React.FC<FeedProps> = ({
           },
         };
         usePropertyCacheStore.getState().setProperty(cachedData.id, cachedData);
+        const params: any = { id: cachedData.id };
+        if (imageIndex !== undefined && imageIndex > 0) {
+          params.imageIndex = String(imageIndex);
+        }
         router.push({
           pathname: "/(stack)/property/[id]",
-          params: { id: cachedData.id },
+          params,
         });
       } else if (item.type === "reel") {
         // `router.push` siempre monta una pantalla nueva (a diferencia de
@@ -298,8 +303,8 @@ const Feed: React.FC<FeedProps> = ({
           return (
             <PropertyCard
               item={item}
-              onClick={() => {
-                handleOpenDetail(item);
+              onClick={(imageIndex) => {
+                handleOpenDetail(item, imageIndex);
               }}
               onUserClick={onUserClick}
               onCommentClick={() => handleOpenComments(item)}
