@@ -61,6 +61,7 @@ export const ProfileEditModals: React.FC<ProfileEditModalsProps> = ({
             propertyId={selectedProperty.id}
             onRefresh={handleSilentRefresh}
             onClose={onCloseProperty}
+            isModal={true}
           />
         </Modal>
       )}

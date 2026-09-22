@@ -33,22 +33,44 @@ export default function CommunityWelcome() {
   const [invitador, setInvitador] = useState<InvitadorInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [linkExpirado, setLinkExpirado] = useState(false);
+  const [errorValidacion, setErrorValidacion] = useState(false);
 
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null;
+
     async function loadInvitador() {
       try {
         const code = await AsyncStorage.getItem(STORED_INVITE_CODE_KEY);
         if (code) {
           log.info("communityWelcome: Codigo encontrado", { code });
-          const { data, error } = await supabase.rpc("validar_codigo_invitacion", {
+
+          const validationPromise = supabase.rpc("validar_codigo_invitacion", {
             p_codigo: code,
           });
-          if (error) {
+
+          const timeoutPromise = new Promise<{ data: null, error: null }>((resolve) => {
+            timeoutId = setTimeout(() => resolve({ data: null, error: null }), 10000);
+          });
+
+          const { data, error } = await Promise.race([validationPromise, timeoutPromise]);
+
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+
+          if (!data) {
+            log.info("communityWelcome: Timeout en validacion");
+            setLinkExpirado(true);
+            setErrorValidacion(true);
+          } else if (error) {
             log.warn("communityWelcome: Error al validar codigo", error);
-          } else if (data) {
+            setLinkExpirado(true);
+            setErrorValidacion(true);
+          } else {
             const validacion = data as ValidacionResultado;
             log.info("communityWelcome: Validacion resultado", validacion);
-            if (validacion.valido) {
+            if (validacion && validacion.valido === true) {
               setInvitador({
                 invitador_id: validacion.invitador_id || "",
                 nombre: validacion.nombre,
@@ -65,11 +87,18 @@ export default function CommunityWelcome() {
         }
       } catch (e) {
         log.warn("communityWelcome: Error al cargar invitador", e);
+        setLinkExpirado(true);
+        setErrorValidacion(true);
       } finally {
         setLoading(false);
       }
     }
+
     loadInvitador();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, []);
 
   const handleEmpezar = () => {
@@ -107,6 +136,9 @@ export default function CommunityWelcome() {
                 <>
                   <Text style={styles.titleDark}>Link</Text>
                   <Text style={styles.titleBlue}>expirado.</Text>
+                  {errorValidacion && (
+                    <Text style={styles.errorText}>No se pudo validar la invitación</Text>
+                  )}
                 </>
               ) : invitador ? (
                 <>
@@ -257,6 +289,12 @@ const styles = StyleSheet.create({
   highlightText: {
     fontWeight: "700",
     color: COLORS.primaryDark,
+  },
+  errorText: {
+    fontSize: 14,
+    color: "#EF4444",
+    marginTop: 8,
+    textAlign: "center",
   },
   button: {
     backgroundColor: COLORS.primary,

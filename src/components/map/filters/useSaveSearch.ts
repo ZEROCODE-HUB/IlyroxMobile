@@ -221,12 +221,12 @@ export const useSaveSearch = (userId?: string) => {
         precio_renta_min: esRenta ? pMin : 0,
         precio_renta_max: esRenta ? pMax : null,
         ubicacion: {
-          estado: filters.locationFilter.estado,
-          ciudad: filters.locationFilter.ciudad,
-          municipio: filters.locationFilter.municipio,
-          colonia: Array.isArray(filters.locationFilter.colonia)
+          estado: filters.locationFilter?.estado ?? '',
+          ciudad: filters.locationFilter?.ciudad ?? '',
+          municipio: filters.locationFilter?.municipio ?? '',
+          colonia: Array.isArray(filters.locationFilter?.colonia)
             ? filters.locationFilter.colonia.join(", ")
-            : filters.locationFilter.colonia,
+            : filters.locationFilter?.colonia ?? '',
           icon: "location-outline",
         },
         zonas_interes,
@@ -246,16 +246,16 @@ export const useSaveSearch = (userId?: string) => {
         },
         superficies: {
           m2_terreno_min: filters.m2TerrenoMin
-            ? parseFloat(filters.m2TerrenoMin.toString().replace(/,/g, ""))
+            ? parseFloat(String(filters.m2TerrenoMin).replace(/,/g, ""))
             : 0,
           m2_construccion_min: filters.m2ConstruccionMin
-            ? parseFloat(filters.m2ConstruccionMin.toString().replace(/,/g, ""))
+            ? parseFloat(String(filters.m2ConstruccionMin).replace(/,/g, ""))
             : 0,
           ancho_terreno_min: filters.anchoTerrenoMin
-            ? parseFloat(filters.anchoTerrenoMin.toString().replace(/,/g, ""))
+            ? parseFloat(String(filters.anchoTerrenoMin).replace(/,/g, ""))
             : 0,
           largo_terreno_min: filters.largoTerrenoMin
-            ? parseFloat(filters.largoTerrenoMin.toString().replace(/,/g, ""))
+            ? parseFloat(String(filters.largoTerrenoMin).replace(/,/g, ""))
             : 0,
           icon: "resize-outline",
         },
@@ -285,11 +285,11 @@ export const useSaveSearch = (userId?: string) => {
     if (filters.subtipo) criterios_busqueda.subtipo = filters.subtipo;
     if (filters.precioMin)
       criterios_busqueda.precio_min = parseFloat(
-        filters.precioMin.toString().replace(/,/g, ""),
+        String(filters.precioMin).replace(/,/g, ""),
       );
     if (filters.precioMax)
       criterios_busqueda.precio_max = parseFloat(
-        filters.precioMax.toString().replace(/,/g, ""),
+        String(filters.precioMax).replace(/,/g, ""),
       );
     if (filters.habitaciones && filters.habitaciones !== "No indicado")
       criterios_busqueda.habitaciones = filters.habitaciones;
@@ -305,27 +305,27 @@ export const useSaveSearch = (userId?: string) => {
       criterios_busqueda.antiguedad = filters.antiguedad;
     if (filters.m2TerrenoMin)
       criterios_busqueda.m2_terreno_min = parseFloat(
-        filters.m2TerrenoMin.toString().replace(/,/g, ""),
+        String(filters.m2TerrenoMin).replace(/,/g, ""),
       );
     if (filters.m2ConstruccionMin)
       criterios_busqueda.m2_construccion_min = parseFloat(
-        filters.m2ConstruccionMin.toString().replace(/,/g, ""),
+        String(filters.m2ConstruccionMin).replace(/,/g, ""),
       );
     if (filters.anchoTerrenoMin)
       criterios_busqueda.ancho_terreno_min = parseFloat(
-        filters.anchoTerrenoMin.toString().replace(/,/g, ""),
+        String(filters.anchoTerrenoMin).replace(/,/g, ""),
       );
     if (filters.largoTerrenoMin)
       criterios_busqueda.largo_terreno_min = parseFloat(
-        filters.largoTerrenoMin.toString().replace(/,/g, ""),
+        String(filters.largoTerrenoMin).replace(/,/g, ""),
       );
-    if (filters.locationFilter.estado)
+    if (filters.locationFilter?.estado)
       criterios_busqueda.estado = filters.locationFilter.estado;
-    if (filters.locationFilter.ciudad)
+    if (filters.locationFilter?.ciudad)
       criterios_busqueda.ciudad = filters.locationFilter.ciudad;
-    if (filters.locationFilter.municipio)
+    if (filters.locationFilter?.municipio)
       criterios_busqueda.municipio = filters.locationFilter.municipio;
-    if (filters.locationFilter.colonia) {
+    if (filters.locationFilter?.colonia) {
       criterios_busqueda.colonias = Array.isArray(filters.locationFilter.colonia)
         ? filters.locationFilter.colonia
         : [filters.locationFilter.colonia];
@@ -454,13 +454,13 @@ export const useSaveSearch = (userId?: string) => {
     }
     if (filters.m2ConstruccionMin) {
       const m2Cons = parseFloat(
-        filters.m2ConstruccionMin.toString().replace(/,/g, ""),
+        String(filters.m2ConstruccionMin).replace(/,/g, ""),
       );
       if (!isNaN(m2Cons)) insertData.metros_construccion = m2Cons;
     }
     if (filters.m2TerrenoMin) {
       const m2Terr = parseFloat(
-        filters.m2TerrenoMin.toString().replace(/,/g, ""),
+        String(filters.m2TerrenoMin).replace(/,/g, ""),
       );
       if (!isNaN(m2Terr)) insertData.metros_terreno = m2Terr;
     }
@@ -555,14 +555,14 @@ export const useSaveSearch = (userId?: string) => {
     if (filters.estacionamientos && filters.estacionamientos !== "No indicado") criterios_busqueda.estacionamientos = filters.estacionamientos;
     if (filters.niveles && filters.niveles !== "No indicado") criterios_busqueda.niveles = filters.niveles;
     if (filters.antiguedad && filters.antiguedad !== "No indicado") criterios_busqueda.antiguedad = filters.antiguedad;
-    if (filters.m2TerrenoMin) criterios_busqueda.m2_terreno_min = parseFloat(filters.m2TerrenoMin.toString().replace(/,/g, ""));
-    if (filters.m2ConstruccionMin) criterios_busqueda.m2_construccion_min = parseFloat(filters.m2ConstruccionMin.toString().replace(/,/g, ""));
-    if (filters.anchoTerrenoMin) criterios_busqueda.ancho_terreno_min = parseFloat(filters.anchoTerrenoMin.toString().replace(/,/g, ""));
-    if (filters.largoTerrenoMin) criterios_busqueda.largo_terreno_min = parseFloat(filters.largoTerrenoMin.toString().replace(/,/g, ""));
-    if (filters.locationFilter.estado) criterios_busqueda.estado = filters.locationFilter.estado;
-    if (filters.locationFilter.ciudad) criterios_busqueda.ciudad = filters.locationFilter.ciudad;
-    if (filters.locationFilter.municipio) criterios_busqueda.municipio = filters.locationFilter.municipio;
-    if (filters.locationFilter.colonia) {
+    if (filters.m2TerrenoMin) criterios_busqueda.m2_terreno_min = parseFloat(String(filters.m2TerrenoMin).replace(/,/g, ""));
+    if (filters.m2ConstruccionMin) criterios_busqueda.m2_construccion_min = parseFloat(String(filters.m2ConstruccionMin).replace(/,/g, ""));
+    if (filters.anchoTerrenoMin) criterios_busqueda.ancho_terreno_min = parseFloat(String(filters.anchoTerrenoMin).replace(/,/g, ""));
+    if (filters.largoTerrenoMin) criterios_busqueda.largo_terreno_min = parseFloat(String(filters.largoTerrenoMin).replace(/,/g, ""));
+    if (filters.locationFilter?.estado) criterios_busqueda.estado = filters.locationFilter.estado;
+    if (filters.locationFilter?.ciudad) criterios_busqueda.ciudad = filters.locationFilter.ciudad;
+    if (filters.locationFilter?.municipio) criterios_busqueda.municipio = filters.locationFilter.municipio;
+    if (filters.locationFilter?.colonia) {
       criterios_busqueda.colonias = Array.isArray(filters.locationFilter.colonia)
         ? filters.locationFilter.colonia
         : [filters.locationFilter.colonia];
@@ -611,8 +611,8 @@ export const useSaveSearch = (userId?: string) => {
     if (filters.habitaciones && filters.habitaciones !== "No indicado") { const v = parseInt(filters.habitaciones); if (!isNaN(v)) updateData.habitaciones = v; }
     if (filters.banos && filters.banos !== "No indicado") { const v = parseInt(filters.banos); if (!isNaN(v)) updateData.banos = v; }
     if (filters.estacionamientos && filters.estacionamientos !== "No indicado") { const v = parseInt(filters.estacionamientos); if (!isNaN(v)) updateData.estacionamientos = v; }
-    if (filters.m2ConstruccionMin) { const v = parseFloat(filters.m2ConstruccionMin.toString().replace(/,/g, "")); if (!isNaN(v)) updateData.metros_construccion = v; }
-    if (filters.m2TerrenoMin) { const v = parseFloat(filters.m2TerrenoMin.toString().replace(/,/g, "")); if (!isNaN(v)) updateData.metros_terreno = v; }
+    if (filters.m2ConstruccionMin) { const v = parseFloat(String(filters.m2ConstruccionMin).replace(/,/g, "")); if (!isNaN(v)) updateData.metros_construccion = v; }
+    if (filters.m2TerrenoMin) { const v = parseFloat(String(filters.m2TerrenoMin).replace(/,/g, "")); if (!isNaN(v)) updateData.metros_terreno = v; }
     if (filters.polygons?.length > 0) updateData.polygon_coords = filters.polygons;
     if (filters.locationChips?.length > 0) {
       const chipsConBounds = filters.locationChips.filter((c: any) => c.bounds);

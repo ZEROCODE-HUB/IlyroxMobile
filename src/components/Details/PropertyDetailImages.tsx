@@ -12,7 +12,7 @@ export interface PropertyDetailImagesProps {
   images: string[];
   currentImageIndex: number;
   onImageIndexChange: (idx: number) => void;
-  onBack: () => void;
+  onBack?: () => void;
   feedItemId: string;
   feedItemLikes: number;
   feedItemComments: number;
@@ -25,6 +25,7 @@ export interface PropertyDetailImagesProps {
   onCommentClick: () => void;
   onTrackInteraction: (kind: string) => void;
   initialIndex?: number;
+  showBackButton?: boolean;
 }
 
 export const PropertyDetailImages: React.FC<PropertyDetailImagesProps> = ({
@@ -44,6 +45,7 @@ export const PropertyDetailImages: React.FC<PropertyDetailImagesProps> = ({
   onCommentClick,
   onTrackInteraction,
   initialIndex,
+  showBackButton = true,
 }) => {
   const hasImages = images.length > 0;
   const galleryImages = hasImages ? images : [FALLBACK_IMAGE];
@@ -93,9 +95,11 @@ export const PropertyDetailImages: React.FC<PropertyDetailImagesProps> = ({
         />
       </View>
 
-      <TouchableOpacity onPress={onBack} style={styles.backFloating}>
-        <Ionicons name="arrow-back" size={24} color={COLORS.white} />
-      </TouchableOpacity>
+      {showBackButton && onBack && (
+        <TouchableOpacity onPress={onBack} style={styles.backFloating}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+        </TouchableOpacity>
+      )}
 
       {images.length > 1 && (
         <View style={styles.imageBadge}>
