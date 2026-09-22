@@ -16,6 +16,7 @@ interface SearchFiltersBarProps {
   locationChips?: LocationChip[];
   polygonChips?: Array<{ index: number; label: string }>;
   onAddZone?: () => void;
+  isZoneSearchOpen?: boolean;
   onRemoveChip?: (id: string) => void;
   onRemovePolygon?: (index: number) => void;
   onBack?: () => void;
@@ -27,6 +28,7 @@ export const SearchFiltersBar: React.FC<SearchFiltersBarProps> = ({
   locationChips = [],
   polygonChips = [],
   onAddZone,
+  isZoneSearchOpen = false,
   onRemoveChip,
   onRemovePolygon,
   onBack,
@@ -42,7 +44,7 @@ export const SearchFiltersBar: React.FC<SearchFiltersBarProps> = ({
             <Ionicons name="arrow-back" size={20} color={COLORS.textPrimary} />
           </TouchableOpacity>
         )}
-        {onAddZone && (
+        {onAddZone && !isZoneSearchOpen && (
           <TouchableOpacity
             style={styles.zoneBtn}
             onPress={onAddZone}

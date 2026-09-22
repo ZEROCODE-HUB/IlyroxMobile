@@ -177,7 +177,7 @@ export async function getCommunityBuildersV3(
 export async function getOrCreateAdvisorInviteCode(userId: string) {
   const { data: existing, error: selectError } = await supabase
     .from("asesor_invitacion_codigos")
-    .select("codigo")
+    .select("codigo, usado, expira_en")
     .eq("invitador_id", userId)
     .maybeSingle();
 
@@ -185,7 +185,14 @@ export async function getOrCreateAdvisorInviteCode(userId: string) {
     log.warn("Could not read advisor invite code", selectError);
   }
 
-  if (existing?.codigo) return existing.codigo as string;
+  if (existing?.codigo) {
+    const isUsed = existing.usado === true;
+    const isExpired = existing.expira_en && new Date(existing.expira_en) < new Date();
+
+    if (!isUsed && !isExpired) {
+      return existing.codigo as string;
+    }
+  }
 
   const codigo = generateInviteCode(userId);
   const { data, error } = await supabase

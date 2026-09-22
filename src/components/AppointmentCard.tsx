@@ -12,6 +12,7 @@ import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../constants/colors";
 import { AppointmentItem } from "./Appointments/appointmentTypes";
+import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 
 interface AppointmentCardProps {
   appointment: AppointmentItem;
@@ -30,6 +31,7 @@ interface AppointmentCardProps {
 const AppointmentCard: React.FC<AppointmentCardProps> = ({
   appointment,
   onMarkCancel,
+  onAcceptAppointment,
   onContact,
   onEdit,
   activeTab,
@@ -38,11 +40,14 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onUserPress,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
+  const [showCoordinationSheet, setShowCoordinationSheet] = useState(false);
 
   const isRequester = !!currentUserId && appointment.created_by === currentUserId;
+  const isInvited = !isRequester;
   const isPending = appointment.estado === "pendiente";
   const isConfirmed = appointment.estado === "confirmada";
   const isCancelled = appointment.estado === "cancelada";
+  const showGuestActions = isInvited && isPending;
 
   const getOtherUserPhone = () => {
     if (appointment.agente?.celular) {
@@ -73,12 +78,14 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
     return getOtherUserName();
   };
 
-  const handleCall = () => {
+  const handleCall = (fromSheet: boolean = false) => {
     const phone = getOtherUserPhone();
     if (phone) {
       Linking.openURL(`tel:${phone.replace(/\s/g, "")}`);
     }
-    setShowMenu(false);
+    if (!fromSheet) {
+      setShowMenu(false);
+    }
   };
 
   const handleMessage = () => {
@@ -141,7 +148,9 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
             {isPending && (
               <View style={styles.pendingBadge}>
-                <Text style={styles.pendingBadgeText}>Pendiente de {creatorName}</Text>
+                <Text style={styles.pendingBadgeText}>
+                  {isInvited ? "Esperando tu respuesta" : `Esperando respuesta de ${creatorName}`}
+                </Text>
               </View>
             )}
             {isConfirmed && (
@@ -179,15 +188,37 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
         </View>
 
         <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.actionBtn} onPress={handleCall}>
-            <Ionicons name="call-outline" size={18} color={COLORS.primary} />
-            <Text style={styles.actionBtnText}>Llamar</Text>
-          </TouchableOpacity>
+          {showGuestActions ? (
+            <>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.confirmBtn]}
+                onPress={() => onAcceptAppointment?.(appointment.id)}
+              >
+                <Ionicons name="checkmark-circle" size={18} color={COLORS.white} />
+                <Text style={[styles.actionBtnText, styles.confirmBtnText]}>Confirmar</Text>
+              </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn} onPress={handleMessage}>
-            <Ionicons name="chatbubble-outline" size={18} color={COLORS.primary} />
-            <Text style={styles.actionBtnText}>Mensaje</Text>
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.coordinateBtn]}
+                onPress={() => setShowCoordinationSheet(true)}
+              >
+                <Ionicons name="calendar-outline" size={18} color={COLORS.primary} />
+                <Text style={styles.actionBtnText}>Coordinar</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity style={styles.actionBtn} onPress={() => handleCall()}>
+                <Ionicons name="call-outline" size={18} color={COLORS.primary} />
+                <Text style={styles.actionBtnText}>Llamar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.actionBtn} onPress={() => handleMessage()}>
+                <Ionicons name="chatbubble-outline" size={18} color={COLORS.primary} />
+                <Text style={styles.actionBtnText}>Mensaje</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
           <TouchableOpacity style={styles.menuBtn} onPress={() => setShowMenu(true)}>
             <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textSecondary} />
@@ -214,6 +245,44 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           </View>
         </Pressable>
       </Modal>
+
+      <AppBottomSheet
+        visible={showCoordinationSheet}
+        onClose={() => setShowCoordinationSheet(false)}
+      >
+        <View style={styles.coordinationSheet}>
+          <Text style={styles.coordinationSheetTitle}>Coordinar con {otherUserName}</Text>
+
+          <TouchableOpacity
+            style={styles.coordinationOption}
+            onPress={() => {
+              handleCall(true);
+              setShowCoordinationSheet(false);
+            }}
+          >
+            <Ionicons name="call" size={24} color={COLORS.primary} />
+            <Text style={styles.coordinationOptionText}>Llamar a {otherUserName}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.coordinationOption}
+            onPress={() => {
+              handleMessage();
+              setShowCoordinationSheet(false);
+            }}
+          >
+            <Ionicons name="chatbubble-ellipses" size={24} color={COLORS.primary} />
+            <Text style={styles.coordinationOptionText}>Escribir a {otherUserName}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.coordinationCancelBtn}
+            onPress={() => setShowCoordinationSheet(false)}
+          >
+            <Text style={styles.coordinationCancelText}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      </AppBottomSheet>
     </View>
   );
 };
@@ -371,6 +440,17 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.primary,
   },
+  confirmBtn: {
+    backgroundColor: COLORS.success,
+    flex: 1,
+  },
+  confirmBtnText: {
+    color: COLORS.white,
+  },
+  coordinateBtn: {
+    backgroundColor: COLORS.background,
+    flex: 1,
+  },
   menuBtn: {
     width: 44,
     height: 40,
@@ -404,6 +484,43 @@ const styles = StyleSheet.create({
   menuItemText: {
     fontSize: 15,
     color: COLORS.textPrimary,
+  },
+  coordinationSheet: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  coordinationSheetTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  coordinationOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
+  },
+  coordinationOptionText: {
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    marginLeft: 16,
+  },
+  coordinationCancelBtn: {
+    marginTop: 16,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  coordinationCancelText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
   },
 });
 

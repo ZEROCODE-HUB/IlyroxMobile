@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import {
+  Animated,
   Modal,
   RefreshControl,
   ScrollView,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -52,6 +54,8 @@ interface PropertyDetailProps {
   onClose?: () => void;
   /** Índice inicial del carrusel de imágenes (para sincronizar con el feed). */
   imageIndex?: number;
+  /** Indica si se renderiza dentro de un Modal (aplica estilos redondeados). */
+  isModal?: boolean;
 }
 
 
@@ -63,6 +67,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   initialData,
   onClose,
   imageIndex,
+  isModal = false,
 }) => {
   const handleClose = onClose ?? (() => router.back());
 
@@ -99,6 +104,8 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
 
   const { handleContact } = useChatInitiator();
 
+  const scrollY = useRef(new Animated.Value(0)).current;
+
   const [refreshing, setRefreshing] = useState(false);
   const { showToast } = useToast();
 
@@ -134,7 +141,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
 
   if (loading && !propertyDetails) {
     return (
-      <PropertyDetailShimmer />
+      <PropertyDetailShimmer isModal={isModal} />
     );
   }
 
@@ -187,10 +194,19 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
 
   return (
     <SafeAreaView style={styles.container}>
+      <TouchableOpacity style={styles.backFloating} onPress={handleClose}>
+        <Ionicons name="arrow-back" size={20} color={COLORS.white} />
+      </TouchableOpacity>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
         removeClippedSubviews={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false },
+        )}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -203,7 +219,6 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           images={images}
           currentImageIndex={currentImageIndex}
           onImageIndexChange={setCurrentImageIndex}
-          onBack={handleClose}
           feedItemId={propertyDetails.feed_items?.id ?? ""}
           feedItemLikes={propertyDetails.feed_items?.likes_count ?? 0}
           feedItemComments={propertyDetails.feed_items?.comentarios_count ?? 0}
@@ -218,9 +233,10 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           onCommentClick={() => setShowComments(true)}
           onTrackInteraction={trackInteraction as (kind: string) => void}
           initialIndex={currentImageIndex}
+          showBackButton={false}
         />
 
-        <View style={styles.content}>
+        <View style={isModal ? styles.contentModal : styles.content}>
           {/* Header Principal */}
           <View style={styles.headerInfo}>
             <View style={styles.metaRowContent}>

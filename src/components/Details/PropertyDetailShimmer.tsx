@@ -53,12 +53,16 @@ const Shimmer = memo(function Shimmer({
   );
 });
 
-export const PropertyDetailShimmer: React.FC = () => {
+interface PropertyDetailShimmerProps {
+  isModal?: boolean;
+}
+
+export const PropertyDetailShimmer: React.FC<PropertyDetailShimmerProps> = ({ isModal = false }) => {
   return (
     <View style={styles.container}>
       <Shimmer width={SCREEN_WIDTH} height={350} borderRadius={0} />
 
-      <View style={styles.content}>
+      <View style={isModal ? styles.contentModal : styles.content}>
         <View style={styles.headerSection}>
           <View style={styles.metaRow}>
             <Shimmer width={90} height={12} borderRadius={4} />
@@ -157,6 +161,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   content: {
+    paddingTop: 30,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    backgroundColor: COLORS.white,
+  },
+  contentModal: {
     paddingTop: 30,
     paddingHorizontal: 20,
     paddingBottom: 40,

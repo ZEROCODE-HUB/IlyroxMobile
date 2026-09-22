@@ -695,14 +695,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         {clusters
           .filter((c: any) => c.properties.cluster)
           .map((cluster: any) => {
+            if (!cluster?.geometry?.coordinates) return null;
             const [lng, lat] = cluster.geometry.coordinates;
-            // Último punto sin proteger contra coordenadas inválidas — el
-            // resto del archivo ya valida NaN/undefined antes de crear un
-            // <Marker>. Un NaN/undefined aquí cruza el puente hacia nativo
-            // como `nil` y causa el crash "object cannot be nil" ya
-            // confirmado 3 veces con logs reales de Apple al aplicar
-            // filtros. TEMPORAL: el insert a debug_logs es solo para
-            // confirmar la causa con certeza — quitar una vez confirmado.
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
               supabase
                 .from("debug_logs")

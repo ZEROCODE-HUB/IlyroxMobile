@@ -106,7 +106,8 @@
       [
         "onesignal-expo-plugin",
         {
-          "mode": "production"
+          "mode": "production",
+          "sounds": ["./assets/audio_ilyrox.wav"]
         }
       ],
       [

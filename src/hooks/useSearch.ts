@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { logger } from "@/utils/logger";
 import { router } from "expo-router";
 import { blockService } from "@/services/blockService";
+import { normalizeStr } from "@/utils/stringNormalizer";
 
 const log = logger.scoped("useSearch");
 
@@ -99,7 +100,7 @@ async function fetchUsers(
   // de las partes. Reemplaza el `.or(...ilike...)` que fallaba con acentos
   // ("Gutierrez" ≠ "Gutiérrez"), con apellidos parciales ("Alejandro G") y con
   // datos que traían dobles espacios. Ver supabase/buscar_perfiles.sql.
-  const { data } = await supabase.rpc("buscar_perfiles", { q, lim: 10 });
+  const { data } = await supabase.rpc("buscar_perfiles", { q: normalizeStr(q), lim: 10 });
 
   return ((data as any[]) ?? [])
     .map((p) => ({
@@ -210,11 +211,11 @@ async function fetchProperties(
   q: string,
   blockedUserIds: string[],
 ): Promise<SearchProperty[]> {
-  const plain = q.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const plain = normalizeStr(q);
   let query = supabase
     .from("propiedades")
     .select("id, created_by, codigo_propiedad, fotos, colonia, municipio, estado, habitaciones, banos, metros_cuadrados_construccion, metros_cuadrados_terreno, operaciones_propiedad(precio, moneda)")
-    .or(`codigo_propiedad.ilike.%${plain}%,unaccent(colonia).ilike.%${plain}%,unaccent(municipio).ilike.%${plain}%`)
+    .or(`codigo_propiedad.ilike.%${plain}%,regexp_replace(unaccent(lower(colonia)), '[.''?\\-]', '', 'g').ilike.%${plain}%,regexp_replace(unaccent(lower(municipio)), '[.''?\\-]', '', 'g').ilike.%${plain}%`)
     .is("deleted_at", null)
     .limit(20);
 

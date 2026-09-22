@@ -59,6 +59,12 @@ type RawProperty = Property & {
 
 export type { PropertyFilters };
 
+const safeParseNum = (val: any, fallback: number = 0): number => {
+  if (val === null || val === undefined) return fallback;
+  const str = typeof val === 'string' ? val : String(val);
+  return parseFloat(str.replace(/,/g, "")) || fallback;
+};
+
 export interface GeofenceBounds {
   minLat: number;
   maxLat: number;
@@ -340,8 +346,8 @@ export const usePropertyFilters = (
         finalPrice = convertPrice(pPrice, pCurrency as "MXN" | "USD", filters.moneda);
       }
 
-      const minP = parseFloat(filters.precioMin.replace(/,/g, "")) || 0;
-      const maxP = parseFloat(filters.precioMax.replace(/,/g, "")) || Infinity;
+      const minP = safeParseNum(filters.precioMin, 0);
+      const maxP = safeParseNum(filters.precioMax, Infinity);
       if (finalPrice < minP || finalPrice > maxP) return false;
 
       // ── Habitaciones ──
@@ -408,22 +414,22 @@ export const usePropertyFilters = (
       // ── M² ──
       if (filters.m2TerrenoMin) {
         const land = p.features?.landSqft || 0;
-        if (land < parseFloat(filters.m2TerrenoMin.replace(/,/g, ""))) return false;
+        if (land < safeParseNum(filters.m2TerrenoMin)) return false;
       }
 
       if (filters.m2ConstruccionMin) {
         const constr = p.features?.constructionSqft || 0;
-        if (constr < parseFloat(filters.m2ConstruccionMin.replace(/,/g, ""))) return false;
+        if (constr < safeParseNum(filters.m2ConstruccionMin)) return false;
       }
 
       // ── Ancho / Largo de terreno (frente/fondo, mínimos) ──
       if (filters.anchoTerrenoMin) {
         const ancho = rawP.ancho_terreno ?? 0;
-        if (ancho < parseFloat(filters.anchoTerrenoMin.replace(/,/g, ""))) return false;
+        if (ancho < safeParseNum(filters.anchoTerrenoMin)) return false;
       }
       if (filters.largoTerrenoMin) {
         const largo = rawP.largo_terreno ?? 0;
-        if (largo < parseFloat(filters.largoTerrenoMin.replace(/,/g, ""))) return false;
+        if (largo < safeParseNum(filters.largoTerrenoMin)) return false;
       }
 
       // ── Niveles ──

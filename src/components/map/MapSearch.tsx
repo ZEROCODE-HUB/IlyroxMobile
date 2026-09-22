@@ -582,7 +582,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
 
       {/* ── Overlay de búsqueda de zonas (zIndex: 50 — encima de la barra) ── */}
       {isZoneSearchOpen && (
-        <View style={styles.zoneSearchOverlay}>
+        <View style={[styles.zoneSearchOverlay, { paddingTop: insets.top }]}>
           <View style={styles.zoneSearchInputRow}>
             <Ionicons name="search-outline" size={18} color={COLORS.textSecondary} style={styles.zoneSearchIcon} />
             <TextInput
@@ -607,7 +607,9 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           )}
 
           <FlatList
-            data={suggestions}
+            data={suggestions.filter(
+              (s) => !locationChips.some((c) => c.label === s.name && c.type === s.type),
+            )}
             keyExtractor={(item, index) => `${item.type}-${item.name}-${item.municipio_nombre ?? ""}-${item.estado_nombre ?? ""}-${index}`}
             keyboardShouldPersistTaps="handled"
             style={styles.zoneSearchList}
@@ -662,6 +664,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           locationChips={locationChips}
           polygonChips={polygonChips}
           onAddZone={openZoneSearch}
+          isZoneSearchOpen={isZoneSearchOpen}
           onRemoveChip={removeLocationChip}
           onRemovePolygon={removePolygon}
           onBack={() => {
