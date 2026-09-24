@@ -4,7 +4,7 @@ import { logger } from "@/utils/logger";
 
 const log = logger.scoped("propertyService");
 
-const normalizePropertyStatus = (
+export const normalizePropertyStatus = (
   value: unknown,
   activo?: boolean,
 ): Property["status"] => {

@@ -276,17 +276,27 @@ export const useTokkoBrokerStore = create<TokkoBrokerStore>((set, get) => ({
               },
             });
           } else if (sync.status === 'completada') {
+            const { channel } = get();
+            if (channel) {
+              channel.unsubscribe();
+            }
             set({
               syncState: 'completed',
               syncProgress: null,
               currentSyncId: null,
+              channel: null,
             });
           } else if (sync.status === 'error') {
+            const { channel } = get();
+            if (channel) {
+              channel.unsubscribe();
+            }
             set({
               syncState: 'error',
               error: sync.mensaje_error || 'Error en sincronización',
               syncProgress: null,
               currentSyncId: null,
+              channel: null,
             });
           }
         }

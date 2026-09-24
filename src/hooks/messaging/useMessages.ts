@@ -981,54 +981,13 @@ export function useMessages(conversationId: string | null, userId?: string) {
 
           log.debug("📨 New message received via Realtime");
 
-          // Intentar cargar mensaje completo con relaciones
-          // NOTA: mensajes no tiene relación directa con propiedades,
-          // y la columna de usuario es emisor_id
-          try {
-            const { data, error } = await supabase
-              .from("mensajes")
-              .select(
-                `
-                *,
-                emisor:perfiles!emisor_id(
-                  id,
-                  nombre,
-                  apellido_paterno,
-                  foto
-                )
-              `,
-              )
-              .eq("id", newMessage.id)
-              .single();
-
-            if (data && isMountedRef.current) {
-              setMessages((prev) => {
-                // Evitar duplicados (por si ya estaba via optimistic ui o carga)
-                if (prev.some((msg) => msg.id === data.id)) {
-                  // Si existe pero es temporal (optimistic), reemplazarlo?
-                  // (La lógica optimistic usa IDs temporales, así que id real no coincidirá salvo que ya haya sido reemplazado)
-                  return prev;
-                }
-                return [...prev, data];
-              });
-              return;
-            } else if (error) {
-              throw error;
-            }
-          } catch (fetchError) {
-            log.warn(
-              "⚠️ Error fetching full message details, using payload:",
-              fetchError,
-            );
-            // Fallback: usar el payload directo
-            if (isMountedRef.current) {
-              setMessages((prev) => {
-                if (prev.some((msg) => msg.id === newMessage.id)) {
-                  return prev;
-                }
-                return [...prev, newMessage];
-              });
-            }
+          if (isMountedRef.current) {
+            setMessages((prev) => {
+              if (prev.some((msg) => msg.id === newMessage.id)) {
+                return prev;
+              }
+              return [...prev, newMessage];
+            });
           }
         },
       )
@@ -1069,24 +1028,31 @@ export function useMessages(conversationId: string | null, userId?: string) {
    * Effect principal: Cargar mensajes y configurar Realtime
    */
   useEffect(() => {
-    isMountedRef.current = true;
+    let cancelled = false;
 
-    if (!conversationId) {
-      setMessages([]);
-      setLoading(false);
-      cleanupChannel();
-      return;
-    }
+    const setup = async () => {
+      isMountedRef.current = true;
 
-    // Cargar mensajes
-    loadMessages(0);
+      if (!conversationId) {
+        setMessages([]);
+        setLoading(false);
+        await cleanupChannel();
+        return;
+      }
 
-    // Configurar Realtime solo si cambió la conversación
-    if (conversationId !== currentConversationIdRef.current) {
-      setupRealtimeSubscription(conversationId);
-    }
+      // Cargar mensajes
+      loadMessages(0);
+
+      // Configurar Realtime solo si cambió la conversación
+      if (conversationId !== currentConversationIdRef.current && !cancelled) {
+        await setupRealtimeSubscription(conversationId);
+      }
+    };
+
+    setup();
 
     return () => {
+      cancelled = true;
       isMountedRef.current = false;
       cleanupChannel();
     };

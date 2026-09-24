@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: COLORS.border,
+    backgroundColor: COLORS.cardBorder,
     marginVertical: 16,
   },
   secondaryStat: {

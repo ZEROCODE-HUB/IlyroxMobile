@@ -71,7 +71,46 @@ export const appointmentService = {
     return { agenteId: currentUserId, clienteId: otherUserId };
   },
 
+  async checkAvailability(
+    agenteId: string,
+    fecha: string,
+    hora: string,
+  ): Promise<{ available: boolean; conflictingAppointment?: { id: string; hora: string; tipo: string } }> {
+    const { data, error } = await supabase
+      .from("citas")
+      .select("id, hora, tipo")
+      .eq("agente_id", agenteId)
+      .eq("fecha", fecha)
+      .eq("hora", hora)
+      .in("estado", ["pendiente", "confirmada"])
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      log.warn("checkAvailability failed", { agenteId, fecha, hora, error });
+      return { available: true };
+    }
+
+    return {
+      available: !data,
+      conflictingAppointment: data ?? undefined,
+    };
+  },
+
   async createAppointment(input: CreateAppointmentInput) {
+    const availability = await appointmentService.checkAvailability(
+      input.agenteId,
+      input.fecha,
+      input.hora,
+    );
+
+    if (!availability.available && availability.conflictingAppointment) {
+      const tipoReadable = availability.conflictingAppointment.tipo || "cita";
+      throw new Error(
+        `Ya tienes una ${tipoReadable} programada a las ${availability.conflictingAppointment.hora.slice(0, 5)} para esta fecha.`,
+      );
+    }
+
     const payload = {
       propiedad_id: input.propertyId,
       agente_id: input.agenteId,
@@ -104,6 +143,11 @@ export const appointmentService = {
     }
 
     if (error) {
+      if (error.code === "23505") {
+        throw new Error(
+          "Ya tienes una cita a esta hora para esta fecha. Por favor elige otro horario.",
+        );
+      }
       log.error("createAppointment failed", error);
       throw error;
     }

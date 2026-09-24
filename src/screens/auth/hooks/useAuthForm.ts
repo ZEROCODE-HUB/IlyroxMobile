@@ -5,7 +5,6 @@
 
 import { useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { perfiles } from "@/types";
 import { collapseSpaces } from "@/utils/stringNormalizer";
 
 import { OneSignal } from "react-native-onesignal";
@@ -134,7 +133,6 @@ export function useAuthForm() {
       lastNamePaterno,
       lastNameMaterno,
       email,
-      phone,
       password,
       confirmPassword,
       estado,
@@ -352,23 +350,33 @@ export function useAuthForm() {
       if (error) throw error;
 
       if (data.user) {
-        // Subir foto si existe (después del registro para no bloquear)
+        // Esperar a que el trigger handle_new_user termine (race condition)
+        await new Promise((r) => setTimeout(r, 500));
+
+        // Subir foto primero
         let finalAvatarUrl = "";
         if (formState.avatarUri) {
           const url = await uploadImage(
             formState.avatarUri,
             "fotos",
-            "fotoperfil",
+            "perfiles",
           );
-          if (url) {
-            finalAvatarUrl = url;
-            // Actualizar foto en el perfil
-            await supabase
-              .from("perfiles")
-              .update({ foto: finalAvatarUrl })
-              .eq("id", data.user.id);
-          }
+          if (url) finalAvatarUrl = url;
         }
+
+        // Actualizar TODOS los campos profesionales en el perfil
+        // (Capa 2: defense in depth si el trigger falla)
+        await supabase
+          .from("perfiles")
+          .update({
+            ocupacion: formState.ocupacion,
+            modalidad: formState.modalidad || null,
+            nombre_inmobiliaria: formState.nombreInmobiliaria || null,
+            fecha_inicio_carrera: formState.fechaInicioCarrera || null,
+            biografia: formState.biografia || null,
+            foto: finalAvatarUrl || null,
+          })
+          .eq("id", data.user.id);
 
         OneSignal.login(data.user.id);
         OneSignal.User.addTag("email", data.user.email ?? "");

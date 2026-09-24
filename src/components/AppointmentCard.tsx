@@ -113,15 +113,24 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   const timeParts = appointment.time ? appointment.time.slice(0, 5).split(":") : ["", ""];
   const hour = timeParts[0];
   const minute = timeParts[1];
-  const isPM = parseInt(hour) >= 12;
-  const displayHour = parseInt(hour) > 12 ? String(parseInt(hour) - 12) : (parseInt(hour) === 0 ? "12" : hour);
-  const ampm = isPM ? "PM" : "AM";
+  const hourNum = parseInt(hour, 10);
+  const minuteNum = parseInt(minute, 10);
+
+  let timeText = "--:--";
+  let ampmText = "";
+
+  if (!isNaN(hourNum) && !isNaN(minuteNum)) {
+    const isPM = hourNum >= 12;
+    const displayHour = hourNum > 12 ? String(hourNum - 12) : (hourNum === 0 ? "12" : hour);
+    timeText = `${displayHour}:${minute}`;
+    ampmText = isPM ? "PM" : "AM";
+  }
 
   return (
     <View style={styles.card}>
       <View style={styles.leftColumn}>
-        <Text style={styles.timeText}>{displayHour}:{minute}</Text>
-        <Text style={styles.ampm}>{ampm}</Text>
+        <Text style={styles.timeText}>{timeText}</Text>
+        <Text style={styles.ampm}>{ampmText}</Text>
       </View>
 
       <View style={styles.rightColumn}>

@@ -69,13 +69,23 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
     );
 
     const formatDate = (dateStr: string): string => {
+        if (!dateStr || typeof dateStr !== "string") {
+            return "Fecha inválida";
+        }
         const date = new Date(dateStr + "T00:00:00");
+        if (isNaN(date.getTime())) {
+            return "Fecha inválida";
+        }
         const day = date.getDate();
         const months = [
             "enero", "febrero", "marzo", "abril", "mayo", "junio",
             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
         ];
-        return `${day} de ${months[date.getMonth()]}`;
+        const monthIndex = date.getMonth();
+        if (monthIndex < 0 || monthIndex > 11) {
+            return "Fecha inválida";
+        }
+        return `${day} de ${months[monthIndex]}`;
     };
 
     const sectionTitle = (key: string, items: AppointmentItem[]): string => {

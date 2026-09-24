@@ -1,88 +1,74 @@
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
-import { logger } from "@/utils/logger";const log = logger.scoped("useExchangeRate");
+import { logger } from "@/utils/logger";
 
-interface ExchangeRate {
-  usd_to_mxn: number;
-  mxn_to_usd: number;
-}
+const log = logger.scoped("useExchangeRate");
 
 const DEFAULT_EXCHANGE_RATE = {
   usd_to_mxn: 20,
   mxn_to_usd: 0.05,
 };
 
-export const useExchangeRate = () => {
-  const [exchangeRate, setExchangeRate] = useState<ExchangeRate>(DEFAULT_EXCHANGE_RATE);
-  const [loading, setLoading] = useState(true);
+interface ExchangeRate {
+  usd_to_mxn: number;
+  mxn_to_usd: number;
+}
 
-  useEffect(() => {
-    const fetchExchangeRate = async () => {
-      try {
-        // Obtener el valor en USD de cada moneda desde configuracion_monedas
-        const { data, error } = await supabase
-          .from("configuracion_monedas")
-          .select("codigo, valor_en_usd")
-          .eq("activa", true)
-          .in("codigo", ["MXN", "USD"]);
+const fetchExchangeRate = async (): Promise<ExchangeRate> => {
+  const { data, error } = await supabase
+    .from("configuracion_monedas")
+    .select("codigo, valor_en_usd")
+    .eq("activa", true)
+    .in("codigo", ["MXN", "USD"]);
 
-        if (error) throw error;
+  if (error) throw error;
 
-        if (data && data.length > 0) {
-          // Encontrar los valores
-          const usdData = data.find((m) => m.codigo === "USD");
-          const mxnData = data.find((m) => m.codigo === "MXN");
+  if (!data || data.length === 0) return DEFAULT_EXCHANGE_RATE;
 
-          if (usdData && mxnData) {
-            // valor_en_usd representa cuántas unidades de esa moneda = 1 USD
-            // Ejemplo: MXN tiene valor_en_usd = 18 significa 1 USD = 18 MXN
-            // Por lo tanto: 1 MXN = 1/18 USD
-            const mxnPerUsd = parseFloat(mxnData.valor_en_usd);
-            
-            setExchangeRate({
-              usd_to_mxn: mxnPerUsd,      // 1 USD = 18 MXN
-              mxn_to_usd: 1 / mxnPerUsd,  // 1 MXN = 0.055 USD
-            });
-          } else {
-            // Si falta alguna moneda, usar valores por defecto
-            log.warn("Missing USD or MXN in configuracion_monedas");
-            setExchangeRate(DEFAULT_EXCHANGE_RATE);
-          }
-        } else {
-          // No hay datos, usar valores por defecto
-          setExchangeRate(DEFAULT_EXCHANGE_RATE);
-        }
-      } catch (error) {
-        log.error("Error fetching exchange rate:", error);
-        // Mantener el valor por defecto en caso de error
-        setExchangeRate(DEFAULT_EXCHANGE_RATE);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const usdData = data.find((m) => m.codigo === "USD");
+  const mxnData = data.find((m) => m.codigo === "MXN");
 
-    fetchExchangeRate();
-  }, []);
+  if (!usdData || !mxnData) {
+    log.warn("Missing USD or MXN in configuracion_monedas");
+    return DEFAULT_EXCHANGE_RATE;
+  }
 
-  const convertPrice = (
-    price: number,
-    fromCurrency: "MXN" | "USD",
-    toCurrency: "MXN" | "USD"
-  ): number => {
-    if (fromCurrency === toCurrency) return price;
-
-    if (fromCurrency === "USD" && toCurrency === "MXN") {
-      return price * exchangeRate.usd_to_mxn;
-    } else if (fromCurrency === "MXN" && toCurrency === "USD") {
-      return price * exchangeRate.mxn_to_usd;
-    }
-
-    return price;
+  const mxnPerUsd = parseFloat(mxnData.valor_en_usd);
+  return {
+    usd_to_mxn: mxnPerUsd,
+    mxn_to_usd: 1 / mxnPerUsd,
   };
+};
+
+export const useExchangeRate = () => {
+  const { data, isLoading } = useQuery<ExchangeRate, Error>({
+    queryKey: ["exchange-rate"],
+    queryFn: fetchExchangeRate,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    placeholderData: () => DEFAULT_EXCHANGE_RATE,
+  });
+
+  const exchangeRate = data ?? DEFAULT_EXCHANGE_RATE;
+
+  const convertPrice = useCallback(
+    (price: number, fromCurrency: "MXN" | "USD", toCurrency: "MXN" | "USD"): number => {
+      if (fromCurrency === toCurrency) return price;
+      if (fromCurrency === "USD" && toCurrency === "MXN") {
+        return price * exchangeRate.usd_to_mxn;
+      }
+      if (fromCurrency === "MXN" && toCurrency === "USD") {
+        return price * exchangeRate.mxn_to_usd;
+      }
+      return price;
+    },
+    [exchangeRate],
+  );
 
   return {
     exchangeRate,
-    loading,
+    loading: isLoading,
     convertPrice,
   };
 };

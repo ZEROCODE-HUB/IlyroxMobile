@@ -32,6 +32,7 @@ const conversationKeys = {
 
 export function useConversations(userId?: string) {
   const queryClient = useQueryClient();
+  const isMountedRef = useRef(true);
 
   const query = useQuery({
     queryKey: userId
@@ -56,11 +57,20 @@ export function useConversations(userId?: string) {
     if (!userId) return;
     if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
     reloadTimerRef.current = setTimeout(() => {
-      queryClient.invalidateQueries({
-        queryKey: conversationKeys.list(userId),
-      });
+      if (isMountedRef.current) {
+        queryClient.invalidateQueries({
+          queryKey: conversationKeys.list(userId),
+        });
+      }
     }, 500);
   }, [queryClient, userId]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!userId) return;

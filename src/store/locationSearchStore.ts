@@ -16,15 +16,6 @@ import { logger } from "@/utils/logger";
 
 const log = logger.scoped("locationSearchStore");
 
-/**
- * Contador global de solicitudes de búsqueda en vuelo. Cada llamada a
- * `searchLocations` toma un id nuevo; cualquier `set` de una llamada anterior
- * (su respuesta llegó tarde) se descarta. Sin esto, escribir "Zon" y luego
- * "Zona Centro" dejaba que la respuesta lenta de "Zon" pisara la de
- * "Zona Centro" (sugerencias e isLoading fuera de sincronía).
- */
-let latestSearchRequestId = 0;
-
 /** Sugerencia de ubicación enriquecida para mostrar en la UI */
 export interface LocationSuggestionWithCount extends LocationSuggestion {
   /** Conteo de propiedades (no calculado en la nueva versión) */
@@ -46,6 +37,8 @@ interface LocationSearchState {
   isLoading: boolean;
   /** Token de sesión para agrupar requests de Places API y reducir costos */
   sessionToken: string;
+  /** Contador de requests para descartar respuestas obsoletas */
+  latestSearchRequestId: number;
   searchLocations: (
     searchTerm: string,
     country?: CountryCode,
@@ -137,6 +130,7 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
   suggestions: [],
   isLoading: false,
   sessionToken: generateToken(),
+  latestSearchRequestId: 0,
 
   clearSuggestions: () => set({ suggestions: [] }),
 
@@ -149,7 +143,8 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
   ) => {
     // Se toma ANTES de cualquier await: una búsqueda nueva deja obsoleta a la
     // anterior en el acto (aunque su respuesta llegue después).
-    const requestId = ++latestSearchRequestId;
+    const requestId = ++get().latestSearchRequestId;
+    set({ latestSearchRequestId: requestId });
 
     if (!searchTerm.trim()) {
       set({ suggestions: [] });
@@ -193,7 +188,7 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
       );
 
       // Respuesta obsoleta (se escribió más mientras esta volaba): se descarta.
-      if (requestId !== latestSearchRequestId) return;
+      if (requestId !== get().latestSearchRequestId) return;
 
       const enriched: LocationSuggestionWithCount[] = results.map((loc) => ({
         ...loc,
@@ -216,7 +211,7 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
           const fallbackResults = await searchLocations(
             fallbackSearchTerm, 5, sessionToken, country, "(regions)",
           );
-          if (requestId !== latestSearchRequestId) return;
+          if (requestId !== get().latestSearchRequestId) return;
           const fallbackEnriched = fallbackResults.map((loc) => ({
             ...loc,
             ...extractMunicipioEstado(loc, country),
@@ -279,7 +274,7 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
             "contar_propiedades_zonas",
             { p_zonas: zonas, p_pais: country },
           );
-          if (requestId !== latestSearchRequestId) return;
+          if (requestId !== get().latestSearchRequestId) return;
           if (Array.isArray(counts) && counts.length > 0) {
             const countMap = new Map<string, number>(
               counts.map((c: {
@@ -305,11 +300,11 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
         }
       }
     } catch (error) {
-      if (requestId !== latestSearchRequestId) return;
+      if (requestId !== get().latestSearchRequestId) return;
       log.error("Error fetching location suggestions:", error);
       set({ suggestions: [] });
     } finally {
-      if (requestId === latestSearchRequestId) set({ isLoading: false });
+      if (requestId === get().latestSearchRequestId) set({ isLoading: false });
     }
   },
 }));

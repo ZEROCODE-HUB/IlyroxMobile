@@ -89,7 +89,7 @@ export default function MessagingScreen({
       // Si entramos directamente a un chat (desde afuera: Appointments, Profile, etc.)
       // o ya estamos en la vista de la lista, salimos de la pantalla.
       if (isAppointment) {
-        router.push("/(stack)/appointments");
+        router.back();
       } else if (onBack) {
         onBack();
       } else {

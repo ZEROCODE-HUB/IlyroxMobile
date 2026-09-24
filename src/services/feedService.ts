@@ -460,6 +460,10 @@ export const feedService = {
       feedService.getReviewStats(perfilIds, currentUserId),
     ]);
 
+    if (postsRes.error) log.error("getFeedPage posts fetch failed", postsRes.error);
+    if (reelsRes.error) log.error("getFeedPage reels fetch failed", reelsRes.error);
+    if (propertiesRes.error) log.error("getFeedPage properties fetch failed", propertiesRes.error);
+
     const postsMap = new Map((postsRes.data || []).map((p: any) => [p.id, p]));
     const reelsMap = new Map((reelsRes.data || []).map((r: any) => [r.id, r]));
     const propertiesMap = new Map(

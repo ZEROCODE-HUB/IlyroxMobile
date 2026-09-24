@@ -76,6 +76,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
 
   const [unblockUserToConfirm, setUnblockUserToConfirm] = useState<string | null>(null);
   const [unblocking, setUnblocking] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   const {
     query,
@@ -229,39 +230,40 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
   };
 
   // Handler: guardar el resultado como NUEVA búsqueda en el historial y navegar
-  const handleNavigate = (
+  const handleNavigate = async (
     action: () => void,
     tipo: TipoBusqueda,
     resultData?: ResultData
   ) => {
-    if (tipo === TIPO_BUSQUEDA.USUARIO && resultData?.resultadoTipoId) {
-      const isBlocked = results.users.find(u => u.id === resultData.resultadoTipoId)?.is_blocked;
-      if (isBlocked) {
-        showToast("No puedes visitar perfiles bloqueados", "info");
-        return;
+    if (isNavigating) return;
+    setIsNavigating(true);
+
+    try {
+      if (tipo === TIPO_BUSQUEDA.USUARIO && resultData?.resultadoTipoId) {
+        const isBlocked = results.users.find(u => u.id === resultData.resultadoTipoId)?.is_blocked;
+        if (isBlocked) {
+          showToast("No puedes visitar perfiles bloqueados", "info");
+          return;
+        }
       }
-    }
 
-    if (userId && (resultData?.name || resultData?.resultadoTitulo)) {
-      createSearchFromResult({ ...resultData, tipo }, userId).catch((e) => {
-        console.error('🔍 [SearchOverlay] Error creating search from result:', e);
-      });
-    }
-
-    // Navegar sin cerrar el search (la navegación cambia de screen)
-    action();
-
-    // Para ubicaciones, cerrar el search DESPUÉS de seleccionar
-    // para que el usuario vea la navegación al mapa
-    if (tipo === TIPO_BUSQUEDA.UBICACION) {
-      if (isScreenMode) {
-        // Igual que handleSelectHistory: navega directo al mapa.
-        // No dependemos del listener pendingOpenMap del Feed (frágil en
-        // screen mode por la race con router.back).
-        router.push("/(stack)/map");
-      } else {
-        onClose();
+      if (userId && (resultData?.name || resultData?.resultadoTitulo)) {
+        await createSearchFromResult({ ...resultData, tipo }, userId);
       }
+
+      action();
+
+      if (tipo === TIPO_BUSQUEDA.UBICACION) {
+        if (!isScreenMode) {
+          onClose();
+        }
+        // En screen mode, selectLocation ya establece pendingOpenMap que triggerá
+        // la navegación desde el Feed - no necesitamos doble router.push
+      }
+    } catch (e) {
+      console.error('🔍 [SearchOverlay] Error in handleNavigate:', e);
+    } finally {
+      setIsNavigating(false);
     }
   };
 

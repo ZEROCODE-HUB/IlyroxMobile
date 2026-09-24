@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { Property, PropertyType, GeoBounds } from "@/types";
 import { blockService } from "@/services/blockService";
+import { normalizePropertyStatus } from "@/services/propertyService";
 
 /**
  * Filtros que se pueden aplicar directamente en Supabase.
@@ -168,7 +169,7 @@ function mapProperty(p: SupabaseProperty): Property {
     type: (p.tipo || "habitacional").toLowerCase() as PropertyType,
     subtype: (p.subtipo || "").toLowerCase(),
     operation: operacion?.tipo_operacion === "venta" ? "Sale" : "Rent",
-    status: "Publicada",
+    status: normalizePropertyStatus(p.status, p.activo ?? undefined),
     operations: p.operaciones_propiedad ?? undefined,
   } as Property;
 }

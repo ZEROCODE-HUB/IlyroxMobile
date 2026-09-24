@@ -206,7 +206,14 @@ export const useEasyBroker = () => {
                     }
                 }
             )
-            .subscribe((status) => { });
+            .subscribe((status, err) => {
+                if (err) {
+                    log.error("EasyBroker Realtime subscription error:", err);
+                }
+                if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+                    log.warn("EasyBroker Realtime channel error, sync may not update in real-time");
+                }
+            });
 
         channelRef.current = channel;
     };

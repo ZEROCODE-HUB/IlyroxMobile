@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
 import { BarChart } from "react-native-gifted-charts";
 import { FilteredChartProps } from "./types";
 import { COLORS } from "../../constants/colors";
-import currencyConverter from "../../utils/currencyConverter";
+import { useExchangeRate } from "../../hooks/useExchangeRate";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
@@ -40,17 +40,9 @@ const Chart04_DemandByZone: React.FC<FilteredChartProps> = ({
   operationType,
   propertyType,
 }) => {
-  const [exchangeRate, setExchangeRate] = useState<number>(18);
+  const { exchangeRate } = useExchangeRate();
+  const { usd_to_mxn: usdToMxn } = exchangeRate;
   const [priceLineType, setPriceLineType] = useState<string>("avg");
-
-  useEffect(() => {
-    const fetchRate = async () => {
-      const rate = await currencyConverter();
-      setExchangeRate(rate);
-    };
-
-    fetchRate();
-  }, []);
 
   const demandByColonia: DemandByColonia[] = useMemo(() => {
     if (!searches) return [];
@@ -124,7 +116,7 @@ const Chart04_DemandByZone: React.FC<FilteredChartProps> = ({
       entry.searches += 1;
 
       const currency = item.moneda || "MXN";
-      const rate = currency === "USD" ? exchangeRate : 1;
+      const rate = currency === "USD" ? usdToMxn : 1;
 
       const minP = parseFloat(item.precio_min);
       const maxP = parseFloat(item.precio_max);
@@ -177,7 +169,7 @@ const Chart04_DemandByZone: React.FC<FilteredChartProps> = ({
         if (!entry) return;
 
         entry.properties += 1;
-        const pRate = matchOp.moneda === "USD" ? exchangeRate : 1;
+        const pRate = matchOp.moneda === "USD" ? usdToMxn : 1;
         const pPrice = parseFloat(matchOp.precio) * pRate;
 
         if (!isNaN(pPrice) && pPrice > 0) {
