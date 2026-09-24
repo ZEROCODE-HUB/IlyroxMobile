@@ -67,7 +67,17 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
           cachePolicy="memory-disk"
         />
 
-        {item.sin_comision ? (
+        {item.status === "Vendida" ? (
+          <View style={[styles.statusBadge, styles.vendidaBadge]}>
+            <Ionicons name="checkmark-circle" size={10} color="#fff" />
+            <Text style={styles.statusText}> Vendida</Text>
+          </View>
+        ) : item.status === "Suspendida" ? (
+          <View style={[styles.statusBadge, styles.suspendedBadge]}>
+            <Ionicons name="pause-circle" size={10} color="#fff" />
+            <Text style={styles.statusText}> Suspendida</Text>
+          </View>
+        ) : item.sin_comision ? (
           <View style={[styles.statusBadge, styles.sinComisionBadge]}>
             <Ionicons name="alert-circle" size={10} color="#fff" />
             <Text style={styles.statusText}> Sin comisión</Text>
@@ -230,11 +240,27 @@ const styles = StyleSheet.create({
   statusText: {
     color: COLORS.white,
     fontSize: 11,
-    fontWeight: "500",
-    letterSpacing: 0.3,
+    fontWeight: "600",
+    letterSpacing: 0.2,
   },
   sinComisionBadge: {
-    backgroundColor: "#C53030cc",
+    backgroundColor: "#C53030",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  vendidaBadge: {
+    backgroundColor: "#2e7d32",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  suspendedBadge: {
+    backgroundColor: "#ed6c02",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     flexDirection: "row",
     alignItems: "center",
   },

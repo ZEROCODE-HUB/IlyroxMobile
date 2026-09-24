@@ -31,7 +31,7 @@ import {
   bulkRecordConstructorViews,
   CommunityBuilder,
   getCommunityBuildersV3,
-  getOrCreateAdvisorInviteCode,
+  generateNewInviteCode,
 } from "@/services/communityService";
 import { useViewTracker } from "@/hooks/useCommunityBuilderViewTracker";
 import { logger } from "@/utils/logger";
@@ -185,17 +185,16 @@ const CommunityBuildersCarousel: React.FC<CommunityBuildersCarouselProps> = ({
 
     setSharing(true);
     try {
-      const code = await getOrCreateAdvisorInviteCode(currentUserId);
+      const code = await generateNewInviteCode(currentUserId);
       const link = buildAdvisorInviteLink(code);
       await Clipboard.setStringAsync(link);
 
       const message =
         "Bienvenido a ILYROX. Te invito a unirte a una comunidad de asesores inmobiliarios. Regístrate con este enlace y entrarás a mi red.";
-      const fullMessage = `${message}\n\n${link}`;
 
       await Share.share({
         title: "Invitación a ILYROX",
-        message: fullMessage,
+        message: Platform.OS === "ios" ? message : `${message}\n\n${link}`,
         url: Platform.OS === "ios" ? link : undefined,
       });
     } catch (error) {

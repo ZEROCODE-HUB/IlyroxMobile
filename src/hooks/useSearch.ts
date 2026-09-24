@@ -211,11 +211,11 @@ async function fetchProperties(
   q: string,
   blockedUserIds: string[],
 ): Promise<SearchProperty[]> {
-  const plain = normalizeStr(q);
+  const plain = q.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   let query = supabase
     .from("propiedades")
     .select("id, created_by, codigo_propiedad, fotos, colonia, municipio, estado, habitaciones, banos, metros_cuadrados_construccion, metros_cuadrados_terreno, operaciones_propiedad(precio, moneda)")
-    .or(`codigo_propiedad.ilike.%${plain}%,regexp_replace(unaccent(lower(colonia)), '[.''?\\-]', '', 'g').ilike.%${plain}%,regexp_replace(unaccent(lower(municipio)), '[.''?\\-]', '', 'g').ilike.%${plain}%`)
+    .or(`codigo_propiedad.ilike.%${plain}%,unaccent(colonia).ilike.%${plain}%,unaccent(municipio).ilike.%${plain}%`)
     .is("deleted_at", null)
     .limit(20);
 
@@ -258,7 +258,10 @@ export function useSearch() {
   const { setSelectedLocation } = useApp();
 
   useEffect(() => {
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, []);
 
   useEffect(() => {

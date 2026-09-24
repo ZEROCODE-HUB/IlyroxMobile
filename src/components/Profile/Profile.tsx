@@ -239,13 +239,18 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
     [profile, reviewStats],
   );
 
-  const filteredProperties = useMemo(
-    () =>
-      activeFilter === "Todas"
-        ? properties
-        : properties.filter((p) => p.status === activeFilter),
-    [properties, activeFilter],
-  );
+  const filteredProperties = useMemo(() => {
+    if (activeFilter === "Todas") {
+      const active = properties.filter(
+        (p) => p.status !== "Vendida" && p.status !== "Suspendida",
+      );
+      const inactive = properties.filter(
+        (p) => p.status === "Vendida" || p.status === "Suspendida",
+      );
+      return [...active, ...inactive];
+    }
+    return properties.filter((p) => p.status === activeFilter);
+  }, [properties, activeFilter]);
 
   const listData = useMemo(() => {
     if (!isMe && isBlocked) return [];

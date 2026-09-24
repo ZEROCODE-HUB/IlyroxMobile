@@ -59,6 +59,7 @@ export default function CreateAppointmentModal({
   const { showToast } = useToast();
   const { ensureConnection } = useGoogleCalendar(currentUserId);
   const scrollRef = useRef<ScrollView>(null);
+  const savingRef = useRef(false);
 
   const [fechaText, setFechaText] = useState("");
   const [horaText, setHoraText] = useState("");
@@ -154,7 +155,13 @@ export default function CreateAppointmentModal({
   };
 
   const handleSaveAppointment = async () => {
+    if (savingRef.current) {
+      return;
+    }
+    savingRef.current = true;
+
     if (!validateDate(fechaText)) {
+      savingRef.current = false;
       showModal({
         title: "Error",
         message:
@@ -165,6 +172,7 @@ export default function CreateAppointmentModal({
     }
 
     if (!validateTime(horaText)) {
+      savingRef.current = false;
       showModal({
         title: "Error",
         message: "Hora inválida. Usa formato HH:MM (24 horas)",
@@ -315,9 +323,19 @@ export default function CreateAppointmentModal({
       resetForm();
     } catch (error: any) {
       log.error("Error creating appointment:", error);
-      showToast(error.message || "Error al crear la cita", "error");
+
+      if (error.code === "23505" || error.message?.includes("Ya tienes una cita")) {
+        showModal({
+          title: "Horario no disponible",
+          message: error.message || "Ya tienes una cita a esta hora para esta fecha.",
+          confirmText: "OK",
+        });
+      } else {
+        showToast(error.message || "Error al crear la cita", "error");
+      }
     } finally {
       setIsSaving(false);
+      savingRef.current = false;
     }
   };
 

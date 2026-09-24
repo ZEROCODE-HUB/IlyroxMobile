@@ -3,7 +3,7 @@
  * Contexto centralizado para notificaciones con Realtime
  */
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -274,18 +274,21 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     };
   }, [userId, fetchNotifications, fetchUnreadCount]);
 
+  const value = useMemo(
+    () => ({
+      notifications,
+      unreadCount,
+      lastNotification,
+      isLoading,
+      markAsRead,
+      markAllAsRead,
+      refresh,
+    }),
+    [notifications, unreadCount, lastNotification, isLoading, markAsRead, markAllAsRead, refresh],
+  );
+
   return (
-    <NotificationContext.Provider
-      value={{
-        notifications,
-        unreadCount,
-        lastNotification,
-        isLoading,
-        markAsRead,
-        markAllAsRead,
-        refresh,
-      }}
-    >
+    <NotificationContext.Provider value={value}>
       {children}
     </NotificationContext.Provider>
   );

@@ -34,6 +34,7 @@ export default function CommunityWelcome() {
   const [loading, setLoading] = useState(true);
   const [linkExpirado, setLinkExpirado] = useState(false);
   const [errorValidacion, setErrorValidacion] = useState(false);
+  const [invitacionRechazada, setInvitacionRechazada] = useState(false);
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout | null = null;
@@ -106,6 +107,13 @@ export default function CommunityWelcome() {
     router.replace("/login");
   };
 
+  const handleRechazarInvitacion = async () => {
+    log.info("communityWelcome: Usuario rechazo invitacion");
+    await AsyncStorage.removeItem(STORED_INVITE_CODE_KEY);
+    setInvitacionRechazada(true);
+    router.replace("/(tabs)");
+  };
+
   const getNombreCompleto = () => {
     if (!invitador) return "";
     const nombre = invitador.nombre || "";
@@ -117,6 +125,15 @@ export default function CommunityWelcome() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {(invitador || linkExpirado) && !loading && !invitacionRechazada && (
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={handleRechazarInvitacion}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="close" size={24} color={COLORS.primary} />
+        </TouchableOpacity>
+      )}
       <View style={styles.content}>
         <Image
           source={SOURCE_LOGO}
@@ -295,6 +312,13 @@ const styles = StyleSheet.create({
     color: "#EF4444",
     marginTop: 8,
     textAlign: "center",
+  },
+  closeButton: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    padding: 8,
   },
   button: {
     backgroundColor: COLORS.primary,

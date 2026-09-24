@@ -453,7 +453,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
         ...updateData,
       };
       
-      const { error } = await supabase
+      const { data: insertedData, error } = await supabase
         .from('historial_busquedas')
         .insert(insertData)
         .select('id')
@@ -462,13 +462,15 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       if (error) {
         console.error('🔍 [SearchStore] Error creating search from result:', error);
       } else {
-        // Reemplazar temp id con real id en caché
-        queryClient.setQueryData<HistorialBusqueda[]>(
-          ['searchHistory', userId],
-          (old) => old?.map(item => 
-            item.id.startsWith('temp_') ? { ...item, id: error?.data?.id || item.id } : item
-          )
-        );
+        const tempId = id || (insertData.query_original ? `temp_${Date.now()}` : null);
+        if (tempId) {
+          queryClient.setQueryData<HistorialBusqueda[]>(
+            ['searchHistory', userId],
+            (old) => old?.map(item => 
+              item.id === tempId ? { ...item, id: insertedData?.id ?? item.id } : item
+            )
+          );
+        }
       }
     }
 

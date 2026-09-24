@@ -205,6 +205,22 @@ export async function getOrCreateAdvisorInviteCode(userId: string) {
   return data.codigo as string;
 }
 
+export async function generateNewInviteCode(userId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("generar_codigo_invitacion", {
+    p_invitador_id: userId,
+  });
+
+  if (error) {
+    log.error("generateNewInviteCode: Error", { error: error.message });
+    if (error.message?.includes("Limite diario")) {
+      throw new Error("Has alcanzado el límite de 100 códigos por día");
+    }
+    throw error;
+  }
+
+  return data as string;
+}
+
 export async function storeInviteCodeFromUrl(url: string) {
   const parsed = Linking.parse(url);
   const path = parsed.path || "";

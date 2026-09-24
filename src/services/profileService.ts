@@ -31,26 +31,22 @@ export const profileService = {
     const blockedUserIds = await blockService.getBlockedUserIds(viewerUserId);
     if (blockedUserIds.length === 0) return stats;
 
-    const { data: recs, error: recsError } = await supabase
-      .from("recomendaciones_usuarios")
-      .select("recomienda")
-      .eq("usuario_recomendado_id", userId)
-      .not("recomendado_por", "in", `(${blockedUserIds.join(",")})`);
+    const { data: countsData, error: countsError } = await supabase
+      .rpc("contar_recomendaciones", {
+        p_usuario_id: userId,
+        p_excluir_usuario_ids: blockedUserIds,
+      })
+      .maybeSingle();
 
-    if (recsError) {
-      log.warn("getReviewStats filtered recommendations failed", recsError);
+    if (countsError) {
+      log.warn("getReviewStats contar_recomendaciones failed", countsError);
       return stats;
     }
 
-    const totalRecomiendan = (recs ?? []).filter((r: any) => r.recomienda).length;
-    const totalNoRecomiendan = (recs ?? []).filter(
-      (r: any) => !r.recomienda,
-    ).length;
-
     return {
       ...stats,
-      total_recomiendan: totalRecomiendan,
-      total_no_recomiendan: totalNoRecomiendan,
+      total_recomiendan: (countsData as any)?.total_true ?? stats.total_recomiendan ?? 0,
+      total_no_recomiendan: (countsData as any)?.total_false ?? stats.total_no_recomiendan ?? 0,
     };
   },
 

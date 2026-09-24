@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 1,
-    backgroundColor: COLORS.border,
+    backgroundColor: COLORS.cardBorder,
     marginTop: 8,
   },
   empty: {

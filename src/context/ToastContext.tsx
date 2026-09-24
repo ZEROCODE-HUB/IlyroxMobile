@@ -13,7 +13,7 @@
  * showToast('¡Usuario aprobado!', 'success');
  */
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { StyleSheet, Text, Animated, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
@@ -46,6 +46,15 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const timeoutRefs = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // Cleanup all timeouts on unmount
+  useEffect(() => {
+    return () => {
+      timeoutRefs.current.forEach((timeout) => clearTimeout(timeout));
+      timeoutRefs.current.clear();
+    };
+  }, []);
 
   const showToast = useCallback(
     (message: string, type: ToastType = 'info', duration = 3000) => {
@@ -56,15 +65,22 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Auto-dismiss
       if (duration > 0) {
-        setTimeout(() => {
+        const timeout = setTimeout(() => {
           hideToast(id);
+          timeoutRefs.current.delete(id);
         }, duration);
+        timeoutRefs.current.set(id, timeout);
       }
     },
     []
   );
 
   const hideToast = useCallback((id: string) => {
+    const timeout = timeoutRefs.current.get(id);
+    if (timeout) {
+      clearTimeout(timeout);
+      timeoutRefs.current.delete(id);
+    }
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 

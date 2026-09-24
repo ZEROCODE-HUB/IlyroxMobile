@@ -32,7 +32,8 @@ export function useUserBlock(
     queryClient.invalidateQueries({ queryKey: ["feed"] });
     queryClient.invalidateQueries({ queryKey: ["map-properties"] });
     queryClient.invalidateQueries({ queryKey: ["mapFeedItems"] });
-    queryClient.invalidateQueries({ queryKey: ["user-blocks"] });
+    queryClient.invalidateQueries({ queryKey: ["propertyFeedItems"] });
+    queryClient.invalidateQueries({ queryKey: ["property"] });
   }, [queryClient]);
 
   const block = useCallback(async () => {
