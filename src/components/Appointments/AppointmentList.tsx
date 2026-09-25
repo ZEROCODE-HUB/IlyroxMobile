@@ -89,6 +89,9 @@ const AppointmentList: React.FC<AppointmentListProps> = ({
     };
 
     const sectionTitle = (key: string, items: AppointmentItem[]): string => {
+        if (!key || key === "Invalid Date" || key === "NaN" || key.includes("NaN")) {
+            return "Fecha pendiente";
+        }
         if (activeTab !== "upcoming") return formatDate(items[0]?.fecha || key);
         if (key === "Hoy") {
             const fecha = items[0]?.fecha;

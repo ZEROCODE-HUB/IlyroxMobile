@@ -125,16 +125,18 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
     text: string,
     setter: (val: string) => void,
   ) => {
-    // Eliminar comas para obtener el valor numérico crudo
     const rawValue = text.replace(/,/g, "");
-
-    // Validar formato numérico (acepta decimales)
     if (/^\d*\.?\d*$/.test(rawValue)) {
-      const parts = rawValue.split(".");
-      // Formatear parte entera con comas
-      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-      setter(parts.join("."));
+      setter(rawValue);
     }
+  };
+
+  const formatCurrencyForDisplay = (value: string): string => {
+    const rawValue = value.replace(/,/g, "");
+    if (!rawValue || !/^\d*\.?\d*$/.test(rawValue)) return value;
+    const parts = rawValue.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
   };
 
   return (
@@ -212,6 +214,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
             {/* 2. PRECIO Y DIVISA */}
             <PriceSection
               handleCurrencyChange={handleCurrencyChange}
+              formatCurrencyForDisplay={formatCurrencyForDisplay}
             />
 
             {/* 3. COMISIÓN MÍNIMA */}

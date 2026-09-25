@@ -241,13 +241,19 @@ export const useAppointments = () => {
                         cita.creator_timezone,
                         cita.created_by === profile.id,
                     );
+
+                    const sanitizedFecha = (cita.fecha && String(cita.fecha).trim()) ? String(cita.fecha) : null;
+                    const sanitizedHora = (cita.hora && String(cita.hora).trim()) ? String(cita.hora) : null;
+
                     const { dateLabel, timeLabel } =
-                        formatAppointmentDateTimeForTimeZone(
-                            cita.fecha,
-                            cita.hora,
-                            cita.creator_timezone,
-                            viewerTimeZone,
-                        );
+                        (sanitizedFecha && sanitizedHora)
+                            ? formatAppointmentDateTimeForTimeZone(
+                                  sanitizedFecha,
+                                  sanitizedHora,
+                                  cita.creator_timezone,
+                                  viewerTimeZone,
+                              )
+                            : { dateLabel: "Fecha pendiente", timeLabel: "--:--" };
 
                     return {
                         ...cita,
@@ -339,36 +345,49 @@ export const useAppointments = () => {
             confirmText: isRejecting ? "Sí, rechazar" : "Sí, cancelar",
             cancelText: "Volver",
             confirmVariant: "danger",
-            // Pasar onCancel hace que el modal pinte el segundo botón ("Volver");
-            // sin él, ConfirmationModal solo muestra el botón de confirmar.
             onCancel: () => {},
             onConfirm: async () => {
+                const appointmentToCancel = appointments.find((a) => a.id === id);
+                const previousState = appointmentToCancel
+                    ? { estado: appointmentToCancel.estado, status: appointmentToCancel.status }
+                    : null;
+
+                setAppointments((current) =>
+                    current.map((item) =>
+                        item.id === id
+                            ? {
+                                  ...item,
+                                  estado: "cancelada",
+                                  status: "cancelada" as AppointmentStatus,
+                              }
+                            : item,
+                    ),
+                );
+
                 const success = await handleCancelAppointment(
                     id,
                     appointment?.google_event_id,
                     appointment?.created_by || appointment?.agente_id,
                 );
+
                 if (success) {
-                    setAppointments((current) =>
-                        current.map((item) =>
-                            item.id === id
-                                ? {
-                                    ...item,
-                                    estado: "cancelada",
-                                    status: "cancelada" as AppointmentStatus,
-                                    google_event_id: null,
-                                    google_meet_url: null,
-                                }
-                                : item,
-                        ),
-                    );
-                    await loadAppointments();
                     showToast(
                         isRejecting
                             ? "Cita rechazada correctamente"
                             : "Cita cancelada correctamente",
                         "success",
                     );
+                } else {
+                    if (previousState) {
+                        setAppointments((current) =>
+                            current.map((item) =>
+                                item.id === id
+                                    ? { ...item, estado: previousState.estado, status: previousState.status }
+                                    : item,
+                            ),
+                        );
+                    }
+                    showToast("No se pudo cancelar la cita", "error");
                 }
             },
         });

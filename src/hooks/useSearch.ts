@@ -310,19 +310,12 @@ export function useSearch() {
   }, [query, profile?.estado, user?.id]);
 
   // Sync location suggestions from store into results
-  // Only update if suggestions match current query (fixes stale suggestions race condition)
   useEffect(() => {
     if (suggestions.length === 0) return;
-    
-    // Check if suggestions are for current query (fixes stale data)
-    const firstSuggestion = suggestions[0];
-    if (!firstSuggestion) return;
-    
-    // If query changed since suggestions were requested, ignore them
-    if (currentQueryRef.current && !firstSuggestion.name.toLowerCase().includes(currentQueryRef.current.toLowerCase())) {
-      return;
-    }
-    
+
+    // El store locationSearchStore ya maneja race conditions con latestSearchRequestId
+    // No necesitamos filtrar por query aquí, solo transferimos los resultados
+
     const locations: SearchLocation[] = suggestions.map((s, i) => ({
       id: `${s.type}-${i}`,
       name: s.name,

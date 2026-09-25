@@ -62,6 +62,7 @@ interface LeadPropertiesModalProps {
   onPropertyClick: (propertyId: string) => void;
   onUserClick: (user: User) => void;
   onDeleteSearch: (busquedaId: string) => void;
+  onSuspendSearch: (busquedaId: string, currentlyActive: boolean) => void;
   currentUserId?: string;
   /** Objeto completo de la búsqueda guardada (para pasar al flujo de edición) */
   busqueda?: busquedas_guardadas;
@@ -82,6 +83,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
   onPropertyClick,
   onUserClick,
   onDeleteSearch,
+  onSuspendSearch,
   currentUserId,
   busqueda,
   onEditSearch,
@@ -102,6 +104,14 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
   );
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSuspendConfirm, setShowSuspendConfirm] = useState(false);
+
+  const isSearchActive = busqueda?.activa ?? true;
+
+  const handleConfirmSuspend = () => {
+    setShowSuspendConfirm(false);
+    onSuspendSearch(busquedaId, isSearchActive);
+  };
 
   // El ConfirmationModal global de ModalContext se renderiza en la raíz de la
   // app y queda invisible detrás de este <Modal> nativo (bug modal-dentro-de-
@@ -122,15 +132,16 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
   const badgeColor = activeTab === "coincidencia" ? COLORS.primaryDark : "#8E8E93";
   const badgeText = activeTab === "coincidencia" ? "Match" : "Similar";
 
-  const formatCompactPrice = (amount: number) => {
-    if (!amount) return "0";
+  const formatCompactPrice = (amount: number, currency: string = "MXN") => {
+    const symbol = currency === "USD" ? "US$" : "$";
+    if (!amount) return `${symbol}0`;
     if (amount >= 1000000) {
-      return `$${(amount / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
+      return `${symbol}${(amount / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
     }
     if (amount >= 1000) {
-      return `$${(amount / 1000).toFixed(0)}k`;
+      return `${symbol}${(amount / 1000).toFixed(0)}k`;
     }
-    return `$${amount}k`;
+    return `${symbol}${amount}`;
   };
 
   const renderSearchDetail = (
@@ -160,6 +171,16 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
               onBack={onClose}
               rightComponent={
                 <View style={styles.headerActions}>
+                  <TouchableOpacity
+                    onPress={() => setShowSuspendConfirm(true)}
+                    style={styles.headerBtn}
+                  >
+                    <Ionicons
+                      name={isSearchActive ? "pause-circle-outline" : "play-circle-outline"}
+                      size={24}
+                      color={isSearchActive ? COLORS.warning : COLORS.success}
+                    />
+                  </TouchableOpacity>
                   {onEditSearch && (
                     <TouchableOpacity
                       onPress={onEditSearch}
@@ -190,9 +211,8 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
             <View style={styles.searchInfoSection}>
               <Text style={styles.detailText}>
                 <Text style={styles.detailLabel}>Busca casa: </Text>
-                {formatCompactPrice(searchCriteria.precio_min || 0)} -{" "}
-                {formatCompactPrice(searchCriteria.precio_max || 0)}{" "}
-                {searchCriteria.moneda || ""}
+                {formatCompactPrice(searchCriteria.precio_min || 0, searchCriteria.moneda)} -{" "}
+                {formatCompactPrice(searchCriteria.precio_max || 0, searchCriteria.moneda)}
               </Text>
               <Text style={styles.sectionTitle}>
                 <Ionicons
@@ -211,6 +231,16 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                   />{" "}
                   {leadEmail}
                 </Text>
+              )}
+              {!isSearchActive && (
+                <View style={styles.suspendedBadge}>
+                  <Ionicons
+                    name="pause-circle"
+                    size={16}
+                    color={COLORS.warning}
+                  />
+                  <Text style={styles.suspendedText}>Búsqueda suspendida</Text>
+                </View>
               )}
               <View style={styles.criteriaContainer}>
                 {renderSearchDetail(
@@ -385,6 +415,22 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
             onConfirm={handleConfirmDelete}
             onCancel={() => setShowDeleteConfirm(false)}
           />
+
+          {/* Confirmación de suspensión/reactivación — local */}
+          <ConfirmationModal
+            visible={showSuspendConfirm}
+            title={isSearchActive ? "Suspender búsqueda" : "Activar búsqueda"}
+            message={
+              isSearchActive
+                ? "Puedes pausar esta búsqueda para dejar de recibir nuevos matches. Podrás activarla en cualquier momento."
+                : "¿Deseas activar esta búsqueda para volver a recibir nuevos matches?"
+            }
+            confirmText={isSearchActive ? "Suspender" : "Activar"}
+            cancelText="Cancelar"
+            confirmVariant={isSearchActive ? "danger" : "primary"}
+            onConfirm={handleConfirmSuspend}
+            onCancel={() => setShowSuspendConfirm(false)}
+          />
         </View>
       </View>
     </Modal>
@@ -427,6 +473,22 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
     fontWeight: "600",
     paddingVertical: 4,
+  },
+  suspendedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: COLORS.warningLight,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: "flex-start",
+    marginTop: 8,
+  },
+  suspendedText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: COLORS.warning,
   },
   criteriaContainer: {
     flexDirection: "row",

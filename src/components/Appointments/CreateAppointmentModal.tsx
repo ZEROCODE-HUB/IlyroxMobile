@@ -72,8 +72,10 @@ export default function CreateAppointmentModal({
   React.useEffect(() => {
     if (visible) {
       if (isEditMode && appointment) {
-        setFechaText(appointment.fecha);
-        setHoraText((appointment.hora || "09:00").slice(0, 5));
+        const fechaValue = appointment.fecha && String(appointment.fecha).trim() ? String(appointment.fecha) : "";
+        const horaValue = appointment.hora && String(appointment.hora).trim() ? String(appointment.hora) : "09:00";
+        setFechaText(fechaValue);
+        setHoraText(horaValue.slice(0, 5));
         setTipo(appointment.tipo || "visita");
         setDescripcion(appointment.descripcion ?? "");
         return;

@@ -7,10 +7,12 @@ import { useShallow } from "zustand/react/shallow";
 
 interface PriceSectionProps {
   handleCurrencyChange: (text: string, setter: (val: string) => void) => void;
+  formatCurrencyForDisplay: (value: string) => string;
 }
 
 export const PriceSection: React.FC<PriceSectionProps> = ({
   handleCurrencyChange,
+  formatCurrencyForDisplay,
 }) => {
   const { precioMin, precioMax, moneda } = usePropertyFiltersStore(
     useShallow((s) => ({
@@ -55,6 +57,12 @@ export const PriceSection: React.FC<PriceSectionProps> = ({
             onChangeText={(val) =>
               handleCurrencyChange(val, (v) => onUpdateFilter("precioMin", v))
             }
+            onBlur={() => {
+              const formatted = formatCurrencyForDisplay(precioMin);
+              if (formatted !== precioMin) {
+                onUpdateFilter("precioMin", formatted);
+              }
+            }}
             keyboardType="numeric"
             placeholder="0"
           />
@@ -66,6 +74,12 @@ export const PriceSection: React.FC<PriceSectionProps> = ({
             onChangeText={(val) =>
               handleCurrencyChange(val, (v) => onUpdateFilter("precioMax", v))
             }
+            onBlur={() => {
+              const formatted = formatCurrencyForDisplay(precioMax);
+              if (formatted !== precioMax) {
+                onUpdateFilter("precioMax", formatted);
+              }
+            }}
             keyboardType="numeric"
             placeholder="Sin límite"
           />

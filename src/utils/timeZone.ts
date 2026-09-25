@@ -55,8 +55,24 @@ const zonedLocalTimeToUtc = (
   hora: string,
   sourceTimeZone: string,
 ) => {
-  const [year, month, day] = fecha.split("-").map(Number);
-  const [hour = 0, minute = 0, second = 0] = hora.split(":").map(Number);
+  if (!fecha || !hora || fecha.trim() === "" || hora.trim() === "") {
+    return new Date(NaN);
+  }
+
+  const dateParts = fecha.split("-").map(Number);
+  const timeParts = hora.split(":").map(Number);
+
+  if (dateParts.length !== 3 || dateParts.some(isNaN)) {
+    return new Date(NaN);
+  }
+
+  const [year, month, day] = dateParts;
+  const [hour = 0, minute = 0, second = 0] = timeParts;
+
+  if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hour) || isNaN(minute)) {
+    return new Date(NaN);
+  }
+
   const localAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
   const firstOffset = getTimeZoneOffsetMs(new Date(localAsUtc), sourceTimeZone);
   const firstGuess = new Date(localAsUtc - firstOffset);
@@ -88,6 +104,11 @@ export const formatAppointmentDateTimeForTimeZone = (
 ) => {
   const source = sourceTimeZone || DEFAULT_APPOINTMENT_TIME_ZONE;
   const date = zonedLocalTimeToUtc(fecha, hora, source);
+
+  if (!date || isNaN(date.getTime())) {
+    return { dateLabel: "Fecha pendiente", timeLabel: "--:--" };
+  }
+
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -110,9 +131,9 @@ export const formatAppointmentDateTimeForTimeZone = (
 
   const timeLabel = new Intl.DateTimeFormat("es-MX", {
     timeZone: targetTimeZone,
-    hour: "numeric",
+    hour: "2-digit",
     minute: "2-digit",
-    hour12: true,
+    hour12: false,
   }).format(date);
 
   return { dateLabel, timeLabel };
