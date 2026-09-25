@@ -110,20 +110,26 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
     return title.charAt(0).toUpperCase() + title.slice(1);
   };
 
-  const timeParts = appointment.time ? appointment.time.slice(0, 5).split(":") : ["", ""];
-  const hour = timeParts[0];
-  const minute = timeParts[1];
-  const hourNum = parseInt(hour, 10);
-  const minuteNum = parseInt(minute, 10);
+  const isValidTimeFormat = (timeStr: string): boolean => {
+    const regex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    return regex.test(timeStr);
+  };
 
   let timeText = "--:--";
   let ampmText = "";
 
-  if (!isNaN(hourNum) && !isNaN(minuteNum)) {
-    const isPM = hourNum >= 12;
-    const displayHour = hourNum > 12 ? String(hourNum - 12) : (hourNum === 0 ? "12" : hour);
-    timeText = `${displayHour}:${minute}`;
-    ampmText = isPM ? "PM" : "AM";
+  if (appointment.time && isValidTimeFormat(appointment.time.slice(0, 5))) {
+    const timeStr = appointment.time.slice(0, 5);
+    const hourNum = parseInt(timeStr.split(":")[0], 10);
+
+    if (!isNaN(hourNum)) {
+      timeText = timeStr;
+      if (hourNum >= 12) {
+        ampmText = "PM";
+      } else {
+        ampmText = "AM";
+      }
+    }
   }
 
   return (
@@ -243,14 +249,24 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
       >
         <Pressable style={styles.menuOverlay} onPress={() => setShowMenu(false)}>
           <View style={styles.menuContainer}>
-            <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
-              <Ionicons name="create-outline" size={20} color={COLORS.textPrimary} />
-              <Text style={styles.menuItemText}>Editar cita</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={handleCancel}>
-              <Ionicons name="close-circle-outline" size={20} color={COLORS.error} />
-              <Text style={[styles.menuItemText, { color: COLORS.error }]}>Cancelar cita</Text>
-            </TouchableOpacity>
+            {!isCancelled && (
+              <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
+                <Ionicons name="create-outline" size={20} color={COLORS.textPrimary} />
+                <Text style={styles.menuItemText}>Editar cita</Text>
+              </TouchableOpacity>
+            )}
+            {!isCancelled && (
+              <TouchableOpacity style={styles.menuItem} onPress={handleCancel}>
+                <Ionicons name="close-circle-outline" size={20} color={COLORS.error} />
+                <Text style={[styles.menuItemText, { color: COLORS.error }]}>Cancelar cita</Text>
+              </TouchableOpacity>
+            )}
+            {isCancelled && (
+              <View style={styles.menuItem}>
+                <Ionicons name="close-circle" size={20} color={COLORS.textTertiary} />
+                <Text style={[styles.menuItemText, { color: COLORS.textTertiary }]}>Cita cancelada</Text>
+              </View>
+            )}
           </View>
         </Pressable>
       </Modal>

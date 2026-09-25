@@ -118,7 +118,9 @@ const Matches: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
-      // PASO 1: Obtener TODAS las búsquedas guardadas activas del usuario
+      // PASO 1: Obtener TODAS las búsquedas guardadas (activas y suspendidas)
+      // Las suspendidas se muestran para que el usuario pueda ver matches existentes
+      // y reactivarlas si desea.
       const { data: searchesData, error: searchesError } = await supabase
         .from("busquedas_guardadas")
         .select(
@@ -128,7 +130,6 @@ const Matches: React.FC = () => {
       `,
         )
         .eq("usuario_id", user.id)
-        .eq("activa", true)
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
 
@@ -274,6 +275,27 @@ const Matches: React.FC = () => {
     } catch (error) {
       log.error("Error deleting search:", error);
       showToast("No se pudo eliminar la búsqueda", "error");
+    }
+  };
+
+  const handleSuspendSearch = async (busquedaId: string, currentlyActive: boolean) => {
+    try {
+      const newActiveState = !currentlyActive;
+      const { error } = await supabase
+        .from("busquedas_guardadas")
+        .update({ activa: newActiveState })
+        .eq("id", busquedaId);
+
+      if (error) throw error;
+
+      showToast(
+        newActiveState ? "Búsqueda reactivada" : "Búsqueda suspendida",
+        "success"
+      );
+      fetchMatches();
+    } catch (error) {
+      log.error("Error suspending search:", error);
+      showToast("No se pudo actualizar la búsqueda", "error");
     }
   };
 
@@ -586,37 +608,36 @@ const Matches: React.FC = () => {
         onBack={() => router.back()}
       />
 
-      {/* Tabs Removed */}
-
-      {/* Buscador */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchWrapper}>
-          <Ionicons name="search" size={20} color={COLORS.textTertiary} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar prospecto..."
-            placeholderTextColor={COLORS.textTertiary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Ionicons
-                name="close-circle"
-                size={20}
-                color={COLORS.textTertiary}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
       {/* Content */}
       <FlatList
         data={leadGroups}
         keyExtractor={(item) => item.leadId}
         renderItem={renderItem}
         contentContainerStyle={styles.scrollContent}
+        ListHeaderComponent={
+          <View style={styles.searchContainerSticky}>
+            <View style={styles.searchWrapper}>
+              <Ionicons name="search" size={20} color={COLORS.textTertiary} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Buscar prospecto..."
+                placeholderTextColor={COLORS.textTertiary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery("")}>
+                  <Ionicons
+                    name="close-circle"
+                    size={20}
+                    color={COLORS.textTertiary}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        }
+        stickyHeaderIndices={[0]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -724,6 +745,7 @@ const Matches: React.FC = () => {
             );
           }}
           onDeleteSearch={handleDeleteSearch}
+          onSuspendSearch={handleSuspendSearch}
           currentUserId={user?.id}
           onEditSearch={
             selectedLead.busquedaObject
@@ -814,6 +836,13 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 4,
     backgroundColor: COLORS.white,
+  },
+  searchContainerSticky: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+    backgroundColor: COLORS.white,
+    zIndex: 100,
   },
   searchWrapper: {
     flexDirection: "row",
