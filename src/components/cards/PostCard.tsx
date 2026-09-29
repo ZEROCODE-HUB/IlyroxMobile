@@ -29,6 +29,7 @@ import { useFeedInteractions, useViewTracking } from "@/hooks";
 import { useUserRecommendations } from "@/hooks/useUserRecommendations";
 import { SpecialPostCard } from "../Feed/SpecialPostCard";
 import { buildRecommendedText } from "./recommendedText";
+import { buildPropertyShareTitle } from "@/utils/propertyShareTitle";
 
 interface PostCardProps {
   item: FeedItem;
@@ -226,15 +227,16 @@ const PostCard: React.FC<PostCardProps> = ({
             }}
             onTrackInteraction={trackInteraction}
             shareTitle={
-              item.propertyDetails?.title ||
-              (item.postDetails?.busquedas_json?.filtros?.tipo_propiedad
-                ? `Se busca ${item.postDetails.busquedas_json.filtros.tipo_propiedad} en ${
-                    item.postDetails.busquedas_json.filtros.ubicacion?.ciudad ||
-                    item.postDetails.busquedas_json.filtros.ubicacion?.municipio ||
-                    item.postDetails.busquedas_json.filtros.ubicacion?.estado ||
-                    ""
-                  }`.trim()
-                : "Búsqueda de propiedad en Ilyrox")
+              item.propertyDetails
+                ? buildPropertyShareTitle(item.propertyDetails)
+                : (item.postDetails?.busquedas_json?.filtros?.tipo_propiedad
+                  ? `Se busca ${item.postDetails.busquedas_json.filtros.tipo_propiedad} en ${
+                      item.postDetails.busquedas_json.filtros.ubicacion?.ciudad ||
+                      item.postDetails.busquedas_json.filtros.ubicacion?.municipio ||
+                      item.postDetails.busquedas_json.filtros.ubicacion?.estado ||
+                      ""
+                    }`.trim()
+                  : "Búsqueda de propiedad en Ilyrox")
             }
             shareDescription={item.content.substring(0, 100)}
             shareImageUrl={hasImages ? images[0] : undefined}

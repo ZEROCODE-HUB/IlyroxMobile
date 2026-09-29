@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../constants/colors";
 import { AppointmentItem } from "./Appointments/appointmentTypes";
 import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
+import { EMPTY_APPOINTMENT_TIME, formatAppointmentTimeLabel } from "@/utils/timeZone";
 
 interface AppointmentCardProps {
   appointment: AppointmentItem;
@@ -110,27 +111,10 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
     return title.charAt(0).toUpperCase() + title.slice(1);
   };
 
-  const isValidTimeFormat = (timeStr: string): boolean => {
-    const regex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-    return regex.test(timeStr);
-  };
-
-  let timeText = "--:--";
-  let ampmText = "";
-
-  if (appointment.time && isValidTimeFormat(appointment.time.slice(0, 5))) {
-    const timeStr = appointment.time.slice(0, 5);
-    const hourNum = parseInt(timeStr.split(":")[0], 10);
-
-    if (!isNaN(hourNum)) {
-      timeText = timeStr;
-      if (hourNum >= 12) {
-        ampmText = "PM";
-      } else {
-        ampmText = "AM";
-      }
-    }
-  }
+  const timeStr = formatAppointmentTimeLabel(appointment.hora || appointment.time);
+  const timeText = timeStr;
+  const hourNum = parseInt(timeStr.split(":")[0], 10);
+  const ampmText = timeStr === EMPTY_APPOINTMENT_TIME ? "" : hourNum >= 12 ? "PM" : "AM";
 
   return (
     <View style={styles.card}>

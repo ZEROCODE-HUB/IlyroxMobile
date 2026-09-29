@@ -215,7 +215,24 @@ export const usePropertyFilters = (
           : filters.locationFilter.colonia)
       );
 
-      if (hasPolygons || hasChips || hasBaseLocation) {
+      if (hasPolygons) {
+        // POLYGON MODE: Si existen polígonos, SOLO se filtran por polígono.
+        // Los chips y base location se ignoran - el polígono dibujado por el
+        // usuario es la autoridad absoluta sobre qué propiedades mostrar.
+        const propLat = p.coordinates?.lat ?? p.latitud ?? undefined;
+        const propLng = p.coordinates?.lng ?? p.longitud ?? undefined;
+        const hasCoords =
+          propLat != null && propLng != null &&
+          !isNaN(propLat) && !isNaN(propLng);
+        if (!hasCoords) return false;
+        const geoMatch = filters.polygons.some(
+          (polygon) =>
+            polygon.length >= 3 &&
+            isPointInPolygon(propLat!, propLng!, polygon),
+        );
+        if (!geoMatch) return false;
+      } else if (hasChips || hasBaseLocation) {
+        // NO POLYGON: Sin polígonos, se usa chips o base location.
         let geoMatch = false;
 
         // Coordenadas de la propiedad (latitud/longitud ya son number en la BD)
@@ -224,16 +241,6 @@ export const usePropertyFilters = (
         const hasCoords =
           propLat != null && propLng != null &&
           !isNaN(propLat) && !isNaN(propLng);
-
-        if (hasPolygons && !geoMatch) {
-          if (hasCoords) {
-            geoMatch = filters.polygons.some(
-              (polygon) =>
-                polygon.length >= 3 &&
-                isPointInPolygon(propLat!, propLng!, polygon),
-            );
-          }
-        }
 
         if (hasChips && !geoMatch) {
           geoMatch = filters.locationChips.some((chip) => {

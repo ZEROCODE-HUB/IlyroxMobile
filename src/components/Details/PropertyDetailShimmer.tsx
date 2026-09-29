@@ -60,7 +60,7 @@ interface PropertyDetailShimmerProps {
 export const PropertyDetailShimmer: React.FC<PropertyDetailShimmerProps> = ({ isModal = false }) => {
   return (
     <View style={styles.container}>
-      <Shimmer width={SCREEN_WIDTH} height={350} borderRadius={0} />
+      <Shimmer width={SCREEN_WIDTH} height={SCREEN_WIDTH * 3 / 4} borderRadius={0} />
 
       <View style={isModal ? styles.contentModal : styles.content}>
         <View style={styles.headerSection}>

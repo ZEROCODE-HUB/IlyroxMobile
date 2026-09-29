@@ -40,6 +40,7 @@ import { PropertyDetailShimmer } from "./PropertyDetailShimmer";
 import { propertyDetailStyles as styles } from "./propertyDetailStyles";
 import { getCamposVisibles } from "@/constants/propertyData";
 import { SafePressable } from "@/design-system";
+import { buildPropertyShareTitle } from "@/utils/propertyShareTitle";
 
 const log = logger.scoped("PropertyDetail");
 
@@ -225,7 +226,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           feedItemShares={propertyDetails.feed_items?.compartidos_count ?? 0}
           userId={user?.id}
           propertyId={propertyDetails.id}
-          shareTitle={`Propiedad: ${propertyDetails.subtipo} en ${propertyDetails.municipio}`}
+          shareTitle={buildPropertyShareTitle(propertyDetails)}
           shareDescription={propertyDetails.descripcion?.substring(0, 100)}
           shareCode={
             propertyDetails.codigo_propiedad || propertyDetails.code

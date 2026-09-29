@@ -17,10 +17,7 @@ import { formatPhoneNumber } from "../components/Profile/profileFormatters";
 import { googleCalendarService } from "@/services/googleCalendarService";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { logger } from "@/utils/logger";
-import {
-    formatAppointmentDateTimeForTimeZone,
-    getAppointmentViewerTimeZone,
-} from "@/utils/timeZone";
+import { formatAppointmentDateTime } from "@/utils/timeZone";
 
 const log = logger.scoped("useAppointments");
 
@@ -237,23 +234,12 @@ export const useAppointments = () => {
                     );
 
                     const hasUserRated = !!userReview;
-                    const viewerTimeZone = getAppointmentViewerTimeZone(
-                        cita.creator_timezone,
-                        cita.created_by === profile.id,
-                    );
 
                     const sanitizedFecha = (cita.fecha && String(cita.fecha).trim()) ? String(cita.fecha) : null;
                     const sanitizedHora = (cita.hora && String(cita.hora).trim()) ? String(cita.hora) : null;
 
                     const { dateLabel, timeLabel } =
-                        (sanitizedFecha && sanitizedHora)
-                            ? formatAppointmentDateTimeForTimeZone(
-                                  sanitizedFecha,
-                                  sanitizedHora,
-                                  cita.creator_timezone,
-                                  viewerTimeZone,
-                              )
-                            : { dateLabel: "Fecha pendiente", timeLabel: "--:--" };
+                        formatAppointmentDateTime(sanitizedFecha, sanitizedHora);
 
                     return {
                         ...cita,

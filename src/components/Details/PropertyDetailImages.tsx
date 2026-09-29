@@ -52,10 +52,10 @@ export const PropertyDetailImages: React.FC<PropertyDetailImagesProps> = ({
 
   return (
     <View style={styles.imageContainer}>
-      {/* Misma galería que el feed: proporción real de la foto, sin recortar,
-          con marco oscuro en los lados para las verticales. */}
+      {/* Misma lógica que el feed: adapta al ratio real de la primera foto. */}
       <ImageGallery
         images={galleryImages}
+        aspectRatio={4 / 3}
         showDots={galleryImages.length > 1}
         showImageCount={false}
         onIndexChange={onImageIndexChange}

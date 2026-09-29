@@ -206,6 +206,9 @@ const Feed: React.FC<FeedProps> = ({
             compartidos_count: item.shares,
             vistas_count: item.views,
           },
+          // user: habilita que normalizePropertyData derive el perfil del publicador
+          // para PropertyOwnerContact (mismo patrón que Matches.tsx:719).
+          user: item.user,
         };
         usePropertyCacheStore.getState().setProperty(cachedData.id, cachedData);
         const params: any = { id: cachedData.id };

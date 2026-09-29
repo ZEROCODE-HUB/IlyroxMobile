@@ -102,13 +102,13 @@ const LazyImage: React.FC<LazyImageProps> = ({
 
 const styles = StyleSheet.create({
   loadingContainer: {
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.backgroundDeep,
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1,
   },
   errorContainer: {
-    backgroundColor: COLORS.errorLight,
+    backgroundColor: COLORS.backgroundDeep,
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1,
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   errorPlaceholder: {
     width: "100%",
     height: "100%",
-    backgroundColor: COLORS.errorLight,
+    backgroundColor: COLORS.backgroundDeep,
   },
 });
 

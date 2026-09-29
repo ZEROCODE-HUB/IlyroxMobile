@@ -83,16 +83,16 @@ export function useShare() {
         // duplicando el link. En Android, `url` no se usa (no existe ese
         // concepto en su share sheet), así que el link debe seguir
         // embebido en el mensaje.
+        const boldTitle = `*${title}*`;
         const message =
           Platform.OS === "ios"
-            ? `${title}\n\n${description}`
-            : `${title}\n\n${description}\n\n${deepLink}`;
+            ? `${boldTitle}\n\n${description}`
+            : `${boldTitle}\n\n${description}\n\n${deepLink}`;
 
         // 3. Compartir (nativo)
         const result = await Share.share({
           message,
           url: Platform.OS === "ios" ? deepLink : undefined,
-          title,
         });
 
         // 4. Registrar share en BD: incrementa compartidos_count vía RPC

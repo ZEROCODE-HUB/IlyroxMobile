@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/constants";
-import { useMapProperties, MapServerFilters } from "@/hooks/useMapProperties";
+import { useMapProperties } from "@/hooks/useMapProperties";
 import { usePropertyFilters } from "@/hooks/usePropertyFilters";
 import { useMapFeedItems } from "@/hooks/useMapFeedItems";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
@@ -164,17 +164,10 @@ export default function MapResultsScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const storeFilters = usePropertyFiltersStore(useShallow((s) => s.filters));
-  const [debouncedFilters, setDebouncedFilters] = useState<MapServerFilters>(
+  const debouncedFilters = useMemo(
     () => extractServerFilters(storeFilters),
+    [storeFilters],
   );
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      setDebouncedFilters(extractServerFilters(storeFilters));
-    }, 600);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [storeFilters]);
 
   const { data: allProperties = [] } = useMapProperties(debouncedFilters);
   const { filteredProperties, hasActiveFilters } = usePropertyFilters(allProperties, null);
@@ -223,7 +216,7 @@ export default function MapResultsScreen() {
 
   const handleOpenDetail = useCallback((item: FeedItem, imageIndex?: number) => {
     if (item.propertyDetails?.id) {
-      const cachedData = item.propertyDetails;
+      const cachedData = { ...item.propertyDetails, user: item.user };
       usePropertyCacheStore.getState().setProperty(cachedData.id, cachedData);
       const params: any = { id: cachedData.id };
       if (imageIndex !== undefined && imageIndex > 0) {

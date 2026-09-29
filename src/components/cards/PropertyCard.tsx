@@ -28,6 +28,7 @@ import ConfirmDialog from "../shared/ConfirmDialog";
 import CreateProperty from "../CreateContent/CreateProperty";
 import { supabase } from "../../lib/supabase";
 import { logger } from "@/utils/logger";
+import { buildPropertyShareTitle } from "@/utils/propertyShareTitle";
 import ActionButtons from "../ActionButtons";
 
 const log = logger.scoped("PropertyCard");
@@ -397,7 +398,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
               onCommentClick();
             }}
             onTrackInteraction={trackInteraction}
-            shareTitle={property.title}
+            shareTitle={buildPropertyShareTitle(property)}
             shareDescription={`${renderOperationsLabel()} - ${
               property.location?.city
             }`}
