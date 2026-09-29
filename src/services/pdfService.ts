@@ -7,6 +7,7 @@ import firstUpperCase from "@/utils/firstUpperCase";
 import { logger } from "@/utils/logger";
 import { LogoBase64 } from "@/assets/logoBase64";
 import { COLORS } from "@/constants";
+import { buildPropertyShareTitle, propertyTitleToFileName } from "@/utils/propertyShareTitle";
 
 const log = logger.scoped("pdfService");
 // ============================================================================
@@ -1017,7 +1018,7 @@ export const pdfService = {
     }
 
     // Mover a un nombre más descriptivo
-    const fileName = `propiedad_${safeText(propertyData.codigo_propiedad) || propertyId}_${Date.now()}.pdf`;
+    const fileName = `${propertyTitleToFileName(buildPropertyShareTitle(propertyData))}.pdf`;
     const newPath = `${documentDirectory}${fileName}`;
 
     await moveAsync({
@@ -1032,7 +1033,7 @@ export const pdfService = {
       try {
         await Sharing.shareAsync(newPath, {
           mimeType: "application/pdf",
-          dialogTitle: `Propiedad ${propertyData.codigo_propiedad || ""}`,
+          dialogTitle: buildPropertyShareTitle(propertyData),
           UTI: "com.adobe.pdf",
         });
         opened = true;

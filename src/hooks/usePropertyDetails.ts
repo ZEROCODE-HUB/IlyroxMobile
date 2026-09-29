@@ -55,11 +55,16 @@ const usePropertyDetails = (
     return result;
   }, [feedItemId, user?.id, setCache]);
 
+  const cachedProfile = (initialData as any)?.perfil;
+  const initialDataLacksProfile =
+    !!initialData &&
+    (!cachedProfile || cachedProfile.celular === undefined);
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["property", feedItemId],
     queryFn: fetchPropertyDetails,
     initialData: initialData ?? undefined,
-    staleTime: 30_000,
+    staleTime: initialDataLacksProfile ? 0 : 30_000,
     gcTime: 5 * 60_000,
     retry: 1,
   });

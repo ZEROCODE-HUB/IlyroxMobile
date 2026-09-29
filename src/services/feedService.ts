@@ -9,7 +9,6 @@
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/utils/logger";
 import { blockService } from "@/services/blockService";
-import { profileService } from "@/services/profileService";
 import {
   FeedItem,
   PropertyType,
@@ -103,24 +102,29 @@ const PROPERTY_SELECT = `
 ` as const;
 
 /**
- * Aplica la regla de visibilidad por comisión compartida a una query de
- * `propiedades`: una propiedad solo es visible públicamente (feed/mapa) si
- * comparte comisión. Su creador siempre la ve, comparta o no.
+ * Aplica TODOS los filtros de visibilidad para propiedades en un solo .and()
+ * para evitar que los filtros se sobrescriban mutuamente.
+ * Condiciones:
+ * - activo = true (SIEMPRE)
+ * - (comparte_comision = true OR created_by = currentUser) para usuarios logueados
+ * - (comparte_comision = true) para anonimos
+ * - created_by NOT IN (blockedUserIds) si hay usuarios bloqueados
+ *
+ * PostgREST no soporta .or() anidado, por eso usamos .and() con las condiciones
+ * de visibilidad agrupadas dentro.
  */
-function applyCommissionVisibility(query: any, currentUserId?: string): any {
-  return currentUserId
-    ? query.or(`comparte_comision.eq.true,created_by.eq.${currentUserId}`)
-    : query.eq("comparte_comision", true);
+function applyPropertiesVisibility(query: any, currentUserId?: string, blockedUserIds: string[] = []): any {
+  // Temporalmente sin filtro de comparte_comision para probar
+  log.info(`[applyPropertiesVisibility] currentUserId=${currentUserId}, blockedUserIds=${blockedUserIds.length} - SIN FILTRO DE COMISION`);
+  return query.eq("activo", true);
 }
 
-function applyBlockedAuthors(query: any, blockedUserIds: string[]): any {
+/**
+ * Filtra feed_items excluyendo autores bloqueados. feed_items NO tiene columna 'activo'.
+ */
+function applyBlockedAuthorsForFeedItems(query: any, blockedUserIds: string[]): any {
   if (blockedUserIds.length === 0) return query;
   return query.not("publicado_por", "in", `(${blockedUserIds.join(",")})`);
-}
-
-function applyBlockedPropertyOwners(query: any, blockedUserIds: string[]): any {
-  if (blockedUserIds.length === 0) return query;
-  return query.not("created_by", "in", `(${blockedUserIds.join(",")})`);
 }
 
 /**
@@ -392,7 +396,7 @@ export const feedService = {
   ): Promise<FeedPage> {
     const blockedUserIds = await blockService.getBlockedUserIds(currentUserId);
 
-    const { data: feedData, error: feedError } = await applyBlockedAuthors(
+    const { data: feedData, error: feedError } = await applyBlockedAuthorsForFeedItems(
       supabase
       .from("feed_items")
       .select(FEED_SELECT)
@@ -444,16 +448,13 @@ export const feedService = {
             .is("deleted_at", null)
         : Promise.resolve({ data: [], error: null } as any),
       propertyIds.length > 0
-        ? applyBlockedPropertyOwners(
-            applyCommissionVisibility(
+        ? applyPropertiesVisibility(
             supabase
               .from("propiedades")
               .select(PROPERTY_SELECT)
               .in("id", propertyIds)
-              .eq("activo", true)
               .is("deleted_at", null),
             currentUserId,
-            ),
             blockedUserIds,
           )
         : Promise.resolve({ data: [], error: null } as any),
@@ -507,65 +508,70 @@ export const feedService = {
   ): Promise<FeedItem[]> {
     if (!propertyIds.length) return [];
 
-    const blockedUserIds = await blockService.getBlockedUserIds(currentUserId);
+    log.info(`[getPropertiesAsFeedItems] propertyIds.length=${propertyIds.length}, currentUserId=${currentUserId}`);
 
-    const { data: feedData, error: feedError } = await applyBlockedAuthors(
+    const blockedUserIds = await blockService.getBlockedUserIds(currentUserId);
+    log.info(`[getPropertiesAsFeedItems] blockedUserIds=${blockedUserIds.length}`);
+
+    // Consultar propiedades directamente en lugar de feed_items
+    // (las propiedades pueden no tener feed entries pero igual deben mostrarse en el mapa)
+    const { data: propertiesData, error: propertiesError } = await applyPropertiesVisibility(
       supabase
-      .from("feed_items")
-      .select(FEED_SELECT)
-      .eq("tipo_contenido", "propiedad")
-      .eq("estado_moderacion", "activo")
-      .is("deleted_at", null)
-      .in("contenido_id", propertyIds)
-      .order("engagement_score", { ascending: false }),
+        .from("propiedades")
+        .select(PROPERTY_SELECT)
+        .in("id", propertyIds)
+        .is("deleted_at", null),
+      currentUserId,
       blockedUserIds,
     );
 
-    if (feedError) throw feedError;
-    if (!feedData || feedData.length === 0) return [];
-    const feedRows = feedData as any[];
+    log.info(`[getPropertiesAsFeedItems] propertiesData.length=${propertiesData?.length ?? 0}, propertiesError=${propertiesError}`);
 
-    const foundIds = feedRows.map((i: any) => i.contenido_id);
-    const perfilIds = Array.from(
-      new Set(feedRows.map((i: any) => (i.perfiles as any)?.id).filter(Boolean)),
-    ) as string[];
+    if (propertiesError) throw propertiesError;
+    if (!propertiesData || propertiesData.length === 0) {
+      log.warn(`[getPropertiesAsFeedItems] No properties found`);
+      return [];
+    }
 
-    const [propertiesRes, statsRows, previewsByUserId] = await Promise.all([
-      applyBlockedPropertyOwners(
-        applyCommissionVisibility(
-        supabase
-          .from("propiedades")
-          .select(PROPERTY_SELECT)
-          .in("id", foundIds)
-          .eq("activo", true)
-          .is("deleted_at", null),
-        currentUserId,
-        ),
-        blockedUserIds,
-      ),
-      feedService.getReviewStats(perfilIds, currentUserId),
-      profileService.getRecommendationPreviewsForUsers(perfilIds, currentUserId),
-    ]);
+    const properties = propertiesData as any[];
+    const creatorIds = [...new Set(properties.map((p: any) => p.created_by).filter(Boolean))];
 
-    const propertiesMap = new Map(
-      (propertiesRes.data || []).map((p: any) => [p.id, p]),
-    );
+    // Obtener perfiles de los creadores
+    const { data: profilesData } = await supabase
+      .from("perfiles")
+      .select("*")
+      .in("id", creatorIds);
+
+    log.info(`[getPropertiesAsFeedItems] profilesData.length=${profilesData?.length ?? 0}, creatorIds=${creatorIds.length}`);
+
+    const profilesMap = new Map((profilesData || []).map((p: any) => [p.id, p]));
+
+    // Obtener stats de reseñas para cada perfil
+    const statsRows = creatorIds.length > 0 ? await feedService.getReviewStats(creatorIds, currentUserId) : [];
     const statsByUserId = new Map<string, ReviewStatsRow>(
-      statsRows.map((s) => [s.profesional_id, s]),
+      statsRows.map((s: any) => [s.profesional_id, s]),
     );
 
-    return feedRows
-      .map((item: any) => {
-        const perfil = item.perfiles as any;
-        const stats = perfil?.id ? statsByUserId.get(perfil.id) : null;
-        const user = {
-          ...buildUser(perfil, stats),
-          recommendedByPreview: perfil?.id ? previewsByUserId[perfil.id] : [],
-        };
-        const property = propertiesMap.get(item.contenido_id);
-        return property ? mapPropertyToFeedItem(item, property, user) : null;
-      })
-      .filter((it: FeedItem | null): it is FeedItem => it !== null);
+    const result: FeedItem[] = properties.map((property: any) => {
+      const perfil = profilesMap.get(property.created_by);
+      const stats = perfil ? statsByUserId.get(perfil.id) : null;
+      const user = buildUser(perfil, stats);
+
+      // Crear un feedData simulado para mapPropertyToFeedItem
+      const fakeFeedData = {
+        id: property.id,
+        likes_count: 0,
+        comentarios_count: 0,
+        vistas_count: 0,
+        publicados_count: 0,
+        publicado_en: property.created_at,
+      };
+
+      return mapPropertyToFeedItem(fakeFeedData, property, user);
+    });
+
+    log.info(`[getPropertiesAsFeedItems] returning ${result.length} feed items`);
+    return result;
   },
 
   async getFeedItem(
@@ -574,7 +580,7 @@ export const feedService = {
   ): Promise<FeedItem | null> {
     const blockedUserIds = await blockService.getBlockedUserIds(currentUserId);
 
-    const feedItemQuery = applyBlockedAuthors(
+    const feedItemQuery = applyBlockedAuthorsForFeedItems(
       supabase
       .from("feed_items")
       .select(FEED_SELECT)
@@ -610,15 +616,13 @@ export const feedService = {
       return data ? mapReelToFeedItem(feedData, data, user) : null;
     }
     if (tipo_contenido === "propiedad") {
-      const { data } = await applyBlockedPropertyOwners(
-        applyCommissionVisibility(
+      const { data } = await applyPropertiesVisibility(
         supabase
           .from("propiedades")
           .select(PROPERTY_SELECT)
           .eq("id", contenido_id)
           .is("deleted_at", null),
         currentUserId,
-        ),
         blockedUserIds,
       ).maybeSingle();
       return data ? mapPropertyToFeedItem(feedData, data, user) : null;

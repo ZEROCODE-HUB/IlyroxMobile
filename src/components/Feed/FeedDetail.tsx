@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppHeader } from "../AppHeader";
 import { commonStyles } from "styles";
 import { SpecialPostCard } from "./SpecialPostCard";
+import { buildPropertyShareTitle } from "@/utils/propertyShareTitle";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -119,15 +120,16 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
               userId={currentUserId}
               onCommentClick={() => setShowComments(true)}
               shareTitle={
-                item.propertyDetails?.title ||
-                (item.postDetails?.busquedas_json?.filtros?.tipo_propiedad
-                  ? `Se busca ${item.postDetails.busquedas_json.filtros.tipo_propiedad} en ${
-                      item.postDetails.busquedas_json.filtros.ubicacion?.ciudad ||
-                      item.postDetails.busquedas_json.filtros.ubicacion?.municipio ||
-                      item.postDetails.busquedas_json.filtros.ubicacion?.estado ||
-                      ""
-                    }`.trim()
-                  : "Búsqueda de propiedad en Ilyrox")
+                item.propertyDetails
+                  ? buildPropertyShareTitle(item.propertyDetails)
+                  : (item.postDetails?.busquedas_json?.filtros?.tipo_propiedad
+                    ? `Se busca ${item.postDetails.busquedas_json.filtros.tipo_propiedad} en ${
+                        item.postDetails.busquedas_json.filtros.ubicacion?.ciudad ||
+                        item.postDetails.busquedas_json.filtros.ubicacion?.municipio ||
+                        item.postDetails.busquedas_json.filtros.ubicacion?.estado ||
+                        ""
+                      }`.trim()
+                    : "Búsqueda de propiedad en Ilyrox")
               }
               shareDescription={item.content.substring(0, 100)}
               shareImageUrl={images[0]}

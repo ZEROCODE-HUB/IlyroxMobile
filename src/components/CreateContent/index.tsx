@@ -39,6 +39,35 @@ export default function CreateContent() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.optionsContainer}>
+
+          
+          {/* Opción: Propiedad */}
+          <SafePressable
+            style={styles.optionCard}
+            onPress={() => router.push("/create/property")}
+            accessibilityLabel="Publicar propiedad"
+            accessibilityRole="button"
+          >
+            <View
+              style={[
+                styles.optionIcon,
+                { backgroundColor: COLORS.primaryTransparent },
+              ]}
+            >
+              <Ionicons name="home-outline" size={32} color={COLORS.primary} />
+            </View>
+            <View style={styles.optionTextContainer}>
+              <Text style={styles.optionTitle}>Publicar Propiedad</Text>
+              <Text style={styles.optionDescription}>
+                Crea una ficha inmobiliaria profesional
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward-outline"
+              size={20}
+              color={COLORS.textTertiary}
+            />
+          </SafePressable>
           {/* Opción: Post */}
           <SafePressable
             style={styles.optionCard}
@@ -95,33 +124,6 @@ export default function CreateContent() {
             />
           </SafePressable>
 
-          {/* Opción: Propiedad */}
-          <SafePressable
-            style={styles.optionCard}
-            onPress={() => router.push("/create/property")}
-            accessibilityLabel="Publicar propiedad"
-            accessibilityRole="button"
-          >
-            <View
-              style={[
-                styles.optionIcon,
-                { backgroundColor: COLORS.primaryTransparent },
-              ]}
-            >
-              <Ionicons name="home-outline" size={32} color={COLORS.primary} />
-            </View>
-            <View style={styles.optionTextContainer}>
-              <Text style={styles.optionTitle}>Publicar Propiedad</Text>
-              <Text style={styles.optionDescription}>
-                Crea una ficha inmobiliaria profesional
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward-outline"
-              size={20}
-              color={COLORS.textTertiary}
-            />
-          </SafePressable>
         </View>
       </ScrollView>
     </View>

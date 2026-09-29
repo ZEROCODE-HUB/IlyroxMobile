@@ -11,130 +11,58 @@ export const getDeviceTimeZone = () => {
   }
 };
 
-const getTimeZoneParts = (date: Date, timeZone: string) => {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
+export const EMPTY_APPOINTMENT_TIME = "--:--";
+export const EMPTY_APPOINTMENT_DATE = "Fecha pendiente";
 
-  const value = (type: string) =>
-    Number(parts.find((part) => part.type === type)?.value ?? 0);
+const pad2 = (n: number): string => String(n).padStart(2, "0");
 
-  return {
-    year: value("year"),
-    month: value("month"),
-    day: value("day"),
-    hour: value("hour"),
-    minute: value("minute"),
-    second: value("second"),
-  };
+/** Normaliza "09:00:00" | "9:00" | "09:00" | "9:00 a. m." -> "HH:mm". null si no es hora válida. */
+export const formatAppointmentTimeLabel = (
+  hora: string | null | undefined,
+): string => {
+  if (!hora || typeof hora !== "string") return EMPTY_APPOINTMENT_TIME;
+  const trimmed = hora.trim();
+  if (!trimmed) return EMPTY_APPOINTMENT_TIME;
+
+  const parts = trimmed.split(/[:\s]/).filter(Boolean);
+  if (parts.length < 2) return EMPTY_APPOINTMENT_TIME;
+
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+
+  if (isNaN(h) || isNaN(m)) return EMPTY_APPOINTMENT_TIME;
+  if (h < 0 || h > 23 || m < 0 || m > 59) return EMPTY_APPOINTMENT_TIME;
+
+  return `${pad2(h)}:${pad2(m)}`;
 };
 
-const getTimeZoneOffsetMs = (date: Date, timeZone: string) => {
-  const parts = getTimeZoneParts(date, timeZone);
-  const localAsUtc = Date.UTC(
-    parts.year,
-    parts.month - 1,
-    parts.day,
-    parts.hour,
-    parts.minute,
-    parts.second,
-  );
+const toLocalDateKey = (d: Date): string =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
-  return localAsUtc - date.getTime();
-};
+/** "Hoy" | "Mañana" | "YYYY-MM-DD" (crudo, para que AppointmentList.formatDate lo parsee). */
+export const formatAppointmentDateLabel = (
+  fecha: string | null | undefined,
+): string => {
+  if (!fecha || typeof fecha !== "string") return EMPTY_APPOINTMENT_DATE;
+  const trimmed = fecha.trim();
+  if (!trimmed) return EMPTY_APPOINTMENT_DATE;
 
-const zonedLocalTimeToUtc = (
-  fecha: string,
-  hora: string,
-  sourceTimeZone: string,
-) => {
-  if (!fecha || !hora || fecha.trim() === "" || hora.trim() === "") {
-    return new Date(NaN);
-  }
-
-  const dateParts = fecha.split("-").map(Number);
-  const timeParts = hora.split(":").map(Number);
-
-  if (dateParts.length !== 3 || dateParts.some(isNaN)) {
-    return new Date(NaN);
-  }
-
-  const [year, month, day] = dateParts;
-  const [hour = 0, minute = 0, second = 0] = timeParts;
-
-  if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hour) || isNaN(minute)) {
-    return new Date(NaN);
-  }
-
-  const localAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
-  const firstOffset = getTimeZoneOffsetMs(new Date(localAsUtc), sourceTimeZone);
-  const firstGuess = new Date(localAsUtc - firstOffset);
-  const secondOffset = getTimeZoneOffsetMs(firstGuess, sourceTimeZone);
-
-  return new Date(localAsUtc - secondOffset);
-};
-
-const getDateKeyInTimeZone = (date: Date, timeZone: string) => {
-  const parts = getTimeZoneParts(date, timeZone);
-  return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(
-    parts.day,
-  ).padStart(2, "0")}`;
-};
-
-export const getAppointmentViewerTimeZone = (
-  creatorTimeZone: string | null | undefined,
-  isCreator: boolean,
-) =>
-  isCreator
-    ? creatorTimeZone || getDeviceTimeZone()
-    : getDeviceTimeZone();
-
-export const formatAppointmentDateTimeForTimeZone = (
-  fecha: string,
-  hora: string,
-  sourceTimeZone: string | null | undefined,
-  targetTimeZone: string,
-) => {
-  const source = sourceTimeZone || DEFAULT_APPOINTMENT_TIME_ZONE;
-  const date = zonedLocalTimeToUtc(fecha, hora, source);
-
-  if (!date || isNaN(date.getTime())) {
-    return { dateLabel: "Fecha pendiente", timeLabel: "--:--" };
-  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return EMPTY_APPOINTMENT_DATE;
 
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const appointmentKey = getDateKeyInTimeZone(date, targetTimeZone);
-  const todayKey = getDateKeyInTimeZone(today, targetTimeZone);
-  const tomorrowKey = getDateKeyInTimeZone(tomorrow, targetTimeZone);
-
-  const dateLabel =
-    appointmentKey === todayKey
-      ? "Hoy"
-      : appointmentKey === tomorrowKey
-        ? "Mañana"
-        : new Intl.DateTimeFormat("es-MX", {
-            timeZone: targetTimeZone,
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          }).format(date);
-
-  const timeLabel = new Intl.DateTimeFormat("es-MX", {
-    timeZone: targetTimeZone,
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
-
-  return { dateLabel, timeLabel };
+  const key = trimmed;
+  if (key === toLocalDateKey(today)) return "Hoy";
+  if (key === toLocalDateKey(tomorrow)) return "Mañana";
+  return key;
 };
+
+export const formatAppointmentDateTime = (
+  fecha: string | null | undefined,
+  hora: string | null | undefined,
+): { dateLabel: string; timeLabel: string } => ({
+  dateLabel: formatAppointmentDateLabel(fecha),
+  timeLabel: formatAppointmentTimeLabel(hora),
+});
