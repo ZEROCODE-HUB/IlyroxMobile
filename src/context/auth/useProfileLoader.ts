@@ -54,6 +54,8 @@ export const useProfileLoader = () => {
             await new Promise((resolve) => setTimeout(resolve, delay));
           }
 
+          log.debug("loadProfile: Intentando cargar perfil", { userId, attempt });
+
           const { data, error } = await supabase
             .from("perfiles")
             .select("*")
@@ -61,19 +63,30 @@ export const useProfileLoader = () => {
             .maybeSingle();
 
           if (error) {
+            log.warn("loadProfile: Error en query", {
+              userId,
+              attempt,
+              error: error.message,
+              code: error.code,
+              details: error.details,
+              hint: error.hint
+            });
             // Si no existe el perfil, no reintentamos
             if (error.code === "PGRST116") {
+              log.info("loadProfile: Perfil no existe (PGRST116)", { userId });
               return null;
             }
             throw error;
           }
 
           if (data) {
+            log.info("loadProfile: Perfil encontrado", { userId, perfilId: data.id });
             // Guardar en cache
             profileCacheRef.current[userId] = data;
             return data;
           }
 
+          log.warn("loadProfile: data es null, perfil no encontrado", { userId, attempt });
           return null;
         } catch (err: unknown) {
           lastError = err;

@@ -6,10 +6,13 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { collapseSpaces } from "@/utils/stringNormalizer";
+import { logger } from "@/utils/logger";
 
 import { OneSignal } from "react-native-onesignal";
 import { useImageUpload } from "@/hooks";
 import { applyStoredAdvisorInvite } from "@/services/communityService";
+
+const log = logger.scoped("auth-form");
 
 export interface AuthFormState {
   // Credenciales
@@ -294,6 +297,7 @@ export function useAuthForm() {
 
   // Registro con email
   const handleRegister = useCallback(async (): Promise<boolean> => {
+    log.info("handleRegister: Iniciando registro");
     setError(null);
     if (!validateStep1() || !validateProfessionalData()) return false;
 
@@ -339,6 +343,8 @@ export function useAuthForm() {
         biografia: formState.biografia || null,
       };
 
+      log.info("handleRegister: Iniciando registro", { email: formState.email, name: formState.name });
+
       const { data, error } = await supabase.auth.signUp({
         email: formState.email,
         password: formState.password,
@@ -347,26 +353,42 @@ export function useAuthForm() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        log.error("handleRegister: Error en signUp", error);
+        throw error;
+      }
+
+      log.info("handleRegister: signUp exitoso", { userId: data.user?.id, email: data.user?.email });
 
       if (data.user) {
-        // Esperar a que el trigger handle_new_user termine (race condition)
-        await new Promise((r) => setTimeout(r, 500));
+        log.info("handleRegister: Llamando RPC handle_new_user para crear perfil");
+        const { error: rpcError } = await supabase.rpc('handle_new_user');
+        if (rpcError) {
+          log.error("handleRegister: Error en RPC handle_new_user", {
+            error: rpcError,
+            message: rpcError.message,
+            code: rpcError.code
+          });
+        } else {
+          log.info("handleRegister: RPC handle_new_user exitosa");
+        }
 
-        // Subir foto primero
         let finalAvatarUrl = "";
         if (formState.avatarUri) {
+          log.info("handleRegister: Subiendo foto");
           const url = await uploadImage(
             formState.avatarUri,
             "fotos",
             "perfiles",
           );
-          if (url) finalAvatarUrl = url;
+          if (url) {
+            finalAvatarUrl = url;
+            log.info("handleRegister: Foto subida", { url });
+          }
         }
 
-        // Actualizar TODOS los campos profesionales en el perfil
-        // (Capa 2: defense in depth si el trigger falla)
-        await supabase
+        log.info("handleRegister: Actualizando perfil con datos profesionales", { userId: data.user.id });
+        const { data: updateData, error: updateError } = await supabase
           .from("perfiles")
           .update({
             ocupacion: formState.ocupacion,
@@ -378,14 +400,30 @@ export function useAuthForm() {
           })
           .eq("id", data.user.id);
 
+        if (updateError) {
+          log.error("handleRegister: Error en update del perfil", {
+            error: updateError,
+            message: updateError.message,
+            code: updateError.code,
+            details: updateError.details,
+            hint: updateError.hint
+          });
+        } else {
+          log.info("handleRegister: Update del perfil exitoso", { updateData });
+        }
+
+        log.info("handleRegister: Configurando OneSignal");
         OneSignal.login(data.user.id);
         OneSignal.User.addTag("email", data.user.email ?? "");
 
+        log.info("handleRegister: Procesando invitacion");
         await applyStoredAdvisorInvite(data.user.id);
+        log.info("handleRegister: Registro completado exitosamente", { userId: data.user.id });
       }
 
       return true;
     } catch (error: any) {
+      log.error("handleRegister: Error en catch", { error: error?.message, code: error?.code });
       const msg = error?.message || "";
       const isEmailDup =
         msg.toLowerCase().includes("already registered") ||

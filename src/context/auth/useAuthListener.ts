@@ -73,10 +73,13 @@ export const useAuthListener = ({
     const handleAuthChange = (_event: string, session: Session | null) => {
       if (!mounted) return;
 
+      log.info("handleAuthChange: Evento recibido", { event: _event, hasSession: !!session, userId: session?.user?.id });
+
       // Verificar expiración (síncrono, seguro dentro del callback)
       if (session?.expires_at) {
         const expiresAt = session.expires_at * 1000;
         if (Date.now() >= expiresAt) {
+          log.warn("handleAuthChange: Sesion expirada", { expiresAt: session.expires_at });
           onSessionChange(null);
           onUserChange(null);
           onProfileChange(null);
@@ -90,6 +93,7 @@ export const useAuthListener = ({
       onUserChange(session?.user ?? null);
 
       if (!session?.user) {
+        log.info("handleAuthChange: No hay usuario, limpiando estado");
         // Sin sesión, limpiar todo
         onProfileChange(null);
         if (Platform.OS !== "web") {
@@ -104,6 +108,7 @@ export const useAuthListener = ({
         return;
       }
 
+      log.info("handleAuthChange: Usuario autenticado, procesando perfil", { userId: session.user.id, email: session.user.email });
       // Diferir el trabajo async FUERA del lock de auth para evitar el deadlock.
       const userId = session.user.id;
       setTimeout(async () => {
@@ -123,28 +128,26 @@ export const useAuthListener = ({
         }
 
         try {
-          // loadProfile ya tiene reintentos con backoff y cache propios;
-          // sin el lock contenido, responde en ms y el backoff solo actúa
-          // ante fallos de red reales.
+          log.info("handleAuthChange: Llamando loadProfile", { userId, event: _event });
+
           const profileData = await loadProfile(userId);
+          log.info("handleAuthChange: loadProfile result", { userId, found: !!profileData, event: _event });
 
           if (!profileData) {
-            log.warn("Profile not found for logged-in user, signing out");
+            log.error("handleAuthChange: Profile not found for logged-in user, signing out", { userId });
             await supabase.auth.signOut();
             onProfileChange(null);
             finishLoading();
             return;
           }
 
+          log.info("handleAuthChange: Perfil cargado exitosamente", { userId, perfilId: profileData.id });
           if (mounted && profileData) onProfileChange(profileData);
 
-          // ✅ REALTIME DESHABILITADO
-          // if (["SIGNED_IN", "INITIAL_SESSION"].includes(_event)) {
-          //   await setupProfileSubscription(userId);
-          // }
         } catch (profileErr) {
-          log.error("Error loading profile:", profileErr);
+          log.error("handleAuthChange: Error en loadProfile", { userId, error: profileErr });
         } finally {
+          log.info("handleAuthChange: Finalizando carga", { userId });
           finishLoading();
         }
       }, 0);
