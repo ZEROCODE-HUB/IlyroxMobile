@@ -56,6 +56,7 @@ interface LeadPropertiesModalProps {
     metros_terreno?: number;
     metros_construccion?: number;
     estado?: string;
+    zona?: string;
     genero?: string;
     codigo_propiedad?: string;
   };
@@ -256,7 +257,10 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                   "location-outline",
                   searchCriteria.municipio || searchCriteria.ciudad,
                 )}
-                {renderSearchDetail("map-outline", searchCriteria.colonia)}
+                {renderSearchDetail(
+                  "map-outline",
+                  searchCriteria.zona || searchCriteria.colonia,
+                )}
                 {renderSearchDetail("globe-outline", searchCriteria.estado)}
               </View>
               <View style={styles.criteriaContainer2}>

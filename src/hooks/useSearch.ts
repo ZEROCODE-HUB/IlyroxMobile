@@ -331,9 +331,12 @@ export function useSearch() {
   }, [suggestions]);
 
   const selectLocation = useCallback(
-    (loc: SearchLocation) => {
+    (loc: SearchLocation, isRestoring = false) => {
       const baseName = loc.name.split(",")[0].trim();
-      clearFilters({ estado: "", ciudad: "", municipio: "", colonia: "" });
+      // Solo limpiar filtros si NO estamos restaurando desde historial
+      if (!isRestoring) {
+        clearFilters({ estado: "", ciudad: "", municipio: "", colonia: "" });
+      }
       setSelectedLocation({
         type: loc.type ?? "colonia",
         name: baseName,

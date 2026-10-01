@@ -8,9 +8,11 @@ import {
   StyleSheet,
   Pressable,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "@/design-system/components/AppInput";
+import SafePressable from "@/design-system/components/SafePressable";
 import { useSaveSearch } from "./filters/useSaveSearch";
 import { COLORS } from "@/constants/colors";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
@@ -39,6 +41,7 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
     leadEmail,
     setLeadEmail,
     errors,
+    isSaving,
     handleSaveSearch,
   } = useSaveSearch(userId);
 
@@ -243,18 +246,28 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
 
           {/* Footer */}
           <View style={styles.footer}>
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+            <SafePressable style={styles.cancelButton} onPress={onClose}>
               <Text style={styles.cancelButtonText}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-              <Ionicons
-                name="save-outline"
-                size={20}
-                color={COLORS.white}
-                style={{ marginRight: 8 }}
-              />
-              <Text style={styles.saveButtonText}>Notifícame</Text>
-            </TouchableOpacity>
+            </SafePressable>
+            <SafePressable
+              style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+              onPress={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator color={COLORS.white} size="small" />
+              ) : (
+                <>
+                  <Ionicons
+                    name="save-outline"
+                    size={20}
+                    color={COLORS.white}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text style={styles.saveButtonText}>Notifícame</Text>
+                </>
+              )}
+            </SafePressable>
           </View>
         </Pressable>
       </Pressable>
@@ -436,6 +449,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
   },
   saveButtonText: {
     fontSize: 15,

@@ -61,6 +61,9 @@ interface LeadGroup {
     ciudad?: string;
     municipio?: string;
     colonia?: string;
+    estado?: string;
+    /** Etiqueta de la zona buscada (p. ej. "Pulgas Pandas"). */
+    zona?: string;
     tipo_operacion?: string;
     precio_min?: number;
     precio_max?: number;
@@ -73,6 +76,48 @@ interface LeadGroup {
     codigo_propiedad?: string;
   };
 }
+
+/**
+ * Las columnas de ubicación de `busquedas_guardadas` (`estado`, `municipio`,
+ * `colonias`) son TEXT[]; `ciudad` es TEXT. Este helper aplana cualquiera de
+ * los dos a una etiqueta legible, ignorando entradas vacías.
+ */
+const toUbicacion = (value: unknown): string | undefined => {
+  if (Array.isArray(value)) {
+    const partes = value
+      .map((v) => (v === null || v === undefined ? "" : String(v).trim()))
+      .filter(Boolean);
+    return partes.length > 0 ? partes.join(", ") : undefined;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  return undefined;
+};
+
+/**
+ * Etiqueta principal de la zona. Prioridad:
+ *   1. `place_name` — lo que el usuario eligió en el buscador del mapa.
+ *   2. `criterios_busqueda.location_chips[].label` — mismo dato, copia histórica.
+ *   3. `colonias` — la columna de nivel más fino disponible.
+ * Antes esta información no se leía en ningún lado: los filtros con ícono de
+ * ubicación quedaban vacíos y la búsqueda se veía como si fuera global.
+ */
+const resolveZona = (search: any): string | undefined => {
+  const placeName = typeof search?.place_name === "string" ? search.place_name.trim() : "";
+  if (placeName) return placeName;
+
+  const chips = search?.criterios_busqueda?.location_chips;
+  if (Array.isArray(chips)) {
+    const labels = chips
+      .map((c: any) => (typeof c?.label === "string" ? c.label.trim() : ""))
+      .filter(Boolean);
+    if (labels.length > 0) return labels.join(", ");
+  }
+
+  return toUbicacion(search?.colonias);
+};
 
 import { usePropertyFeedItems } from "../hooks/usePropertyFeedItems";
 import { LeadMatchCard } from "./LeadMatchCard";
@@ -159,6 +204,29 @@ const Matches: React.FC = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+
+      // ── DIAGNÓSTICO TEMPORAL ──────────────────────────────────────────────
+      // Ver qué devuelve realmente la query de matches. Usa log.warn (no
+      // log.debug) porque el logger suprime debug/info en builds de release.
+      // ELIMINAR este bloque al terminar de diagnosticar.
+      {
+        const rows = (data || []) as any[];
+        const porTipo: Record<string, number> = {};
+        rows.forEach((m) => {
+          porTipo[m.tipo_match] = (porTipo[m.tipo_match] ?? 0) + 1;
+        });
+        log.warn(
+          `[DIAG] matches=${rows.length}`,
+          `sin_propiedad=${rows.filter((m) => !m.propiedad).length}`,
+          `sin_operaciones=${rows.filter((m) => m.propiedad && !m.propiedad.operaciones?.length).length}`,
+          `sin_perfil=${rows.filter((m) => m.propiedad && !m.propiedad.perfil).length}`,
+          `por_tipo=${JSON.stringify(porTipo)}`,
+        );
+        log.warn(
+          "[DIAG] muestra cruda (1er match):",
+          JSON.stringify(rows[0], null, 2)?.slice(0, 4000),
+        );
+      }
 
       // Si tenemos datos, obtener perfiles por separado
       if (data && data.length > 0) {
@@ -347,10 +415,12 @@ const Matches: React.FC = () => {
           similars: [],
           searchCriteria: {
             tipo_propiedad: search.tipo_propiedad,
-            subtipo: search.subtipo,
+            subtipo: toUbicacion(search.subtipo),
             ciudad: search.ciudad,
-            municipio: search.municipio,
-            colonia: search.colonia,
+            municipio: toUbicacion(search.municipio),
+            colonia: toUbicacion(search.colonias),
+            estado: toUbicacion(search.estado),
+            zona: resolveZona(search),
             tipo_operacion: search.tipo_operacion,
             precio_min: search.precio_min,
             precio_max: search.precio_max,
@@ -393,10 +463,12 @@ const Matches: React.FC = () => {
           similars: [],
           searchCriteria: {
             tipo_propiedad: match.busqueda?.tipo_propiedad,
-            subtipo: match.busqueda?.subtipo,
+            subtipo: toUbicacion(match.busqueda?.subtipo),
             ciudad: match.busqueda?.ciudad,
-            municipio: match.busqueda?.municipio,
-            colonia: match.busqueda?.colonia,
+            municipio: toUbicacion(match.busqueda?.municipio),
+            colonia: toUbicacion(match.busqueda?.colonias),
+            estado: toUbicacion(match.busqueda?.estado),
+            zona: resolveZona(match.busqueda),
             tipo_operacion: match.busqueda?.tipo_operacion,
             precio_min: match.busqueda?.precio_min,
             precio_max: match.busqueda?.precio_max,
@@ -434,6 +506,31 @@ const Matches: React.FC = () => {
       let perfil = prop.perfil;
       if (Array.isArray(perfil)) {
         perfil = perfil[0];
+      }
+
+      // ── DIAGNÓSTICO TEMPORAL ──────────────────────────────────────────────
+      // Detecta campos que llegan vacíos desde la BD y por eso la tarjeta se
+      // renderiza incompleta. ELIMINAR al terminar de diagnosticar.
+      {
+        const anomalias: string[] = [];
+        if (!prop.operaciones?.length) anomalias.push("sin_operaciones");
+        if (!operacion) anomalias.push("operacion_undefined");
+        if (operacion?.tipo_operacion &&
+            operacion.tipo_operacion !== "venta" &&
+            operacion.tipo_operacion !== "renta") {
+          anomalias.push(`tipo_op_inesperado:${operacion.tipo_operacion}`);
+        }
+        if (!operacion?.precio) anomalias.push("precio_vacio");
+        if (!prop.colonia) anomalias.push("sin_colonia");
+        if (!prop.estado) anomalias.push("sin_estado");
+        if (!prop.municipio) anomalias.push("sin_municipio");
+        if (!prop.fotos) anomalias.push("sin_fotos");
+        if (prop.pisos != null) anomalias.push(`pisos_no_mapeado:${prop.pisos}`);
+        if (prop.amenidades?.length) anomalias.push("amenidades_no_mapeadas");
+        if (!perfil) anomalias.push("sin_perfil");
+        if (anomalias.length) {
+          log.warn(`[DIAG] item ${prop.id}`, anomalias.join(" "));
+        }
       }
 
       // Parse images
@@ -540,6 +637,47 @@ const Matches: React.FC = () => {
         group.similars.push(feedItem);
       }
     });
+
+    // ── DIAGNÓSTICO TEMPORAL ────────────────────────────────────────────────
+    // Resumen agregado + muestra de los FeedItem realmente construidos.
+    // ELIMINAR al terminar de diagnosticar.
+    {
+      const items: any[] = Array.from(grouped.values()).flatMap((g) =>
+        [...g.coincidences, ...g.similars],
+      );
+      log.warn(
+        `[DIAG] feeditems=${items.length}`,
+        `precio_cero=${items.filter((i) => !i.propertyDetails?.price).length}`,
+        `op_Rent=${items.filter((i) => i.propertyDetails?.operation === "Rent").length}`,
+        `op_Sale=${items.filter((i) => i.propertyDetails?.operation === "Sale").length}`,
+        `state_vacio=${items.filter((i) => !i.propertyDetails?.location?.state).length}`,
+        `sin_imagen=${items.filter((i) => !i.propertyDetails?.images?.length).length}`,
+        `sin_floors=${items.filter((i) => i.propertyDetails?.features?.floors == null).length}`,
+        `amenities_vacias=${items.filter((i) => !i.propertyDetails?.amenities?.length).length}`,
+        `ids_duplicados=${items.length - new Set(items.map((i) => i.id)).size}`,
+      );
+      log.warn(
+        "[DIAG] feeditem de muestra:",
+        JSON.stringify(items[0], null, 2)?.slice(0, 3000),
+      );
+      log.warn(
+        "[DIAG] grupos:",
+        JSON.stringify(
+          Array.from(grouped.values()).map((g) => ({
+            lead: g.leadName,
+            busquedaId: g.busquedaId,
+            zona: g.searchCriteria?.zona,
+            estado: g.searchCriteria?.estado,
+            colonia: g.searchCriteria?.colonia,
+            matches: g.matches.length,
+            coincidencias: g.coincidences.length,
+            similares: g.similars.length,
+          })),
+          null,
+          2,
+        ),
+      );
+    }
 
     // Convertir a array y ordenar por fecha más reciente
     // Convertir a array y ordenar
