@@ -11,7 +11,6 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
-import { useModal } from "@/context/ModalContext";
 import { useToast } from "@/context/ToastContext";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -21,6 +20,7 @@ import { COLORS } from "../../constants/colors";
 import { Avatar } from "../shared";
 import { ViewImage } from "../modals/ViewImage";
 import { logger } from "@/utils/logger";
+import { useGalleryPermission } from "@/hooks/useGalleryPermission";
 
 const log = logger.scoped("ProfileAvatarPicker");
 
@@ -35,22 +35,16 @@ interface ProfileAvatarPickerProps {
 
 const ProfileAvatarPicker: React.FC<ProfileAvatarPickerProps> = React.memo(
   ({ uri, name, size = 100, userId, isOwnProfile, onPhotoUpdated }) => {
-    const { showModal } = useModal();
     const { showToast } = useToast();
     const [uploading, setUploading] = useState(false);
     const [openModal, setOpenModal] = useState(false);
+    const { ensurePermission } = useGalleryPermission();
 
     const handleImagePick = async () => {
       if (!isOwnProfile) return;
 
       try {
-        const { status } =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-        if (status !== "granted") {
-          showModal({ title: "Permiso denegado", message: "Se requiere acceso a la galería para cambiar la foto.", confirmText: "OK" });
-          return;
-        }
+        if (!(await ensurePermission())) return;
 
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,

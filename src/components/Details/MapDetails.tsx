@@ -1,18 +1,22 @@
-import React, { useMemo, useRef, useState, useDeferredValue } from "react";
-import MapView, {
-  Marker,
-  PROVIDER_DEFAULT,
-  PROVIDER_GOOGLE,
-} from "../shared/MapComponents";
-import { View, StyleSheet, Text, Platform, Pressable, Linking, TouchableOpacity } from "react-native";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import {
+  Linking,
+  Platform,
+  StyleProp,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ViewStyle,
+} from "react-native";
+import MapView, { Marker, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from "../shared/MapComponents";
 import { Ionicons } from "@expo/vector-icons";
 import { Property } from "../../types";
 import { COLORS } from "../../constants";
-import { Globe, MapIcon } from "lucide-react-native";
 
 interface PropertyMapProps {
   property: Property;
-  containerStyle?: any;
+  containerStyle?: StyleProp<ViewStyle>;
 }
 
 export const MapDetails: React.FC<PropertyMapProps> = ({
@@ -21,121 +25,109 @@ export const MapDetails: React.FC<PropertyMapProps> = ({
 }) => {
   const nativeMapRef = useRef<MapView>(null);
 
-  const lat = property.latitud;
-  const lng = property.longitud;
+  // Extraer y validar coordenadas una sola vez
+  const latNum = property.latitud != null ? Number(property.latitud) : NaN;
+  const lngNum = property.longitud != null ? Number(property.longitud) : NaN;
+  const hasValidCoordinates =
+    !isNaN(latNum) && !isNaN(lngNum) && latNum !== 0 && lngNum !== 0;
 
-  // "hybrid" = satélite CON nombres de calles/colonias (mejor para ubicarse que
-  // el satélite puro). Se alterna con "standard" (mapa normal).
-  const [mapTypeId, setMapTypeId] = useState<"standard" | "hybrid">(
-    "hybrid",
+  // Region inicial — null indica coordenadas no disponibles
+  const initialRegion = useMemo(
+    () =>
+      hasValidCoordinates
+        ? {
+            latitude: latNum,
+            longitude: lngNum,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          }
+        : null,
+    [hasValidCoordinates, latNum, lngNum],
   );
-  const deferredMapTypeId = useDeferredValue(mapTypeId);
 
-  const openInMaps = () => {
+  // Tipo de mapa: "standard" (calle) vs "hybrid" (satélite con etiquetas)
+  const [mapTypeId, setMapTypeId] = useState<"standard" | "hybrid">("hybrid");
+
+  // Abrir en app de mapas nativa
+  const openInMaps = useCallback(() => {
     const url = Platform.select({
-      ios: `maps:0,0?q=${lat},${lng}`,
-      android: `geo:${lat},${lng}?q=${lat},${lng}`,
-      default: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+      ios: `maps:0,0?q=${latNum},${lngNum}`,
+      android: `geo:${latNum},${lngNum}?q=${latNum},${lngNum}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${latNum},${lngNum}`,
     });
     if (url) Linking.openURL(url).catch(() => {});
-  };
+  }, [latNum, lngNum]);
 
-  const recenterMap = () => {
-    nativeMapRef.current?.animateToRegion(initialRegion, 600);
-  };
+  // Recentrar mapa animado
+  const recenterMap = useCallback(() => {
+    if (initialRegion) {
+      nativeMapRef.current?.animateToRegion(initialRegion, 600);
+    }
+  }, [initialRegion]);
 
-  if (!lat || !lng || isNaN(Number(lat)) || isNaN(Number(lng))) {
+  // Web no soporta MapView — mostrar mensaje antes de cualquier otra cosa
+  if (Platform.OS === "web") {
     return (
-      <View style={styles.container}>
-        <Text
-          style={{
-            textAlign: "center",
-            padding: 20,
-            color: COLORS.textSecondary,
-          }}
-        >
-          Ubicación no disponible
-        </Text>
+      <View style={[styles.container, containerStyle]}>
+        <Text style={styles.unavailableText}>Mapa no disponible en web</Text>
       </View>
     );
   }
 
-  const initialRegion = useMemo(() => {
-    return {
-      latitude: Number(lat),
-      longitude: Number(lng),
-      latitudeDelta: 0.005,
-      longitudeDelta: 0.005,
-    };
-  }, [lat, lng]);
-
-  if (Platform.OS === "web") {
+  // Coordenadas no disponibles
+  if (!initialRegion) {
     return (
-      <View
-        style={[
-          styles.container,
-          {
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "#f3f4f6",
-          },
-        ]}
-      >
-        <Text style={{ color: COLORS.textSecondary }}>
-          Mapa no disponible en web
-        </Text>
+      <View style={[styles.container, containerStyle]}>
+        <Text style={styles.unavailableText}>Ubicación no disponible</Text>
       </View>
     );
   }
 
   return (
     <View style={[styles.container, containerStyle]}>
-      <Pressable
+      {/* Botón alternar tipo de mapa */}
+      <TouchableOpacity
         style={styles.mapTypeButton}
         onPress={() =>
-          setMapTypeId(
-            mapTypeId === "standard" ? "hybrid" : "standard",
-          )
+          setMapTypeId((prev) => (prev === "standard" ? "hybrid" : "standard"))
         }
+        activeOpacity={0.7}
       >
-        {mapTypeId === "standard" ? (
-          <View style={styles.mapTypeButtonIcon}>
-            <Globe size={10} />
-            <Text style={styles.mapTypeButtonText}>Satélite</Text>
-          </View>
-        ) : (
-          <View style={styles.mapTypeButtonIcon}>
-            <MapIcon size={10} />
-            <Text style={styles.mapTypeButtonText}>Mapa</Text>
-          </View>
-        )}
-      </Pressable>
+        <Text style={styles.mapTypeButtonText}>
+          {mapTypeId === "standard" ? "Satélite" : "Mapa"}
+        </Text>
+      </TouchableOpacity>
+
       <MapView
         ref={nativeMapRef}
-        mapType={deferredMapTypeId}
-        provider={
-          Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
-        }
+        mapType={mapTypeId}
+        provider={Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
         style={styles.map}
         initialRegion={initialRegion}
-        moveOnMarkerPress={true}
-        scrollEnabled={true}
-        zoomEnabled={true}
+        moveOnMarkerPress={false}
+        scrollEnabled
+        zoomEnabled
         liteMode={Platform.OS === "android"}
       >
         <Marker
           key={property.id}
-          coordinate={{ latitude: Number(lat), longitude: Number(lng) }}
+          coordinate={{ latitude: latNum, longitude: lngNum }}
         />
       </MapView>
-      <TouchableOpacity style={styles.openMapsButton} onPress={openInMaps} activeOpacity={0.8}>
+
+      <TouchableOpacity
+        style={styles.openMapsButton}
+        onPress={openInMaps}
+        activeOpacity={0.8}
+      >
         <Ionicons name="navigate-outline" size={14} color={COLORS.white} />
         <Text style={styles.openMapsText}>Abrir en mapa</Text>
       </TouchableOpacity>
+
       <TouchableOpacity
         style={styles.recenterButton}
         onPress={recenterMap}
-        activeOpacity={0.8}
+        activeOpacity={0.7}
       >
         <Ionicons name="locate" size={16} color={COLORS.textPrimary} />
       </TouchableOpacity>
@@ -151,17 +143,26 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#e2e8f0", // Adding border for better visibility boundaries
+    borderColor: "#e2e8f0",
   },
   map: {
     ...StyleSheet.absoluteFillObject,
+  },
+  unavailableText: {
+    flex: 1,
+    textAlign: "center",
+    textAlignVertical: "center",
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    padding: 20,
   },
   mapTypeButton: {
     position: "absolute",
     top: 16,
     right: 16,
     zIndex: 1,
-    padding: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 12,
     backgroundColor: COLORS.white,
     elevation: 3,
@@ -170,14 +171,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
   },
-  mapTypeButtonIcon: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
   mapTypeButtonText: {
-    fontSize: 10,
-    fontWeight: "bold",
+    fontSize: 11,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
   },
   openMapsButton: {
     position: "absolute",

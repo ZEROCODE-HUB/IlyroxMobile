@@ -30,6 +30,7 @@ import { useVideoUpload } from "@/hooks";
 import { AppHeader } from "../AppHeader";
 import { uploadImage } from "../../services/uploadService";
 import { logger } from "@/utils/logger";
+import { useGalleryPermission } from "@/hooks/useGalleryPermission";
 
 const log = logger.scoped("CreateReel");
 
@@ -115,6 +116,7 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
   };
   const { user } = useAuth();
   const { showModal, modalElement } = useLocalModal();
+  const { ensurePermission } = useGalleryPermission();
   const { showToast } = useToast();
   const router = useRouter();
   const isEditing = !!reelId;
@@ -189,12 +191,9 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
    * Seleccionar video de la galería
    */
   const handlePickVideo = async () => {
-    // Pedir permisos
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      showModal({ title: "Permiso denegado", message: "Necesitamos acceso a tu galería", confirmText: "OK" });
-      return;
-    }
+    // Pedir/verificar permisos (recuerda la concesión y guía a Ajustes si
+    // está bloqueado). No abre la galería si no hay permiso.
+    if (!(await ensurePermission())) return;
 
     // Abrir galería (solo videos)
     const result = await ImagePicker.launchImageLibraryAsync({

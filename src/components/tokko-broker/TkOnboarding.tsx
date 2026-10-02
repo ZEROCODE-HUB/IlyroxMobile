@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/colors';
@@ -85,9 +86,7 @@ export default function TkOnboarding({ apiKey, setApiKey, onSave, loading }: Pro
 
         <View style={styles.helpSection}>
           <TouchableOpacity
-            onPress={() => {
-              // Open Toko Broker docs
-            }}
+            onPress={() => Linking.openURL('https://www.tokkobroker.com')}
           >
             <Text style={styles.helpText}>
               ¿No tienes tu API Key?{' '}

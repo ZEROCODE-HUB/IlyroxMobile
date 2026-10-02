@@ -29,7 +29,7 @@ import CreateProperty from "../CreateContent/CreateProperty";
 import { supabase } from "../../lib/supabase";
 import { logger } from "@/utils/logger";
 import { buildPropertyShareTitle } from "@/utils/propertyShareTitle";
-import ActionButtons from "../ActionButtons";
+import ActionButtons, { ACTIONS_COLUMN_MIN_HEIGHT } from "../ActionButtons";
 
 const log = logger.scoped("PropertyCard");
 import { Toilet, Building2, MoveVertical } from "lucide-react-native";
@@ -366,9 +366,14 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 
       {/* Galería de imágenes - independiente para evitar conflictos de gestos */}
       <View style={styles.imageContainer}>
+        {/* `minHeight` = alto de la pila de acciones verticales. Sin esto, una
+            foto apaisada mide ~180-255px, menos de lo que necesitan los
+            botones (~260px): los que sobran se salían de la foto y quedaban
+            sobre el fondo blanco, donde al ser blancos no se veían. */}
         <ImageGallery
           images={images}
           aspectRatio={DIMENSIONS.POST_ASPECT_RATIO}
+          minHeight={ACTIONS_COLUMN_MIN_HEIGHT}
           showDots={true}
           showImageCount={false}
           onImagePress={handleImagePress}

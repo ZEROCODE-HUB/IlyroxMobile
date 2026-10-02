@@ -115,6 +115,8 @@ const flushPendingSaves = async () => {
       if (insertError) {
         if (insertError.code === '23503') {
           log.warn("Views batch skipped: feed_item_id no longer exists (item may have been deleted)");
+        } else if (insertError.code === '23505') {
+          log.debug("Views batch skipped: duplicate key (already recorded)");
         } else {
           log.error("Error inserting views batch:", insertError);
         }

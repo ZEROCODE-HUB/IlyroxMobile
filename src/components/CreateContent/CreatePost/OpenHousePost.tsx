@@ -20,6 +20,7 @@ import { uploadImage } from "../../../services/uploadService";
 import { AppInput } from "@/design-system/components/AppInput";
 import { SelectionModal } from "@/components/modals";
 import { logger } from "@/utils/logger";
+import { useGalleryPermission } from "@/hooks/useGalleryPermission";
 
 const log = logger.scoped("OpenHousePost");
 
@@ -52,7 +53,8 @@ export const OpenHousePost = ({
   statusPost,
   setStatusPost,
 }: OpenHousePostProps) => {
-  const { showModal, modalElement } = useLocalModal();
+  const { modalElement } = useLocalModal();
+  const { ensurePermission } = useGalleryPermission();
   const { showToast } = useToast();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -63,12 +65,7 @@ export const OpenHousePost = ({
 
   const handlePickAndUpload = async () => {
     try {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        showModal({ title: "Permiso denegado", message: "Necesitamos acceso a tu galería", confirmText: "OK" });
-        return;
-      }
+      if (!(await ensurePermission())) return;
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,

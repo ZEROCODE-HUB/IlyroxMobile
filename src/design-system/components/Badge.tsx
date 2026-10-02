@@ -103,8 +103,8 @@ export const Badge: React.FC<BadgeProps> = ({
   style,
   solid = false,
 }) => {
-  const tones = TONE_MAP[tone];
-  const sizes = SIZE_MAP[size];
+  const tones = TONE_MAP[tone] ?? TONE_MAP.neutral;
+  const sizes = SIZE_MAP[size] ?? SIZE_MAP.sm;
   const flatStyle = Array.isArray(style) ? Object.assign({}, ...style) : style;
 
   return (

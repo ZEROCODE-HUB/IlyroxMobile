@@ -24,6 +24,7 @@ import { useSearchHistory } from "@/hooks/useSearchHistory";
 import { useSearchStore, TIPO_BUSQUEDA, ResultData } from "@/store/searchStore";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 import { useAuth } from "@/context/AuthContext";
+import { useApp } from "@/context/AppContext";
 import type { TipoBusqueda } from "@/types";
 import { HistorySearches } from "@/components/search/HistorySearches";
 import { formatPriceShort } from "@/utils/priceFormatter";
@@ -119,6 +120,9 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
     eliminarBusqueda,
   } = useSearchHistory();
 
+  // For restoring selectedLocation from history
+  const { setSelectedLocation } = useApp();
+
   // Handler: select history item
   const handleSelectHistory = (busqueda: HistorialBusqueda) => {
     const tipo = busqueda.tipo_busqueda;
@@ -153,6 +157,16 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
           touchTimestamp(busqueda.id, userId!);
           setCurrentSearchId(busqueda.id);
           usePropertyFiltersStore.getState().setFiltersFromHistory(busqueda as any);
+          // Restaurar selectedLocation desde historial para que el mapa se centre correctamente
+          if (busqueda.place_name || busqueda.estado) {
+            setSelectedLocation({
+              type: busqueda.colonia ? 'colonia' : (busqueda.municipio ? 'municipio' : 'estado'),
+              name: busqueda.place_name || busqueda.query_original || '',
+              estado_id: 0,
+              municipio_nombre: busqueda.municipio || '',
+              estado_nombre: busqueda.estado || '',
+            });
+          }
           router.push('/map');
           break;
         default:
@@ -172,6 +186,16 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
       touchTimestamp(busqueda.id, userId!);
       setCurrentSearchId(busqueda.id);
       usePropertyFiltersStore.getState().setFiltersFromHistory(busqueda as any);
+      // Restaurar selectedLocation desde historial para que el mapa se centre correctamente
+      if (busqueda.place_name || busqueda.estado) {
+        setSelectedLocation({
+          type: busqueda.colonia ? 'colonia' : (busqueda.municipio ? 'municipio' : 'estado'),
+          name: busqueda.place_name || busqueda.query_original || '',
+          estado_id: 0,
+          municipio_nombre: busqueda.municipio || '',
+          estado_nombre: busqueda.estado || '',
+        });
+      }
       router.push('/map');
       return;
     }

@@ -60,9 +60,9 @@ export const Card: React.FC<CardProps> = ({
   ...rest
 }) => {
   const composed: ViewStyle = {
-    borderRadius: theme.borderRadius[radius],
-    padding: PADDING_MAP[padding],
-    ...VARIANT_STYLES[variant],
+    borderRadius: theme.borderRadius[radius] ?? theme.borderRadius.lg,
+    padding: PADDING_MAP[padding] ?? PADDING_MAP.md,
+    ...VARIANT_STYLES[variant] ?? VARIANT_STYLES.flat,
   };
 
   const flatStyle = Array.isArray(style) ? Object.assign({}, ...style) : style;

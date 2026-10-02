@@ -117,7 +117,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
                 {screen === "Matches" && unseenMatches > 0 && (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
-                      {unseenMatches > 9 ? "9+" : unseenMatches}
+                      {unseenMatches > 99 ? "99+" : unseenMatches}
                     </Text>
                   </View>
                 )}

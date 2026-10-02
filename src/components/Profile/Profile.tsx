@@ -8,7 +8,6 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
 
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
@@ -22,6 +21,7 @@ import {
   Property,
   Reel,
 } from "../../types";
+import { usePropertyCacheStore } from "@/store/propertyCacheStore";
 
 import SelectionModal from "../modals/SelectionModal";
 import { useProfile } from "../../hooks/profile/useProfile";
@@ -135,9 +135,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   // Modal state
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(
-    null,
-  );
   const [editProperty, setEditProperty] = useState<Property | null>(null);
   const [editPost, setEditPost] = useState<Post | null>(null);
   const [editReel, setEditReel] = useState<Reel | null>(null);
@@ -170,11 +167,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
 
   const targetUserId = userId || authUser?.id;
 
-  useFocusEffect(
-    useCallback(() => {
-      setSelectedProperty(null);
-    }, []),
-  );
+
 
   // Cargar Open House IDs al montar y cuando cambia el usuario
   React.useEffect(() => {
@@ -241,11 +234,12 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
 
   const filteredProperties = useMemo(() => {
     if (activeFilter === "Todas") {
+      const INACTIVE_STATUSES = ["Vendida", "Suspendida", "Reservada"];
       const active = properties.filter(
-        (p) => p.status !== "Vendida" && p.status !== "Suspendida",
+        (p) => !INACTIVE_STATUSES.includes(p.status),
       );
-      const inactive = properties.filter(
-        (p) => p.status === "Vendida" || p.status === "Suspendida",
+      const inactive = properties.filter((p) =>
+        INACTIVE_STATUSES.includes(p.status),
       );
       return [...active, ...inactive];
     }
@@ -295,9 +289,20 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
     [profile, targetUserId],
   );
 
-  const handlePropertyPress = useCallback((property: Property) => {
-    setSelectedProperty(property);
-  }, []);
+  const handlePropertyPress = useCallback(
+    (property: Property) => {
+      // Pre-cachar la propiedad para mostrarla instantáneamente al navegar
+      // (mismo patrón que Feed.tsx). La propiedad ya tiene `perfil` populated
+      // desde la query de propiedades del usuario.
+      usePropertyCacheStore.getState().setProperty(property.id, property);
+
+      router.push({
+        pathname: "/(stack)/property/[id]",
+        params: { id: property.id },
+      });
+    },
+    [],
+  );
 
   const handleEditProperty = useCallback((property: Property) => {
     setEditProperty(property);
@@ -712,8 +717,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
       />
 
       <ProfileEditModals
-        selectedProperty={selectedProperty}
-        onCloseProperty={() => setSelectedProperty(null)}
+        selectedProperty={null}
         handleSilentRefresh={handleSilentRefresh}
         showEditPropertyModal={showEditPropertyModal}
         editProperty={editProperty}

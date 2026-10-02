@@ -116,8 +116,8 @@ const ToastItem: React.FC<{
   index: number;
   onDismiss: () => void;
 }> = ({ toast, index, onDismiss }) => {
-  const [fadeAnim] = useState(new Animated.Value(0));
-  const [slideAnim] = useState(new Animated.Value(-20));
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(-20)).current;
 
   React.useEffect(() => {
     // Animación de entrada

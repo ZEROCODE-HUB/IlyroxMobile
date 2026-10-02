@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useLocalModal } from "@/hooks/useLocalModal";
+
 import { useToast } from "@/context/ToastContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
@@ -27,6 +28,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { logger } from "@/utils/logger";
 import { collapseSpaces } from "@/utils/stringNormalizer";
 import SafePressable from "@/design-system/components/SafePressable";
+import { useGalleryPermission } from "@/hooks/useGalleryPermission";
 
 const log = logger.scoped("EditProfile");
 
@@ -42,6 +44,7 @@ const EditProfile = () => {
   const { user, profile: authProfile, refreshProfile } = useAuth();
   const { showModal, modalElement } = useLocalModal();
   const { showToast } = useToast();
+  const { ensurePermission } = useGalleryPermission();
   const [loading, setLoading] = useState(false);
   const [, setUploading] = useState(false);
 
@@ -61,12 +64,7 @@ const EditProfile = () => {
 
   const handleImagePick = async () => {
     try {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        showModal({ title: "Permiso denegado", message: "Se requiere acceso a la galería para cambiar la foto.", confirmText: "OK" });
-        return;
-      }
+      if (!(await ensurePermission())) return;
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,

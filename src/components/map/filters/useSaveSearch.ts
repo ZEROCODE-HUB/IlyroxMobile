@@ -76,6 +76,7 @@ export const useSaveSearch = (userId?: string) => {
   const [leadPhone, setLeadPhone] = useState("");
   const [leadEmail, setLeadEmail] = useState("");
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const validateLeadFields = () => {
     if (!createLead) return true;
@@ -723,6 +724,7 @@ export const useSaveSearch = (userId?: string) => {
     }
 
     try {
+      setIsSaving(true);
       let leadId = null;
 
       if (createLead) {
@@ -746,6 +748,8 @@ export const useSaveSearch = (userId?: string) => {
     } catch (error: any) {
       showToast(error.message || "Error al procesar el guardado", "error");
       return { success: false };
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -759,6 +763,7 @@ export const useSaveSearch = (userId?: string) => {
     leadEmail,
     setLeadEmail,
     errors,
+    isSaving,
     handleSaveSearch,
     updateSearchInDatabase,
   };

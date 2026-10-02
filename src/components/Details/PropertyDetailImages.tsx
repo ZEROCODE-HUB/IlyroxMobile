@@ -3,7 +3,7 @@ import { Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { COLORS, FALLBACKS } from "@/constants";
-import { ActionButtons, ImageGallery } from "../shared";
+import { ActionButtons, ACTIONS_COLUMN_MIN_HEIGHT, ImageGallery } from "../shared";
 import { propertyDetailStyles as styles } from "./propertyDetailStyles";
 
 const FALLBACK_IMAGE = FALLBACKS.PROPERTY_IMAGE_URL;
@@ -52,10 +52,13 @@ export const PropertyDetailImages: React.FC<PropertyDetailImagesProps> = ({
 
   return (
     <View style={styles.imageContainer}>
-      {/* Misma lógica que el feed: adapta al ratio real de la primera foto. */}
+      {/* Misma lógica que el feed: adapta al ratio real de la primera foto.
+          `minHeight` garantiza que la pila de acciones que flota encima
+          siempre quepa; sin él, las fotos apaisadas cortaban los botones. */}
       <ImageGallery
         images={galleryImages}
         aspectRatio={4 / 3}
+        minHeight={ACTIONS_COLUMN_MIN_HEIGHT}
         showDots={galleryImages.length > 1}
         showImageCount={false}
         onIndexChange={onImageIndexChange}

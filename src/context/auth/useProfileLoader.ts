@@ -10,6 +10,22 @@ import { logger } from "@/utils/logger";
 
 const log = logger.scoped("profile-loader");
 
+/**
+ * Error thrown when the profile does not exist in the database for a
+ * authenticated user. This is DISTINCT from a network error — the user has
+ * a valid session but their profile row is missing. In this case we MUST sign
+ * the user out (their account is corrupt). Network errors return null instead
+ * of throwing, so the caller can decide what to do.
+ */
+export class ProfileNotFoundError extends Error {
+  readonly userId: string;
+  constructor(userId: string) {
+    super(`Profile not found for user ${userId}`);
+    this.name = "ProfileNotFoundError";
+    this.userId = userId;
+  }
+}
+
 export const useProfileLoader = () => {
   // Cache para evitar llamadas redundantes
   const profileCacheRef = useRef<{ [userId: string]: perfiles }>({});
@@ -54,6 +70,8 @@ export const useProfileLoader = () => {
             await new Promise((resolve) => setTimeout(resolve, delay));
           }
 
+          log.debug("loadProfile: Intentando cargar perfil", { userId, attempt });
+
           const { data, error } = await supabase
             .from("perfiles")
             .select("*")
@@ -61,21 +79,42 @@ export const useProfileLoader = () => {
             .maybeSingle();
 
           if (error) {
-            // Si no existe el perfil, no reintentamos
+            log.warn("loadProfile: Error en query", {
+              userId,
+              attempt,
+              error: error.message,
+              code: error.code,
+              details: error.details,
+              hint: error.hint
+            });
+            // Si no existe el perfil (PGRST116 = 0 rows), es un error genuino: el
+            // perfil no está en la BD — throwing en vez de retornar null permite al
+            // caller distinguir "perfil inexistente" (signOut) de "error de red" (no signOut).
             if (error.code === "PGRST116") {
-              return null;
+              throw new ProfileNotFoundError(userId);
             }
             throw error;
           }
 
           if (data) {
+            log.info("loadProfile: Perfil encontrado", { userId, perfilId: data.id });
             // Guardar en cache
             profileCacheRef.current[userId] = data;
             return data;
           }
 
-          return null;
+          log.warn("loadProfile: data es null, perfil no encontrado", { userId, attempt });
+          throw new ProfileNotFoundError(userId);
         } catch (err: unknown) {
+          // El perfil no existe en la BD. No es un fallo de red ni de sesión, y
+          // reintentar no lo va a arreglar, así que se propaga de inmediato.
+          // Si se dejara caer aquí, el catch se lo tragaría, agotaría los
+          // reintentos y devolvería `null` — igual que un fallo de red — y el
+          // caller no podría distinguir "perfil dado de baja" de "sin internet".
+          if (err instanceof ProfileNotFoundError) {
+            throw err;
+          }
+
           lastError = err;
 
           const errorMsg =

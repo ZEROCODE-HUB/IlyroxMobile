@@ -1,14 +1,15 @@
 import React from "react";
 import { Modal } from "react-native";
-import PropertyDetail from "../Details/PropertyDetail";
 import CreateProperty from "../CreateContent/CreateProperty";
 import CreatePost from "../CreateContent/CreatePost/CreatePost";
 import CreateReel from "../CreateContent/CreateReel";
 import { Post, Property, Reel } from "@/types";
 
 export interface ProfileEditModalsProps {
-  selectedProperty: Property | null;
-  onCloseProperty: () => void;
+  /** Propiedad seleccionada para ver detalle — ya no se usa (se navega por ruta). */
+  selectedProperty?: Property | null;
+  /** @deprecated Ya no se usa para ver detalle. */
+  onCloseProperty?: () => void;
   handleSilentRefresh: () => void;
 
   showEditPropertyModal: boolean;
@@ -29,8 +30,8 @@ export interface ProfileEditModalsProps {
 }
 
 export const ProfileEditModals: React.FC<ProfileEditModalsProps> = ({
-  selectedProperty,
-  onCloseProperty,
+  selectedProperty: _selectedProperty,
+  onCloseProperty: _onCloseProperty,
   handleSilentRefresh,
   showEditPropertyModal,
   editProperty,
@@ -47,25 +48,6 @@ export const ProfileEditModals: React.FC<ProfileEditModalsProps> = ({
 }) => {
   return (
     <>
-      {selectedProperty && (
-        <Modal
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={onCloseProperty}
-          // iOS: el swipe-down del pageSheet NO dispara onRequestClose; sin
-          // onDismiss el estado del padre queda en true con el modal ya cerrado
-          // (desincronizado, no reabre). onDismiss lo sincroniza.
-          onDismiss={onCloseProperty}
-        >
-          <PropertyDetail
-            propertyId={selectedProperty.id}
-            onRefresh={handleSilentRefresh}
-            onClose={onCloseProperty}
-            isModal={true}
-          />
-        </Modal>
-      )}
-
       {showEditPropertyModal && (
         <Modal
           animationType="slide"

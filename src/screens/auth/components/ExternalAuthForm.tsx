@@ -13,6 +13,7 @@ import {
 import { ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { useGalleryPermission } from "@/hooks/useGalleryPermission";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { Avatar } from "../../../components/shared";
 import { SubmitButton } from "./SubmitButton";
@@ -56,8 +57,11 @@ export function ExternalAuthForm({
   const [showEstadoModal, setShowEstadoModal] = useState(false);
   const [showOcupacionModal, setShowOcupacionModal] = useState(false);
   const [showModalidadModal, setShowModalidadModal] = useState(false);
+  const { ensurePermission } = useGalleryPermission();
 
   const handlePickImage = async () => {
+    if (!(await ensurePermission())) return;
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,

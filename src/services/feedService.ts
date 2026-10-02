@@ -98,6 +98,16 @@ const PROPERTY_SELECT = `
     comision_monto_fijo,
     comparte_comision,
     porcentaje_comision_compartida
+  ),
+  created_by_profile:perfiles!propiedades_creado_por_fkey (
+    id,
+    nombre,
+    apellido_paterno,
+    apellido_materno,
+    nombre_completo,
+    foto,
+    rol,
+    ocupacion
   )
 ` as const;
 
@@ -536,26 +546,22 @@ export const feedService = {
     const properties = propertiesData as any[];
     const creatorIds = [...new Set(properties.map((p: any) => p.created_by).filter(Boolean))];
 
-    // Obtener perfiles de los creadores
-    const { data: profilesData } = await supabase
-      .from("perfiles")
-      .select("*")
-      .in("id", creatorIds);
+    // Los perfiles ya vienen en el join: created_by_profile
+    log.info(`[getPropertiesAsFeedItems] creatorIds=${creatorIds.length} (perfiles ya vienen en el join)`);
 
-    log.info(`[getPropertiesAsFeedItems] profilesData.length=${profilesData?.length ?? 0}, creatorIds=${creatorIds.length}`);
-
-    const profilesMap = new Map((profilesData || []).map((p: any) => [p.id, p]));
-
-    // Obtener stats de reseñas para cada perfil
+    // Obtener stats de reseñas para cada perfil (esto sigue siendo necesario)
     const statsRows = creatorIds.length > 0 ? await feedService.getReviewStats(creatorIds, currentUserId) : [];
     const statsByUserId = new Map<string, ReviewStatsRow>(
       statsRows.map((s: any) => [s.profesional_id, s]),
     );
 
     const result: FeedItem[] = properties.map((property: any) => {
-      const perfil = profilesMap.get(property.created_by);
+      // Usar el perfil que viene en el join (created_by_profile)
+      const perfil = property.created_by_profile;
+      log.info(`[getPropertiesAsFeedItems] property.id=${property.id}, created_by=${property.created_by}, created_by_profile=${JSON.stringify(perfil)}`);
       const stats = perfil ? statsByUserId.get(perfil.id) : null;
       const user = buildUser(perfil, stats);
+      log.info(`[getPropertiesAsFeedItems] user.name=${user.name}, user.nombre=${user.nombre}`);
 
       // Crear un feedData simulado para mapPropertyToFeedItem
       const fakeFeedData = {

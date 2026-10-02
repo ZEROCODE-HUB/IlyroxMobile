@@ -38,6 +38,7 @@ import { OpenHousePost } from "./OpenHousePost";
 import { BusquedaPost } from "./BusquedaPost";
 import { LocationChipItem } from "@/components/common/MultiLevelLocationPicker";
 import { logger } from "@/utils/logger";
+import { useGalleryPermission } from "@/hooks/useGalleryPermission";
 
 const log = logger.scoped("CreatePost");
 
@@ -69,6 +70,7 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   };
   const { user } = useAuth();
   const { showModal, modalElement } = useLocalModal();
+  const { ensurePermission } = useGalleryPermission();
   const { showToast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -267,17 +269,17 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
    * Seleccionar imagen de la galería
    */
   const handlePickImage = async (limit: number = 5) => {
-    // Pedir permisos
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      showModal({ title: "Permiso denegado", message: "Necesitamos acceso a tu galería", confirmText: "OK" });
-      return;
-    }
+    // Pedir/verificar permisos (recuerda la concesión y guía a Ajustes si
+    // está bloqueado). No abre la galería si no hay permiso.
+    if (!(await ensurePermission())) return;
 
-    // Abrir galería
+    // Abrir galería. `selectionLimit` limita cuántas imágenes puede marcar el
+    // usuario en el selector (iOS 14+ / Android 13+); el recorte posterior a
+    // `limit` queda como respaldo en versiones que no lo respetan.
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: limit > 1,
+      selectionLimit: Math.max(1, limit - images.length),
       quality: 0.8,
     });
 

@@ -3,7 +3,7 @@
  * Grid de propiedades con badges de comisión y estado
  */
 
-import React, { useState } from "react";
+import React, { useState, ReactNode } from "react";
 import {
   View,
   Text,
@@ -101,6 +101,8 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
       },
     ];
 
+    const statusBadge = getStatusBadge(item, commissionText);
+
     return (
       <TouchableOpacity
         style={[styles.gridItem, isLastInRow && { marginRight: 0 }]}
@@ -110,20 +112,7 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
         <Image source={{ uri: item.images[0] }} style={styles.gridImage} />
 
         {/* Status Badge */}
-        {item.sin_comision ? (
-          <View style={[styles.statusBadge, styles.sinComisionBadge]}>
-            <Ionicons name="alert-circle" size={10} color="#fff" />
-            <Text style={[styles.statusText, { color: "#fff" }]}> Sin comisión</Text>
-          </View>
-        ) : (
-          <View style={[styles.statusBadge, { backgroundColor: "#aab9d761" }]}>
-            {commissionText ? (
-              <Text style={styles.statusText}>{commissionText} comisión</Text>
-            ) : (
-              <Text style={styles.statusText}>{item.status}</Text>
-            )}
-          </View>
-        )}
+        {statusBadge}
 
         {/* 3-Dot Menu (solo si es perfil propio) */}
         {isOwnProfile && (
@@ -265,6 +254,63 @@ const formatCommission = (commission?: {
   if (commission.percentage) {
     return `${commission.percentage}%`;
   }
+  return null;
+};
+
+type StatusStyle = {
+  backgroundColor: string;
+  textColor: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+};
+
+const getStatusBadge = (
+  property: Property,
+  commissionText: string | null,
+): ReactNode => {
+  // 1. Sin comisión siempre primero
+  if (property.sin_comision) {
+    return (
+      <View style={[styles.statusBadge, styles.sinComisionBadge]}>
+        <Ionicons name="alert-circle" size={10} color="#fff" />
+        <Text style={[styles.statusText, { color: "#fff" }]}> Sin comisión</Text>
+      </View>
+    );
+  }
+
+  // 2. Status del negocio (Reservada, Vendida, etc.) tiene PRIORIDAD sobre comisión
+  const statusConfig: Record<string, StatusStyle> = {
+    reservada: { backgroundColor: "#F59E0B", textColor: "#fff" },
+    suspendida: { backgroundColor: "#6B7280", textColor: "#fff" },
+    vendida: { backgroundColor: "#DC2626", textColor: "#fff" },
+    rentada: { backgroundColor: "#2563EB", textColor: "#fff" },
+    publicada: { backgroundColor: "#16A34A", textColor: "#fff" },
+  };
+
+  const statusKey = property.status?.toLowerCase() ?? "";
+  const config = statusConfig[statusKey];
+
+  if (config) {
+    // Capitalizar primera letra para display一致
+    const displayStatus =
+      statusKey.charAt(0).toUpperCase() + statusKey.slice(1);
+    return (
+      <View style={[styles.statusBadge, { backgroundColor: config.backgroundColor }]}>
+        <Text style={[styles.statusText, { color: config.textColor }]}>
+          {displayStatus}
+        </Text>
+      </View>
+    );
+  }
+
+  // 3. Si no hay status, mostrar badge de comisión (solo si aplica)
+  if (commissionText) {
+    return (
+      <View style={[styles.statusBadge, { backgroundColor: "#aab9d761" }]}>
+        <Text style={styles.statusText}>{commissionText} comisión</Text>
+      </View>
+    );
+  }
+
   return null;
 };
 

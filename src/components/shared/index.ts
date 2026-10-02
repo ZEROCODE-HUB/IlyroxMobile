@@ -9,7 +9,7 @@ export { default as VideoPlayer } from "./VideoPlayer";
 export { default as Avatar } from "./Avatar";
 export { default as LazyImage } from "../LazyImage";
 export { default as UserHeader } from "../UserHeader";
-export { default as ActionButtons } from "../ActionButtons";
+export { default as ActionButtons, ACTIONS_COLUMN_MIN_HEIGHT } from "../ActionButtons";
 export { default as RatingStars } from "./RatingStars";
 export { RichText } from "./RichText";
 export { GoogleCalendarIcon } from "./GoogleCalendarIcon";

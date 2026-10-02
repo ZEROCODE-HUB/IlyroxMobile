@@ -11,7 +11,7 @@ import { COLORS } from "../../constants";
 
 export const InitialLoading = () => {
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(1)).current;
   const barTranslateX = useRef(new Animated.Value(-50)).current;
 
   useEffect(() => {

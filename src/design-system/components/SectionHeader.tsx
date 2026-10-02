@@ -28,7 +28,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
   return (
     <View style={[styles.container, flatStyle]}>
       <View style={styles.textBlock}>
-        <Text style={[styles.title, { fontSize: LEVEL_SIZES[level] }]}>
+        <Text style={[styles.title, { fontSize: LEVEL_SIZES[level] ?? LEVEL_SIZES[2] }]}>
           {title}
         </Text>
         {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}

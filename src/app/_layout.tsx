@@ -16,13 +16,15 @@ import { queryClient } from "@/lib/queryClient";
 import { OneSignal } from "react-native-onesignal";
 import { useFonts } from "expo-font";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Platform,
   StatusBar,
   LogBox,
   AppState,
   AppStateStatus,
+  View,
+  StyleSheet,
 } from "react-native";
 import * as Linking from "expo-linking";
 
@@ -31,7 +33,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 
-import { ModalProvider } from "@/context/ModalContext";
+import { ModalProvider, useModal } from "@/context/ModalContext";
 import { SafeInsetsProvider } from "@/context/SafeInsetsContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import PendingApprovalScreen from "@/screens/PendingApprovalScreen";
@@ -46,7 +48,8 @@ import { buildFeedItemNavigation } from "@/utils/notificationNavigation";
 
 if (Platform.OS !== "web") {
   OneSignal.initialize(process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID!);
-  OneSignal.Notifications.requestPermission(true);
+  // No solicitar permiso automáticamente - el usuario debe activarlo desde Settings
+  OneSignal.Notifications.requestPermission(false);
   OneSignal.Notifications.addEventListener("click", (event: any) => {
     const data = event?.notification?.additionalData;
     if (data) emitNotificationClick(data);
@@ -275,7 +278,16 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-  const { session, profile, loading: authLoading, isPasswordResetProcessing } = useAuth();
+  const {
+    session,
+    profile,
+    loading: authLoading,
+    isPasswordResetProcessing,
+    signOut,
+    refreshProfile,
+  } = useAuth();
+  const { showModal } = useModal();
+  const webBlockShownRef = useRef(false);
   const queryClient = useQueryClient();
   const {
     updateRequired,
@@ -287,6 +299,7 @@ function RootLayoutNav() {
 
   // Toque en una push pendiente de navegar.
   const [notificationClick, setNotificationClick] = useState<any>(null);
+  const [readyAppUserId, setReadyAppUserId] = useState<string | null>(null);
 
   // Precarga las fuentes de íconos (Ionicons + MaterialCommunityIcons) antes de
   // renderizar la app. Evita que íconos como el de "Agrícola" (tractor, de
@@ -303,6 +316,38 @@ function RootLayoutNav() {
   useOTAUpdates();
 
   const loading = authLoading || !fontsReady;
+  const inAuthGroup = segments[0] === "(auth)";
+  const isResetPassword =
+    segments.includes("reset-password") ||
+    segments.includes("verify-password-reset");
+  const isWebAccount = !!session && profile?.rol === "web";
+  const needsApproval =
+    !!session &&
+    !!profile &&
+    profile.rol !== "admin" &&
+    (profile.aprobaciones_recibidas || 0) <
+      (profile.aprobaciones_requeridas || 3);
+  const needsAuthRedirect =
+    !isPasswordResetProcessing &&
+    !needsApproval &&
+    ((!session && !inAuthGroup) ||
+      (!!session && !!profile && !isWebAccount && inAuthGroup && !isResetPassword));
+  const showNavigationLoading =
+    !isWebAccount &&
+    (needsAuthRedirect ||
+      !rootNavigationState?.key ||
+      (!!session &&
+        !!profile &&
+        !needsApproval &&
+        !isPasswordResetProcessing &&
+        !isResetPassword &&
+        readyAppUserId !== session.user.id));
+
+  useEffect(() => {
+    if (!session || loading || !profile || needsApproval) {
+      setReadyAppUserId(null);
+    }
+  }, [session, loading, profile, needsApproval]);
 
   // Mostrar notificaciones aunque la app esté en foreground — efecto estable sin dependencias
   useEffect(() => {
@@ -421,22 +466,70 @@ function RootLayoutNav() {
   }, []);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || !rootNavigationState?.key || !needsAuthRedirect) return;
 
-    if (isPasswordResetProcessing) return;
+    router.replace(session ? "/(tabs)" : "/login");
+  }, [session, loading, needsAuthRedirect, rootNavigationState?.key, router]);
 
-    const inAuthGroup = segments[0] === "(auth)";
+  // Si hay sesión pero el perfil no cargó, NO se cierra sesión: casi siempre es
+  // un fallo de red, y la sesión sigue siendo válida. Antes, tras 15s se cerraba
+  // la sesión local y eso expulsaba al usuario de la app cada vez que abría sin
+  // internet. Ahora se reintenta con backoff hasta que vuelva la conexión; si el
+  // perfil realmente no existe, useAuthListener ya cerró sesión y este efecto se
+  // desmonta por sí solo.
+  useEffect(() => {
+    if (loading || !session || profile) return;
 
-    const isResetPassword =
-      segments.includes("reset-password") ||
-      segments.includes("verify-password-reset");
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let attempt = 0;
 
-    if (!session && !inAuthGroup) {
-      router.replace("/login");
-    } else if (session && inAuthGroup && !isResetPassword) {
-      router.replace("/(tabs)");
+    const schedule = () => {
+      // Si el perfil ya llegó, `profile` cambió y el cleanup ya corrió: no
+      // dejar un timer huérfano corriendo en segundo plano.
+      if (cancelled) return;
+      // 5s, 10s, 20s, 30s… tope de 30s para no martillear al backend.
+      const delay = Math.min(30000, 5000 * 2 ** attempt);
+      attempt += 1;
+      timer = setTimeout(async () => {
+        if (cancelled) return;
+        try {
+          await refreshProfile();
+        } catch (e) {
+          // Perfil inexistente: `refreshProfile` propaga ProfileNotFoundError y
+          // el listener ya cerró sesión. No se insiste.
+          logger.warn("[auth] el perfil no existe; se detiene el reintento", e);
+          return;
+        }
+        // Si el perfil llegó, el efecto se limpia solo por el cambio de deps.
+        schedule();
+      }, delay);
+    };
+
+    schedule();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [loading, session, profile, refreshProfile]);
+
+  useEffect(() => {
+    if (session && profile?.rol === "web" && !webBlockShownRef.current) {
+      webBlockShownRef.current = true;
+      logger.warn("[auth] cuenta web no permitida en móvil; mostrando aviso");
+      showModal({
+        type: "alert",
+        title: "Acceso no permitido",
+        message:
+          "Esta cuenta fue creada en la web de Ilyrox. La app móvil es exclusiva para asesores inmobiliarios.",
+        confirmText: "Entendido",
+        onConfirm: async () => {
+          await signOut();
+          webBlockShownRef.current = false;
+        },
+      });
     }
-  }, [session, loading, segments, isPasswordResetProcessing]);
+  }, [session, profile?.rol, showModal, signOut]);
 
   /**
    * Ejecuta la navegación de una push tocada antes de que la app pudiera navegar.
@@ -461,6 +554,9 @@ function RootLayoutNav() {
       !loading &&
       !!session &&
       !!profile &&
+      !isWebAccount &&
+      !needsApproval &&
+      !showNavigationLoading &&
       !!rootNavigationState?.key &&
       segments[0] !== "(auth)";
     if (!ready) return;
@@ -485,6 +581,9 @@ function RootLayoutNav() {
     loading,
     session,
     profile,
+    isWebAccount,
+    needsApproval,
+    showNavigationLoading,
     segments,
     rootNavigationState?.key,
     router,
@@ -494,55 +593,79 @@ function RootLayoutNav() {
     return <InitialLoading />;
   }
 
-  // Si hay sesión pero el perfil aún no carga, seguimos en loading
   if (session && !profile) {
     return <InitialLoading />;
   }
 
   // Verificación de aprobaciones para no-admins
-  if (session && profile) {
-    const isAdmin = profile.rol === "admin";
-    if (
-      !isAdmin &&
-      (profile.aprobaciones_recibidas || 0) <
-        (profile.aprobaciones_requeridas || 3)
-    ) {
-      return <PendingApprovalScreen />;
-    }
+  if (needsApproval) {
+    return <PendingApprovalScreen />;
   }
 
   // Main Stack incorporating all groups
   return (
-    <NotificationProvider userId={profile?.id || null}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="(stack)" />
-        <Stack.Screen name="invite" />
-        <Stack.Screen name="invite/[code]" />
-        <Stack.Screen name="p/[id]" />
-        {/* Los formularios de creación guardan todo en estado local: un gesto
+    <View style={{ flex: 1 }}>
+      <NotificationProvider userId={profile?.id || null}>
+        <Stack
+          screenOptions={{ headerShown: false }}
+          screenListeners={({ route, navigation }) => ({
+            transitionEnd: ({ data }) => {
+              if (
+                !data.closing &&
+                navigation.isFocused() &&
+                route.name !== "(auth)" &&
+                session &&
+                !isWebAccount
+              ) {
+                setReadyAppUserId(session.user.id);
+              }
+            },
+            focus: () => {
+              if (
+                Platform.OS === "web" &&
+                route.name !== "(auth)" &&
+                session &&
+                !isWebAccount
+              ) {
+                setReadyAppUserId(session.user.id);
+              }
+            },
+          })}
+        >
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="(stack)" />
+          <Stack.Screen name="invite" />
+          <Stack.Screen name="invite/[code]" />
+          <Stack.Screen name="p/[id]" />
+          {/* Los formularios de creación guardan todo en estado local: un gesto
             lateral accidental hacía pop de la ruta y borraba lo llenado sin
             preguntar. La salida se confirma desde el propio formulario. */}
-        <Stack.Screen
-          name="create/property"
-          options={{ gestureEnabled: false, fullScreenGestureEnabled: false }}
-        />
-        <Stack.Screen
-          name="create/reel"
-          options={{ gestureEnabled: false, fullScreenGestureEnabled: false }}
-        />
-        <Stack.Screen
-          name="create/post"
-          options={{ gestureEnabled: false, fullScreenGestureEnabled: false }}
-        />
-      </Stack>
-      {updateRequired && versionInfo && (
-        <VersionUpdateModal
-          visible={updateRequired}
-          storeUrl={versionInfo.store_url}
-        />
+          <Stack.Screen
+            name="create/property"
+            options={{ gestureEnabled: false, fullScreenGestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="create/reel"
+            options={{ gestureEnabled: false, fullScreenGestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="create/post"
+            options={{ gestureEnabled: false, fullScreenGestureEnabled: false }}
+          />
+        </Stack>
+        {updateRequired && versionInfo && (
+          <VersionUpdateModal
+            visible={updateRequired}
+            storeUrl={versionInfo.store_url}
+          />
+        )}
+      </NotificationProvider>
+      {showNavigationLoading && (
+        <View style={StyleSheet.absoluteFill}>
+          <InitialLoading />
+        </View>
       )}
-    </NotificationProvider>
+    </View>
   );
 }

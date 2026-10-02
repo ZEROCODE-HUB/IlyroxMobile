@@ -13,6 +13,7 @@ import { formatPriceShort } from "../../utils/priceFormatter";
 import { Property } from "../../types";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import { Bath } from "lucide-react-native";
+import { SafePressable } from "@/design-system";
 
 const { width } = Dimensions.get("window");
 const GAP = 8;
@@ -54,7 +55,7 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
     ];
 
     return (
-      <TouchableOpacity
+      <SafePressable
         style={[styles.gridItem, isLastInRow && { marginRight: 0 }]}
         onPress={() => onPress(item)}
         activeOpacity={0.8}
@@ -76,6 +77,16 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
           <View style={[styles.statusBadge, styles.suspendedBadge]}>
             <Ionicons name="pause-circle" size={10} color="#fff" />
             <Text style={styles.statusText}> Suspendida</Text>
+          </View>
+        ) : item.status === "Reservada" ? (
+          <View style={[styles.statusBadge, styles.reservadaBadge]}>
+            <Ionicons name="bookmark" size={10} color="#fff" />
+            <Text style={styles.statusText}> Reservada</Text>
+          </View>
+        ) : item.status === "Rentada" ? (
+          <View style={[styles.statusBadge, styles.rentadaBadge]}>
+            <Ionicons name="key" size={10} color="#fff" />
+            <Text style={styles.statusText}> Rentada</Text>
           </View>
         ) : item.sin_comision ? (
           <View style={[styles.statusBadge, styles.sinComisionBadge]}>
@@ -185,7 +196,7 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
             )}
           </View>
         </View>
-      </TouchableOpacity>
+      </SafePressable>
     );
   },
 );
@@ -259,6 +270,20 @@ const styles = StyleSheet.create({
   },
   suspendedBadge: {
     backgroundColor: "#ed6c02",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  reservadaBadge: {
+    backgroundColor: "#F59E0B",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  rentadaBadge: {
+    backgroundColor: "#2563EB",
     paddingHorizontal: 6,
     paddingVertical: 3,
     flexDirection: "row",

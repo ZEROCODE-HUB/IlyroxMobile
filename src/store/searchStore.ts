@@ -600,6 +600,18 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       ...preview,
     };
 
+    // 1. Actualizar cache inmediatamente (optimistic update)
+    queryClient.setQueryData<HistorialBusqueda[]>(
+      ['searchHistory', userId],
+      (old) => {
+        if (!old) return old;
+        return old.map((item) =>
+          item.id === id ? { ...item, ...updateData } : item
+        );
+      }
+    );
+
+    // 2. Actualizar en Supabase
     const { error } = await supabase
       .from('historial_busquedas')
       .update(updateData)
@@ -608,9 +620,9 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
 
     if (error) {
       console.error('🔍 [SearchStore] Error updating filters:', error);
+      // Rollback: invalidar cache para forzar refetch
+      queryClient.invalidateQueries({ queryKey: ['searchHistory', userId] });
     }
-
-    // No invalidar aquí - solo actualiza timestamp, no cambia datos visibles
   },
 
   touchTimestamp: async (id: string, userId: string): Promise<void> => {

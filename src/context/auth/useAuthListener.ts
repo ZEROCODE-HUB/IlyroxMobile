@@ -13,6 +13,7 @@ import { perfiles } from "../../types";
 import { OneSignal } from "react-native-onesignal";
 import { Platform } from "react-native";
 import { logger } from "@/utils/logger";
+import { ProfileNotFoundError } from "./useProfileLoader";
 
 const log = logger.scoped("auth-listener");
 
@@ -73,14 +74,28 @@ export const useAuthListener = ({
     const handleAuthChange = (_event: string, session: Session | null) => {
       if (!mounted) return;
 
+      log.info("handleAuthChange: Evento recibido", { event: _event, hasSession: !!session, userId: session?.user?.id });
+
       // Verificar expiración (síncrono, seguro dentro del callback)
       if (session?.expires_at) {
         const expiresAt = session.expires_at * 1000;
         if (Date.now() >= expiresAt) {
+          log.warn("handleAuthChange: Sesion expirada", { expiresAt: session.expires_at });
           onSessionChange(null);
           onUserChange(null);
           onProfileChange(null);
           finishLoading();
+          // Limpiar también la sesión PERSISTIDA. Sin esto, auth-js sigue
+          // reutilizando el token caducado y la app queda en un bucle en el
+          // splash (vuelve a emitir eventos con la misma sesión expirada).
+          // Se difiere con setTimeout(0) para NO ejecutar Supabase dentro del
+          // lock de auth (provocaría un deadlock). `scope: "local"` limpia sin
+          // llamada al servidor (la sesión ya no es válida de todos modos).
+          setTimeout(() => {
+            supabase.auth
+              .signOut({ scope: "local" })
+              .catch((e) => log.warn("signOut tras sesión expirada falló:", e));
+          }, 0);
           return;
         }
       }
@@ -90,6 +105,7 @@ export const useAuthListener = ({
       onUserChange(session?.user ?? null);
 
       if (!session?.user) {
+        log.info("handleAuthChange: No hay usuario, limpiando estado");
         // Sin sesión, limpiar todo
         onProfileChange(null);
         if (Platform.OS !== "web") {
@@ -104,47 +120,49 @@ export const useAuthListener = ({
         return;
       }
 
+      log.info("handleAuthChange: Usuario autenticado, procesando perfil", { userId: session.user.id, email: session.user.email });
       // Diferir el trabajo async FUERA del lock de auth para evitar el deadlock.
       const userId = session.user.id;
       setTimeout(async () => {
         if (!mounted) return;
 
         if (Platform.OS !== "web") {
+          // Solo asociar el external_id al dispositivo - NO reactiva push automáticamente
+          // El usuario debe togglear manualmente en Settings para activar/desactivar
           OneSignal.login(userId);
-          // login() SOLO asocia el external_id a este dispositivo; NO reactiva la
-          // suscripción push. Si quedó en opt-out (un logout previo la apagó, o el
-          // dispositivo estaba "muerto": token vacío / enabled:false), las push
-          // dejan de llegar aunque el usuario vuelva a entrar. optIn() la vuelve a
-          // encender. Es idempotente y NO pide permiso (eso es requestPermission),
-          // así que no puede robar el foco ni pisar una preferencia del usuario:
-          // si el permiso del SO sigue concedido, revive la suscripción; si el
-          // usuario denegó en Ajustes, es un no-op (no hay token que activar).
-          OneSignal.User.pushSubscription.optIn();
         }
 
         try {
-          // loadProfile ya tiene reintentos con backoff y cache propios;
-          // sin el lock contenido, responde en ms y el backoff solo actúa
-          // ante fallos de red reales.
-          const profileData = await loadProfile(userId);
+          log.info("handleAuthChange: Llamando loadProfile", { userId, event: _event });
 
+          const profileData = await loadProfile(userId);
+          log.info("handleAuthChange: loadProfile result", { userId, found: !!profileData, event: _event });
+
+          // `loadProfile` solo devuelve null cuando la red falló (la sesión sigue
+          // siendo válida): en ese caso NO se cierra sesión, la app queda
+          // esperando a que vuelva la conexión.
           if (!profileData) {
-            log.warn("Profile not found for logged-in user, signing out");
-            await supabase.auth.signOut();
-            onProfileChange(null);
-            finishLoading();
+            log.warn(
+              "handleAuthChange: No se pudo cargar el perfil (fallo de red); se conserva la sesión",
+              { userId },
+            );
             return;
           }
 
-          if (mounted && profileData) onProfileChange(profileData);
-
-          // ✅ REALTIME DESHABILITADO
-          // if (["SIGNED_IN", "INITIAL_SESSION"].includes(_event)) {
-          //   await setupProfileSubscription(userId);
-          // }
+          log.info("handleAuthChange: Perfil cargado exitosamente", { userId, perfilId: profileData.id });
+          if (mounted) onProfileChange(profileData);
         } catch (profileErr) {
-          log.error("Error loading profile:", profileErr);
+          if (profileErr instanceof ProfileNotFoundError) {
+            // El perfil no existe (usuario eliminado/bloqueado desde el panel).
+            // ÚNICO caso en el que se cierra la sesión automáticamente.
+            log.error("handleAuthChange: Perfil inexistente, cerrando sesión", { userId });
+            await supabase.auth.signOut();
+            if (mounted) onProfileChange(null);
+          } else {
+            log.error("handleAuthChange: Error en loadProfile", { userId, error: profileErr });
+          }
         } finally {
+          log.info("handleAuthChange: Finalizando carga", { userId });
           finishLoading();
         }
       }, 0);

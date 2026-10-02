@@ -11,22 +11,20 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import ReordenableImages from "../ReordenableImages";
 import { COLORS } from "../../../constants/colors";
 import { usePropertyFormContext } from "./PropertyFormContext";
+import { useGalleryPermission } from "@/hooks/useGalleryPermission";
 
 export const ImageGallerySection = React.memo(function ImageGallerySection() {
   const { images, setImages, errors } = usePropertyFormContext();
   const error = errors.images;
   const { showModal, modalElement } = useLocalModal();
+  const { ensurePermission } = useGalleryPermission();
   const handlePickImages = useCallback(async () => {
     if (images.length >= 15) {
       showModal({ title: "Límite alcanzado", message: "Puedes subir máximo 15 imágenes", confirmText: "OK" });
       return;
     }
 
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      showModal({ title: "Permiso denegado", message: "Necesitamos acceso a tu galería", confirmText: "OK" });
-      return;
-    }
+    if (!(await ensurePermission())) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -39,7 +37,7 @@ export const ImageGallerySection = React.memo(function ImageGallerySection() {
       const uris = result.assets.map((asset) => asset.uri);
       setImages((prev) => [...prev, ...uris].slice(0, 15));
     }
-  }, [images.length, setImages]);
+  }, [images.length, setImages, ensurePermission]);
 
   const handleRemoveImage = useCallback(
     (index: number) => {

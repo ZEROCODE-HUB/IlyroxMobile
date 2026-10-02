@@ -142,7 +142,7 @@ export default function SelectionModal({
 
 const styles = StyleSheet.create({
   modalContent: {
-    maxHeight: SCREEN_HEIGHT * 0.7,
+    height: SCREEN_HEIGHT * 0.85,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
