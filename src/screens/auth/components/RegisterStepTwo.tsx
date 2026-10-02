@@ -12,6 +12,7 @@ import {
 import { ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { useGalleryPermission } from "@/hooks/useGalleryPermission";
 import { AppInput } from "../../../design-system/components/AppInput";
 import { Avatar } from "../../../components/shared";
 import { SubmitButton } from "./SubmitButton";
@@ -63,6 +64,8 @@ export function RegisterStepTwo({
   const [showOcupacionModal, setShowOcupacionModal] = useState(false);
   const [showModalidadModal, setShowModalidadModal] = useState(false);
   const [photoTouched, setPhotoTouched] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const { ensurePermission } = useGalleryPermission();
 
   const handleSubmit = () => {
     if (!formState.avatarUri) {
@@ -73,6 +76,8 @@ export function RegisterStepTwo({
   };
 
   const handlePickImage = async () => {
+    if (!(await ensurePermission())) return;
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.7,
@@ -200,12 +205,13 @@ export function RegisterStepTwo({
         showCounter
       />
 
-      <LegalAcceptanceText />
+      <LegalAcceptanceText accepted={acceptedTerms} onChange={setAcceptedTerms} />
 
       <SubmitButton
         loading={loading}
         onPress={handleSubmit}
         text="Finalizar Registro"
+        disabled={!acceptedTerms}
       />
 
       <BackButton onPress={onBack} text="Volver al paso 1" />

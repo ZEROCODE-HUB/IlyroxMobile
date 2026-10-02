@@ -43,6 +43,11 @@ export const propertyService = {
           ciudad,
           municipio,
           colonia,
+          estado,
+          calle,
+          numero_exterior,
+          latitud,
+          longitud,
           fotos,
           habitaciones,
           banos,
@@ -56,6 +61,17 @@ export const propertyService = {
           es_easybroker,
           codigo_propiedad,
           created_at,
+          perfiles!propiedades_creado_por_fkey (
+            id,
+            nombre,
+            foto,
+            ocupacion,
+            celular,
+            prefijo_celular,
+            estado,
+            apellido_paterno
+          ),
+          amenidades:propiedad_amenidades(amenidad:catalogo_amenidades(nombre)),
           operaciones_propiedad (
             tipo_operacion,
             precio,
@@ -105,6 +121,8 @@ export const propertyService = {
         };
       }
 
+      const addressParts = [p.calle, p.numero_exterior].filter(Boolean).join(" ");
+
       return {
         id: p.id,
         code: p.codigo_propiedad || undefined,
@@ -114,9 +132,9 @@ export const propertyService = {
         currency: operation?.moneda || "MXN",
         createdAt: p.created_at,
         location: {
-          address: "",
+          address: addressParts,
           country: "México",
-          state: "",
+          state: p.estado || "",
           city: p.ciudad || "",
           municipio: p.municipio,
           colony: p.colonia || "",
@@ -129,7 +147,9 @@ export const propertyService = {
           constructionSqft: p.metros_cuadrados_construccion || 0,
           landSqft: p.metros_cuadrados_terreno || 0,
         },
-        amenities: [],
+        amenities: (p.amenidades?.map((a: any) => a.amenidad.nombre) || []) as Property["amenities"],
+        // Mantener estructura de BD para PropertyDetail (que espera amenidades.map(a => a.amenidad.nombre))
+        amenidades: p.amenidades || [],
         type: p.tipo,
         subtype: p.subtipo,
         operation: operation?.tipo_operacion === "venta" ? "Sale" : "Rent",
@@ -138,6 +158,10 @@ export const propertyService = {
         comparte_comision: p.comparte_comision ?? false,
         es_easybroker: p.es_easybroker || false,
         commission,
+        latitud: p.latitud ?? undefined,
+        longitud: p.longitud ?? undefined,
+        perfil: p.perfiles ?? undefined,
+        operations: p.operaciones_propiedad ?? [],
       };
     });
   },
@@ -297,6 +321,19 @@ export const propertyService = {
         .in("nombre", amenidades);
 
       if (amenidadLookupError) throw amenidadLookupError;
+
+      // Aviso: si alguna amenidad seleccionada no existe en el catálogo, se
+      // omite. Antes esto pasaba en silencio y se perdían amenidades; ahora se
+      // registra para detectar desajustes entre la UI y catalogo_amenidades.
+      const matchedNames = new Set((catAmenidades || []).map((c) => c.nombre));
+      const unmatchedAmenidades = amenidades.filter(
+        (a: string) => !matchedNames.has(a),
+      );
+      if (unmatchedAmenidades.length > 0) {
+        log.warn("Amenidades no encontradas en el catálogo (se omiten):", {
+          unmatchedAmenidades,
+        });
+      }
 
       const amenidadIds = (catAmenidades || []).map((c) => c.id);
       if (amenidadIds.length > 0) {

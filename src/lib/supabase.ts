@@ -6,14 +6,14 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  log.error("Supabase config missing! Check your .env file.");
-} else {
-  log.debug("Supabase config loaded:", {
-    urlLength: supabaseUrl.length,
-    keyLength: supabaseAnonKey.length,
-    urlStart: supabaseUrl.substring(0, 8) + "...",
-  });
+  throw new Error("SUPABASE_CONFIG_MISSING: Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY environment variables. Check your .env file.");
 }
+
+log.debug("Supabase config loaded:", {
+  urlLength: supabaseUrl.length,
+  keyLength: supabaseAnonKey.length,
+  urlStart: supabaseUrl.substring(0, 8) + "...",
+});
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

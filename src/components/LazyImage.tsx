@@ -60,6 +60,7 @@ const LazyImage: React.FC<LazyImageProps> = ({
           {isArray ? (
             <FlatList
               data={source as { uri: string }[]}
+              keyExtractor={(item) => item.uri}
               renderItem={({ item }) => (
                 <Image
                   source={item}

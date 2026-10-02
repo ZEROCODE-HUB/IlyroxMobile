@@ -84,6 +84,17 @@ export const useAuthListener = ({
           onUserChange(null);
           onProfileChange(null);
           finishLoading();
+          // Limpiar también la sesión PERSISTIDA. Sin esto, auth-js sigue
+          // reutilizando el token caducado y la app queda en un bucle en el
+          // splash (vuelve a emitir eventos con la misma sesión expirada).
+          // Se difiere con setTimeout(0) para NO ejecutar Supabase dentro del
+          // lock de auth (provocaría un deadlock). `scope: "local"` limpia sin
+          // llamada al servidor (la sesión ya no es válida de todos modos).
+          setTimeout(() => {
+            supabase.auth
+              .signOut({ scope: "local" })
+              .catch((e) => log.warn("signOut tras sesión expirada falló:", e));
+          }, 0);
           return;
         }
       }
@@ -115,16 +126,9 @@ export const useAuthListener = ({
         if (!mounted) return;
 
         if (Platform.OS !== "web") {
+          // Solo asociar el external_id al dispositivo - NO reactiva push automáticamente
+          // El usuario debe togglear manualmente en Settings para activar/desactivar
           OneSignal.login(userId);
-          // login() SOLO asocia el external_id a este dispositivo; NO reactiva la
-          // suscripción push. Si quedó en opt-out (un logout previo la apagó, o el
-          // dispositivo estaba "muerto": token vacío / enabled:false), las push
-          // dejan de llegar aunque el usuario vuelva a entrar. optIn() la vuelve a
-          // encender. Es idempotente y NO pide permiso (eso es requestPermission),
-          // así que no puede robar el foco ni pisar una preferencia del usuario:
-          // si el permiso del SO sigue concedido, revive la suscripción; si el
-          // usuario denegó en Ajustes, es un no-op (no hay token que activar).
-          OneSignal.User.pushSubscription.optIn();
         }
 
         try {

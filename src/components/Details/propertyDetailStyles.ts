@@ -57,11 +57,12 @@ export const propertyDetailStyles = StyleSheet.create({
   imageBadge: {
     position: "absolute",
     bottom: 26,
-    right: 20,
+    left: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
     backgroundColor: COLORS.blackTransparent60,
+    zIndex: 11,
   },
   imageBadgeText: {
     color: COLORS.white,

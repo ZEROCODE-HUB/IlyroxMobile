@@ -92,7 +92,7 @@ export const Chip: React.FC<ChipProps> = ({
   selected = false,
   style,
 }) => {
-  const sizes = SIZE_MAP[size];
+  const sizes = SIZE_MAP[size] ?? SIZE_MAP.md;
   const toneStyles = getToneStyles(tone, selected);
   const flatStyle = Array.isArray(style) ? Object.assign({}, ...style) : style;
 

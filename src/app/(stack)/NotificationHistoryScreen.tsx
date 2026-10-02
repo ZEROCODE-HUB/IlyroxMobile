@@ -42,13 +42,26 @@ export default function NotificationHistoryScreen() {
     error,
   } = useNotificationHistory({ userId: user?.id, pageSize: 30 });
 
-  const { markAsRead } = useNotifications();
+  const { markAsRead, markAllAsRead, unreadCount } = useNotifications();
 
   // Refrescar al entrar para ver notificaciones nuevas
   useEffect(() => {
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Marcar todas como leídas al entrar a la pantalla (después de un delay para que el usuario vea cuántas tenía)
+  // Solo se ejecuta una vez cuando se monta el componente
+  useEffect(() => {
+    if (unreadCount > 0) {
+      console.log("🔔 [NotificationHistory] markAllAsRead: marking", unreadCount, "notifications as read");
+      const timer = setTimeout(() => {
+        markAllAsRead();
+      }, 1500); // 1.5 segundos de delay para que el usuario vea el badge
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Sin dependencias - solo se ejecuta al montar
 
   const sections = useMemo<NotificationSection[]>(
     () => groupNotificationsByDay(notifications),

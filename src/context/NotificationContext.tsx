@@ -1,9 +1,15 @@
 /**
  * NotificationContext.tsx
  * Contexto centralizado para notificaciones con Realtime
+ * 
+ * FIX v3: 
+ * - Previene re-suscripciones innecesarias cuando userId oscila
+ * - markAsRead y markAllAsRead usan el userId del parámetro, no del ref
+ * - Cuando el unreadCount llega a 0, se refleja inmediatamente en el badge
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { AppState, AppStateStatus } from "react-native";
 import { supabase } from "../lib/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -74,17 +80,29 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const [notifications, setNotifications] = useState<NotificacionExtendida[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
+  
+  // Refs para control
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const isMountedRef = useRef(true);
+  const isFetchingRef = useRef(false);
+  
+  // FIX: Mantener tracking del último userId verificado
+  const lastUserIdRef = useRef<string | null>(null);
+  const channelUserIdRef = useRef<string | null>(null);
 
   const lastNotification = notifications[0] || null;
 
-  const fetchNotifications = useCallback(async () => {
-    if (!userId) return;
+  /**
+   * Fetch completo de notificaciones desde la BD.
+   */
+  const fetchNotifications = useCallback(async (currentUserId: string) => {
+    if (!currentUserId || isFetchingRef.current) return;
 
-    setIsLoading(true);
+    isFetchingRef.current = true;
+    console.log("🔔 [Notifications] fetchNotifications called, userId:", currentUserId);
     try {
       const { data, error } = await supabase.rpc('get_enriched_notifications', {
-        p_user_id: userId,
+        p_user_id: currentUserId,
       });
 
       if (error) {
@@ -112,75 +130,85 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         }));
 
         const unread = enrichedNotifications.filter(n => n.estado === "pendiente").length;
+        console.log("🔔 [Notifications] Setting unreadCount to:", unread, "from total notifications:", enrichedNotifications.length);
 
-        setNotifications(enrichedNotifications);
-        setUnreadCount(unread);
+        if (isMountedRef.current) {
+          setNotifications(enrichedNotifications);
+          setUnreadCount(unread);
+        }
+      } else {
+        if (isMountedRef.current) {
+          setNotifications([]);
+          setUnreadCount(0);
+        }
       }
     } catch (err) {
       console.error("🔔 [Notifications] Exception:", err);
     } finally {
-      setIsLoading(false);
+      isFetchingRef.current = false;
     }
-  }, [userId]);
+  }, []);
 
-  const fetchUnreadCount = useCallback(async () => {
-    if (!userId) return;
-
-    try {
-      const { count, error } = await supabase
-        .from("user_notifications")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("estado", "pendiente");
-
-      if (!error) {
-        setUnreadCount(count || 0);
-      }
-    } catch (err) {
-      console.error("Error fetching unread count:", err);
-    }
-  }, [userId]);
-
+  /**
+   * Marca una notificación individual como leída.
+   * FIX: Recibe userId como parámetro para evitar dependencias de refs.
+   */
   const markAsRead = useCallback(async (notificationId: string) => {
-    if (!userId) return;
+    // Usar el userId actual de la prop, no el ref (que puede estar desactualizado)
+    const currentUserId = userId;
+    console.log("🔔 [Notifications] markAsRead called, notificationId:", notificationId, "userId:", currentUserId);
+    if (!currentUserId) return;
 
     try {
       const { error } = await supabase.rpc("mark_notification_as_read", {
         p_notification_id: notificationId,
-        p_user_id: userId,
+        p_user_id: currentUserId,
       });
 
-      if (!error) {
+      if (!error && isMountedRef.current) {
+        console.log("🔔 [Notifications] markAsRead success, updating local state");
         setNotifications((prev) => {
-          // Las notificaciones agrupadas representan N autores en un único
-          // row. Decrementar por 1 subestima el contador. Tomamos el
-          // `total_autores` real del state ANTES de mutar.
           const target = prev.find((n) => n.id === notificationId);
           const dec = Math.max(1, target?.total_autores ?? 1);
-          setUnreadCount((c) => Math.max(0, c - dec));
+          console.log("🔔 [Notifications] Decrementing by:", dec);
+          setUnreadCount((c) => {
+            const newCount = Math.max(0, c - dec);
+            console.log("🔔 [Notifications] unreadCount:", c, "->", newCount);
+            return newCount;
+          });
           return prev.map((n) =>
             n.id === notificationId
               ? { ...n, estado: "leida" as const, leida_en: new Date().toISOString() }
               : n
           );
         });
+      } else if (error) {
+        console.error("🔔 [Notifications] markAsRead error:", error);
       }
     } catch (err) {
-      console.error("Error marking as read:", err);
+      console.error("🔔 [Notifications] markAsRead exception:", err);
     }
   }, [userId]);
 
+  /**
+   * Marca TODAS las notificaciones como leídas.
+   * FIX: Recibe userId como parámetro.
+   */
   const markAllAsRead = useCallback(async () => {
-    if (!userId) return;
+    const currentUserId = userId;
+    console.log("🔔 [Notifications] markAllAsRead called, userId:", currentUserId);
+    if (!currentUserId) return;
 
     try {
+      console.log("🔔 [Notifications] Updating all notifications to 'leida' in DB");
       const { error } = await supabase
         .from("user_notifications")
         .update({ estado: "leida", leida_en: new Date().toISOString() })
-        .eq("user_id", userId)
+        .eq("user_id", currentUserId)
         .eq("estado", "pendiente");
 
-      if (!error) {
+      if (!error && isMountedRef.current) {
+        console.log("🔔 [Notifications] markAllAsRead success, setting unreadCount to 0");
         setNotifications((prev) =>
           prev.map((n) => ({
             ...n,
@@ -189,30 +217,66 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
           }))
         );
         setUnreadCount(0);
+      } else if (error) {
+        console.error("🔔 [Notifications] markAllAsRead error:", error);
       }
     } catch (err) {
-      console.error("Error marking all as read:", err);
+      console.error("🔔 [Notifications] markAllAsRead exception:", err);
     }
   }, [userId]);
 
+  /**
+   * Refresh forzado.
+   */
   const refresh = useCallback(async () => {
-    await fetchNotifications();
-    await fetchUnreadCount();
-  }, [fetchNotifications, fetchUnreadCount]);
+    if (userId) {
+      await fetchNotifications(userId);
+    }
+  }, [userId, fetchNotifications]);
 
-  // Realtime subscription
+  // ============================================================
+  // REALTIME SUBSCRIPTION
+  // ============================================================
   useEffect(() => {
+    isMountedRef.current = true;
+    
     if (!userId) {
+      console.log("🔔 [Notifications] Skipping - no userId");
       return;
     }
+    
+    // FIX: Si el userId no cambió y ya tenemos canal activo, no recrear
+    if (userId === channelUserIdRef.current && channelRef.current) {
+      console.log("🔔 [Notifications] Same userId, skipping channel recreation");
+      lastUserIdRef.current = userId;
+      return;
+    }
+    
+    console.log("🔔 [Notifications] Setting up channel for userId:", userId);
+    lastUserIdRef.current = userId;
 
-    // Fetch initial data
-    fetchNotifications();
-    fetchUnreadCount();
+    // Cleanup del canal anterior
+    const cleanupChannel = () => {
+      if (channelRef.current) {
+        console.log("🔔 [Notifications] Removing previous channel");
+        supabase.removeChannel(channelRef.current).catch((e) => {
+          console.warn("🔔 [Notifications] Error removing channel:", e);
+        });
+        channelRef.current = null;
+        channelUserIdRef.current = null;
+      }
+    };
 
-    // Setup realtime
+    cleanupChannel();
+
+    // Fetch inicial
+    fetchNotifications(userId);
+
+    // Crear canal con nombre ÚNICO por userId
+    const channelName = `notifications-realtime-${userId}`;
+
     const channel = supabase
-      .channel("notifications-realtime")
+      .channel(channelName)
       .on(
         "postgres_changes",
         {
@@ -222,57 +286,92 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
+          console.log("🔔 [Notifications] Realtime event:", payload.eventType);
+          
           if (payload.eventType === "INSERT") {
-            // En lugar de insertar la fila cruda (sin autores ni thumbnail),
-            // reusamos el RPC enrichment para tener la misma forma que la
-            // carga inicial. Esto garantiza que la notificación aparece con
-            // avatar, nombre, thumbnail y total_autores correctos desde el
-            // primer render. El coste es 1 roundtrip por INSERT nuevo.
-            fetchNotifications();
-            setUnreadCount((prev) => prev + 1);
+            console.log("🔔 [Notifications] INSERT detected, fetching fresh data");
+            fetchNotifications(userId);
           } else if (payload.eventType === "UPDATE") {
             const updatedNotification = payload.new as Notificacion;
-            const newData = (updatedNotification.data as Record<string, unknown>) || null;
-            const newTotalAutor =
-              ((newData?.author_ids as string[] | undefined) || []).length;
+            if (!updatedNotification) return;
+
+            console.log("🔔 [Notifications] UPDATE for:", updatedNotification.id, "estado:", updatedNotification.estado);
+
+            const wasUnread = notifications.some(n => n.id === updatedNotification.id && n.estado === "pendiente");
+            const isUnread = updatedNotification.estado === "pendiente";
+            const newTotalAutor = ((updatedNotification.data as Record<string, unknown>)?.author_ids as string[] | undefined)?.length || 1;
+
+            if (wasUnread && !isUnread) {
+              setUnreadCount((prev) => Math.max(0, prev - Math.max(1, newTotalAutor)));
+              console.log("🔔 [Notifications] Decrementing count");
+            } else if (!wasUnread && isUnread) {
+              setUnreadCount((prev) => prev + Math.max(1, newTotalAutor));
+              console.log("🔔 [Notifications] Incrementing count");
+            }
+
             setNotifications((prev) =>
               prev.map((n) => {
                 if (n.id !== updatedNotification.id) return n;
-                // Si el server acumuló más autores en `data.author_ids`,
-                // sincronizamos el `data` y recalculamos `total_autores`.
                 const total = newTotalAutor || n.total_autores;
                 return {
                   ...n,
                   estado: updatedNotification.estado as "pendiente" | "leida",
                   leida_en: updatedNotification.leida_en as string | null,
-                  data: newData || n.data,
+                  data: (updatedNotification.data as Record<string, unknown>) || n.data,
                   total_autores: total,
                 };
               })
             );
-            if (updatedNotification.estado === "leida") {
-              // El decremento agrupado se hace en `markAsRead` (vía state).
-              // Aquí, el cambio viene del server (otra pestaña / trigger
-              // externo), así que usamos el `total_autores` recalculado.
-              setUnreadCount((prev) => Math.max(0, prev - Math.max(1, newTotalAutor || 1)));
-            }
           } else if (payload.eventType === "DELETE") {
-            const deletedId = payload.old.id;
-            setNotifications((prev) => prev.filter((n) => n.id !== deletedId));
+            const deletedId = payload.old?.id;
+            if (deletedId) {
+              console.log("🔔 [Notifications] DELETE for:", deletedId);
+              setNotifications((prev) => {
+                const deletedNotif = prev.find(n => n.id === deletedId);
+                const wasUnread = deletedNotif?.estado === "pendiente";
+                if (wasUnread) {
+                  setUnreadCount((c) => Math.max(0, c - Math.max(1, deletedNotif?.total_autores || 1)));
+                }
+                return prev.filter((n) => n.id !== deletedId);
+              });
+            }
           }
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log("🔔 [Notifications] Channel status:", status, "error:", err);
+        if (status === "SUBSCRIBED") {
+          channelUserIdRef.current = userId;
+          console.log("🔔 [Notifications] Successfully subscribed for user:", userId);
+        }
+      });
 
-    realtimeChannelRef.current = channel;
+    channelRef.current = channel;
 
+    // Cleanup
     return () => {
-      if (realtimeChannelRef.current) {
-        realtimeChannelRef.current.unsubscribe();
-        realtimeChannelRef.current = null;
+      isMountedRef.current = false;
+      console.log("🔔 [Notifications] Effect cleanup");
+      cleanupChannel();
+    };
+  }, [userId, fetchNotifications]);
+
+  // ============================================================
+  // APP STATE LISTENER
+  // ============================================================
+  useEffect(() => {
+    if (!userId) return;
+
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === "active" && userId) {
+        console.log("🔔 [Notifications] App foreground, refreshing...");
+        fetchNotifications(userId);
       }
     };
-  }, [userId, fetchNotifications, fetchUnreadCount]);
+
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription.remove();
+  }, [userId, fetchNotifications]);
 
   const value = useMemo(
     () => ({

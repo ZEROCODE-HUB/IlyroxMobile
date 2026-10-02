@@ -397,6 +397,11 @@ export function useAuthForm() {
             fecha_inicio_carrera: formState.fechaInicioCarrera || null,
             biografia: formState.biografia || null,
             foto: finalAvatarUrl || null,
+            // El teléfono se guarda aquí porque el trigger de la BD no persiste
+            // `celular` (solo el id). Sin esto, el campo queda vacío en
+            // "Editar Perfil" tras registrarse.
+            celular: celularDigits.length >= 10 ? celularDigits : null,
+            prefijo_celular: "+52",
           })
           .eq("id", data.user.id);
 

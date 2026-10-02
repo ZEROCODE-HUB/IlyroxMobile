@@ -261,7 +261,7 @@ export type perfiles = {
   id: string;
   nombre: string;
   nombre_completo?: string;
-  rol: "admin" | "agente" | "cliente";
+  rol: "admin" | "agente" | "cliente" | "web";
   apellido_materno: string;
   apellido_paterno: string;
   celular?: string;

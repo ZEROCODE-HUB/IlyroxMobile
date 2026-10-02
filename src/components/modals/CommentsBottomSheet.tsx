@@ -31,7 +31,7 @@ import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 import { Ionicons } from "@expo/vector-icons";
 import {
   KeyboardProvider,
-  KeyboardAvoidingView,
+  KeyboardStickyView,
 } from "react-native-keyboard-controller";
 
 import { useComments } from "../../hooks";
@@ -393,82 +393,90 @@ export default function CommentsBottomSheet({
   // Render
   // ============================================================================
 
+  const renderHeader = () => (
+    <>
+      {/* Handle */}
+      <View style={styles.handleContainer}>
+        <View style={styles.handle} />
+      </View>
+
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>
+          Comentarios ({totalCount})
+        </Text>
+        <SafePressable
+          onPress={handleClose}
+          style={styles.closeButton}
+        >
+          <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+        </SafePressable>
+      </View>
+    </>
+  );
+
+  const renderFooter = () => (
+    <>
+      {/* Context bar (reply) */}
+      {replyTo && (
+        <View style={styles.contextBar}>
+          <View style={styles.replyBadge}>
+            <Text style={styles.replyBadgeText}>
+              Respondiendo a:{" "}
+              <Text style={styles.replyBadgeName}>{replyToUser}</Text>
+            </Text>
+            <SafePressable onPress={() => setReplyTo(null)}>
+              <Ionicons
+                name="close"
+                size={20}
+                color={COLORS.textSecondary}
+              />
+            </SafePressable>
+          </View>
+        </View>
+      )}
+
+      {/* MessageInput */}
+      <View style={{ marginBottom: Platform.OS === "android" ? 0 : 30 }}>
+        <MessageInput
+          ref={inputRef}
+          onSendCombined={handleSendCombined}
+          sending={posting}
+          mediaType="Images"
+        />
+      </View>
+    </>
+  );
+
   return (
     <AppBottomSheet visible={visible} onClose={handleClose} statusBarTranslucent>
       <View style={[styles.sheet, { height: modalHeight }]}>
-          <KeyboardProvider>
-            <KeyboardAvoidingView
-              style={styles.container}
-              behavior={Platform.OS === "ios" ? "padding" : "height"}
-              keyboardVerticalOffset={100}
-            >
-              {/* Handle */}
-              <View style={styles.handleContainer}>
-                <View style={styles.handle} />
-              </View>
+        <KeyboardProvider>
+          {renderHeader()}
 
-              {/* Header */}
-              <View style={styles.header}>
-                <Text style={styles.title}>
-                  Comentarios ({totalCount})
-                </Text>
-                <SafePressable
-                  onPress={handleClose}
-                  style={styles.closeButton}
-                >
-                  <Ionicons name="close" size={24} color={COLORS.textPrimary} />
-                </SafePressable>
-              </View>
+          {/* Comments List */}
+          <FlatList
+            ref={flatListRef}
+            data={displayComments}
+            renderItem={renderComment}
+            keyExtractor={(item) => item.id}
+            style={styles.list}
+            contentContainerStyle={[
+              styles.listContent,
+              displayComments.length === 0 && styles.listContentEmpty,
+            ]}
+            ListEmptyComponent={ListEmptyComponent}
+            ListFooterComponent={ListFooterComponent}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.4}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          />
 
-              {/* Comments List */}
-              <FlatList
-                ref={flatListRef}
-                data={displayComments}
-                renderItem={renderComment}
-                keyExtractor={(item) => item.id}
-                style={styles.list}
-                contentContainerStyle={[
-                  styles.listContent,
-                  displayComments.length === 0 && styles.listContentEmpty,
-                ]}
-                ListEmptyComponent={ListEmptyComponent}
-                ListFooterComponent={ListFooterComponent}
-                onEndReached={loadMore}
-                onEndReachedThreshold={0.4}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              />
-
-              {/* Context bar (reply) */}
-              {replyTo && (
-                <View style={styles.contextBar}>
-                  <View style={styles.replyBadge}>
-                    <Text style={styles.replyBadgeText}>
-                      Respondiendo a:{" "}
-                      <Text style={styles.replyBadgeName}>{replyToUser}</Text>
-                    </Text>
-                    <SafePressable onPress={() => setReplyTo(null)}>
-                      <Ionicons
-                        name="close"
-                        size={20}
-                        color={COLORS.textSecondary}
-                      />
-                    </SafePressable>
-                  </View>
-                </View>
-              )}
-
-              {/* MessageInput */}
-              <View style={{ marginBottom: 30 }}>
-                <MessageInput
-                  ref={inputRef}
-                  onSendCombined={handleSendCombined}
-                  sending={posting}
-                  mediaType="Images"
-                />
-              </View>
-            </KeyboardAvoidingView>
-          </KeyboardProvider>
+          <KeyboardStickyView offset={{ opened: Platform.OS === "ios" ? 12 :42}}>
+            {renderFooter()}
+          </KeyboardStickyView>
+        </KeyboardProvider>
       </View>
     </AppBottomSheet>
   );

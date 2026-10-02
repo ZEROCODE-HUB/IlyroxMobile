@@ -18,6 +18,8 @@ export interface LocationSuggestion {
   secondaryText: string;    // Contexto (ej: "Miguel Hidalgo, CDMX")
   fullDescription: string;  // Descripción completa (ej: "Polanco, Miguel Hidalgo, CDMX, México")
   type: "estado" | "municipio" | "colonia";
+  /** Tipos crudos de Google Places, útiles para filtrar ruido (establecimientos, calles, POIs) */
+  types?: string[];
 }
 
 /**
@@ -60,6 +62,7 @@ export async function searchLocations(
       secondaryText: p.secondaryText,
       fullDescription: p.description,
       type: derivePlaceType(p.types),
+      types: p.types,
     }));
   } catch (e) {
     console.warn("[locationService] searchLocations error:", e);

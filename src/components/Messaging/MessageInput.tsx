@@ -16,6 +16,7 @@ import { useToast } from "@/context/ToastContext";
 import { COLORS } from "../../constants";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { logger } from "@/utils/logger";
+import { useGalleryPermission } from "@/hooks/useGalleryPermission";
 
 const log = logger.scoped("MessageInput");
 
@@ -45,6 +46,7 @@ export default React.forwardRef<TextInput, MessageInputProps>(
   ) {
     const { showModal } = useModal();
     const { showToast } = useToast();
+    const { ensurePermission } = useGalleryPermission();
     const [text, setText] = useState("");
     const [uploading, setUploading] = useState(false);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -88,13 +90,7 @@ export default React.forwardRef<TextInput, MessageInputProps>(
       if (!onSendImage && !onSendCombined) return;
 
       try {
-        const { status } =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-        if (status !== "granted") {
-          showModal({ title: "Permiso denegado", message: "Necesitamos permiso para acceder a tus fotos", confirmText: "OK" });
-          return;
-        }
+        if (!(await ensurePermission())) return;
 
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes:

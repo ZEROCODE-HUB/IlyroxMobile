@@ -16,6 +16,72 @@ import { logger } from "@/utils/logger";
 
 const log = logger.scoped("locationSearchStore");
 
+/**
+ * Tipos de Google Places que se consideran RUIDO y se filtran.
+ * Son tipos de establecimientos, calles y POIs que no son zonas geográficas
+ * relevantes para bienes raíces (colonias, fraccionamientos, municipios, estados).
+ */
+const NOISE_TYPES = new Set([
+  "route",                    // Calles y avenidas (ej: "Av. del Valle")
+  "establishment",            // Negocios genéricos (ej: "Loreta café")
+  "point_of_interest",       // Puntos de interés
+  "store",                   // Tiendas
+  "cafe",                    // Cafés/restaurantes
+  "food",                    // Lugares de comida
+  "lodging",                 // Hoteles
+  "bank",                    // Bancos
+  "church",                  // Iglesias
+  "hindu_temple",            // Templos
+  "mosque",                  // Mezquitas
+  "synagogue",              // Sinagogas
+  "city_hall",               // Ayuntamientos
+  "courthouse",              // Juzgados
+  "hospital",                // Hospitales
+  "doctor",                  // Doctores
+  "pharmacy",                // Farmacias
+  "gas_station",             // Gasolineras
+  "parking",                 // Estacionamientos
+  "school",                  // Escuelas
+  "university",              // Universidades
+  "gym",                     // Gimnasios
+  "shopping_mall",           // Centros comerciales
+  "supermarket",             // Supermercados
+  "movie_theater",           // Cine
+  "museum",                  // Museos
+  "zoo",                     // Zoológicos
+  "airport",                 // Aeropuertos
+  "train_station",           // Estaciones de tren
+  "bus_station",             // Estaciones de autobús
+  "car_rental",              // Rentadoras de auto
+  "car_repair",              // Talleres mecánicos
+  "laundry",                 // Lavanderías
+  "beauty_salon",            // Salones de belleza
+  "hair_care",               // Peluquerías
+  "insurance_agency",         // Agencias de seguros
+  "real_estate_agency",      // Agencias inmobiliarias (puede generar ruido)
+  "travel_agency",           // Agencias de viaje
+  "library",                 // Bibliotecas
+  "stadium",                 // Estadios
+  "amusement_park",          // Parques de diversiones
+  "aquarium",                // Acuarios
+  "casino",                  // Casinos
+  "night_club",              // Clubs nocturnos
+  "bar",                     // Bares
+  "bowling_alley",           // Boliches
+  "art_gallery",             // Galerías de arte
+  "zoo_entrance",            // Entradas de zoológico
+]);
+
+/**
+ * Verifica si una sugerencia de Google Places es "ruido" (establecimiento, calle, POI).
+ * Retorna true si es ruido y debe filtrarse.
+ */
+function isNoiseSuggestion(types: string[] | undefined): boolean {
+  if (!types || types.length === 0) return false;
+  // Si AL MENOS UNO de los types es ruido, se filtra
+  return types.some((t) => NOISE_TYPES.has(t));
+}
+
 /** Sugerencia de ubicación enriquecida para mostrar en la UI */
 export interface LocationSuggestionWithCount extends LocationSuggestion {
   /** Conteo de propiedades (no calculado en la nueva versión) */
@@ -221,6 +287,10 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
           combined = [...enriched, ...nonDuplicated];
         }
       }
+      // FILTRAR RUIDO: eliminar establecimientos, calles y POIs
+      // que no son relevantes para bienes raíces (solo interesan colonias,
+      // fraccionamientos, municipios, estados)
+      combined = combined.filter((s) => !isNoiseSuggestion(s.types));
       // Score textual: priorizar coincidencia exacta, empieza con, contiene
       // Normalizar acentos para que "Nicolás" == "Nicolas" (el usuario escribe sin acentos)
       const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();

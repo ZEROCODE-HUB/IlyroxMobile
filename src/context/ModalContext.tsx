@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useRef, ReactNode } from "react";
 import { ConfirmationModal } from "../components/modals/ConfirmationModal";
 import { logger } from "../utils/logger";
 
@@ -31,8 +31,14 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
     const [visible, setVisible] = useState(false);
     const [modalConfig, setModalConfig] = useState<ModalOptions | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const hideModalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const showModal = (options: ModalOptions) => {
+        // Clear any pending hide timeout when showing a new modal
+        if (hideModalTimeoutRef.current) {
+            clearTimeout(hideModalTimeoutRef.current);
+            hideModalTimeoutRef.current = null;
+        }
         setModalConfig(options);
         setVisible(true);
         setIsLoading(false);
@@ -40,10 +46,15 @@ export const ModalProvider = ({ children }: { children: ReactNode }) => {
 
     const hideModal = () => {
         setVisible(false);
-        // Optionally reset config after a delay to allow animation to finish
-        setTimeout(() => {
+        // Clear any existing timeout before setting a new one
+        if (hideModalTimeoutRef.current) {
+            clearTimeout(hideModalTimeoutRef.current);
+        }
+        // Reset config after a delay to allow animation to finish
+        hideModalTimeoutRef.current = setTimeout(() => {
             setModalConfig(null);
             setIsLoading(false);
+            hideModalTimeoutRef.current = null;
         }, 300);
     };
 
