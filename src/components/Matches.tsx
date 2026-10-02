@@ -845,6 +845,7 @@ const Matches: React.FC = () => {
           coincidences={selectedLead.coincidences}
           similars={selectedLead.similars}
           searchCriteria={selectedLead.searchCriteria}
+          hasPolygon={!!selectedLead.busquedaObject?.polygon_coords?.length}
           onPropertyClick={(propertyId) => {
             // Pre-cache del detalle desde el FeedItem del lead → render
             // instantáneo sin shimmer. Incluimos el user para que normalize

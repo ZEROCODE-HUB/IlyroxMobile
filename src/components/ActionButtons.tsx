@@ -22,6 +22,25 @@ import { useShareCount } from "@/hooks/useShareCount";
 import { propertyService } from "../services/propertyService";
 import { SafePressable } from "@/design-system";
 
+/**
+ * Alto mínimo que necesita la pila de acciones en orientación vertical
+ * (`orientation="vertical"`), que se superpone a la foto en las tarjetas.
+ *
+ * Cálculo del peor caso (4 botones: like, comentario, compartir, reportar):
+ *   - cada botón `iconWithCountVertical`: ícono 28 + `gap: 2` + texto ~15
+ *     + `paddingVertical: 4×2`           ≈ 53px
+ *   - separaciones `actionLeftVertical` `gap: 16` × 3        = 48px
+ *   - total                                        ≈ 260px
+ *
+ * Con 270 hay ~10px de margen sobre ese peor caso. El valor importa porque
+ * define el punto donde el aspect ratio deja de recortar: mientras más alto
+ * sea, más fotos se ven afectadas (300 ya alcanzaría a las verticales 4:5).
+ *
+ * Se exporta para que las tarjetas que flotan estas acciones sobre la galería
+ * le pasen el mismo número a `ImageGallery minHeight` y nunca se corten.
+ */
+export const ACTIONS_COLUMN_MIN_HEIGHT = 270;
+
 interface ActionButtonsProps {
   feedItemId: string;
   feedItemType: "post" | "reel" | "property";

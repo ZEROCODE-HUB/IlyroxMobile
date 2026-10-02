@@ -60,6 +60,8 @@ interface LeadPropertiesModalProps {
     genero?: string;
     codigo_propiedad?: string;
   };
+  /** Indica si la búsqueda tiene polígonos dibujados */
+  hasPolygon?: boolean;
   onPropertyClick: (propertyId: string) => void;
   onUserClick: (user: User) => void;
   onDeleteSearch: (busquedaId: string) => void;
@@ -88,6 +90,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
   currentUserId,
   busqueda,
   onEditSearch,
+  hasPolygon = false,
 }) => {
   const insets = useSafeAreaInsets();
   const safeStyle = {
@@ -160,12 +163,136 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
     );
   };
 
+  // Componente scrolleable que contiene search info + tabs (va como ListHeaderComponent del FlatList)
+  const ListHeader = (
+    <>
+      {/* Search Info Section */}
+      <View style={styles.searchInfoSection}>
+        <Text style={styles.detailText}>
+          <Text style={styles.detailLabel}>Busca casa: </Text>
+          {formatCompactPrice(searchCriteria.precio_min || 0, searchCriteria.moneda)} -{" "}
+          {formatCompactPrice(searchCriteria.precio_max || 0, searchCriteria.moneda)}
+        </Text>
+        <Text style={styles.sectionTitle}>
+          <Ionicons
+            name="call-outline"
+            size={16}
+            color={COLORS.textSecondary}
+          />{" "}
+          {leadPhone}
+        </Text>
+        {leadEmail && (
+          <Text style={styles.emailText}>
+            <Ionicons
+              name="mail-outline"
+              size={16}
+              color={COLORS.textSecondary}
+            />{" "}
+            {leadEmail}
+          </Text>
+        )}
+        {!isSearchActive && (
+          <View style={styles.suspendedBadge}>
+            <Ionicons
+              name="pause-circle"
+              size={16}
+              color={COLORS.warning}
+            />
+            <Text style={styles.suspendedText}>Búsqueda suspendida</Text>
+          </View>
+        )}
+        <View style={styles.criteriaContainer}>
+          {renderSearchDetail(
+            "home-outline",
+            searchCriteria.tipo_propiedad,
+          )}
+          {renderSearchDetail("business-outline", searchCriteria.subtipo)}
+          {renderSearchDetail(
+            "pricetag-outline",
+            searchCriteria.tipo_operacion,
+          )}
+          {renderSearchDetail(
+            "location-outline",
+            searchCriteria.municipio || searchCriteria.ciudad,
+          )}
+          {(searchCriteria.zona || searchCriteria.colonia) && renderSearchDetail(
+            "map-outline",
+            searchCriteria.zona || searchCriteria.colonia,
+          )}
+          {hasPolygon && renderSearchDetail(
+            "layers-outline",
+            "Zona dibujada",
+          )}
+          {renderSearchDetail("globe-outline", searchCriteria.estado)}
+        </View>
+        <View style={styles.criteriaContainer2}>
+          {renderSearchDetail("bed-outline", searchCriteria.habitaciones)}
+          {renderSearchDetail("water-outline", searchCriteria.banos)}
+          {renderSearchDetail(
+            "car-outline",
+            searchCriteria.estacionamientos,
+          )}
+          {renderSearchDetail(
+            "construct-outline",
+            searchCriteria.metros_construccion === null
+              ? ""
+              : `${searchCriteria.metros_construccion} m²`,
+          )}
+          {renderSearchDetail(
+            "grid-outline",
+            searchCriteria.metros_terreno === null
+              ? ""
+              : `${searchCriteria.metros_terreno} m²`,
+          )}
+        </View>
+      </View>
+
+      {/* Tabs */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === "coincidencia" && styles.activeTab,
+          ]}
+          onPress={() => setActiveTab("coincidencia")}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "coincidencia" && styles.activeTabText,
+            ]}
+            numberOfLines={1}
+          >
+            Coincidencias ({coincidences.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === "similar" && styles.activeTabSimilar,
+          ]}
+          onPress={() => setActiveTab("similar")}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "similar" && styles.activeTabText,
+            ]}
+            numberOfLines={1}
+          >
+            Similares ({similars.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </>
+  );
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={safeStyle}>
         <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.headerContainer}>
+          {/* Fixed Header - only AppHeader is sticky */}
+          <View style={styles.fixedHeader}>
             <AppHeader
               title={leadName}
               showBackButton
@@ -207,121 +334,6 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                 </View>
               }
             />
-
-            {/* Search Info Section */}
-            <View style={styles.searchInfoSection}>
-              <Text style={styles.detailText}>
-                <Text style={styles.detailLabel}>Busca casa: </Text>
-                {formatCompactPrice(searchCriteria.precio_min || 0, searchCriteria.moneda)} -{" "}
-                {formatCompactPrice(searchCriteria.precio_max || 0, searchCriteria.moneda)}
-              </Text>
-              <Text style={styles.sectionTitle}>
-                <Ionicons
-                  name="call-outline"
-                  size={16}
-                  color={COLORS.textSecondary}
-                />{" "}
-                {leadPhone}
-              </Text>
-              {leadEmail && (
-                <Text style={styles.emailText}>
-                  <Ionicons
-                    name="mail-outline"
-                    size={16}
-                    color={COLORS.textSecondary}
-                  />{" "}
-                  {leadEmail}
-                </Text>
-              )}
-              {!isSearchActive && (
-                <View style={styles.suspendedBadge}>
-                  <Ionicons
-                    name="pause-circle"
-                    size={16}
-                    color={COLORS.warning}
-                  />
-                  <Text style={styles.suspendedText}>Búsqueda suspendida</Text>
-                </View>
-              )}
-              <View style={styles.criteriaContainer}>
-                {renderSearchDetail(
-                  "home-outline",
-                  searchCriteria.tipo_propiedad,
-                )}
-                {renderSearchDetail("business-outline", searchCriteria.subtipo)}
-                {renderSearchDetail(
-                  "pricetag-outline",
-                  searchCriteria.tipo_operacion,
-                )}
-                {renderSearchDetail(
-                  "location-outline",
-                  searchCriteria.municipio || searchCriteria.ciudad,
-                )}
-                {renderSearchDetail(
-                  "map-outline",
-                  searchCriteria.zona || searchCriteria.colonia,
-                )}
-                {renderSearchDetail("globe-outline", searchCriteria.estado)}
-              </View>
-              <View style={styles.criteriaContainer2}>
-                {renderSearchDetail("bed-outline", searchCriteria.habitaciones)}
-                {renderSearchDetail("water-outline", searchCriteria.banos)}
-                {renderSearchDetail(
-                  "car-outline",
-                  searchCriteria.estacionamientos,
-                )}
-                {renderSearchDetail(
-                  "construct-outline",
-                  searchCriteria.metros_construccion === null
-                    ? ""
-                    : `${searchCriteria.metros_construccion} m²`,
-                )}
-                {renderSearchDetail(
-                  "grid-outline",
-                  searchCriteria.metros_terreno === null
-                    ? ""
-                    : `${searchCriteria.metros_terreno} m²`,
-                )}
-              </View>
-            </View>
-          </View>
-
-          {/* Tabs */}
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[
-                styles.tab,
-                activeTab === "coincidencia" && styles.activeTab,
-              ]}
-              onPress={() => setActiveTab("coincidencia")}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === "coincidencia" && styles.activeTabText,
-                ]}
-                numberOfLines={1}
-              >
-                Coincidencias ({coincidences.length})
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.tab,
-                activeTab === "similar" && styles.activeTabSimilar,
-              ]}
-              onPress={() => setActiveTab("similar")}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === "similar" && styles.activeTabText,
-                ]}
-                numberOfLines={1}
-              >
-                Similares ({similars.length})
-              </Text>
-            </TouchableOpacity>
           </View>
 
           {/* Properties List — FlatList VIRTUALIZADO.
@@ -331,6 +343,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
               El FlatList solo monta las visibles (+ un margen), así que abre al
               instante sin importar el total. */}
           <FlatList
+            ListHeaderComponent={ListHeader}
             data={activeList}
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
@@ -446,11 +459,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  headerContainer: {
+  fixedHeader: {
     backgroundColor: COLORS.white,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
+    zIndex: 10,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
   },
   headerActions: {
     flexDirection: "row",
@@ -462,7 +478,9 @@ const styles = StyleSheet.create({
   },
   searchInfoSection: {
     paddingHorizontal: 16,
-    marginTop: 12,
+    paddingTop: 12,
+    paddingBottom: 4,
+    backgroundColor: COLORS.white,
   },
   sectionTitle: {
     fontSize: 14,
@@ -555,12 +573,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    // paddingHorizontal 0: las secciones del ListHeader (info + tabs) y las
+    // tarjetas traen su propio margen horizontal de 16.
+    paddingTop: 0,
     paddingBottom: 100,
   },
   propertyCardWrapper: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
+    marginHorizontal: 16,
     marginBottom: 24,
     overflow: "hidden",
     borderWidth: 1,
@@ -612,6 +633,7 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: "center",
     marginTop: 60,
+    paddingHorizontal: 32,
     gap: 12,
   },
   emptyText: {

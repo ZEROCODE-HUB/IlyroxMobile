@@ -278,7 +278,14 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-  const { session, profile, loading: authLoading, isPasswordResetProcessing, signOut } = useAuth();
+  const {
+    session,
+    profile,
+    loading: authLoading,
+    isPasswordResetProcessing,
+    signOut,
+    refreshProfile,
+  } = useAuth();
   const { showModal } = useModal();
   const webBlockShownRef = useRef(false);
   const queryClient = useQueryClient();
@@ -464,20 +471,47 @@ function RootLayoutNav() {
     router.replace(session ? "/(tabs)" : "/login");
   }, [session, loading, needsAuthRedirect, rootNavigationState?.key, router]);
 
-  // Red de seguridad: si hay sesión pero el perfil nunca carga (sesión expirada
-  // o fallo de red persistente), no dejar la app atrapada en el splash para
-  // siempre. Tras 15s sin perfil con sesión activa, se cierra la sesión local
-  // para volver al login.
+  // Si hay sesión pero el perfil no cargó, NO se cierra sesión: casi siempre es
+  // un fallo de red, y la sesión sigue siendo válida. Antes, tras 15s se cerraba
+  // la sesión local y eso expulsaba al usuario de la app cada vez que abría sin
+  // internet. Ahora se reintenta con backoff hasta que vuelva la conexión; si el
+  // perfil realmente no existe, useAuthListener ya cerró sesión y este efecto se
+  // desmonta por sí solo.
   useEffect(() => {
     if (loading || !session || profile) return;
-    const t = setTimeout(() => {
-      logger.warn(
-        "[auth] perfil no cargó con sesión activa; cerrando sesión local",
-      );
-      supabase.auth.signOut({ scope: "local" }).catch(() => {});
-    }, 15000);
-    return () => clearTimeout(t);
-  }, [loading, session, profile]);
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let attempt = 0;
+
+    const schedule = () => {
+      // Si el perfil ya llegó, `profile` cambió y el cleanup ya corrió: no
+      // dejar un timer huérfano corriendo en segundo plano.
+      if (cancelled) return;
+      // 5s, 10s, 20s, 30s… tope de 30s para no martillear al backend.
+      const delay = Math.min(30000, 5000 * 2 ** attempt);
+      attempt += 1;
+      timer = setTimeout(async () => {
+        if (cancelled) return;
+        try {
+          await refreshProfile();
+        } catch (e) {
+          // Perfil inexistente: `refreshProfile` propaga ProfileNotFoundError y
+          // el listener ya cerró sesión. No se insiste.
+          logger.warn("[auth] el perfil no existe; se detiene el reintento", e);
+          return;
+        }
+        // Si el perfil llegó, el efecto se limpia solo por el cambio de deps.
+        schedule();
+      }, delay);
+    };
+
+    schedule();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [loading, session, profile, refreshProfile]);
 
   useEffect(() => {
     if (session && profile?.rol === "web" && !webBlockShownRef.current) {

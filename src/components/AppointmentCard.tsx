@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   timeText: {
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: "700",
     color: COLORS.primaryDark,
   },

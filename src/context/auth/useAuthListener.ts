@@ -13,6 +13,7 @@ import { perfiles } from "../../types";
 import { OneSignal } from "react-native-onesignal";
 import { Platform } from "react-native";
 import { logger } from "@/utils/logger";
+import { ProfileNotFoundError } from "./useProfileLoader";
 
 const log = logger.scoped("auth-listener");
 
@@ -137,19 +138,29 @@ export const useAuthListener = ({
           const profileData = await loadProfile(userId);
           log.info("handleAuthChange: loadProfile result", { userId, found: !!profileData, event: _event });
 
+          // `loadProfile` solo devuelve null cuando la red falló (la sesión sigue
+          // siendo válida): en ese caso NO se cierra sesión, la app queda
+          // esperando a que vuelva la conexión.
           if (!profileData) {
-            log.error("handleAuthChange: Profile not found for logged-in user, signing out", { userId });
-            await supabase.auth.signOut();
-            onProfileChange(null);
-            finishLoading();
+            log.warn(
+              "handleAuthChange: No se pudo cargar el perfil (fallo de red); se conserva la sesión",
+              { userId },
+            );
             return;
           }
 
           log.info("handleAuthChange: Perfil cargado exitosamente", { userId, perfilId: profileData.id });
-          if (mounted && profileData) onProfileChange(profileData);
-
+          if (mounted) onProfileChange(profileData);
         } catch (profileErr) {
-          log.error("handleAuthChange: Error en loadProfile", { userId, error: profileErr });
+          if (profileErr instanceof ProfileNotFoundError) {
+            // El perfil no existe (usuario eliminado/bloqueado desde el panel).
+            // ÚNICO caso en el que se cierra la sesión automáticamente.
+            log.error("handleAuthChange: Perfil inexistente, cerrando sesión", { userId });
+            await supabase.auth.signOut();
+            if (mounted) onProfileChange(null);
+          } else {
+            log.error("handleAuthChange: Error en loadProfile", { userId, error: profileErr });
+          }
         } finally {
           log.info("handleAuthChange: Finalizando carga", { userId });
           finishLoading();

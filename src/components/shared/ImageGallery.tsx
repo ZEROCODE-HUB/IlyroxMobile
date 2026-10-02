@@ -44,6 +44,26 @@ export interface ImageGalleryProps {
   aspectRatio?: number; // 1 = cuadrado, 4/3 = horizontal, etc.
   /** Fuerza `aspectRatio` e ignora las dimensiones reales de la imagen. */
   fixedAspectRatio?: boolean;
+  /**
+   * Altura mínima del área de la galería, en píxeles.
+   *
+   * Existe para las tarjetas que flotan acciones (like/comentario/compartir)
+   * encima de la foto: si el ratio real es muy apaisado, el contenedor queda
+   * más bajo que la pila de botones y los que sobran caen sobre el fondo
+   * blanco, donde al ser blancos se vuelven invisibles.
+   *
+   * NO altera el cálculo de aspect ratio: Yoga resuelve primero la altura vía
+   * `aspectRatio` y después aplica esta restricción, así que solo sube la
+   * altura cuando ya era insuficiente. Las verticales y cuadradas, que miden
+   * bastante más, no se alteran.
+   *
+   * Las imágenes usan `height: "100%"` + `resizeMode="cover"`, de modo que una
+   * galería más alta no deforma la foto: solo la recorta un poco más a los
+   * lados, igual que hace Instagram con las panorámicas.
+   *
+   * Si se omite, el comportamiento es exactamente el actual.
+   */
+  minHeight?: number;
   showDots?: boolean;
   showImageCount?: boolean;
   onImagePress?: () => void;
@@ -57,6 +77,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
   images,
   aspectRatio = 1,
   fixedAspectRatio = false,
+  minHeight,
   showDots = true,
   showImageCount = false,
   onImagePress,
@@ -147,7 +168,13 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   return (
     <View
-      style={[styles.container, { width: "100%", aspectRatio: galleryAspectRatio }]}
+      style={[
+        styles.container,
+        { width: "100%", aspectRatio: galleryAspectRatio },
+        // Restricción posterior al aspect ratio: solo actúa si la altura
+        // resuelta fue menor que el mínimo (fotos muy apaisadas).
+        minHeight ? { minHeight } : null,
+      ]}
       onLayout={onLayout}
     >
       <FlatList
