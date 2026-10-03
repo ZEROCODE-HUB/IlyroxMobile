@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Pressable,
+  ScrollView,
 } from "react-native";
 import { VideoView, useVideoPlayer as useExpoVideoPlayer } from "expo-video";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -117,6 +118,7 @@ const ReelVideoPlayer: React.FC<ReelVideoPlayerProps> = ({
       player={player}
       style={[StyleSheet.absoluteFill, { opacity: isReady ? 1 : 0 }]}
       contentFit="contain"
+      surfaceType="textureView"
       nativeControls={false}
     />
   );
@@ -133,6 +135,7 @@ interface ReelListItemProps {
   currentUserId?: string;
   width: number;
   height: number;
+  onCaptionExpandedChange?: (expanded: boolean) => void;
 }
 
 const ReelListItem: React.FC<ReelListItemProps> = ({
@@ -144,10 +147,12 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
   currentUserId,
   width,
   height,
+  onCaptionExpandedChange,
 }) => {
   const insets = useSafeAreaInsets();
   const [showComments, setShowComments] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
+  const [captionCanExpand, setCaptionCanExpand] = useState(false);
   const [isPlaying, setIsPlaying] = useState(isActive);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -158,7 +163,20 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
 
   const videoSource =
     item.videoUrl || FALLBACKS.VIDEO_URL;
-  const SAFE_BOTTOM = insets.bottom || 20;
+  const SAFE_BOTTOM = Math.max(insets.bottom, 12);
+
+  const handleCaptionToggle = () => {
+    const expanded = !showFullCaption;
+    setShowFullCaption(expanded);
+    onCaptionExpandedChange?.(expanded);
+  };
+
+  React.useEffect(() => {
+    if (!isActive && showFullCaption) {
+      setShowFullCaption(false);
+      onCaptionExpandedChange?.(false);
+    }
+  }, [isActive, showFullCaption, onCaptionExpandedChange]);
 
   const handlePlayingChange = useCallback((v: boolean) => setIsPlaying(v), []);
   const handleProgressChange = useCallback((v: number) => setProgress(v), []);
@@ -200,7 +218,10 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
 
         <TouchableOpacity
           onPress={onClose}
-          style={[styles.backButton, { top: insets.top + 14 }]}
+          style={[
+            styles.backButton,
+            { top: insets.top + 14, left: insets.left + 12 },
+          ]}
         >
           <Ionicons name="chevron-back" size={28} color={COLORS.white} />
         </TouchableOpacity>
@@ -217,16 +238,34 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
           </Pressable>
         )}
 
-        <View style={[styles.bottomUI, { bottom: SAFE_BOTTOM }]}>
-          <View style={styles.timelineTrack}>
-            <View
-              style={[
-                styles.timelineFill,
-                { width: `${Math.round((progress || 0) * 100)}%` },
-              ]}
-            />
-          </View>
+        <View
+          style={[
+            styles.timelineTrack,
+            {
+              bottom: SAFE_BOTTOM,
+              left: insets.left + 12,
+              right: insets.right + 12,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.timelineFill,
+              { width: `${Math.round((progress || 0) * 100)}%` },
+            ]}
+          />
+        </View>
 
+        <View
+          style={[
+            styles.bottomUI,
+            {
+              bottom: SAFE_BOTTOM + 32,
+              left: insets.left + 12,
+              right: insets.right + 80,
+            },
+          ]}
+        >
           <SafePressable
             style={styles.userInfo}
             onPress={() => onUserClick?.(item.user)}
@@ -237,36 +276,70 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
               <Avatar name={item.user.name} size={40} />
             )}
             <View style={styles.userTextContainer}>
-              <Text style={styles.userName}>
+              <Text
+                style={styles.userName}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
                 {item.user.name || item.user.nombre || "Usuario"}
               </Text>
             </View>
           </SafePressable>
 
           {item.content && (
-            <TouchableOpacity
-              style={styles.contentContainer}
-              onPress={() => setShowFullCaption(!showFullCaption)}
-            >
-              <Text
+            <View style={styles.contentContainer}>
+              <ScrollView
                 style={[
-                  styles.content,
+                  styles.captionScroll,
                   showFullCaption && styles.contentExpanded,
+                  { maxHeight: Math.min(height * 0.3, 240) },
                 ]}
-                numberOfLines={showFullCaption ? undefined : 3}
+                contentContainerStyle={
+                  showFullCaption ? styles.expandedContent : undefined
+                }
+                scrollEnabled={showFullCaption}
+                nestedScrollEnabled
+                bounces={false}
+                showsVerticalScrollIndicator={showFullCaption}
               >
-                {item.content}
-              </Text>
-              {item.content.length > 100 && (
-                <Text style={styles.seeMoreText}>
-                  {showFullCaption ? "Ver menos" : "Ver más"}
+                <Text
+                  style={styles.content}
+                  numberOfLines={showFullCaption ? undefined : 3}
+                  selectable={showFullCaption}
+                  onPress={
+                    !showFullCaption && captionCanExpand
+                      ? handleCaptionToggle
+                      : undefined
+                  }
+                  onTextLayout={({ nativeEvent }) => {
+                    if (!showFullCaption) {
+                      setCaptionCanExpand(nativeEvent.lines.length >= 3);
+                    }
+                  }}
+                >
+                  {item.content}
                 </Text>
+              </ScrollView>
+              {captionCanExpand && (
+                <TouchableOpacity
+                  onPress={handleCaptionToggle}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.seeMoreText}>
+                    {showFullCaption ? "Ver menos" : "Ver más"}
+                  </Text>
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
+            </View>
           )}
         </View>
 
-        <View style={[styles.actionsContainer, { bottom: SAFE_BOTTOM + 120 }]}>
+        <View
+          style={[
+            styles.actionsContainer,
+            { bottom: SAFE_BOTTOM + 120, right: insets.right + 10 },
+          ]}
+        >
           <ActionButtons
             feedItemId={item.id}
             feedItemType="reel"
@@ -358,10 +431,11 @@ const styles = StyleSheet.create({
     right: 80,
   },
   timelineTrack: {
+    position: "absolute",
     height: 2,
     backgroundColor: COLORS.whiteTransparent30,
     borderRadius: 1,
-    marginBottom: 12,
+    overflow: "hidden",
   },
   timelineFill: {
     height: "100%",
@@ -382,6 +456,7 @@ const styles = StyleSheet.create({
   },
   userTextContainer: {
     flex: 1,
+    minWidth: 0,
   },
   userName: {
     color: COLORS.white,
@@ -417,6 +492,11 @@ const styles = StyleSheet.create({
   contentExpanded: {
     backgroundColor: COLORS.blackTransparent,
     borderRadius: 10,
+  },
+  captionScroll: {
+    flexGrow: 0,
+  },
+  expandedContent: {
     padding: 10,
   },
   placeholder: {

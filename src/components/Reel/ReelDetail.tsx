@@ -10,9 +10,10 @@ import {
   Animated,
   PanResponder,
   StatusBar,
-  Platform,
   Pressable,
+  ScrollView,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VideoView, useVideoPlayer as useExpoVideoPlayer } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { FeedItem, User } from "../../types";
@@ -35,8 +36,20 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
   onUserClick,
   currentUserId,
 }) => {
-  const { width, height } = useWindowDimensions();
+  const windowDimensions = useWindowDimensions();
+  const [{ width, height }, setViewport] = useState({
+    width: windowDimensions.width,
+    height: windowDimensions.height,
+  });
+  const insets = useSafeAreaInsets();
   const [showComments, setShowComments] = useState(false);
+  const [showFullCaption, setShowFullCaption] = useState(false);
+  const [captionCanExpand, setCaptionCanExpand] = useState(false);
+  const showFullCaptionRef = useRef(false);
+
+  useEffect(() => {
+    showFullCaptionRef.current = showFullCaption;
+  }, [showFullCaption]);
 
   const videoSource =
     item.videoUrl || FALLBACKS.VIDEO_URL;
@@ -86,7 +99,11 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
         // Solo permitir swipe si no hay comentarios abiertos
-        return !showCommentsRef.current && Math.abs(gestureState.dy) > 15;
+        return (
+          !showCommentsRef.current &&
+          !showFullCaptionRef.current &&
+          Math.abs(gestureState.dy) > 15
+        );
       },
       onPanResponderMove: (_, gestureState) => {
         // Solo permitir swipe hacia abajo
@@ -118,9 +135,7 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
     }),
   ).current;
 
-  const SAFE_BOTTOM = Platform.OS === "ios" ? 34 : 20;
-
-  const [showFullCaption, setShowFullCaption] = useState(false);
+  const SAFE_BOTTOM = Math.max(insets.bottom, 12);
 
   const handleShowMore = () => {
     setShowFullCaption(!showFullCaption);
@@ -144,11 +159,17 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
         style={[
           styles.container,
           {
-            width,
-            height,
             transform: [{ translateY: panY }],
           },
         ]}
+        onLayout={({ nativeEvent }) => {
+          const { width, height } = nativeEvent.layout;
+          setViewport((previous) =>
+            previous.width === width && previous.height === height
+              ? previous
+              : { width, height },
+          );
+        }}
         {...panResponder.panHandlers}
       >
         <View style={[styles.video, { width, height }]}>
@@ -157,7 +178,7 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
             <Image
               source={{ uri: item.images[0] }}
               style={StyleSheet.absoluteFill}
-              resizeMode="cover"
+              resizeMode="contain"
             />
           ) : null}
 
@@ -183,7 +204,7 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
             onPress={onClose}
             style={[
               styles.backButton,
-              { top: Platform.OS === "ios" ? 54 : 40 },
+              { top: insets.top + 14, left: insets.left + 12 },
             ]}
           >
             <Ionicons name="chevron-back" size={28} color={COLORS.white} />
@@ -203,17 +224,34 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
           )}
 
           {/* Bottom UI - Información del usuario (estilo TikTok) */}
-          <View style={[styles.bottomUI, { bottom: SAFE_BOTTOM }]}>
-            {/* Timeline de progreso */}
-            <View style={styles.timelineTrack}>
-              <View
-                style={[
-                  styles.timelineFill,
-                  { width: `${Math.round(progress * 100)}%` },
-                ]}
-              />
-            </View>
+          <View
+            style={[
+              styles.timelineTrack,
+              {
+                bottom: SAFE_BOTTOM,
+                left: insets.left + 12,
+                right: insets.right + 12,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.timelineFill,
+                { width: `${Math.round(progress * 100)}%` },
+              ]}
+            />
+          </View>
 
+          <View
+            style={[
+              styles.bottomUI,
+              {
+                bottom: SAFE_BOTTOM + 32,
+                left: insets.left + 12,
+                right: insets.right + 80,
+              },
+            ]}
+          >
             {/* User info - Bottom left (estilo TikTok) */}
             <SafePressable
               style={styles.userInfo}
@@ -225,40 +263,72 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
                   style={styles.avatar}
                 />
               ) : (
-                <Avatar name={item.user.name} size={10} />
+                <Avatar name={item.user.name} size={40} />
               )}
               <View style={styles.userTextContainer}>
-                <Text style={styles.userName}>
+                <Text
+                  style={styles.userName}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
                   {item.user.name || item.user.nombre || "Usuario"}
                 </Text>
               </View>
             </SafePressable>
             {item.content && (
-              <TouchableOpacity
-                style={styles.contentContainer}
-                onPress={handleShowMore}
-              >
-                <Text
+              <View style={styles.contentContainer}>
+                <ScrollView
                   style={[
-                    styles.content,
+                    styles.captionScroll,
                     showFullCaption && styles.contentExpanded,
+                    { maxHeight: Math.min(height * 0.3, 240) },
                   ]}
-                  numberOfLines={showFullCaption ? undefined : 3}
+                  contentContainerStyle={
+                    showFullCaption ? styles.expandedContent : undefined
+                  }
+                  scrollEnabled={showFullCaption}
+                  nestedScrollEnabled
+                  bounces={false}
+                  showsVerticalScrollIndicator={showFullCaption}
                 >
-                  {item.content}
-                </Text>
-                {item.content.length > 100 && (
-                  <Text style={styles.seeMoreText}>
-                    {showFullCaption ? "Ver menos" : "Ver más"}
+                  <Text
+                    style={styles.content}
+                    numberOfLines={showFullCaption ? undefined : 3}
+                    selectable={showFullCaption}
+                    onPress={
+                      !showFullCaption && captionCanExpand
+                        ? handleShowMore
+                        : undefined
+                    }
+                    onTextLayout={({ nativeEvent }) => {
+                      if (!showFullCaption) {
+                        setCaptionCanExpand(nativeEvent.lines.length >= 3);
+                      }
+                    }}
+                  >
+                    {item.content}
                   </Text>
+                </ScrollView>
+                {captionCanExpand && (
+                  <TouchableOpacity
+                    onPress={handleShowMore}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.seeMoreText}>
+                      {showFullCaption ? "Ver menos" : "Ver más"}
+                    </Text>
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
+              </View>
             )}
           </View>
 
           {/* Actions - Botones verticales derecha (estilo TikTok) */}
           <View
-            style={[styles.actionsContainer, { bottom: SAFE_BOTTOM + 120 }]}
+            style={[
+              styles.actionsContainer,
+              { bottom: SAFE_BOTTOM + 120, right: insets.right + 10 },
+            ]}
           >
             <ActionButtons
               feedItemId={item.id}
@@ -296,7 +366,9 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     backgroundColor: COLORS.black,
+    overflow: "hidden",
   },
   video: {
     position: "absolute",
@@ -350,10 +422,11 @@ const styles = StyleSheet.create({
     right: 80, // Espacio para los botones de acción
   },
   timelineTrack: {
+    position: "absolute",
     height: 2,
     backgroundColor: COLORS.whiteTransparent30,
     borderRadius: 1,
-    marginBottom: 12,
+    overflow: "hidden",
   },
   timelineFill: {
     height: "100%",
@@ -374,6 +447,7 @@ const styles = StyleSheet.create({
   },
   userTextContainer: {
     flex: 1,
+    minWidth: 0,
   },
   userName: {
     color: COLORS.white,
@@ -410,6 +484,11 @@ const styles = StyleSheet.create({
   contentExpanded: {
     backgroundColor: COLORS.blackTransparent,
     borderRadius: 10,
+  },
+  captionScroll: {
+    flexGrow: 0,
+  },
+  expandedContent: {
     padding: 10,
   },
 });
