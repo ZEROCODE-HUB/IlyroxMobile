@@ -38,7 +38,26 @@ export const HistorySearches: React.FC<HistorySearchesProps> = ({
     return null;
   }
 
-  const displayedItems = showAll ? historial : historial.slice(0, 5);
+  const groupedItems: { busqueda: HistorialBusqueda; ids: string[] }[] = [];
+
+  for (const busqueda of historial) {
+    const previous = groupedItems[groupedItems.length - 1];
+    const isSearch = busqueda.tipo_busqueda === 'draft' || busqueda.tipo_busqueda === null;
+
+    if (
+      isSearch &&
+      busqueda.query_original &&
+      previous &&
+      previous.busqueda.tipo_busqueda === busqueda.tipo_busqueda &&
+      previous.busqueda.query_original === busqueda.query_original
+    ) {
+      previous.ids.push(busqueda.id);
+    } else {
+      groupedItems.push({ busqueda, ids: [busqueda.id] });
+    }
+  }
+
+  const displayedItems = showAll ? groupedItems : groupedItems.slice(0, 5);
 
   const formatNum = (n: string | number): string => {
     const val = Number(n);
@@ -183,7 +202,8 @@ export const HistorySearches: React.FC<HistorySearchesProps> = ({
     return parts.filter(Boolean).join(' · ');
   };
 
-  const renderItem = ({ item }: { item: HistorialBusqueda }) => {
+  const renderItem = ({ item: group }: { item: (typeof groupedItems)[number] }) => {
+    const { busqueda: item, ids } = group;
     const titulo = getTitulo(item);
     const subtitulo = getSubtitulo(item);
     const filtros = getFiltrosPreview(item);
@@ -218,7 +238,7 @@ export const HistorySearches: React.FC<HistorySearchesProps> = ({
         </View>
         <Pressable
           style={styles.removeBtn}
-          onPress={() => onRemove(item.id)}
+          onPress={() => ids.forEach((id) => onRemove(id))}
           hitSlop={8}
         >
           <Ionicons name="close" size={16} color="#999" />
@@ -236,13 +256,13 @@ export const HistorySearches: React.FC<HistorySearchesProps> = ({
       <FlatList
         data={displayedItems}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.busqueda.id}
         scrollEnabled={showAll}
         style={showAll ? styles.listExpanded : undefined}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
 
-      {historial.length > 5 && !showAll && (
+      {groupedItems.length > 5 && !showAll && (
         <Pressable style={styles.verMas} onPress={() => setShowAll(true)}>
           <Text style={styles.verMasText}>Ver más...</Text>
         </Pressable>

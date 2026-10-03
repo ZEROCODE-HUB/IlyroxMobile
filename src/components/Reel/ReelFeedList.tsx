@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useRef } from "react";
-import { View, StyleSheet, useWindowDimensions, StatusBar, FlatList } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import { View, StyleSheet, StatusBar, FlatList } from "react-native";
+import type { LayoutChangeEvent } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import ReelListItem from "./ReelListItem";
 import { useReelFeed } from "./useReelFeed";
@@ -26,14 +26,37 @@ const ReelFeedList: React.FC<ReelFeedListProps> = ({
   onUserClick,
   currentUserId,
 }) => {
-  const { height, width } = useWindowDimensions();
+  const [{ height, width }, setViewport] = useState({ height: 0, width: 0 });
   const isFocused = useIsFocused();
   const { reels, fetchMoreReels } = useReelFeed(initialReelItem);
 
   // El reel abierto siempre queda en el índice 0, así que no hace falta
   // calcular un índice inicial ni remontar la lista.
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [captionExpanded, setCaptionExpanded] = useState(false);
+  const currentIndexRef = useRef(0);
   const flatListRef = useRef<FlatList>(null);
+
+  const handleLayout = useCallback(({ nativeEvent }: LayoutChangeEvent) => {
+    const { height, width } = nativeEvent.layout;
+    setViewport((previous) =>
+      previous.height === height && previous.width === width
+        ? previous
+        : { height, width },
+    );
+  }, []);
+
+  useEffect(() => {
+    if (height <= 0 || width <= 0) return;
+    const index = currentIndexRef.current;
+    const frame = requestAnimationFrame(() => {
+      flatListRef.current?.scrollToOffset({
+        offset: index * height,
+        animated: false,
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [height, width]);
 
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 80,
@@ -42,6 +65,7 @@ const ReelFeedList: React.FC<ReelFeedListProps> = ({
 
   const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
+      currentIndexRef.current = viewableItems[0].index;
       setCurrentIndex(viewableItems[0].index);
     }
   }, []);
@@ -74,6 +98,7 @@ const ReelFeedList: React.FC<ReelFeedListProps> = ({
             currentUserId={currentUserId}
             width={width}
             height={height}
+            onCaptionExpandedChange={setCaptionExpanded}
           />
         </View>
       );
@@ -86,19 +111,24 @@ const ReelFeedList: React.FC<ReelFeedListProps> = ({
   // aquí, pero un Modal montado sobre una pantalla nativa-modal a veces no
   // aparece en Android — era la causa de que el reel "no abriera".)
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+    <View style={styles.container} onLayout={handleLayout}>
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
         translucent
       />
-      {reels.length > 0 ? (
+      {reels.length > 0 && height > 0 && width > 0 ? (
         <FlatList
+          style={styles.list}
           ref={flatListRef}
           data={reels}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           pagingEnabled
+          scrollEnabled={!captionExpanded}
+          bounces={false}
+          contentInsetAdjustmentBehavior="never"
+          automaticallyAdjustContentInsets={false}
           showsVerticalScrollIndicator={false}
           decelerationRate="fast"
           disableIntervalMomentum
@@ -114,7 +144,7 @@ const ReelFeedList: React.FC<ReelFeedListProps> = ({
           initialNumToRender={2}
         />
       ) : null}
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -122,6 +152,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.black,
+    overflow: "hidden",
+  },
+  list: {
+    flex: 1,
   },
 });
 
