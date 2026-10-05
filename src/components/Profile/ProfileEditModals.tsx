@@ -27,6 +27,14 @@ export interface ProfileEditModalsProps {
   showOpenHouseModal: boolean;
   openHousePost: Post | null;
   onCloseOpenHouseModal: () => void;
+
+  /**
+   * Refresca SOLO ese contenido en la cache del feed tras una edición exitosa.
+   * Antes, editar invalidaba ["feed"] completo (refetch que reordenaba el feed por
+   * engagement_score); con este parche puntual el feed se queda en su sitio y la
+   * tarjeta muestra el dato nuevo al volver.
+   */
+  onFeedContentUpdated?: (contenidoId: string) => void;
 }
 
 export const ProfileEditModals: React.FC<ProfileEditModalsProps> = ({
@@ -45,6 +53,7 @@ export const ProfileEditModals: React.FC<ProfileEditModalsProps> = ({
   showOpenHouseModal,
   openHousePost,
   onCloseOpenHouseModal,
+  onFeedContentUpdated,
 }) => {
   return (
     <>
@@ -57,6 +66,7 @@ export const ProfileEditModals: React.FC<ProfileEditModalsProps> = ({
         >
           <CreateProperty
             onBack={(shouldRefresh) => onCloseEditProperty(shouldRefresh)}
+            onUpdated={(id) => onFeedContentUpdated?.(id)}
             propertyId={editProperty?.id}
           />
         </Modal>
@@ -67,13 +77,18 @@ export const ProfileEditModals: React.FC<ProfileEditModalsProps> = ({
           <CreatePost
             post={editPost || undefined}
             onBack={onCloseEditPost}
+            onUpdated={(id) => onFeedContentUpdated?.(id)}
           />
         </Modal>
       )}
 
       {showEditReelModal && (
         <Modal visible={showEditReelModal}>
-          <CreateReel reelId={editReel?.id} onBack={onCloseEditReel} />
+          <CreateReel
+            reelId={editReel?.id}
+            onBack={onCloseEditReel}
+            onUpdated={(id) => onFeedContentUpdated?.(id)}
+          />
         </Modal>
       )}
 

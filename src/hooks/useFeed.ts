@@ -12,11 +12,12 @@ import {
   useInfiniteQuery,
   useQuery,
   useQueryClient,
+  type InfiniteData,
   type QueryClient,
 } from "@tanstack/react-query";
 import { FeedItem, RecommendedByPreviewUser, User } from "@/types";
 import { useAuth } from "@/context/AuthContext";
-import { feedService } from "@/services/feedService";
+import { feedService, type FeedPage } from "@/services/feedService";
 import { profileService } from "@/services/profileService";
 import { PAGINATION } from "@/constants/config";
 import { logger } from "@/utils/logger";
@@ -40,13 +41,21 @@ const feedKeys = {
     [...feedKeys.all, "item", id, userId ?? "anon"] as const,
 };
 
+/**
+ * Id del CONTENIDO (post/reel/propiedad) que representa un item del feed.
+ * El `id` del item es el id de la fila de `feed_items`, que puede cambiar si el
+ * trigger re-crea la fila (p. ej. al cambiar el status de una propiedad), por eso
+ * para identificar contenido usamos siempre el id del post/propiedad.
+ */
+function contentIdOf(item: FeedItem): string {
+  return item.postDetails?.id || item.propertyDetails?.id || item.id;
+}
+
 function dedupeItems(items: FeedItem[]): FeedItem[] {
   const seen = new Set<string>();
   const out: FeedItem[] = [];
   for (const item of items) {
-    const contentId =
-      item.postDetails?.id || item.propertyDetails?.id || item.id;
-    const key = `${item.type}_${contentId}`;
+    const key = `${item.type}_${contentIdOf(item)}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(item);
@@ -212,6 +221,18 @@ export function useFeed(options: UseFeedOptions = {}) {
     return query.refetch();
   }, [query.refetch]);
 
+  // Refresca UN item del feed (post/propiedad) sin tocar el orden de la lista.
+  const patchFeedItemById = useCallback(
+    (contenidoId: string) => patchFeedItem(queryClient, contenidoId, userId),
+    [queryClient, userId],
+  );
+
+  // Quita UN item de la lista del feed (borrado / dejó de ser visible).
+  const removeFeedItemById = useCallback(
+    (feedItemId: string) => removeFeedItem(queryClient, feedItemId),
+    [queryClient],
+  );
+
   return {
     items,
     loading: query.isLoading,
@@ -221,7 +242,118 @@ export function useFeed(options: UseFeedOptions = {}) {
     loadMore,
     refresh,
     refreshUserStats,
+    patchFeedItem: patchFeedItemById,
+    removeFeedItem: removeFeedItemById,
   };
+}
+
+/**
+ * Refresca UN SOLO item del feed (post/reel/propiedad) sin recargar la lista.
+ *
+ * Por qué: `queryClient.invalidateQueries({ queryKey: ["feed"] })` marca la
+ * lista infinita como stale y dispara un refetch en background; el servidor
+ * devuelve el feed reordenado por `engagement_score`, así que los items se
+ * saltan de posición mientras el usuario los está mirando (el "feed se
+ * desordena al editar"). Aquí en su lugar se trae solo ese contenido con
+ * `feedService.getFeedItem` y se sustituye en el MISMO índice de la MISMA
+ * página, por lo que el orden no cambia.
+ *
+ * Si el contenido ya no debe estar en el feed (propiedad Vendida/Reservada/
+ * Eliminada, post borrado, autor bloqueado), `getFeedItem` devuelve `null` y el
+ * item se quita de la lista en vez de dejar datos viejos.
+ *
+ * `contenidoId` acepta el id del contenido (post/propiedad) o el id de la fila
+ * de feed_items.
+ */
+export async function patchFeedItem(
+  queryClient: QueryClient,
+  contenidoId: string,
+  currentUserId?: string,
+) {
+  try {
+    const fresh = await feedService.getFeedItem(contenidoId, currentUserId);
+
+    // La query del item individual (detalle, comentarios) se actualiza con el
+    // dato fresco: son pocas queries y no afectan al orden de la lista. Se
+    // cubren las dos claves posibles (id de feed_items e id del contenido).
+    if (fresh) {
+      queryClient.setQueryData(feedKeys.item(fresh.id, currentUserId), fresh);
+      if (contenidoId !== fresh.id) {
+        queryClient.setQueryData(
+          feedKeys.item(contenidoId, currentUserId),
+          fresh,
+        );
+      }
+    } else {
+      queryClient.removeQueries({ queryKey: feedKeys.item(contenidoId) });
+    }
+
+    // Todas las variantes de la lista (cualquier pageSize / usuario) se parchean.
+    // Si el item no está entre las páginas cargadas NO se inserta (insertarlo
+    // cambiaría el orden); aparecerá en el siguiente refetch o paginación.
+    queryClient.setQueriesData<InfiniteData<FeedPage, unknown>>(
+      { queryKey: [...feedKeys.all, "list"] },
+      (prev) => {
+        if (!prev?.pages?.length) return prev;
+
+        let changed = false;
+
+        const pages = prev.pages.map((page) => {
+          const items = page.items ?? [];
+          const nextItems: FeedItem[] = [];
+          let pageChanged = false;
+
+          for (const item of items) {
+            const matches =
+              item.id === contenidoId || contentIdOf(item) === contenidoId;
+            if (matches) {
+              pageChanged = true;
+              // Si `fresh` es null el contenido ya no va en el feed: se omite.
+              if (fresh) nextItems.push(fresh);
+              continue;
+            }
+            nextItems.push(item);
+          }
+
+          if (!pageChanged) return page;
+          changed = true;
+          return { ...page, items: nextItems };
+        });
+
+        return changed ? { ...prev, pages } : prev;
+      },
+    );
+
+    return fresh;
+  } catch (e) {
+    log.warn("patchFeedItem failed", e);
+    return null;
+  }
+}
+
+/** Quita un item del feed de la cache de listas (borrado / dejó de ser visible). */
+export function removeFeedItem(
+  queryClient: QueryClient,
+  feedItemId: string,
+) {
+  queryClient.setQueriesData<InfiniteData<FeedPage, unknown>>(
+    { queryKey: [...feedKeys.all, "list"] },
+    (prev) => {
+      if (!prev?.pages?.length) return prev;
+      let changed = false;
+      const pages = prev.pages.map((page) => {
+        const items = (page.items ?? []).filter(
+          (item) =>
+            item.id !== feedItemId && contentIdOf(item) !== feedItemId,
+        );
+        if (items.length === (page.items?.length ?? 0)) return page;
+        changed = true;
+        return { ...page, items };
+      });
+      return changed ? { ...prev, pages } : prev;
+    },
+  );
+  queryClient.removeQueries({ queryKey: feedKeys.item(feedItemId) });
 }
 
 /**

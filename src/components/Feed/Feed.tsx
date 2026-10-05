@@ -71,6 +71,8 @@ const Feed: React.FC<FeedProps> = ({
     loadMore,
     refresh,
     refreshUserStats,
+    patchFeedItem,
+    removeFeedItem,
     error,
   } = useFeed({
     userId: currentUserId,
@@ -86,6 +88,10 @@ const Feed: React.FC<FeedProps> = ({
     await refresh();
     setIsUserRefreshing(false);
   }, [refresh]);
+
+  // Tras editar una propiedad/post NO se recarga la lista: eso reordena el feed
+  // por engagement_score. Se parchea solo ese item (patchFeedItem), que conserva
+  // su posición; el scroll tampoco se restaura porque la lista no cambia de orden.
 
   useFocusEffect(
     useCallback(() => {
@@ -299,7 +305,11 @@ const Feed: React.FC<FeedProps> = ({
               onCommentClick={() => handleOpenComments(item)}
               isVisible={isVisible}
               currentUserId={currentUserId}
-              onReelUpdated={refresh}
+              onReelUpdated={() => {
+                const id = item.reelDetails?.id;
+                if (id) patchFeedItem(id);
+              }}
+              onReelRemoved={() => removeFeedItem(item.id)}
             />
           );
         case "property":
@@ -312,7 +322,13 @@ const Feed: React.FC<FeedProps> = ({
               onUserClick={onUserClick}
               onCommentClick={() => handleOpenComments(item)}
               currentUserId={currentUserId}
-              onPropertyUpdated={refresh}
+              // Refresca SOLO este item (misma posición). Un refetch de la lista
+              // reordenaría por engagement_score y saltaría el contenido de lugar.
+              onPropertyUpdated={() => {
+                const propertyId = item.propertyDetails?.id;
+                if (propertyId) patchFeedItem(propertyId);
+              }}
+              onPropertyRemoved={() => removeFeedItem(item.id)}
             />
           );
         default:
@@ -325,7 +341,11 @@ const Feed: React.FC<FeedProps> = ({
               onUserClick={onUserClick}
               onCommentClick={() => handleOpenComments(item)}
               currentUserId={currentUserId}
-              onPostUpdated={refresh}
+              onPostUpdated={() => {
+                const postId = item.postDetails?.id;
+                if (postId) patchFeedItem(postId);
+              }}
+              onPostRemoved={() => removeFeedItem(item.id)}
             />
           );
       }
@@ -336,7 +356,8 @@ const Feed: React.FC<FeedProps> = ({
       onUserClick,
       focusedItemId,
       currentUserId,
-      refresh,
+      patchFeedItem,
+      removeFeedItem,
     ],
   );
 

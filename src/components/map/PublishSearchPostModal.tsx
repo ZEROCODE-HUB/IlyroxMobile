@@ -386,7 +386,9 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
           .update({ busquedas_json: updatedMetadata, updated_at: new Date() })
           .eq("id", editPost.id);
         if (error) throw error;
-        queryClient.invalidateQueries({ queryKey: ["feed"] });
+        // NO invalidar ["feed"]: el refetch de la lista reordena el feed por
+        // engagement_score. El contenedor refresca solo este post (patchFeedItem).
+        queryClient.invalidateQueries({ queryKey: ["feed", "item"] });
         showToast("Búsqueda actualizada", "success");
         onPublished();
       } else {

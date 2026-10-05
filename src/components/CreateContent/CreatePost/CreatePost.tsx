@@ -4,7 +4,6 @@
  */
 
 import React, { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import {
   View,
@@ -59,9 +58,15 @@ const parseNum = (val: string): number | null => {
 interface CreatePostProps {
   post?: Post;
   onBack: () => void;
+  /**
+   * Se dispara SOLO tras guardar una EDICIÓN correctamente (no al cancelar), con
+   * el id del post. Permite refrescar ese item puntual del feed en vez de invalidar
+   * la lista completa, que la reordena por engagement_score.
+   */
+  onUpdated?: (postId: string) => void;
 }
 
-export default function CreatePost({ post, onBack }: CreatePostProps) {
+export default function CreatePost({ post, onBack, onUpdated }: CreatePostProps) {
   const insets = useSafeAreaInsets();
   const safeStyle = {
     paddingBottom: Math.max(insets.bottom, 10),
@@ -73,7 +78,6 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
   const { ensurePermission } = useGalleryPermission();
   const { showToast } = useToast();
   const router = useRouter();
-  const queryClient = useQueryClient();
   const { createPost, uploading: creatingPost } = useCreateContent(user?.id);
 
   const [content, setContent] = useState("");
@@ -473,20 +477,17 @@ export default function CreatePost({ post, onBack }: CreatePostProps) {
         setUploadProgress(0);
         setIsUploadingManual(false);
         if (!isEditing) {
-          router.replace({
-            pathname: "/(tabs)",
-            params: { refresh: String(Date.now()) },
-          });
-        } else if (post?.tipo === "busqueda") {
-          // Edición de post de búsqueda: no hay prepend, así que refrescamos el
-          // feed para que el cambio editado se refleje (se reordena por score).
-          queryClient.invalidateQueries({ queryKey: ["feed"] });
-          onBack();
+          // Publicación nueva: se crea y se lleva al feed (la tarjeta hace prepend).
           router.replace({
             pathname: "/(tabs)",
             params: { refresh: String(Date.now()) },
           });
         } else {
+          // EDICIÓN: no se navega a ningún lado (se editó desde un modal, en el feed
+          // o en el perfil: moverse sacaba al usuario de donde estaba) y no se
+          // invalida ["feed"] (reordenaba la lista por engagement_score). El
+          // contenedor refresca solo este post con patchFeedItem.
+          if (post?.id) onUpdated?.(post.id);
           onBack();
         }
       }, 500);

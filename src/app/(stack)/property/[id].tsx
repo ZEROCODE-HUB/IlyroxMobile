@@ -8,8 +8,22 @@ import {
 import { normalizePropertyData } from "@/utils/normalizePropertyData";
 
 export default function PropertyDetailScreen() {
-  const { id, imageIndex } = useLocalSearchParams();
+  const { id, imageIndex, highlightUserId, highlightUserIds, highlightCommentIds } =
+    useLocalSearchParams();
   const cache = usePropertyCacheStore((state) => state.cache);
+
+  // Parse CSV params (same pattern as post/[id].tsx)
+  const parseCsv = (v: unknown): string[] => {
+    if (Array.isArray(v)) return v.flatMap((x) => String(x).split(",")).map((s) => s.trim()).filter(Boolean);
+    if (typeof v === "string") return v.split(",").map((s) => s.trim()).filter(Boolean);
+    return [];
+  };
+
+  const highlightUserIdsFinal = parseCsv(highlightUserIds);
+  const parsedHighlightCommentIds = typeof highlightCommentIds === "string"
+    ? highlightCommentIds.split(",").filter(Boolean)
+    : undefined;
+  const shouldAutoOpenComments = !!(highlightUserId || highlightUserIds);
 
   // Cache lookup síncrono durante el render (mismo patrón que los posts):
   // el feed precachea la propiedad con setProperty() ANTES de navegar, así
@@ -29,6 +43,9 @@ export default function PropertyDetailScreen() {
       propertyId={id as string}
       initialData={initialData}
       imageIndex={parsedImageIndex}
+      highlightUserIds={highlightUserIdsFinal}
+      highlightCommentIds={parsedHighlightCommentIds}
+      autoOpenComments={shouldAutoOpenComments}
     />
   );
 }

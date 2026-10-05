@@ -153,6 +153,12 @@ const trackInteractionDedup = async (
   seconds: number,
   type: "like" | "comentario" | "compartir" | "guardar",
 ): Promise<void> => {
+  // Validate inputs
+  if (!feedItemId || feedItemId === "undefined" || !userId || userId === "undefined") {
+    log.warn("trackInteractionDedup skipped: invalid feedItemId or userId");
+    return;
+  }
+
   try {
     const { data: existing, error: selectError } = await supabase
       .from("feed_visualizaciones")
@@ -252,7 +258,8 @@ export function useViewTracking(options: UseViewTrackingOptions) {
   const trackInteraction = async (
     type: "like" | "comentario" | "compartir" | "guardar",
   ) => {
-    if (!userId) return;
+    // Validate userId is a valid UUID, not "undefined" or empty
+    if (!userId || userId === "undefined" || userId.trim() === "") return;
 
     const seconds = Math.floor(
       (Date.now() - startTimeRef.current) / 1000,

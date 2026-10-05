@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { COLORS } from "@/constants";
@@ -23,6 +24,7 @@ import { useToast } from "@/context/ToastContext";
 import { MapDetails } from "./MapDetails";
 import CreateProperty from "../CreateContent/CreateProperty";
 import { useChatInitiator } from "@/hooks/messaging/useChatInitiator";
+import { patchFeedItem } from "@/hooks/useFeed";
 import { logger } from "@/utils/logger";
 import { parseImages } from "@/utils/imageParser";
 import { formatDateShort } from "@/utils/dateFormatter";
@@ -57,6 +59,12 @@ interface PropertyDetailProps {
   imageIndex?: number;
   /** Indica si se renderiza dentro de un Modal (aplica estilos redondeados). */
   isModal?: boolean;
+  /** Usuarios a highlightear en comentarios (desde notificación). */
+  highlightUserIds?: string[];
+  /** Comentarios a highlightear (desde notificación). */
+  highlightCommentIds?: string[];
+  /** Auto-abrir el sheet de comentarios (desde notificación). */
+  autoOpenComments?: boolean;
 }
 
 
@@ -69,6 +77,9 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   onClose,
   imageIndex,
   isModal = false,
+  highlightUserIds,
+  highlightCommentIds,
+  autoOpenComments,
 }) => {
   const handleClose = onClose ?? (() => router.back());
 
@@ -90,6 +101,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
     [onClose],
   );
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { currentUser } = useApp();
   const { propertyDetails, loading, refetch } = usePropertyDetails(
     propertyId || "",
@@ -109,6 +121,18 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
 
   const [refreshing, setRefreshing] = useState(false);
   const { showToast } = useToast();
+
+  // Auto-open comments when navigating from a notification
+  useEffect(() => {
+    if (autoOpenComments && propertyDetails?.feed_items?.id) {
+      setShowComments(true);
+    }
+  }, [autoOpenComments, propertyDetails?.feed_items?.id]);
+
+  // Handle when a highlighted comment from notification is not found (deleted)
+  const handleHighlightedCommentNotFound = useCallback(() => {
+    showToast("El comentario fue eliminado", "info");
+  }, [showToast]);
 
   const copyToClipboard = async (text: string) => {
     await Clipboard.setStringAsync(text);
@@ -227,7 +251,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           userId={user?.id}
           propertyId={propertyDetails.id}
           shareTitle={buildPropertyShareTitle(propertyDetails)}
-          shareDescription={propertyDetails.descripcion?.substring(0, 100)}
+          shareDescription={propertyDetails.descripcion}
           shareCode={
             propertyDetails.codigo_propiedad || propertyDetails.code
           }
@@ -304,6 +328,16 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                   </Text>
                 </View>
               ))}
+              {user?.id === propertyDetails.created_by && propertyDetails.precio_contrato && (propertyDetails.status === "Vendida" || propertyDetails.status === "Rentada") && (
+                <View style={styles.contractPriceBadge}>
+                  <Text style={styles.contractPriceLabel}>
+                    {propertyDetails.status === "Rentada" ? "Rentada en" : "Vendida en"}
+                  </Text>
+                  <Text style={styles.contractPriceValue}>
+                    {propertyDetails.moneda_contrato || 'MXN'} {propertyDetails.precio_contrato.toLocaleString("es-MX")}
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.locationRow}>
@@ -541,6 +575,9 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
         onClose={() => setShowComments(false)}
         feedItemId={propertyDetails.feed_items?.id ?? ""}
         currentUserId={user?.id}
+        highlightUserIds={highlightUserIds}
+        highlightCommentIds={highlightCommentIds}
+        onHighlightedCommentNotFound={handleHighlightedCommentNotFound}
       />
 
       <Modal visible={showModal} onRequestClose={() => setShowModal(false)}>
@@ -549,6 +586,11 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
             setShowModal(false);
             setLoadingEdit(false);
             if (shouldRefresh) handleRefresh();
+          }}
+          // Al editar desde el detalle se refresca SOLO el item del feed (sin
+          // recargar la lista, que la reordena por engagement_score).
+          onUpdated={(id) => {
+            patchFeedItem(queryClient, id, user?.id);
           }}
           propertyId={propertyIdModal ?? undefined}
         />

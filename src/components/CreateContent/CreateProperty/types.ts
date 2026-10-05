@@ -70,6 +70,13 @@ export interface NumberInputConfig {
 
 export interface CreatePropertyProps {
   onBack: (shouldRefresh?: boolean) => void;
+  /**
+   * Se dispara SOLO tras guardar una EDICIÓN correctamente (no al cancelar ni al
+   * descartar), con el id de la propiedad actualizada. Permite que el contenedor
+   * refresque ese item puntual (patchFeedItem) en vez de recargar la lista
+   * completa, que reordena el feed por engagement_score.
+   */
+  onUpdated?: (propertyId: string) => void;
   propertyId?: string;
 }
 
@@ -152,6 +159,10 @@ export interface PropertyFormState {
 
   // Contract data (venta/renta)
   contractData: ContractData | null;
+  /** Campos de contrato (precio final de venta/renta) */
+  precioContrato: number | null;
+  monedaContrato: "USD" | "MXN" | null;
+  tipoContrato: "venta" | "renta" | null;
 
   // EasyBroker
   sinComision: boolean;

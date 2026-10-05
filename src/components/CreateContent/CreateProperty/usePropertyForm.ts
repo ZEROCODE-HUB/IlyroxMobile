@@ -121,6 +121,10 @@ const INITIAL_STATE: PropertyFormState = {
 
   // Contrato
   contractData: null,
+  /** Campos de contrato guardados en la BD */
+  precioContrato: null,
+  monedaContrato: null,
+  tipoContrato: null,
 
   // EasyBroker
   sinComision: false,
@@ -363,6 +367,9 @@ export function usePropertyForm(
   const setEmailPropietario = makeSetter("emailPropietario");
   const setTelefonoPropietario = makeSetter("telefonoPropietario");
   const setContractData = makeSetter("contractData");
+  const setPrecioContrato = makeSetter("precioContrato");
+  const setMonedaContrato = makeSetter("monedaContrato");
+  const setTipoContrato = makeSetter("tipoContrato");
   const setErrors = makeSetter("errors");
 
   // Setters especializados — Agrícola
@@ -731,6 +738,17 @@ export function usePropertyForm(
       payload.status = data.status || "Publicada";
       payload.sinComision = data.sin_comision ?? false;
       payload.originalStatus = data.status || "Publicada";
+
+      // Cargar campos de contrato si existe
+      if (data.precio_contrato != null) {
+        payload.precioContrato = data.precio_contrato;
+      }
+      if (data.moneda_contrato) {
+        payload.monedaContrato = data.moneda_contrato as "USD" | "MXN";
+      }
+      if (data.tipo_contrato) {
+        payload.tipoContrato = data.tipo_contrato as "venta" | "renta";
+      }
 
       const rawTipo = (data.tipo || "habitacional").toLowerCase();
       const isValidTipo = Object.keys(PROPERTY_TYPES).includes(rawTipo);
@@ -1112,6 +1130,12 @@ export function usePropertyForm(
     // Contract
     contractData: state.contractData,
     setContractData,
+    precioContrato: state.precioContrato,
+    setPrecioContrato,
+    monedaContrato: state.monedaContrato,
+    setMonedaContrato,
+    tipoContrato: state.tipoContrato,
+    setTipoContrato,
 
     // Images
     images: state.images,

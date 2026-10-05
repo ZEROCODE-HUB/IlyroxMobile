@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { AppHeader } from "../AppHeader";
 import { commonStyles } from "styles";
 import { SpecialPostCard } from "./SpecialPostCard";
 import { buildPropertyShareTitle } from "@/utils/propertyShareTitle";
+import { useToast } from "@/context/ToastContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -81,6 +82,12 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
     }
   }, [autoOpenComments]);
 
+  // Handle when a highlighted comment from notification is not found (deleted)
+  const { showToast } = useToast();
+  const handleHighlightedCommentNotFound = useCallback(() => {
+    showToast("El comentario fue eliminado", "info");
+  }, [showToast]);
+
   return (
     <View style={[styles.container, safeStyle]}>
       <AppHeader
@@ -131,7 +138,7 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
                       }`.trim()
                     : "Búsqueda de propiedad en Ilyrox")
               }
-              shareDescription={item.content.substring(0, 100)}
+              shareDescription={item.content}
               shareImageUrl={images[0]}
               showContactButton={false}
               orientation="horizontal"
@@ -289,7 +296,7 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
                       }`.trim()
                     : "Búsqueda de propiedad en Ilyrox")
                 }
-                shareDescription={item.content.substring(0, 100)}
+                shareDescription={item.content}
                 showContactButton={false}
                 authorId={item.user.id}
                 contentId={
@@ -317,6 +324,7 @@ const FeedDetail: React.FC<FeedDetailProps> = ({
         currentUserId={currentUserId}
         highlightUserIds={highlightUserIds}
         highlightCommentIds={highlightCommentIds}
+        onHighlightedCommentNotFound={handleHighlightedCommentNotFound}
       />
     </View>
   );

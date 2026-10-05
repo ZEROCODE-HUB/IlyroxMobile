@@ -54,7 +54,7 @@ import { PropertyFormProvider } from "./PropertyFormContext";
 import { PropertyPublishedSheet } from "./PropertyPublishedSheet";
 
 // Types
-import type { CreatePropertyProps } from "./types";
+import type { CreatePropertyProps, TipoOperacion } from "./types";
 
 // Anclas de scroll a nivel de campo
 import { FieldAnchor, FieldAnchorContext } from "./fieldAnchors";
@@ -90,6 +90,7 @@ const ERROR_ANCHOR: Record<string, string> = {
 
 export default function CreateProperty({
   onBack,
+  onUpdated,
   propertyId,
 }: CreatePropertyProps) {
   const insets = useSafeAreaInsets();
@@ -204,13 +205,16 @@ export default function CreateProperty({
     (info: PublishSuccessInfo) => {
       if (info.isUpdate) {
         showToast("Propiedad actualizada", "success");
+        // Aviso de GUARDADO (no de "cerré la pantalla"): el contenedor refresca
+        // SOLO este item del feed, así que la lista no se reordena.
+        if (propertyId) onUpdated?.(propertyId);
         onBack?.(true);
         return;
       }
       setPublishedInfo(info);
       setShowPublishedSheet(true);
     },
-    [onBack, showToast],
+    [onBack, onUpdated, propertyId, showToast],
   );
 
   // Navega al feed reemplazando la pantalla de creación en el stack (igual que los
@@ -245,6 +249,40 @@ export default function CreateProperty({
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showSaleContractModal, setShowSaleContractModal] = useState(false);
+
+  // Maneja el cambio de tipo de operación verificando compatibilidad con el status
+  const handleTipoOperacionChange = useCallback(
+    (nuevaOperacion: TipoOperacion) => {
+      const currentStatus = form.status;
+      const incompatible =
+        (currentStatus === "Vendida" && nuevaOperacion === "renta") ||
+        (currentStatus === "Rentada" && nuevaOperacion === "venta") ||
+        (currentStatus === "Vendida" && nuevaOperacion === "ambas") ||
+        (currentStatus === "Rentada" && nuevaOperacion === "ambas");
+
+      if (incompatible) {
+        showLocalAlert({
+          title: "Cambio de operación",
+          message:
+            "La operación actual no es compatible con el nuevo tipo. El estado de la propiedad cambiará a 'Publicada' y se eliminarán los datos del contrato anterior.",
+          confirmText: "Cambiar",
+          cancelText: "Cancelar",
+          onConfirm: () => {
+            form.setTipoOperacion(nuevaOperacion);
+            form.setStatus("Publicada");
+            // Limpiar campos de contrato al cambiar a Publicada
+            form.setPrecioContrato(null);
+            form.setMonedaContrato(null);
+            form.setTipoContrato(null);
+          },
+          onCancel: () => {},
+        });
+      } else {
+        form.setTipoOperacion(nuevaOperacion);
+      }
+    },
+    [form, showLocalAlert],
+  );
 
   // Scroll automático al CAMPO inválido más alto (de arriba hacia abajo). Cada
   // campo validable se registra con <FieldAnchor name="..."> (guarda su nodo).
@@ -447,7 +485,7 @@ export default function CreateProperty({
         )}
 
         {/* 2. INFORMACIÓN BÁSICA */}
-        <BasicInfoSection />
+        <BasicInfoSection onTipoOperacionChange={handleTipoOperacionChange} />
 
         {/* 3. UBICACIÓN */}
         <LocationSection />

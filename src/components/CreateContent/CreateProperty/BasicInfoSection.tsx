@@ -24,6 +24,10 @@ import type { TipoOperacion, MonedaType } from "./types";
 import { usePropertyFormContext } from "./PropertyFormContext";
 import { FieldAnchor } from "./fieldAnchors";
 
+export interface BasicInfoSectionProps {
+  onTipoOperacionChange?: (tipoOperacion: TipoOperacion) => void;
+}
+
 const TIPO_CARDS = [
   { value: "habitacional", label: "Habitacional", icon: "home-outline" },
   { value: "comercial", label: "Comercial", icon: "storefront-outline" },
@@ -76,7 +80,9 @@ const AGRICOLA_NOTAS: Record<string, { desc: string; fotos: string }> = {
   },
 };
 
-export const BasicInfoSection = React.memo(function BasicInfoSection() {
+export const BasicInfoSection = React.memo(function BasicInfoSection({
+  onTipoOperacionChange,
+}: BasicInfoSectionProps) {
   const {
     descripcion,
     setDescripcion,
@@ -98,6 +104,17 @@ export const BasicInfoSection = React.memo(function BasicInfoSection() {
   const [showMonedaModal, setShowMonedaModal] = React.useState(false);
 
   const subtiposDisponibles = PROPERTY_TYPES[tipoPrincipal as TipoPrincipal] ?? [];
+
+  // RadioGroupSelector entrega string; aquí se acota a TipoOperacion (las tres
+  // opciones del grupo) para poder reenviarlo al guardián de compatibilidad.
+  const handleTipoOperacionChange = (val: string) => {
+    if (val !== "venta" && val !== "renta" && val !== "ambas") return;
+    if (onTipoOperacionChange) {
+      onTipoOperacionChange(val);
+    } else {
+      setTipoOperacion(val);
+    }
+  };
 
   return (
     <View style={styles.section}>
@@ -243,7 +260,7 @@ export const BasicInfoSection = React.memo(function BasicInfoSection() {
           label="Tipo de Operación *"
           options={["venta", "renta", "ambas"]}
           selectedValue={tipoOperacion}
-          onSelect={(val) => setTipoOperacion(val as TipoOperacion)}
+          onSelect={handleTipoOperacionChange}
           error={errors.tipoOperacion}
         />
       </FieldAnchor>

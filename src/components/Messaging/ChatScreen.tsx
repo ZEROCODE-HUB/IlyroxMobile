@@ -3,7 +3,7 @@
  * Pantalla de chat con manejo robusto de teclado usando react-native-keyboard-controller
  */
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import MessageBubble from "./MessageBubble";
 import PropertyMessageBubble from "./PropertyMessageBubble";
 import MessageInput from "./MessageInput";
+import DateSeparator from "./DateSeparator";
 import { useMessages } from "../../hooks/messaging/useMessages";
 import { useModal } from "@/context/ModalContext";
 import { COLORS } from "../../constants";
@@ -69,6 +70,33 @@ export default function ChatScreen({
     destinatario_id: otherUser.id,
     propiedad_id: propertyId,
   };
+
+  // Procesar mensajes para insertar separadores de fecha
+  const processedMessages = useMemo(() => {
+    if (messages.length === 0) return [];
+
+    const result: Array<any> = [];
+    let currentDateKey = "";
+
+    messages.forEach((message) => {
+      const messageDate = new Date(message.created_at);
+      const dateKey = `${messageDate.getFullYear()}-${messageDate.getMonth()}-${messageDate.getDate()}`;
+
+      // Si es un nuevo día, agregar separador
+      if (dateKey !== currentDateKey) {
+        currentDateKey = dateKey;
+        result.push({
+          id: `date-${message.id}`,
+          type: "dateSeparator",
+          date: message.created_at,
+        });
+      }
+
+      result.push(message);
+    });
+
+    return result;
+  }, [messages]);
 
   const sendMessage = async (
     text: string,
@@ -134,12 +162,12 @@ export default function ChatScreen({
 
   // Auto-scroll al recibir nuevos mensajes
   useEffect(() => {
-    if (messages.length > 0 && !loading) {
+    if (processedMessages.length > 0 && !loading) {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-  }, [messages.length]);
+  }, [processedMessages.length]);
 
   const handleSendProperty = () => {
     showModal({
@@ -150,6 +178,11 @@ export default function ChatScreen({
   };
 
   const renderMessage = ({ item }: { item: any }) => {
+    // Renderizar separador de fecha
+    if (item.type === "dateSeparator") {
+      return <DateSeparator date={item.date} />;
+    }
+
     const isMe = item.emisor_id === userId;
 
     if (item.tipo === "propiedad") {
@@ -193,7 +226,7 @@ export default function ChatScreen({
     >
       <FlatList
         ref={flatListRef}
-        data={messages}
+        data={processedMessages}
         keyExtractor={(item) => item.id}
         renderItem={renderMessage}
         contentContainerStyle={styles.messagesContent}
@@ -215,7 +248,7 @@ export default function ChatScreen({
           ) : null
         }
         onContentSizeChange={() => {
-          if (messages.length > 0) {
+          if (processedMessages.length > 0) {
             flatListRef.current?.scrollToEnd({ animated: false });
           }
         }}

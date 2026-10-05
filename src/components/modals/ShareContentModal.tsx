@@ -77,7 +77,10 @@ const ShareContentModal: React.FC<ShareContentModalProps> = ({
         shareId: shareCode || contentId,
         type: feedItemType,
         title: contentTitle,
-        description: shareDescription || "Mira esta propiedad en ilyrox",
+        // Se pasa la descripción tal cual (sin recortar). `shareContent` la
+        // sanea y la trunca en un límite de palabra; si el texto se recortara
+        // acá con `substring`, llegaría partido al helper.
+        description: shareDescription || "Mira esto en Ilyrox",
         imageUrl: shareImageUrl,
         sinDatos: activeTab === "sin",
       });

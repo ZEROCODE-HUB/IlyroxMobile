@@ -20,15 +20,14 @@ export const PropertyFinancialSection: React.FC<PropertyFinancialSectionProps> =
   const showFinancial = financiamientos.length > 0 || gravamenes.length > 0;
 
   const hasCommissionData = (op: any) =>
-    !!op?.comparte_comision &&
-    (op.comision_porcentaje != null ||
-      op.comision_monto_fijo != null ||
-      op.comision_meses != null ||
-      op.porcentaje_comision_compartida != null ||
-      op.monto_comision_compartida != null);
+    op.comision_porcentaje != null ||
+    op.comision_monto_fijo != null ||
+    op.comision_meses != null ||
+    op.porcentaje_comision_compartida != null ||
+    op.monto_comision_compartida != null;
 
   const validOps = operations.filter(hasCommissionData);
-  const showCommissions = !sinDatos && validOps.length > 0;
+  const showCommissions = validOps.length > 0;
 
   if (!showFinancial && !showCommissions) return null;
 

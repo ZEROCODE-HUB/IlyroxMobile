@@ -1,16 +1,10 @@
 import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-} from "react-native";
+import { View, Text, StyleSheet, Dimensions } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 import { formatPriceShort } from "../../utils/priceFormatter";
-import { Property } from "../../types";
+import { Property, operaciones_propiedad } from "../../types";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import { Bath } from "lucide-react-native";
 import { SafePressable } from "@/design-system";
@@ -18,6 +12,78 @@ import { SafePressable } from "@/design-system";
 const { width } = Dimensions.get("window");
 const GAP = 8;
 const ITEM_SIZE = (width - 24 - GAP * 2) / 3;
+
+/** Color por operación: azul = venta, verde = renta (se distinguen de un vistazo). */
+const OP_COLOR = {
+  Venta: "#1D4ED8",
+  Renta: "#047857",
+} as const;
+
+/** Una línea de precio de la tarjeta: "Venta · $1.5M · MXN" */
+type PriceLine = {
+  /** "Venta" / "Renta". null cuando la propiedad tiene una sola operación
+   *  (entonces no hace falta rotular: el precio se ve igual que antes). */
+  label: "Venta" | "Renta" | null;
+  price: string;
+  currency: string;
+  /** "/mes" en renta: aclaraba que la periodicidad es mensual. */
+  suffix: string;
+};
+
+/**
+ * Precios de la tarjeta, Derivados de `operations` (una fila por operación).
+ *
+ * Con una sola operación devuelve UNA línea sin etiqueta → la tarjeta se ve
+ * exactamente como antes. Con venta+renta devuelve DOS líneas rotuladas, para
+ * saber cuál es cuál (antes solo se pintaba `operations[0]`, cuyo orden no
+ * garantiza Postgres, y sin decir si era venta o renta).
+ *
+ * Si `operations` viniera vacío (item cacheado de antes de la migration) cae a
+ * los campos planos `price`/`currency`/`operation`.
+ */
+function getPriceLines(item: Property): PriceLine[] {
+  const ops = (item.operations ?? []).filter(
+    (op) => op?.tipo_operacion === "venta" || op?.tipo_operacion === "renta",
+  );
+
+  const toLine = (op: operaciones_propiedad): PriceLine => {
+    const monto = Number(op.precio);
+    return {
+      label: null,
+      price: monto > 0 ? formatPriceShort(monto) : "Consultar",
+      currency: op.moneda || item.currency || "MXN",
+      suffix: op.tipo_operacion === "renta" ? "/mes" : "",
+    };
+  };
+
+  const venta = ops.find((o) => o.tipo_operacion === "venta");
+  const renta = ops.find((o) => o.tipo_operacion === "renta");
+
+  if (venta || renta) {
+    const lines = [venta && toLine(venta), renta && toLine(renta)].filter(
+      Boolean,
+    ) as PriceLine[];
+    // Con DOS operaciones se rotula cada una (si no, no se sabe cuál es cuál).
+    if (lines.length > 1) {
+      return lines.map((l, i) => ({
+        ...l,
+        label: i === 0 ? ("Venta" as const) : ("Renta" as const),
+      }));
+    }
+    return lines;
+  }
+
+  // Fallback: item sin `operations` (cache viejo).
+  const monto = Number(item.price);
+  return [
+    {
+      label: null,
+      price: monto > 0 ? formatPriceShort(monto) : "Consultar",
+      currency: item.currency || "MXN",
+      suffix: item.operation === "Rent" ? "/mes" : "",
+    },
+  ];
+}
 
 interface ProfilePropertyItemProps {
   item: Property;
@@ -34,6 +100,7 @@ interface ProfilePropertyItemProps {
 const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
   ({ item, onPress, isOwnProfile, onEdit, onDelete, onPublishOpenHouse, hasOpenHouse, isLastInRow }) => {
     const commissionText = formatCommission(item.commission);
+    const priceLines = getPriceLines(item);
 
     const menuOptions: MenuOption[] = [
       {
@@ -119,19 +186,92 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
         )}
 
         <View style={styles.infoContainer}>
-          <View style={styles.priceRow}>
-            <Text style={styles.propertyPrice}>
-              {formatPriceShort(item.price)}
-            </Text>
-            <Text style={styles.propertyCurrency}>{item.currency}</Text>
+          {/* El bloque de texto ocupa el alto sobrante de la tarjeta y ancla la
+              colonia abajo: cuando una tarjeta de la misma fila es más alta
+              (venta+renta), el espacio extra se reparte sin descuadrar nada. */}
+          <View style={styles.textStack}>
+            <View>
+              {priceLines.map((line, idx) => {
+                const isSecondary = idx > 0;
+                const opColor = line.label
+                  ? line.label === "Venta"
+                    ? OP_COLOR.Venta
+                    : OP_COLOR.Renta
+                  : undefined;
+                // Ambas operaciones casi siempre comparten moneda (el formulario
+                // usa una sola). Si es la misma, no se repite en la segunda
+                // línea: eso libera ancho para que el precio de renta se vea
+                // grande. Si difieren, sí se muestra.
+                const sameCurrency =
+                  idx > 0 && line.currency === priceLines[0]?.currency;
+                const trailing = `${sameCurrency ? "" : line.currency}${line.suffix}`;
+                return (
+                  <View
+                    key={`${line.label ?? "precio"}-${idx}`}
+                    style={[
+                      styles.priceRow,
+                      isSecondary && styles.priceRowSecondary,
+                    ]}
+                  >
+                    {line.label ? (
+                      <Text
+                        style={[styles.priceTag, { color: opColor }]}
+                        numberOfLines={1}
+                      >
+                        {line.label}
+                      </Text>
+                    ) : null}
+                    <Text
+                      style={[
+                        styles.propertyPrice,
+                        line.label && styles.propertyPriceLabeled,
+                        isSecondary && styles.secondaryPrice,
+                        opColor ? { color: opColor } : null,
+                      ]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.75}
+                    >
+                      {line.price}
+                    </Text>
+                    {trailing ? (
+                      <Text
+                        style={[
+                          styles.propertyCurrency,
+                          line.label && styles.currencyLabeled,
+                          isSecondary && styles.secondaryCurrency,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {trailing}
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </View>
+
+            <View>
+              {isOwnProfile && item.precio_contrato && (item.status === "Vendida" || item.status === "Rentada") && (
+                <View style={styles.contractPriceRow}>
+                  <Text style={styles.contractPriceLabel}>
+                    {item.status === "Rentada" ? "Rentada en" : "Vendida en"}
+                  </Text>
+                  <Text style={styles.contractPrice}>
+                    {formatPriceShort(item.precio_contrato)}
+                  </Text>
+                  <Text style={styles.propertyCurrency}>{item.moneda_contrato}</Text>
+                </View>
+              )}
+              <Text style={styles.propertyLocation} numberOfLines={1}>
+                {/* Colonia (la ubicación específica), no el municipio. Fallback a
+                    municipio/ciudad si la propiedad no tiene colonia. */}
+                {item.location.colony ||
+                  item.location.municipio ||
+                  item.location.city}
+              </Text>
+            </View>
           </View>
-          <Text style={styles.propertyLocation} numberOfLines={1}>
-            {/* Colonia (la ubicación específica), no el municipio. Fallback a
-                municipio/ciudad si la propiedad no tiene colonia. */}
-            {item.location.colony ||
-              item.location.municipio ||
-              item.location.city}
-          </Text>
 
           <View style={styles.propertyFeatures}>
             {item.features.beds > 0 && (
@@ -303,26 +443,93 @@ const styles = StyleSheet.create({
   infoContainer: {
     backgroundColor: COLORS.white,
     padding: 8,
+    // Absorbe el alto sobrante cuando la tarjeta se estira por ser la más alta
+    // de su fila (FlatList numColumns estira las celdas de la línea).
+    flex: 1,
+  },
+  /**
+   * Precios arriba, colonia abajo. Con `flex: 1` + `space-between` el espacio
+   * extra de una tarjeta estirada se reparte entre ambos bloques en vez de dejar
+   * un hueco pegado al separador de las amenidades.
+   */
+  textStack: {
+    flex: 1,
+    justifyContent: "space-between",
   },
   priceRow: {
     flexDirection: "row",
     alignItems: "baseline",
+    gap: 4,
+  },
+  priceRowSecondary: {
+    marginTop: 2,
+  },
+  /**
+   * Etiqueta "Venta"/"Renta". Ancho FIJO + flexShrink 0: nunca se estira ni se
+   * parte, y deja el resto del ancho al precio.
+   */
+  priceTag: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: COLORS.textQuaternary,
+    width: 30,
+    flexShrink: 0,
   },
   propertyPrice: {
     fontSize: 14,
     fontWeight: "700",
     color: COLORS.textQuaternary,
+    // flex:1 + minWidth:0 es IMPRESINDIBLE en RN: sin minWidth el Text no baja
+    // de su ancho intrínseco dentro de la fila y se desborda fuera de la tarjeta.
+    flex: 1,
+    minWidth: 0,
+  },
+  propertyPriceLabeled: {
+    fontSize: 13,
   },
   propertyCurrency: {
     fontSize: 12,
     fontWeight: "600",
     color: COLORS.textQuaternary,
-    marginLeft: 2,
+    flexShrink: 0,
+  },
+  currencyLabeled: {
+    fontSize: 10,
+  },
+  /** Precio de la segunda operación (renta): mismo cuerpo que el de venta,
+   *  solo un punto más chico para mantener la jerarquía. */
+  secondaryPrice: {
+    fontSize: 13,
+  },
+  /** Solo el "/mes" (la moneda se omite si es la misma que la de arriba). */
+  secondaryCurrency: {
+    fontSize: 10,
+  },
+  contractPriceRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 4,
+    marginTop: 2,
+  },
+  contractPriceLabel: {
+    fontSize: 9,
+    fontWeight: "600",
+    color: "#2e7d32",
+    flexShrink: 0,
+  },
+  contractPrice: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#2e7d32",
+    flex: 1,
+    minWidth: 0,
   },
   propertyLocation: {
     fontSize: 10,
     color: COLORS.textQuaternary,
     marginTop: 2,
+    flex: 1,
+    minWidth: 0,
   },
   propertyFeatures: {
     flexDirection: "row",

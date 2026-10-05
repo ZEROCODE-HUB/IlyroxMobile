@@ -73,10 +73,206 @@ const NOISE_TYPES = new Set([
 ]);
 
 /**
+ * Palabras clave que indican que un lugar es una zona residencial/fraccionamiento
+ * y NO debe filtrarse aunque tenga tipos como "establishment" o "point_of_interest".
+ * Google no clasifica bien los fraccionamientos en México, los marca como
+ * establecimientos, así que filtramos por nombre.
+ *
+ * Fuentes: Google Places API types para Housing (apartment_building, apartment_complex,
+ * condominium_complex, housing_complex) y desarrollos residenciales comunes en México.
+ */
+const RESIDENTIAL_KEYWORDS = [
+  // === ABREVIATURAS Y VARIANTES ===
+  "fracc",        // Fracc., Fraccionamiento
+  "frac.",        // Frac. (abreviatura)
+  "res.",         // Res. (abreviatura)
+  "cond.",        // Cond. (abreviatura)
+
+  // === TIPOS DE DESARROLLOS RESIDENCIALES ===
+  "fraccionamiento",
+  "residencial",
+  "condominio",
+  "coto",
+  "conjunto habitacional",
+  "conjunto",
+  "casa club",
+  "habitacional",
+  "privada",       // Fraccionamiento privado
+  "paraje",         // Paraje/Parajo (zonas semi-rurales en México)
+  "barrio",
+  "villa",
+  "lote",           // Lotes residenciales
+  "lotes",
+  "ampliacion",     // Ampliaciones (común en México)
+
+  // === NOMBRES COMUNES EN FRACCIONAMIENTOS ===
+  // Naturales
+  "valle",          // Fracc. El Valle, Valle Real
+  "lomas",          // Las Lomas
+  "bosques",        // Bosques
+  "arboledas",
+  "palmas",
+  "cipreses",
+  "flores",
+  "rosales",
+  "jardines",
+  "monte",
+  "prados",
+  "fuentes",
+  "rios",           // Residenciales cerca de ríos
+  "lagos",
+  "mirador",        // Vista
+
+  // Ingleses (comunes en México)
+  "garden",
+  "park",
+  "view",           // Vista
+  "vista",
+  "hills",
+  "heights",
+  "green",
+  "place",
+  "square",
+  "terrace",
+  "residence",
+
+  // === PATRONES FRECUENTES EN NOMBRES ===
+  // "Las + naturaleza"
+  "las lomas",
+  "las flores",
+  "las palmas",
+  "las cipreses",
+  // "San/Santa + nombre"
+  "san angel",
+  "santa fe",
+  "santa maria",
+  // "El + nombre"
+  "el valle",
+  "el palomar",
+  "el encantado",
+  // Otros
+  "hacienda",       // Comunidades cerradas tipo hacienda
+  "puerto",         // Puertos residenciales
+  "boutique",       // Residenciales tipo boutique
+  "paseo",          // Paseos residenciales
+  "andares",
+  "boulevard",
+  "centro",
+
+  // === NOMBRES DE DESARROLLOS RESIDENCIALES COMUNES EN MÉXICO ===
+  // Nombres con "Premier", "Cumbres", etc.
+  "premier",        // San Nicolás Premier, Cumbres Elite Premier
+  "cumbres",        // Cumbres, Valle de Cumbres
+  "elite",          // Cumbres Elite
+  "santuario",      // Santuario Residencial
+  "torres",         // Torres residenciales
+  "parque",         // Parque Residencial
+  "alameda",        // Alameda
+
+  // === FLORES Y PLANTAS EN NOMBRES ===
+  "bugambilias",
+  "girasoles",
+  "lavanda",
+  "magnolia",
+  "naranjos",
+  "limones",
+  "nogales",
+  "encinos",
+  "madreselva",
+  "dalias",
+  "claveles",
+  "orquideas",
+  "tulipanes",
+  "violetas",
+  "margaritas",
+  "geranios",
+  "lavanda",
+
+  // === GEOGRAFICOS ===
+  "colina",         // Colina/Colinas
+  "colinas",
+  "montaña",
+  "cerro",
+  "cumbre",
+  "cumbres",
+  "valles",
+  "loma",           // Loma/Lomas
+
+  // === INGLESES COMUNES EN MÉXICO ===
+  "sunset",
+  "sunrise",
+  "bay",
+  "ocean",
+  "sky",
+  "harbor",
+  "harbour",
+  "lake",
+  "country club",
+
+  // === OTROS TERMINOS RESIDENCIALES ===
+  "europa",         // Residencial Europa
+  "america",         // Residencial América
+  "mexico",         // Residencial México
+  "regio",          // Regio
+  "noroeste",
+  "sureste",
+  "suroeste",
+  "noreste",
+  "norte",
+  "sur",
+  "oriente",
+  "poniente",
+  "real",           // Fracc. El Real, Valle Real
+  "vistas",         // Las Vistas
+  "coto",
+  "jaiber",
+  "siguiente",
+  "alameda",
+  "reforma",
+  "madero",
+  "zaragoza",
+  "independencia",
+  "revolucion",
+
+  // === ZONAS ESPECIFICAS DE AGUASCALIENTES Y ZONA METROPOLITANA ===
+  "aguascalientes",
+  "jesus maria",
+  "calvillo",
+  "pabellon",
+  "rincon",
+  "san cayetano",
+  "san marcos",
+  "san jose",
+  "san francisco",
+  "san rafael",
+  "san miguel",
+  "san juan",
+  "san pedro",
+  "san sebastian",
+  "18 de marzo",
+  "circuito",
+  "tecon",
+  "megaclick",
+  "oradel",
+  "hidrocuitz",
+];
+
+/**
+ * Verifica si el nombre indica que es una zona residencial/fraccionamiento.
+ */
+function isResidentialArea(name: string): boolean {
+  const lower = name.toLowerCase();
+  return RESIDENTIAL_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
+/**
  * Verifica si una sugerencia de Google Places es "ruido" (establecimiento, calle, POI).
  * Retorna true si es ruido y debe filtrarse.
  */
-function isNoiseSuggestion(types: string[] | undefined): boolean {
+function isNoiseSuggestion(types: string[] | undefined, name: string): boolean {
+  // Las zonas residenciales/fraccionamientos NO son ruido aunque Google
+  // los marque como establishment o point_of_interest
+  if (isResidentialArea(name)) return false;
   if (!types || types.length === 0) return false;
   // Si AL MENOS UNO de los types es ruido, se filtra
   return types.some((t) => NOISE_TYPES.has(t));
@@ -289,8 +485,11 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
       }
       // FILTRAR RUIDO: eliminar establecimientos, calles y POIs
       // que no son relevantes para bienes raíces (solo interesan colonias,
-      // fraccionamientos, municipios, estados)
-      combined = combined.filter((s) => !isNoiseSuggestion(s.types));
+      // fraccionamientos, municipios, estados).
+      // NOTA: Los fraccionamientos y residenciales en México son marcados por Google
+      // como "establishment" o "point_of_interest", así que los dejamos pasar si el
+      // nombre contiene palabras clave residenciales.
+      combined = combined.filter((s) => !isNoiseSuggestion(s.types, s.name));
       // Score textual: priorizar coincidencia exacta, empieza con, contiene
       // Normalizar acentos para que "Nicolás" == "Nicolas" (el usuario escribe sin acentos)
       const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();

@@ -176,6 +176,25 @@ export const propertyDetailStyles = StyleSheet.create({
     fontWeight: "bold",
     color: COLORS.white,
   },
+  contractPriceBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#2e7d32",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 8,
+  },
+  contractPriceLabel: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  contractPriceValue: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: COLORS.white,
+  },
   locationRow: {
     flexDirection: "row",
     alignItems: "flex-start",
