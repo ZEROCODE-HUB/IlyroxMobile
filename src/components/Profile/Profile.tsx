@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   FlatList,
   ListRenderItem,
@@ -49,6 +50,7 @@ import { mapPostToFeedItem, mapProfileToUser, mapReelToFeedItem } from "./profil
 import { ProfileInfoHeader } from "./ProfileInfoHeader";
 import { ProfileEditModals } from "./ProfileEditModals";
 import ProfileSkeleton from "./ProfileSkeleton";
+import { patchFeedItem } from "@/hooks/useFeed";
 
 const log = logger.scoped("Profile");
 
@@ -70,6 +72,7 @@ const FILTER_OPTIONS = [
 const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack }) => {
   const insets = useSafeAreaInsets();
   const { user: authUser } = useAuth();
+  const queryClient = useQueryClient();
   const { showToast } = useToast();
   const {
     profile,
@@ -234,7 +237,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
 
   const filteredProperties = useMemo(() => {
     if (activeFilter === "Todas") {
-      const INACTIVE_STATUSES = ["Vendida", "Suspendida", "Reservada"];
+      const INACTIVE_STATUSES = ["Vendida", "Suspendida", "Reservada", "Rentada"];
       const active = properties.filter(
         (p) => !INACTIVE_STATUSES.includes(p.status),
       );
@@ -746,6 +749,9 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
           setShowEditReelModal(false);
           setEditReel(null);
           handleRefresh();
+        }}
+        onFeedContentUpdated={(contenidoId) => {
+          patchFeedItem(queryClient, contenidoId, authUser?.id);
         }}
       />
 

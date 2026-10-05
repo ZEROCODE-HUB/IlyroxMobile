@@ -37,7 +37,14 @@ interface PostCardProps {
   onUserClick?: (user: User) => void;
   onCommentClick: () => void;
   currentUserId?: string;
+  /**
+   * Se dispara SOLO tras guardar la edición con éxito (no al cerrar/cancelar).
+   * El contenedor refresca ese item puntual del feed; así el orden por
+   * engagement_score no se altera mientras el usuario mira el feed.
+   */
   onPostUpdated?: () => void;
+  /** Se dispara tras eliminar el post: el contenedor lo quita del feed. */
+  onPostRemoved?: () => void;
 }
 
 const PostCard: React.FC<PostCardProps> = ({
@@ -47,6 +54,7 @@ const PostCard: React.FC<PostCardProps> = ({
   onCommentClick,
   currentUserId,
   onPostUpdated,
+  onPostRemoved,
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -75,7 +83,7 @@ const PostCard: React.FC<PostCardProps> = ({
       setDeleting(true);
       await postsService.deletePost(item.postDetails);
       setShowDeleteConfirm(false);
-      onPostUpdated?.();
+      onPostRemoved?.();
     } catch {
       // postsService.deletePost shows toast on success; errors bubble silently
     } finally {
@@ -238,7 +246,7 @@ const PostCard: React.FC<PostCardProps> = ({
                     }`.trim()
                   : "Búsqueda de propiedad en Ilyrox")
             }
-            shareDescription={item.content.substring(0, 100)}
+            shareDescription={item.content}
             shareImageUrl={hasImages ? images[0] : undefined}
             orientation="horizontal"
             authorId={item.user.id}
@@ -301,10 +309,8 @@ const PostCard: React.FC<PostCardProps> = ({
         <Modal visible={showEditModal} animationType="slide">
           <CreatePost
             post={item.postDetails}
-            onBack={() => {
-              setShowEditModal(false);
-              onPostUpdated?.();
-            }}
+            onBack={() => setShowEditModal(false)}
+            onUpdated={() => onPostUpdated?.()}
           />
         </Modal>
       )}

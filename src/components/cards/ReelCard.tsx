@@ -35,7 +35,14 @@ interface ReelCardProps {
   onCommentClick: () => void;
   isVisible?: boolean;
   currentUserId?: string;
+  /**
+   * Se dispara SOLO tras guardar la edición con éxito (no al cerrar/cancelar).
+   * El contenedor refresca ese item puntual del feed; así el orden por
+   * engagement_score no se altera mientras el usuario mira el feed.
+   */
   onReelUpdated?: () => void;
+  /** Se dispara tras eliminar el reel: el contenedor lo quita del feed. */
+  onReelRemoved?: () => void;
 }
 
 const ReelCard: React.FC<ReelCardProps> = ({
@@ -46,6 +53,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
   isVisible = false,
   currentUserId,
   onReelUpdated,
+  onReelRemoved,
 }) => {
   const { showOptions, setShowOptions, setShowReportModal } =
     useFeedInteractions();
@@ -69,7 +77,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
       if (error) throw error;
       setShowDeleteConfirm(false);
       showToast("Reel eliminado correctamente", "success");
-      onReelUpdated?.();
+      onReelRemoved?.();
     } catch {
       showToast("No se pudo eliminar el reel", "error");
     } finally {
@@ -262,10 +270,8 @@ const ReelCard: React.FC<ReelCardProps> = ({
         <Modal visible={showEditModal} animationType="slide">
           <CreateReel
             reelId={reelId}
-            onBack={() => {
-              setShowEditModal(false);
-              onReelUpdated?.();
-            }}
+            onBack={() => setShowEditModal(false)}
+            onUpdated={() => onReelUpdated?.()}
           />
         </Modal>
       )}

@@ -387,13 +387,19 @@ export function usePublishProperty(
           nombre_propietario: form.nombreCompletoPropietario || null,
           email_propietario: form.emailPropietario || null,
           telefono_propietario: form.telefonoPropietario || null,
-          ...(resolvedContractData
+          // Guardar campos de contrato solo si el status es Vendida o Rentada
+          // Si status es Publicada/Suspendida/Reservada, los contratos se limpian
+          ...(form.status === "Vendida" || form.status === "Rentada"
             ? {
-                tipo_contrato: resolvedContractData.tipo_contrato,
-                moneda_contrato: resolvedContractData.moneda,
-                precio_contrato: resolvedContractData.precio,
+                tipo_contrato: resolvedContractData?.tipo_contrato || form.tipoContrato || null,
+                moneda_contrato: resolvedContractData?.moneda || form.monedaContrato || null,
+                precio_contrato: resolvedContractData?.precio ?? form.precioContrato ?? null,
               }
-            : {}),
+            : {
+                tipo_contrato: null,
+                moneda_contrato: null,
+                precio_contrato: null,
+              }),
           // Campos especializados por tipo
           ...(form.tipoPrincipal === 'agricola' ? {
             tipo_agua: form.tiposAgua.length ? form.tiposAgua : null,

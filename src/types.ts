@@ -185,6 +185,12 @@ export type Property = {
   /** Denormalizado: true si alguna operación comparte comisión. */
   comparte_comision?: boolean;
   es_easybroker?: boolean;
+  /** Precio final de transacción (cuando se vendió o rentó) */
+  precio_contrato?: number;
+  /** Moneda del contrato */
+  moneda_contrato?: string;
+  /** Tipo de contrato: venta o renta */
+  tipo_contrato?: "venta" | "renta";
   legal?: LegalDetails;
   /** Coordenada numérica directa de la BD (tipo numeric en Supabase) */
   longitud?: number;

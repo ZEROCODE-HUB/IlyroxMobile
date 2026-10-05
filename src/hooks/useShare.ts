@@ -13,7 +13,17 @@ import { Share, Platform } from "react-native";
 import { supabase } from "../lib/supabase";
 import * as Linking from "expo-linking";
 import { useAuth } from "@/context/AuthContext";
-import { logger } from "@/utils/logger";const log = logger.scoped("useShare");
+import { logger } from "@/utils/logger";
+import { collapseSpaces } from "@/utils/stringNormalizer";
+import { toShareText } from "@/utils/shareText";
+
+const log = logger.scoped("useShare");
+
+/** Largo máximo de la descripción dentro del mensaje nativo. */
+const MAX_SHARE_DESCRIPTION = 160;
+
+/** Texto que se usa si el contenido no traía descripción. */
+const SHARE_DESCRIPTION_FALLBACK = "Mira esto en Ilyrox";
 
 interface ShareOptions {
   feedItemId: string;
@@ -77,17 +87,29 @@ export function useShare() {
         );
 
         // 2. Mensaje para compartir.
+        //
+        // La descripción pasa SIEMPRE por `toShareText`: el campo viene con
+        // los `\n\n` de cada párrafo y algunos call sites lo recortaban con
+        // `.substring(0, N)`, que parte palabras a la mitad. Sanear aquí, y no
+        // en cada call site, garantiza que ningún texto llegue roto al
+        // mensaje — también los que se agreguen en el futuro.
+        //
         // En iOS, el link va SOLO en `url` (el campo nativo correcto para
         // esto) — no se repite dentro de `message`, porque iOS concatena
         // message + url en varios destinos (Mensajes, Mail, "Copiar"),
         // duplicando el link. En Android, `url` no se usa (no existe ese
         // concepto en su share sheet), así que el link debe seguir
         // embebido en el mensaje.
-        const boldTitle = `*${title}*`;
+        const boldTitle = `*${collapseSpaces(toShareText(title, 80))}*`;
+        const cleanDescription = toShareText(
+          description,
+          MAX_SHARE_DESCRIPTION,
+          SHARE_DESCRIPTION_FALLBACK,
+        );
         const message =
           Platform.OS === "ios"
-            ? `${boldTitle}\n\n${description}`
-            : `${boldTitle}\n\n${description}\n\n${deepLink}`;
+            ? `${boldTitle}\n\n${cleanDescription}`
+            : `${boldTitle}\n\n${cleanDescription}\n\n${deepLink}`;
 
         // 3. Compartir (nativo)
         const result = await Share.share({

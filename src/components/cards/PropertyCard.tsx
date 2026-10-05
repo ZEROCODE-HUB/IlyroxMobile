@@ -53,7 +53,14 @@ interface PropertyCardProps {
   onCommentClick: () => void;
   showContactButton?: boolean;
   currentUserId?: string;
+  /**
+   * Se dispara SOLO tras guardar la edición con éxito (no al cerrar/cancelar).
+   * El contenedor refresca ese item puntual del feed; así el orden por
+   * engagement_score no se altera mientras el usuario mira el feed.
+   */
   onPropertyUpdated?: () => void;
+  /** Se dispara tras eliminar la propiedad: el contenedor la quita del feed. */
+  onPropertyRemoved?: () => void;
   /**
    * Se ejecuta (y se espera) ANTES de navegar a "Contactar". Se usa cuando la
    * tarjeta vive dentro de un <Modal> nativo (p. ej. Coincidencias): hay que
@@ -71,6 +78,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
   showContactButton = true,
   currentUserId,
   onPropertyUpdated,
+  onPropertyRemoved,
   onBeforeNavigate,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -118,7 +126,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       if (error) throw error;
       showToast("Propiedad eliminada correctamente", "success");
       setShowDeleteConfirm(false);
-      onPropertyUpdated?.();
+      onPropertyRemoved?.();
     } catch (error: any) {
       log.error("Error deleting property:", error);
       showToast(error.message || "No se pudo eliminar la propiedad", "error");
@@ -127,12 +135,18 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
     }
   };
 
+  const isEditableStatus = property.status !== "Vendida" && property.status !== "Rentada";
+
   const ownerMenuOptions: MenuOption[] = [
-    {
-      icon: "pencil-outline",
-      label: "Editar",
-      onPress: () => setShowEditModal(true),
-    },
+    ...(isEditableStatus
+      ? [
+          {
+            icon: "pencil-outline" as const,
+            label: "Editar",
+            onPress: () => setShowEditModal(true),
+          },
+        ]
+      : []),
     {
       icon: "trash-outline",
       label: "Eliminar",
@@ -559,10 +573,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       <Modal visible={showEditModal} animationType="slide">
         <CreateProperty
           propertyId={property.id}
-          onBack={() => {
-            setShowEditModal(false);
-            onPropertyUpdated?.();
-          }}
+          onBack={() => setShowEditModal(false)}
+          onUpdated={() => onPropertyUpdated?.()}
         />
       </Modal>
     </View>

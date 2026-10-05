@@ -53,6 +53,9 @@ interface CommentsBottomSheetProps {
   currentUserId?: string;
   highlightUserIds?: string[];
   highlightCommentIds?: string[];
+  /** Callback cuando un comentario highlighteado no se encontró (fue eliminado).
+   * Se llama DESPUÉS de que TODOS los comentarios se cargaron (hasMore=false). */
+  onHighlightedCommentNotFound?: () => void;
 }
 
 interface CommentItemProps {
@@ -76,7 +79,10 @@ interface CommentItemProps {
 
 const CommentItem = React.memo<CommentItemProps>(
   ({ comment, replies, isLiked, onLike, onReply, highlightedUserIds, highlightCommentIds }) => {
-    const isByHighlightedAuthor = highlightedUserIds?.includes(comment.user.id) || false;
+    // Only use highlightedUserIds for parent comments (root level).
+    // For replies, ONLY highlight by exact comment ID match (highlightCommentIds).
+    // This prevents "Alex replied to you" from highlighting ALL of Alex's replies.
+    const isByHighlightedAuthor = !comment.parentId && (highlightedUserIds?.includes(comment.user.id) || false);
     const isExactHighlighted = highlightCommentIds?.includes(comment.id) || false;
     const isCommentHighlighted = isByHighlightedAuthor || isExactHighlighted;
 
@@ -125,9 +131,11 @@ const CommentItem = React.memo<CommentItemProps>(
           </View>
 
           {replies.map((reply) => {
-            const isReplyByAuthor = highlightedUserIds?.includes(reply.user.id) || false;
+            // If highlightCommentIds is provided, ONLY highlight by exact comment ID match.
+            // This handles the "Alex replied to your comment" case - we want only Alex's
+            // specific reply highlighted, not ALL of Alex's replies.
             const isReplyExact = highlightCommentIds?.includes(reply.id) || false;
-            const isReplyHighlighted = isReplyByAuthor || isReplyExact;
+            const isReplyHighlighted = isReplyExact;
             return (
               <View key={reply.id} style={[styles.replyContainer, isReplyHighlighted && styles.highlightedReply]}>
                 <Avatar
@@ -174,6 +182,7 @@ export default function CommentsBottomSheet({
   currentUserId,
   highlightUserIds,
   highlightCommentIds,
+  onHighlightedCommentNotFound,
 }: CommentsBottomSheetProps) {
   const { height: screenHeight } = useWindowDimensions();
   const modalHeight = screenHeight * 0.95;
@@ -291,6 +300,64 @@ export default function CommentsBottomSheet({
     }
   }, [highlightCommentIds]);
 
+  // Scroll to highlighted comment when it appears in the list
+  const hasScrolledToHighlightRef = useRef(false);
+  useEffect(() => {
+    if (!localHighlightCommentIds || localHighlightCommentIds.length === 0) return;
+    if (loading) return; // Wait for loading to complete
+
+    const findCommentIndex = () => {
+      for (let i = 0; i < displayComments.length; i++) {
+        if (localHighlightCommentIds.includes(displayComments[i].id)) {
+          return i;
+        }
+        // Also check replies
+        const replies = repliesMap.get(displayComments[i].id) || [];
+        for (let j = 0; j < replies.length; j++) {
+          if (localHighlightCommentIds.includes(replies[j].id)) {
+            return i; // Scroll to parent, reply will be visible
+          }
+        }
+      }
+      return -1;
+    };
+
+    const index = findCommentIndex();
+    if (index >= 0 && !hasScrolledToHighlightRef.current) {
+      hasScrolledToHighlightRef.current = true;
+      // Small delay to ensure list is rendered
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index: Math.min(index, displayComments.length - 1),
+          animated: true,
+          viewPosition: 0.3, // Position in viewport (0=top, 1=bottom)
+        });
+      }, 150);
+    }
+  }, [localHighlightCommentIds, loading, displayComments, repliesMap]);
+
+  // Check if highlighted comments still exist after ALL loading completes
+  // Only show "deleted" toast when hasMore=false (fully loaded) and comment truly not found
+  const deletedToastShownRef = useRef(false);
+  useEffect(() => {
+    if (!highlightCommentIds || highlightCommentIds.length === 0) return;
+    if (loading) return;
+    if (hasMore) return; // Still loading more, wait
+
+    // Only check once
+    if (deletedToastShownRef.current) return;
+
+    const allCommentIds = comments.map((c) => c.id);
+    const highlightSet = new Set(highlightCommentIds);
+    const foundIds = allCommentIds.filter((id) => highlightSet.has(id));
+
+    // Only show toast if NONE of the highlightCommentIds were found
+    if (foundIds.length === 0) {
+      deletedToastShownRef.current = true;
+      onHighlightedCommentNotFound?.();
+    }
+  }, [loading, hasMore, comments, highlightCommentIds, onHighlightedCommentNotFound]);
+
   // ============================================================================
   // Handlers
   // ============================================================================
@@ -332,7 +399,9 @@ export default function CommentsBottomSheet({
 
   const renderComment = useCallback(
     ({ item }: { item: Comment }) => {
-      const isByHighlightedAuthor = highlightedUserIds?.includes(item.user.id) || false;
+      // Only use highlightedUserIds for parent comments (root level).
+      // For replies, ONLY highlight by exact comment ID.
+      const isByHighlightedAuthor = !item.parentId && (highlightedUserIds?.includes(item.user.id) || false);
       const isExactHighlighted = localHighlightCommentIds?.includes(item.id) || false;
       const isItemHighlighted = isByHighlightedAuthor || isExactHighlighted;
       return (

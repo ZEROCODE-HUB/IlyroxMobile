@@ -89,7 +89,6 @@ function CommissionSlider({ label, value, onChange, min, max, step, formatValue,
   );
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 function formatMeses(n: number): string {
   const whole = Math.floor(n);
   const half = n % 1 !== 0;

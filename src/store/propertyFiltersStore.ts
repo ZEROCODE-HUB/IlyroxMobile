@@ -266,21 +266,24 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
     removeLocationChip: (id) =>
       set((state) => {
         const locationChips = state.filters.locationChips.filter((c) => c.id !== id);
+        const noChipsLeft = locationChips.length === 0;
         return {
           filters: {
             ...state.filters,
             locationChips,
-            locationFilter:
-              locationChips.length === 0
-                ? initialFilters.locationFilter
-                : state.filters.locationFilter,
+            locationFilter: noChipsLeft
+              ? initialFilters.locationFilter
+              : state.filters.locationFilter,
+            // Si ya no hay chips, también limpiar los polígonos dibujados
+            // ya que están relacionados con la zona seleccionada
+            polygons: noChipsLeft ? [] : state.filters.polygons,
           },
         };
       }),
 
     clearLocationChips: () =>
       set((state) => ({
-        filters: { ...state.filters, locationChips: [] },
+        filters: { ...state.filters, locationChips: [], polygons: [] },
       })),
 
     clearFilters: (newLocationFilter) =>

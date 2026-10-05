@@ -37,6 +37,12 @@ const log = logger.scoped("CreateReel");
 interface CreateReelProps {
   reelId?: string;
   onBack: () => void;
+  /**
+   * Se dispara SOLO tras guardar una EDICIÓN correctamente (no al cancelar), con
+   * el id del reel, para que el contenedor refresque ese item puntual del feed en
+   * vez de recargar la lista (que la reordena por engagement_score).
+   */
+  onUpdated?: (reelId: string) => void;
 }
 
 const VideoPreview = ({
@@ -107,7 +113,7 @@ const VideoPreview = ({
   );
 };
 
-export default function CreateReel({ onBack, reelId }: CreateReelProps) {
+export default function CreateReel({ onBack, reelId, onUpdated }: CreateReelProps) {
   const insets = useSafeAreaInsets();
   const safeStyle = {
     paddingBottom: Math.max(insets.bottom, 10),
@@ -287,6 +293,8 @@ export default function CreateReel({ onBack, reelId }: CreateReelProps) {
               params: { refresh: String(Date.now()) },
             });
           } else {
+            showToast("Reel actualizado", "success");
+            if (reelId) onUpdated?.(reelId);
             onBack();
           }
         }, 500);

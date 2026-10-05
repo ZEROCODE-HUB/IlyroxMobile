@@ -41,9 +41,16 @@ export const usePropertyMutation = () => {
       queryClient.invalidateQueries({ queryKey: ["map-properties"] });
 
       if (propertyId) {
-        // UPDATE: refrescar el feed (para reflejar los cambios) y el detalle.
-        queryClient.invalidateQueries({ queryKey: ["feed"] });
+        // UPDATE: NO invalidar ["feed"] completo. Eso marca la lista infinita
+        // como stale y dispara un refetch en background: el servidor devuelve el
+        // feed reordenado por engagement_score y los items se saltan de posición
+        // mientras el usuario los está mirando. En su lugar el caller parchea SOLO
+        // el item editado (patchFeedItem en useFeed) y se refresca el detalle.
+        queryClient.invalidateQueries({ queryKey: ["feed", "item"] });
         queryClient.invalidateQueries({ queryKey: ["property", propertyId] });
+        // Propiedades del perfil/mapa del propietario: se refrescan sin tocar el feed.
+        queryClient.invalidateQueries({ queryKey: ["mapFeedItems"] });
+        queryClient.invalidateQueries({ queryKey: ["propertyFeedItems"] });
       }
       // CREATE: NO invalidar el feed. El caller hace un prepend optimista para que
       // la propiedad aparezca arriba al instante; invalidar aquí dispararía un
