@@ -9,7 +9,7 @@
  */
 
 import { useCallback } from "react";
-import { Share, Platform } from "react-native";
+import { Share } from "react-native";
 import { supabase } from "../lib/supabase";
 import * as Linking from "expo-linking";
 import { useAuth } from "@/context/AuthContext";
@@ -89,33 +89,28 @@ export function useShare() {
         // 2. Mensaje para compartir.
         //
         // La descripción pasa SIEMPRE por `toShareText`: el campo viene con
-        // los `\n\n` de cada párrafo y algunos call sites lo recortaban con
+        // los `\n\n` de cada párrafo (que se CONSERVAN, para que el mensaje
+        // respete los saltos de línea) y algunos call sites lo recortaban con
         // `.substring(0, N)`, que parte palabras a la mitad. Sanear aquí, y no
         // en cada call site, garantiza que ningún texto llegue roto al
         // mensaje — también los que se agreguen en el futuro.
         //
-        // En iOS, el link va SOLO en `url` (el campo nativo correcto para
-        // esto) — no se repite dentro de `message`, porque iOS concatena
-        // message + url en varios destinos (Mensajes, Mail, "Copiar"),
-        // duplicando el link. En Android, `url` no se usa (no existe ese
-        // concepto en su share sheet), así que el link debe seguir
-        // embebido en el mensaje.
+        // El link va SIEMPRE al final, separado por una línea en blanco, y
+        // vive SOLO en `message` (en ambas plataformas). En iOS, si además se
+        // pasaba `url`, varios destinos (Mensajes, Mail, "Copiar", WhatsApp)
+        // concatenan message + url y el link quedaba pegado a la descripción
+        // o directamente duplicado. Con un solo string el orden es el que
+        // armamos acá: título, descripción con sus saltos, y el link abajo.
         const boldTitle = `*${collapseSpaces(toShareText(title, 80))}*`;
         const cleanDescription = toShareText(
           description,
           MAX_SHARE_DESCRIPTION,
           SHARE_DESCRIPTION_FALLBACK,
         );
-        const message =
-          Platform.OS === "ios"
-            ? `${boldTitle}\n\n${cleanDescription}`
-            : `${boldTitle}\n\n${cleanDescription}\n\n${deepLink}`;
+        const message = `${boldTitle}\n\n${cleanDescription}\n\n${deepLink}`;
 
         // 3. Compartir (nativo)
-        const result = await Share.share({
-          message,
-          url: Platform.OS === "ios" ? deepLink : undefined,
-        });
+        const result = await Share.share({ message });
 
         // 4. Registrar share en BD: incrementa compartidos_count vía RPC
         //    (la función también registra la interacción en feed_visualizaciones

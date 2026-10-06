@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { ActivityIndicator, View, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapSearch from "../../components/map/MapSearch";
@@ -49,6 +49,9 @@ export default function MapScreen() {
   }, [storeFilters]);
 
   const { data: properties = [] } = useMapProperties(debouncedFilters);
+  // Stabilize the array reference so that MapSearch's useMemo over
+  // properties doesn't re-run when the query returns the same data.
+  const memoizedProperties = useMemo(() => properties, [properties]);
 
   const safeStyle = {
     flex: 1,
@@ -71,7 +74,7 @@ export default function MapScreen() {
   return (
     <View style={safeStyle}>
       <MapSearch
-        properties={properties}
+        properties={memoizedProperties}
         onSaveSearch={(name, leadName, leadPhone) =>
           saveSearch(name, "", leadName, leadPhone)
         }

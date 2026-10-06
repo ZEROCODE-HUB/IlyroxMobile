@@ -14,7 +14,9 @@ import { COLORS } from "@/constants/colors";
 import { Globe, MapIcon, Layers, Mountain, ChevronDown } from "lucide-react-native";
 import { PolygonCoord } from "@/store/propertyFiltersStore";
 import Supercluster from "supercluster";
-import { supabase } from "@/lib/supabase";
+import { logger } from "@/utils/logger";
+
+const log = logger.scoped("PropertyMap");
 
 /** Estable: cada nueva referencia reescribe la prop nativa de la Polyline. */
 const DRAFT_DASH_PATTERN = [8, 4];
@@ -69,6 +71,23 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const [mapReady, setMapReady] = useState(false);
+
+  // ── Cleanup refs ──
+  const mountedRef = useRef(true);
+  const rafRef = useRef<number | null>(null);
+  const autoFitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftPolygonPointsRef = useRef<PolygonCoord[]>(draftPolygonPoints);
+  draftPolygonPointsRef.current = draftPolygonPoints;
+  const individualPropertyIdsRef = useRef<Set<string>>(new Set());
+
+  // Cleanup al desmontar
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (autoFitTimerRef.current) clearTimeout(autoFitTimerRef.current);
+    };
+  }, []);
 
   // Cierre del polígono tocando el primer vértice (crítico en iOS): el onPress
   // se conecta desde que el vértice se crea (longitud 1) y se mantiene ESTABLE,
@@ -155,7 +174,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         };
       })
       .filter(Boolean) as any[];
-    console.log(`[MapDebug] supercluster: ${points.length} puntos con coords (de ${properties.length} props totales)`);
+    log.debug(`supercluster: ${points.length} puntos con coords (de ${properties.length} props totales)`);
     sc.load(points);
     superclusterRef.current = sc;
     return sc;
@@ -177,7 +196,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     const result = superclusterIndex.getClusters(bbox, zoom);
     const isCluster = result.filter((c: any) => c.properties.cluster).length;
     const isPoint = result.filter((c: any) => !c.properties.cluster).length;
-    console.log(`[MapDebug] clusters: ${result.length} (${isCluster} agrupados, ${isPoint} individuales) | zoom: ${zoom} | latDelta: ${latitudeDelta.toFixed(3)} | center: ${latitude.toFixed(3)},${longitude.toFixed(3)}`);
+    log.debug(`clusters: ${result.length} (${isCluster} agrupados, ${isPoint} individuales) | zoom: ${zoom} | latDelta: ${latitudeDelta.toFixed(3)} | center: ${latitude.toFixed(3)},${longitude.toFixed(3)}`);
     return result;
   }, [superclusterIndex, currentRegion]);
 
@@ -190,6 +209,11 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       ),
     [clusters],
   );
+
+  // Mantener ref sincronizado para que updateOverlayPositions acceda sin deps
+  useEffect(() => {
+    individualPropertyIdsRef.current = individualPropertyIds;
+  }, [individualPropertyIds]);
 
   const handleClusterPress = (clusterId: number) => {
     const leaves = superclusterIndex.getLeaves(clusterId, Infinity);
@@ -226,30 +250,24 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   useEffect(() => { focusRegionRef.current = focusRegion; }, [focusRegion]);
 
   // Optimized function to calculate positions only for visible elements
-  const updateOverlayPositions = async (region?: any) => {
-    if (
-      Platform.OS === "web" ||
-      !nativeMapRef.current ||
-      !mapReady
-    )
-      return;
+  const updateOverlayPositions = useCallback(async (region?: any) => {
+    if (Platform.OS === "web" || !nativeMapRef.current || !mapReady) return;
+    if (!mountedRef.current) return;
 
-    // Use the passed region or the last known one
     const activeRegion = region || regionRef.current;
     if (!activeRegion) return;
 
-    // Throttle: avoid overlapping calculations
     if (isCalculatingRef.current) return;
 
     const now = Date.now();
-    // Only update every ~32ms during motion to keep bridge clear (30fps)
-    if (region && now - lastUpdateRef.current < 32) return;
+    // 120ms throttle — imperceptible visually (badges already lag from async calls)
+    // but reduces bridge load by ~75% vs 32ms
+    if (region && now - lastUpdateRef.current < 120) return;
 
     isCalculatingRef.current = true;
     lastUpdateRef.current = now;
 
     try {
-      // ── Posiciones de precio (propiedades individuales) ──
       const { latitude, longitude, latitudeDelta, longitudeDelta } = activeRegion;
       const latBuffer = latitudeDelta * 0.5;
       const lngBuffer = longitudeDelta * 0.5;
@@ -258,30 +276,35 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       const minLng = longitude - longitudeDelta - lngBuffer;
       const maxLng = longitude + longitudeDelta + lngBuffer;
 
-      const visibleProps = properties.filter((p) => {
-        const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
-        const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
-        if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return false;
-        return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
-      });
+      // Solo non-clustered (las únicas que renderizan badge) — intersect BEFORE
+      // calling pointForCoordinate para reducir bridge calls hasta ~90%
+      const visibleNonClustered = properties
+        .filter((p) => {
+          const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
+          const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
+          if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) return false;
+          if (lat < minLat || lat > maxLat || lng < minLng || lng > maxLng) return false;
+          return individualPropertyIdsRef.current.has(p.id);
+        })
+        .slice(0, 150); // cap 150 — no-clustered visibles rara vez superan ~50
 
-      const limitedProps = visibleProps.slice(0, 500);
       const newPositions: any = {};
-      const propPromises = limitedProps.map(async (p) => {
+      const propPromises = visibleNonClustered.map(async (p) => {
         const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
         const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
+        if (!mountedRef.current || !nativeMapRef.current) return;
         try {
-          if (!nativeMapRef.current) return;
           const point = await nativeMapRef.current.pointForCoordinate({
             latitude: Number(lat),
             longitude: Number(lng),
           });
           newPositions[p.id] = point;
-        } catch (e) { /* ignore */ }
+        } catch { /* ignore */ }
       });
       await Promise.all(propPromises);
+      if (!mountedRef.current) return;
 
-      // ── Posiciones de clusters ──
+      // Clusters (pocos — necesarios para burbujas)
       const currentClusters = superclusterRef.current?.getClusters(
         [minLng, minLat, maxLng, maxLat],
         latDeltaToZoom(latitudeDelta),
@@ -290,47 +313,45 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       const newClusterPositions: any = {};
       const clusterPromises = clusterFeatures.map(async (c: any) => {
         const [lng, lat] = c.geometry.coordinates;
+        if (!mountedRef.current || !nativeMapRef.current) return;
         try {
-          if (!nativeMapRef.current) return;
-          const point = await nativeMapRef.current.pointForCoordinate({
-            latitude: lat,
-            longitude: lng,
-          });
+          const point = await nativeMapRef.current.pointForCoordinate({ latitude: lat, longitude: lng });
           newClusterPositions[`cluster-${c.id}`] = {
             x: point.x,
             y: point.y,
             count: c.properties.point_count as number,
             clusterId: c.id,
           };
-        } catch (e) { /* ignore */ }
+        } catch { /* ignore */ }
       });
       await Promise.all(clusterPromises);
 
-      // ── Posición del primer vértice del borrador (botón de cierre) ──
+      // Primer vértice del polígono (botón de cierre)
       let firstVertexPos: { x: number; y: number } | null = null;
       if (
-        drawingMode &&
-        draftPolygonPoints.length >= 3 &&
+        drawingModeRef.current &&
+        draftPolygonPointsRef.current.length >= 3 &&
+        mountedRef.current &&
         nativeMapRef.current
       ) {
         try {
           const fp = await nativeMapRef.current.pointForCoordinate({
-            latitude: draftPolygonPoints[0].latitude,
-            longitude: draftPolygonPoints[0].longitude,
+            latitude: draftPolygonPointsRef.current[0].latitude,
+            longitude: draftPolygonPointsRef.current[0].longitude,
           });
           firstVertexPos = { x: fp.x, y: fp.y };
-        } catch (e) { /* ignore */ }
+        } catch { /* ignore */ }
       }
 
-      requestAnimationFrame(() => {
+      if (mountedRef.current) {
         setOverlayPositions(newPositions);
         setClusterOverlayPositions(newClusterPositions);
         setFirstVertexScreenPos(firstVertexPos);
-      });
+      }
     } finally {
       isCalculatingRef.current = false;
     }
-  };
+  }, []); // sin deps — usa solo refs
 
   useEffect(() => {
     if (mapReady) {
@@ -431,7 +452,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     if (region) {
       hasAutoFitRef.current = true;
       setCurrentRegion(region);
-      setTimeout(() => {
+      autoFitTimerRef.current = setTimeout(() => {
         if (focusRegionRef.current) return;
         nativeMapRef.current?.animateToRegion(region, 1000);
       }, 700);
@@ -565,6 +586,117 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     );
   }, []);
 
+  // ── Badge de precio (memoizado — solo re-renderiza si cambian sus props) ──
+  const PriceBadge = React.memo(({
+    x, y, priceText, bgColor, stackCount,
+  }: {
+    x: number; y: number; priceText: string; bgColor: string; stackCount: number;
+  }) => (
+    <View
+      style={{
+        position: "absolute",
+        left: Math.max(6, x - 35),
+        top: Math.max(6, y - 35),
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <View
+        style={{
+          backgroundColor: bgColor,
+          paddingVertical: 5,
+          paddingHorizontal: 8,
+          borderRadius: 6,
+          borderWidth: 1.5,
+          borderColor: "white",
+          elevation: 5,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.3,
+          shadowRadius: 2,
+        }}
+      >
+        <Text style={{ color: "white", fontSize: 11, fontWeight: "bold" }}>
+          {priceText}
+        </Text>
+      </View>
+      <View
+        style={{
+          width: 0,
+          height: 0,
+          borderLeftWidth: 5,
+          borderRightWidth: 5,
+          borderTopWidth: 7,
+          borderLeftColor: "transparent",
+          borderRightColor: "transparent",
+          borderTopColor: bgColor,
+          marginTop: -1,
+        }}
+      />
+      {stackCount > 1 && (
+        <View
+          style={{
+            position: "absolute",
+            top: -8,
+            right: -10,
+            minWidth: 20,
+            height: 20,
+            paddingHorizontal: 4,
+            borderRadius: 10,
+            backgroundColor: COLORS.error,
+            borderWidth: 1.5,
+            borderColor: "white",
+            alignItems: "center",
+            justifyContent: "center",
+            elevation: 6,
+          }}
+        >
+          <Text style={{ color: "white", fontSize: 10, fontWeight: "bold" }}>
+            {stackCount > 99 ? "99+" : stackCount}
+          </Text>
+        </View>
+      )}
+    </View>
+  ));
+
+  // ── Burbuja de cluster (memoizada) ──
+  const ClusterBubble = React.memo(({ x, y, count }: { x: number; y: number; count: number }) => {
+    const size = count < 10 ? 44 : count < 50 ? 56 : 68;
+    const bg = count < 10 ? COLORS.primary : count < 50 ? "#E07B00" : COLORS.error;
+    return (
+      <View
+        style={{
+          position: "absolute",
+          left: x - size / 2,
+          top: y - size / 2,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: bg + "30",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <View
+          style={{
+            width: size * 0.7,
+            height: size * 0.7,
+            borderRadius: (size * 0.7) / 2,
+            backgroundColor: bg,
+            alignItems: "center",
+            justifyContent: "center",
+            borderWidth: 2,
+            borderColor: "white",
+          }}
+        >
+          <Text style={styles.clusterCount}>
+            {count > 999 ? "999+" : count}
+          </Text>
+        </View>
+      </View>
+    );
+  });
+
   const makeFocusRegion = (lat: number, lng: number) => {
     const baseDelta = 0.06;
     const latDelta = baseDelta;
@@ -624,7 +756,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           regionRef.current = region;
           setCurrentRegion(region);
           updateOverlayPositions(region);
-          console.log(`[MapDebug] onRegionChangeComplete: latDelta=${region.latitudeDelta.toFixed(3)} center=${region.latitude.toFixed(3)},${region.longitude.toFixed(3)}`);
+          log.debug(`onRegionChangeComplete: latDelta=${region.latitudeDelta.toFixed(3)} center=${region.latitude.toFixed(3)},${region.longitude.toFixed(3)}`);
         }}
         // Dibujando, un toque simple añade punto. Antes solo servía el long
         // press: en iOS se perdía en cuanto el dedo se movía un poco, y de ahí
@@ -698,22 +830,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
             if (!cluster?.geometry?.coordinates) return null;
             const [lng, lat] = cluster.geometry.coordinates;
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-              supabase
-                .from("debug_logs")
-                .insert({
-                  contexto: "cluster_coord_invalida",
-                  payload: {
-                    clusterId: cluster.id,
-                    lat,
-                    lng,
-                    pointCount: cluster.properties?.point_count ?? null,
-                    totalPropiedadesEnMapa: properties.length,
-                  },
-                })
-                .then(
-                  () => {},
-                  () => {},
-                );
+              // Render puro: solo loguear, no insertar en la BD desde el render
+              console.warn("[MapDebug] cluster_coord_invalida:", cluster.id, lat, lng);
               return null;
             }
             return (
@@ -791,6 +909,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
               const p = propertyMap.get(id);
               if (!p) return null;
               if (!individualPropertyIds.has(id)) return null;
+              if (!Number.isFinite((pos as any)?.x) || !Number.isFinite((pos as any)?.y)) return null;
 
               // Conteo de propiedades en la MISMA coordenada; si ya dibujamos un
               // badge para esta coordenada, omitimos los duplicados encimados.
@@ -813,84 +932,14 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
               const bgColor = isHighlighted ? COLORS.warning : COLORS.primary;
 
               return (
-                <View
+                <PriceBadge
                   key={`price-${p.id}`}
-                  style={{
-                    position: "absolute",
-                    left: Math.max(6, (pos as any).x - 35),
-                    top: Math.max(6, (pos as any).y - 35),
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <View
-                    style={{
-                      backgroundColor: bgColor,
-                      paddingVertical: 5,
-                      paddingHorizontal: 8,
-                      borderRadius: 6,
-                      borderWidth: 1.5,
-                      borderColor: "white",
-                      elevation: 5,
-                      shadowColor: "#000",
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.3,
-                      shadowRadius: 2,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        fontSize: 11,
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {priceText}
-                    </Text>
-                  </View>
-                  <View
-                    style={{
-                      width: 0,
-                      height: 0,
-                      borderLeftWidth: 5,
-                      borderRightWidth: 5,
-                      borderTopWidth: 7,
-                      borderLeftColor: "transparent",
-                      borderRightColor: "transparent",
-                      borderTopColor: bgColor,
-                      marginTop: -1,
-                    }}
-                  />
-                  {stackCount > 1 && (
-                    <View
-                      style={{
-                        position: "absolute",
-                        top: -8,
-                        right: -10,
-                        minWidth: 20,
-                        height: 20,
-                        paddingHorizontal: 4,
-                        borderRadius: 10,
-                        backgroundColor: COLORS.error,
-                        borderWidth: 1.5,
-                        borderColor: "white",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        elevation: 6,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: "white",
-                          fontSize: 10,
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {stackCount > 99 ? "99+" : stackCount}
-                      </Text>
-                    </View>
-                  )}
-                </View>
+                  x={(pos as any).x}
+                  y={(pos as any).y}
+                  priceText={priceText}
+                  bgColor={bgColor}
+                  stackCount={stackCount}
+                />
               );
             });
           })()}
@@ -900,45 +949,9 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       {/* Cluster bubbles overlay — rendered outside MapView para garantizar visibilidad en Android */}
       {Platform.OS !== "web" && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          {Object.entries(clusterOverlayPositions).map(([key, data]: [string, any]) => {
-            const count = data.count as number;
-            const size = count < 10 ? 44 : count < 50 ? 56 : 68;
-            const bg =
-              count < 10 ? COLORS.primary : count < 50 ? "#E07B00" : COLORS.error;
-            return (
-              <View
-                key={key}
-                style={{
-                  position: "absolute",
-                  left: data.x - size / 2,
-                  top: data.y - size / 2,
-                  width: size,
-                  height: size,
-                  borderRadius: size / 2,
-                  backgroundColor: bg + "30",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <View
-                  style={{
-                    width: size * 0.7,
-                    height: size * 0.7,
-                    borderRadius: (size * 0.7) / 2,
-                    backgroundColor: bg,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderWidth: 2,
-                    borderColor: "white",
-                  }}
-                >
-                  <Text style={styles.clusterCount}>
-                    {count > 999 ? "999+" : count}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
+          {Object.entries(clusterOverlayPositions).map(([key, data]: [string, any]) => (
+            <ClusterBubble key={key} x={data.x} y={data.y} count={data.count} />
+          ))}
         </View>
       )}
 

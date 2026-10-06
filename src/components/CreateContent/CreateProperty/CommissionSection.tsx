@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo, useCallback, useEffect, memo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppInput } from "../../../design-system/components/AppInput";
@@ -13,6 +13,35 @@ const THUMB = 22;
 const TRACK_H = 6;
 const ZONE_H = 48;
 
+// ── Helper: debounce simple.
+// Mantiene el timer en un ref; cancela y reinicia cada vez que se llama.
+// Cuando por fin para (el timer llega a 0), llama a `fn` con el último valor.
+function useDebounceCallback(fn: () => void, delay: number) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fnRef = useRef(fn);
+  fnRef.current = fn;
+
+  const fire = useCallback(() => {
+    if (timer.current !== null) clearTimeout(timer.current);
+    timer.current = null;
+    fnRef.current();
+  }, []);
+
+  const schedule = useCallback(() => {
+    if (timer.current !== null) clearTimeout(timer.current);
+    timer.current = setTimeout(fire, delay);
+  }, [delay, fire]);
+
+  const cancel = useCallback(() => {
+    if (timer.current !== null) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+  }, []);
+
+  return { schedule, cancel };
+}
+
 interface SliderProps {
   label: string;
   value: string;
@@ -25,59 +54,114 @@ interface SliderProps {
   onScrollLock?: (locked: boolean) => void;
 }
 
-function CommissionSlider({ label, value, onChange, min, max, step, formatValue, hint, onScrollLock }: SliderProps) {
-  const [trackWidth, setTrackWidth] = useState(0);
+// Slider simple: el thumb sigue el dedo con estado local.
+// Solo el update al FORM (onChange) se debouncea 500ms.
+function CommissionSlider({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  formatValue,
+  hint,
+  onScrollLock,
+}: SliderProps) {
+  const [trackW, setTrackW] = useState(0);
+  // Valor que se muestra en el display y donde está el thumb visualmente.
+  // Se actualiza INMEDIATAMENTE en cada movimiento del dedo.
+  const [localVal, setLocalVal] = useState(() =>
+    Math.max(min, Math.min(max, parseFloat(value) || min)),
+  );
+  const trackWRef = useRef(0);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const dragging = useRef(false);
 
-  const numVal = Math.max(min, Math.min(max, parseFloat(value) || min));
-  const usable = Math.max(1, trackWidth - THUMB);
-  const thumbLeft = ((numVal - min) / (max - min)) * usable;
+  // Valor que se mandará al form cuando el timer expire.
+  const pendingVal = useRef("");
 
-  // Usa locationX (posición del toque RELATIVA a la barra), no pageX+measure():
-  // dentro de un <Modal> nativo en iOS `measure()` devuelve coordenadas
-  // incorrectas, y por eso el slider "no se movía" al EDITAR (que abre en Modal).
-  const resolve = (localX: number) => {
-    const ratio = Math.max(0, Math.min(1, (localX - THUMB / 2) / usable));
+  const { schedule, cancel } = useDebounceCallback(() => {
+    if (pendingVal.current) {
+      onChangeRef.current(pendingVal.current);
+      pendingVal.current = "";
+    }
+  }, 500);
+
+  // Cuando el form cambia el valor desde fuera (chip, etc), sincroniza.
+  useEffect(() => {
+    if (!dragging.current) {
+      setLocalVal(Math.max(min, Math.min(max, parseFloat(value) || min)));
+    }
+  }, [value, min, max]);
+
+  const computeVal = (x: number): number => {
+    const usable = trackWRef.current - THUMB;
+    if (usable <= 0) return localVal;
+    const ratio = Math.max(0, Math.min(1, (x - THUMB / 2) / usable));
     const raw = min + ratio * (max - min);
     const snapped = Math.round(raw / step) * step;
-    onChangeRef.current(String(Math.round(Math.max(min, Math.min(max, snapped)) * 100) / 100));
+    return Math.max(min, Math.min(max, snapped));
   };
+
+  const onMove = (x: number) => {
+    const v = computeVal(x);
+    pendingVal.current = String(Math.round(v * 100) / 100);
+    setLocalVal(v); // display inmediato
+    schedule();     // programa onChange al form en 500ms
+  };
+
+  const onRelease = (x: number) => {
+    cancel();
+    onScrollLock?.(true);
+    dragging.current = false;
+    const v = computeVal(x);
+    if (pendingVal.current) {
+      onChangeRef.current(pendingVal.current);
+      pendingVal.current = "";
+    }
+    setLocalVal(v);
+  };
+
+  const thumbLeft =
+    trackW > THUMB
+      ? ((localVal - min) / (max - min)) * (trackW - THUMB)
+      : 0;
+  const fillW = thumbLeft + THUMB / 2;
 
   return (
     <View style={styles.sliderContainer}>
       <View style={styles.sliderHeader}>
         <Text style={styles.label}>{label}</Text>
-        <Text style={styles.sliderValue}>{formatValue(numVal)}</Text>
+        <Text style={styles.sliderValue}>{formatValue(localVal)}</Text>
       </View>
 
       <View
         style={styles.touchZone}
-        onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
-        // Agarra cualquier toque que EMPIECE sobre la barra (no solo la bolita):
-        // más tolerante y funciona aunque la bolita esté en un extremo.
+        onLayout={(e) => {
+          trackWRef.current = e.nativeEvent.layout.width;
+          setTrackW(e.nativeEvent.layout.width);
+        }}
         onStartShouldSetResponder={() => true}
-        // No reclamar en movimiento: un scroll que empezó FUERA de la barra sigue
-        // perteneciendo al formulario.
         onMoveShouldSetResponder={() => false}
         onResponderTerminationRequest={() => false}
         onResponderGrant={(e) => {
+          dragging.current = true;
           onScrollLock?.(false);
-          resolve(e.nativeEvent.locationX);
+          onMove(e.nativeEvent.locationX);
         }}
-        onResponderMove={(e) => resolve(e.nativeEvent.locationX)}
-        // Restaurar SIEMPRE el scroll al soltar/cancelar (si no, el formulario y
-        // el perfil quedaban "congelados" con el scroll bloqueado).
-        onResponderRelease={() => onScrollLock?.(true)}
-        onResponderTerminate={() => onScrollLock?.(true)}
+        onResponderMove={(e) => onMove(e.nativeEvent.locationX)}
+        onResponderRelease={(e) => onRelease(e.nativeEvent.locationX)}
+        onResponderTerminate={() => {
+          if (dragging.current) {
+            dragging.current = false;
+            onScrollLock?.(true);
+          }
+        }}
       >
         <View style={styles.track} />
-        {trackWidth > 0 && (
-          <View style={[styles.trackFill, { width: thumbLeft + THUMB / 2 }]} />
-        )}
-        {trackWidth > 0 && (
-          <View style={[styles.thumb, { left: thumbLeft }]} />
-        )}
+        {trackW > 0 && <View style={[styles.trackFill, { width: fillW }]} />}
+        {trackW > 0 && <View style={[styles.thumb, { left: thumbLeft }]} />}
       </View>
 
       <View style={styles.sliderEnds}>
@@ -88,6 +172,34 @@ function CommissionSlider({ label, value, onChange, min, max, step, formatValue,
     </View>
   );
 }
+
+// ── Chip de porcentaje ────────────────────────────────────────────────────────
+const PresetChip = memo(function PresetChip({
+  pct,
+  active,
+  onPress,
+}: {
+  pct: number;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.presetChip, active && styles.presetChipActive]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Text
+        style={[
+          styles.presetChipText,
+          active && styles.presetChipTextActive,
+        ]}
+      >
+        {pct}%
+      </Text>
+    </TouchableOpacity>
+  );
+});
 
 function formatMeses(n: number): string {
   const whole = Math.floor(n);
@@ -114,211 +226,281 @@ export const CommissionSection = React.memo(function CommissionSection({
   const form = usePropertyFormContext();
   const { tipoOperacion } = form;
 
-  const ventaValues: ComisionValues = {
-    comparte: form.comparteComision,
-    tipo: form.comisionTipo,
-    valor: form.comisionValor,
-    compartidaTipo: form.comisionCompartidaTipo,
-    compartidaValor: form.comisionCompartidaValor,
-    condiciones: form.condicionesComision,
-  };
-  const ventaSetters: ComisionSetters = {
-    setComparte: form.setComparteComision,
-    setTipo: form.setComisionTipo,
-    setValor: form.setComisionValor,
-    setCompartidaTipo: form.setComisionCompartidaTipo,
-    setCompartidaValor: form.setComisionCompartidaValor,
-    setCondiciones: form.setCondicionesComision,
-  };
-  const rentaValues: ComisionValues = {
-    comparte: form.comparteComisionRenta,
-    tipo: form.comisionTipoRenta,
-    valor: form.comisionValorRenta,
-    compartidaTipo: form.comisionCompartidaTipoRenta,
-    compartidaValor: form.comisionCompartidaValorRenta,
-    condiciones: form.condicionesComisionRenta,
-  };
-  const rentaSetters: ComisionSetters = {
-    setComparte: form.setComparteComisionRenta,
-    setTipo: form.setComisionTipoRenta,
-    setValor: form.setComisionValorRenta,
-    setCompartidaTipo: form.setComisionCompartidaTipoRenta,
-    setCompartidaValor: form.setComisionCompartidaValorRenta,
-    setCondiciones: form.setCondicionesComisionRenta,
-  };
+  // onScrollLock se memoiza para que sea la MISMA función cada render.
+  // Sin esto, cada render del padre crea una función nueva y se la pasa al
+  // CommissionSlider, rompiendo su memo interno (aunque la comparación de value
+  // seguiría funcionando, evita re-renders innecesarios del padre).
+  const handleScrollLock = useCallback(
+    (locked: boolean) => onScrollLock?.(locked),
+    [onScrollLock],
+  );
+
+  const ventaValues = useMemo<ComisionValues>(
+    (): ComisionValues => ({
+      comparte: form.comparteComision,
+      tipo: form.comisionTipo,
+      valor: form.comisionValor,
+      compartidaTipo: form.comisionCompartidaTipo,
+      compartidaValor: form.comisionCompartidaValor,
+      condiciones: form.condicionesComision,
+    }),
+    [
+      form.comparteComision,
+      form.comisionTipo,
+      form.comisionValor,
+      form.comisionCompartidaTipo,
+      form.comisionCompartidaValor,
+      form.condicionesComision,
+    ],
+  );
+  const ventaSetters = useMemo<ComisionSetters>(
+    (): ComisionSetters => ({
+      setComparte: form.setComparteComision,
+      setTipo: form.setComisionTipo,
+      setValor: form.setComisionValor,
+      setCompartidaTipo: form.setComisionCompartidaTipo,
+      setCompartidaValor: form.setComisionCompartidaValor,
+      setCondiciones: form.setCondicionesComision,
+    }),
+    [
+      form.setComparteComision,
+      form.setComisionTipo,
+      form.setComisionValor,
+      form.setComisionCompartidaTipo,
+      form.setComisionCompartidaValor,
+      form.setCondicionesComision,
+    ],
+  );
+  const rentaValues = useMemo<ComisionValues>(
+    (): ComisionValues => ({
+      comparte: form.comparteComisionRenta,
+      tipo: form.comisionTipoRenta,
+      valor: form.comisionValorRenta,
+      compartidaTipo: form.comisionCompartidaTipoRenta,
+      compartidaValor: form.comisionCompartidaValorRenta,
+      condiciones: form.condicionesComisionRenta,
+    }),
+    [
+      form.comparteComisionRenta,
+      form.comisionTipoRenta,
+      form.comisionValorRenta,
+      form.comisionCompartidaTipoRenta,
+      form.comisionCompartidaValorRenta,
+      form.condicionesComisionRenta,
+    ],
+  );
+  const rentaSetters = useMemo<ComisionSetters>(
+    (): ComisionSetters => ({
+      setComparte: form.setComparteComisionRenta,
+      setTipo: form.setComisionTipoRenta,
+      setValor: form.setComisionValorRenta,
+      setCompartidaTipo: form.setComisionCompartidaTipoRenta,
+      setCompartidaValor: form.setComisionCompartidaValorRenta,
+      setCondiciones: form.setCondicionesComisionRenta,
+    }),
+    [
+      form.setComparteComisionRenta,
+      form.setComisionTipoRenta,
+      form.setComisionValorRenta,
+      form.setComisionCompartidaTipoRenta,
+      form.setComisionCompartidaValorRenta,
+      form.setCondicionesComisionRenta,
+    ],
+  );
 
   // ── VENTA ──────────────────────────────────────────────────────────────────
-  const renderVentaForm = (
-    title: string,
-    values: ComisionValues,
-    setters: ComisionSetters,
-    withTopBorder = false,
-  ) => {
-    const precio = parseFloat(form.precioVenta.replace(/,/g, "")) || 0;
-    const miPct = parseFloat(values.valor) || 0;
-    const miMonto = precio * miPct / 100;
-    const sharePct = parseFloat(values.compartidaValor) || 0;
-    const compartoMonto = miMonto * sharePct / 100;
+  const renderVentaForm = useCallback(
+    (
+      title: string,
+      values: ComisionValues,
+      setters: ComisionSetters,
+      withTopBorder = false,
+    ) => {
+      const precio = parseFloat(form.precioVenta.replace(/,/g, "")) || 0;
+      const miPct = parseFloat(values.valor) || 0;
+      const miMonto = precio * miPct / 100;
+      const sharePct = parseFloat(values.compartidaValor) || 0;
+      const compartoMonto = miMonto * sharePct / 100;
 
-    return (
-      <View style={withTopBorder ? styles.secondSection : undefined}>
-        {!!title && <Text style={styles.operationTitle}>{title}</Text>}
+      return (
+        <View style={withTopBorder ? styles.secondSection : undefined}>
+          {!!title && <Text style={styles.operationTitle}>{title}</Text>}
 
-        <View style={styles.presetRow}>
-          {[2, 3, 4, 5, 8, 10].map((p) => (
-            <TouchableOpacity
-              key={p}
-              style={[
-                styles.presetChip,
-                parseFloat(values.valor) === p && styles.presetChipActive,
-              ]}
-              onPress={() => setters.setValor(String(p))}
-            >
-              <Text
-                style={[
-                  styles.presetChipText,
-                  parseFloat(values.valor) === p && styles.presetChipTextActive,
-                ]}
-              >
-                {p}%
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <CommissionSlider
-          label="Mi comisión"
-          value={values.valor}
-          onChange={setters.setValor}
-          min={0} max={20} step={0.5}
-          formatValue={fmtPct}
-          hint={precio > 0 ? formatMXN(miMonto) : undefined}
-          onScrollLock={onScrollLock}
-        />
-
-        <RadioGroupSelector
-          label="¿Compartes comisión?"
-          options={[...OPCIONES_SI_NO]}
-          selectedValue={values.comparte}
-          onSelect={(val) => setters.setComparte(val as SiNo)}
-        />
-
-        {values.comparte === "Sí" && (
-          <View>
-            <CommissionSlider
-              label="Comparto (% de mi comisión)"
-              value={values.compartidaValor}
-              onChange={setters.setCompartidaValor}
-              min={0} max={100} step={5}
-              formatValue={fmtPct}
-              hint={precio > 0 ? formatMXN(compartoMonto) : undefined}
-            />
-            <AppInput
-              label="Condiciones (opcional)"
-              placeholder="Detalles de la comisión compartida..."
-              value={values.condiciones}
-              onChangeText={setters.setCondiciones}
-              multiline
-              numberOfLines={3}
-              inputStyle={styles.textArea}
-            />
+          <View style={styles.presetRow}>
+            {[2, 3, 4, 5, 8, 10].map((p) => (
+              <PresetChip
+                key={p}
+                pct={p}
+                active={parseFloat(values.valor) === p}
+                onPress={() => setters.setValor(String(p))}
+              />
+            ))}
           </View>
-        )}
 
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Mi comisión</Text>
-            <Text style={styles.summaryAmount}>
-              {precio > 0 ? formatMXN(miMonto) : `${miPct}% del precio`}
-            </Text>
-          </View>
+          <CommissionSlider
+            label="Mi comisión"
+            value={values.valor}
+            onChange={setters.setValor}
+            min={0}
+            max={20}
+            step={0.5}
+            formatValue={fmtPct}
+            hint={precio > 0 ? formatMXN(miMonto) : undefined}
+            onScrollLock={handleScrollLock}
+          />
+
+          <RadioGroupSelector
+            label="¿Compartes comisión?"
+            options={[...OPCIONES_SI_NO]}
+            selectedValue={values.comparte}
+            onSelect={(val) => setters.setComparte(val as SiNo)}
+          />
+
           {values.comparte === "Sí" && (
-            <View style={[styles.summaryItem, styles.summaryItemRight]}>
-              <Text style={styles.summaryLabel}>Comparto</Text>
-              <Text style={[styles.summaryAmount, styles.summaryAmountShare]}>
-                {precio > 0 ? formatMXN(compartoMonto) : `${sharePct}% de mi comisión`}
-              </Text>
+            <View>
+              <CommissionSlider
+                label="Comparto (% de mi comisión)"
+                value={values.compartidaValor}
+                onChange={setters.setCompartidaValor}
+                min={0}
+                max={100}
+                step={5}
+                formatValue={fmtPct}
+                hint={precio > 0 ? formatMXN(compartoMonto) : undefined}
+                onScrollLock={handleScrollLock}
+              />
+              <AppInput
+                label="Condiciones (opcional)"
+                placeholder="Detalles de la comisión compartida..."
+                value={values.condiciones}
+                onChangeText={setters.setCondiciones}
+                multiline
+                numberOfLines={3}
+                inputStyle={styles.textArea}
+              />
             </View>
           )}
+
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Mi comisión</Text>
+              <Text style={styles.summaryAmount}>
+                {precio > 0 ? formatMXN(miMonto) : `${miPct}% del precio`}
+              </Text>
+            </View>
+            {values.comparte === "Sí" && (
+              <View style={[styles.summaryItem, styles.summaryItemRight]}>
+                <Text style={styles.summaryLabel}>Comparto</Text>
+                <Text
+                  style={[
+                    styles.summaryAmount,
+                    styles.summaryAmountShare,
+                  ]}
+                >
+                  {precio > 0
+                    ? formatMXN(compartoMonto)
+                    : `${sharePct}% de mi comisión`}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
-      </View>
-    );
-  };
+      );
+    },
+    [form.precioVenta, ventaValues, ventaSetters, handleScrollLock],
+  );
 
   // ── RENTA ──────────────────────────────────────────────────────────────────
-  const renderRentaForm = (
-    title: string,
-    values: ComisionValues,
-    setters: ComisionSetters,
-    withTopBorder = false,
-  ) => {
-    const precioRenta = parseFloat(form.precioRenta.replace(/,/g, "")) || 0;
-    const meses = parseFloat(values.valor) || 0;
-    const miMonto = precioRenta * meses;
-    const sharePct = parseFloat(values.compartidaValor) || 0;
-    const compartoMonto = miMonto * sharePct / 100;
+  const renderRentaForm = useCallback(
+    (
+      title: string,
+      values: ComisionValues,
+      setters: ComisionSetters,
+      withTopBorder = false,
+    ) => {
+      const precioRenta =
+        parseFloat(form.precioRenta.replace(/,/g, "")) || 0;
+      const meses = parseFloat(values.valor) || 0;
+      const miMonto = precioRenta * meses;
+      const sharePct = parseFloat(values.compartidaValor) || 0;
+      const compartoMonto = miMonto * sharePct / 100;
 
-    return (
-      <View style={withTopBorder ? styles.secondSection : undefined}>
-        {!!title && <Text style={styles.operationTitle}>{title}</Text>}
+      return (
+        <View style={withTopBorder ? styles.secondSection : undefined}>
+          {!!title && <Text style={styles.operationTitle}>{title}</Text>}
 
-        <CommissionSlider
-          label="Mi comisión"
-          value={values.valor}
-          onChange={setters.setValor}
-          min={0.5} max={3} step={0.5}
-          formatValue={formatMeses}
-          hint={precioRenta > 0 ? formatMXN(miMonto) : undefined}
-          onScrollLock={onScrollLock}
-        />
+          <CommissionSlider
+            label="Mi comisión"
+            value={values.valor}
+            onChange={setters.setValor}
+            min={0.5}
+            max={3}
+            step={0.5}
+            formatValue={formatMeses}
+            hint={precioRenta > 0 ? formatMXN(miMonto) : undefined}
+            onScrollLock={handleScrollLock}
+          />
 
-        <RadioGroupSelector
-          label="¿Compartes comisión?"
-          options={[...OPCIONES_SI_NO]}
-          selectedValue={values.comparte}
-          onSelect={(val) => setters.setComparte(val as SiNo)}
-        />
+          <RadioGroupSelector
+            label="¿Compartes comisión?"
+            options={[...OPCIONES_SI_NO]}
+            selectedValue={values.comparte}
+            onSelect={(val) => setters.setComparte(val as SiNo)}
+          />
 
-        {values.comparte === "Sí" && (
-          <View>
-            <CommissionSlider
-              label="Comparto (% de mi comisión)"
-              value={values.compartidaValor}
-              onChange={setters.setCompartidaValor}
-              min={0} max={100} step={5}
-              formatValue={fmtPct}
-              hint={precioRenta > 0 ? formatMXN(compartoMonto) : undefined}
-            />
-            <AppInput
-              label="Condiciones (opcional)"
-              placeholder="Detalles de la comisión compartida..."
-              value={values.condiciones}
-              onChangeText={setters.setCondiciones}
-              multiline
-              numberOfLines={3}
-              inputStyle={styles.textArea}
-            />
-          </View>
-        )}
-
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Mi comisión</Text>
-            <Text style={styles.summaryAmount}>
-              {precioRenta > 0 ? formatMXN(miMonto) : formatMeses(meses)}
-            </Text>
-          </View>
           {values.comparte === "Sí" && (
-            <View style={[styles.summaryItem, styles.summaryItemRight]}>
-              <Text style={styles.summaryLabel}>Comparto</Text>
-              <Text style={[styles.summaryAmount, styles.summaryAmountShare]}>
-                {precioRenta > 0 ? formatMXN(compartoMonto) : `${sharePct}% de mi comisión`}
-              </Text>
+            <View>
+              <CommissionSlider
+                label="Comparto (% de mi comisión)"
+                value={values.compartidaValor}
+                onChange={setters.setCompartidaValor}
+                min={0}
+                max={100}
+                step={5}
+                formatValue={fmtPct}
+                hint={precioRenta > 0 ? formatMXN(compartoMonto) : undefined}
+                onScrollLock={handleScrollLock}
+              />
+              <AppInput
+                label="Condiciones (opcional)"
+                placeholder="Detalles de la comisión compartida..."
+                value={values.condiciones}
+                onChangeText={setters.setCondiciones}
+                multiline
+                numberOfLines={3}
+                inputStyle={styles.textArea}
+              />
             </View>
           )}
+
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Mi comisión</Text>
+              <Text style={styles.summaryAmount}>
+                {precioRenta > 0 ? formatMXN(miMonto) : formatMeses(meses)}
+              </Text>
+            </View>
+            {values.comparte === "Sí" && (
+              <View style={[styles.summaryItem, styles.summaryItemRight]}>
+                <Text style={styles.summaryLabel}>Comparto</Text>
+                <Text
+                  style={[
+                    styles.summaryAmount,
+                    styles.summaryAmountShare,
+                  ]}
+                >
+                  {precioRenta > 0
+                    ? formatMXN(compartoMonto)
+                    : `${sharePct}% de mi comisión`}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
-      </View>
-    );
-  };
+      );
+    },
+    [form.precioRenta, rentaValues, rentaSetters, handleScrollLock],
+  );
 
   const isRenta = tipoOperacion === "renta";
   const isAmbas = tipoOperacion === "ambas";
@@ -327,25 +509,31 @@ export const CommissionSection = React.memo(function CommissionSection({
 
   return (
     <FieldAnchor name="commission">
-    <View style={[styles.section, comisionError && styles.sectionError]}>
-      <View style={styles.sectionHeaderBand}>
-        <Ionicons name="cash-outline" size={18} color={COLORS.primary} />
-        <Text style={styles.sectionTitleBand}>Comisión</Text>
-      </View>
+      <View style={[styles.section, comisionError && styles.sectionError]}>
+        <View style={styles.sectionHeaderBand}>
+          <Ionicons name="cash-outline" size={18} color={COLORS.primary} />
+          <Text style={styles.sectionTitleBand}>Comisión</Text>
+        </View>
 
-      {comisionError && <Text style={styles.errorText}>{comisionError}</Text>}
-
-      {!isRenta &&
-        renderVentaForm(isAmbas ? "Comisión para Venta" : "", ventaValues, ventaSetters)}
-
-      {(isRenta || isAmbas) &&
-        renderRentaForm(
-          isAmbas ? "Comisión para Renta" : "",
-          isAmbas ? rentaValues : ventaValues,
-          isAmbas ? rentaSetters : ventaSetters,
-          isAmbas,
+        {comisionError && (
+          <Text style={styles.errorText}>{comisionError}</Text>
         )}
-    </View>
+
+        {!isRenta &&
+          renderVentaForm(
+            isAmbas ? "Comisión para Venta" : "",
+            ventaValues,
+            ventaSetters,
+          )}
+
+        {(isRenta || isAmbas) &&
+          renderRentaForm(
+            isAmbas ? "Comisión para Renta" : "",
+            isAmbas ? rentaValues : ventaValues,
+            isAmbas ? rentaSetters : ventaSetters,
+            isAmbas,
+          )}
+      </View>
     </FieldAnchor>
   );
 });
@@ -414,7 +602,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     padding: 14,
   },
-  // Slider
   sliderContainer: {
     marginBottom: 20,
   },
@@ -478,7 +665,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.primary,
   },
-  // Resumen de montos
   summaryRow: {
     flexDirection: "row",
     backgroundColor: COLORS.background ?? "#F5F5F5",

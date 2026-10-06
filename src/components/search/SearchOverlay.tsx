@@ -365,14 +365,15 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
           <>
             <SectionHeader title="Ubicaciones" />
             {s.displayItems.map((l, i) => (
-              <LocationRow 
-                key={`${l.id}-${i}`} 
-                location={l} 
+              <LocationRow
+                key={`${l.id}-${i}`}
+                location={l}
+                query={query}
                 onPress={() => handleNavigate(
                   () => selectLocation(l),
                   TIPO_BUSQUEDA.UBICACION,
                   { name: l.name, type: l.type || '', estado: l.estado, municipio: l.municipio, placeId: l.placeId }
-                )} 
+                )}
               />
             ))}
             {s.showToggle && <ToggleButton isExpanded={s.isExpanded} count={results.locations.length} onPress={s.toggle} />}
@@ -461,6 +462,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
       renderItem={({ item: l }) => (
               <LocationRow
                 location={l}
+                query={query}
                 onPress={() => handleNavigate(
                   () => selectLocation(l),
                   TIPO_BUSQUEDA.UBICACION,
@@ -942,18 +944,53 @@ function PropertyFichaCard({ property, onPress }: { property: SearchProperty; on
   );
 }
 
-function LocationRow({ location, onPress }: { location: SearchLocation; onPress: () => void }) {
-  // Descripción completa separada por comas, estilo Google Places.
-  const fullText =
-    location.fullDescription ||
-    [location.name, location.municipio, location.estado].filter(Boolean).join(", ");
+function LocationRow({ location, onPress, query = "" }: { location: SearchLocation; onPress: () => void; query?: string }) {
+  // Normalizar sin acentos para encontrar coincidencia
+  const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const normQuery = norm(query).toLowerCase();
+
+  // Partir el nombre en segmentos: caracteres que coinciden (bold) y los que no
+  const parts: Array<{ text: string; bold: boolean }> = [];
+  let qIdx = 0;
+
+  for (let i = 0; i < location.name.length; i++) {
+    const char = location.name[i];
+    const normChar = norm(char).toLowerCase();
+    if (qIdx < normQuery.length && normChar === normQuery[qIdx]) {
+      // Este carácter coincide con la query → bold
+      if (parts.length > 0 && parts[parts.length - 1].bold) {
+        parts[parts.length - 1].text += char;
+      } else {
+        parts.push({ text: char, bold: true });
+      }
+      qIdx++;
+    } else {
+      if (parts.length > 0 && !parts[parts.length - 1].bold) {
+        parts[parts.length - 1].text += char;
+      } else {
+        parts.push({ text: char, bold: false });
+      }
+    }
+  }
+
+  const suffix = [location.municipio, location.estado].filter(Boolean).join(", ");
+
   return (
     <SafePressable style={locStyles.row} activeOpacity={0.7} onPress={onPress}>
       <View style={locStyles.iconWrapper}>
         <Ionicons name="location" size={22} color={COLORS.primary} />
       </View>
       <View style={locStyles.info}>
-        <Text style={locStyles.name} numberOfLines={2}>{fullText}</Text>
+        <Text style={locStyles.name} numberOfLines={2}>
+          {parts.map((part, i) =>
+            part.bold ? (
+              <Text key={i} style={{ fontWeight: "700" }}>{part.text}</Text>
+            ) : (
+              <Text key={i} style={{ fontWeight: "400" }}>{part.text}</Text>
+            )
+          )}
+          {suffix ? <Text style={{ fontWeight: "400", color: COLORS.textSecondary }}>{`, ${suffix}`}</Text> : null}
+        </Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={COLORS.cardBorder} />
     </SafePressable>
@@ -1224,6 +1261,14 @@ const locStyles = StyleSheet.create({
   name: {
     fontSize: 14,
     fontWeight: "600",
+    color: COLORS.textPrimary,
+  },
+  nameBold: {
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+  },
+  nameNormal: {
+    fontWeight: "400",
     color: COLORS.textPrimary,
   },
   hierarchy: {

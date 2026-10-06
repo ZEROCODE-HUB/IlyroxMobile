@@ -358,6 +358,7 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
           onClose={() => setShowComments(false)}
           feedItemId={item.id}
           currentUserId={currentUserId}
+          heightRatio={0.8}
         />
       </Animated.View>
     </Modal>

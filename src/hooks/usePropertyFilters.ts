@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { Property } from "@/types";
 import { useExchangeRate } from "./useExchangeRate";
 import { normalizeStr } from "@/utils/stringNormalizer";
@@ -191,6 +191,9 @@ export const usePropertyFilters = (
     (s) => s.clearLocationChips,
   );
   const clearFilters = usePropertyFiltersStore((s) => s.clearFilters);
+
+  // Timer ref para debounce del log de debug
+  const debugLogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const filteredProperties = useMemo(() => {
     return properties.filter((p) => {
@@ -586,37 +589,42 @@ export const usePropertyFilters = (
     if (filters.polygons.length === 0) return;
     const usuarioId = user?.id;
     if (!usuarioId) return;
+    // Solo en desarrollo — en producción no serializamos el payload
+    if (typeof __DEV__ !== 'undefined' && !__DEV__) return;
 
-    const payload = {
-      polygons: filters.polygons,
-      locationChips: filters.locationChips,
-      locationFilter: filters.locationFilter,
-      resultCount: filteredProperties.length,
-      properties: filteredProperties.map((p) => ({
-        id: p.id,
-        colonia: (p as any).colonia,
-        municipio: (p as any).municipio,
-        lat: p.coordinates?.lat ?? (p as any).latitud,
-        lng: p.coordinates?.lng ?? (p as any).longitud,
-      })),
+    // Debounce: no repetir si ya hay una en vuelo
+    if (debugLogTimerRef.current) return;
+    debugLogTimerRef.current = setTimeout(() => {
+      debugLogTimerRef.current = null;
+      supabase
+        .from("debug_logs")
+        .insert({
+          usuario_id: usuarioId,
+          contexto: "polygon_filter",
+          payload: {
+            polygonCount: filters.polygons.length,
+            locationChipCount: filters.locationChips.length,
+            resultCount: filteredProperties.length,
+            // Sin array de propiedades — evita serializar hasta 3000 objetos
+          },
+        })
+        .then(
+          ({ error }) => {
+            if (error) log.warn("[debug_logs] insert falló:", error);
+          },
+          (e) => {
+            log.warn("[debug_logs] insert falló:", e);
+          },
+        );
+    }, 2000);
+
+    return () => {
+      if (debugLogTimerRef.current) {
+        clearTimeout(debugLogTimerRef.current);
+        debugLogTimerRef.current = null;
+      }
     };
-
-    supabase
-      .from("debug_logs")
-      .insert({
-        usuario_id: usuarioId,
-        contexto: "polygon_filter",
-        payload,
-      })
-      .then(
-        ({ error }) => {
-          if (error) log.warn("[debug_logs] insert falló:", error);
-        },
-        (e) => {
-          log.warn("[debug_logs] insert falló:", e);
-        },
-      );
-  }, [filteredProperties, filters.polygons]);
+  }, [filters.polygons, filters.locationChips, filteredProperties.length, user?.id]);
 
   return {
     filters,

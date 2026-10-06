@@ -36,7 +36,7 @@ async function compressForUpload(uri: string): Promise<string> {
       width > MAX_IMAGE_WIDTH ? [{ resize: { width: MAX_IMAGE_WIDTH } }] : [];
 
     const result = await ImageManipulator.manipulateAsync(uri, actions, {
-      compress: 0.8,
+      compress: 0.7,
       format: ImageManipulator.SaveFormat.JPEG,
     });
     return result.uri;

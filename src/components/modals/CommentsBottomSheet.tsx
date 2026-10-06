@@ -56,6 +56,9 @@ interface CommentsBottomSheetProps {
   /** Callback cuando un comentario highlighteado no se encontró (fue eliminado).
    * Se llama DESPUÉS de que TODOS los comentarios se cargaron (hasMore=false). */
   onHighlightedCommentNotFound?: () => void;
+  /** Fracción de la pantalla que ocupa la caja (default 0.95 = 95%).
+   * El reel pasa 0.8 para que no tape el video. */
+  heightRatio?: number;
 }
 
 interface CommentItemProps {
@@ -183,9 +186,10 @@ export default function CommentsBottomSheet({
   highlightUserIds,
   highlightCommentIds,
   onHighlightedCommentNotFound,
+  heightRatio = 0.95,
 }: CommentsBottomSheetProps) {
   const { height: screenHeight } = useWindowDimensions();
-  const modalHeight = screenHeight * 0.95;
+  const modalHeight = screenHeight * heightRatio;
 
   // State
   const [replyTo, setReplyTo] = useState<string | null>(null);
