@@ -45,6 +45,13 @@ import { usePropertyCacheStore } from "@/store/propertyCacheStore";
 
 const log = logger.scoped("MapSearch");
 
+// Hoisted outside the component so the reference is STABLE across renders.
+// If defined inside the component (React.memo(PropertyMap) as a function
+// expression), React may treat it as a new component type on each render,
+// causing MapView to unmount/remount — which produces the gray flicker
+// before the focusRegion animation.
+const MemoizedPropertyMap = React.memo(PropertyMap);
+
 interface MapSearchProps {
   properties: Property[];
   onSaveSearch: (name: string, leadName?: string, leadPhone?: string) => void;
@@ -90,7 +97,11 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
 
   const mountedRef = useRef(true);
   const focusThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const drawingModeRef = useRef(drawingMode);
+  const drainingRef = useRef(draining);
   useEffect(() => { return () => { mountedRef.current = false; if (focusThrottleRef.current) clearTimeout(focusThrottleRef.current); }; }, []);
+  useEffect(() => { drawingModeRef.current = drawingMode; }, [drawingMode]);
+  useEffect(() => { drainingRef.current = draining; }, [draining]);
 
   // Actualizar búsqueda en BD cuando los filtros cambian (con debounce)
   const filtersUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -106,7 +117,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
 
     filtersUpdateTimeoutRef.current = setTimeout(() => {
       if (currentSearchId && userId) {
-        console.log('🔍 [MapSearch] Actualizando búsqueda con filtros cambiados:', currentSearchId);
+        log.debug('Actualizando búsqueda con filtros cambiados:', currentSearchId);
         updateSearchWithFilters(currentSearchId, currentFilters, userId).catch((e: Error) => {
           log.warn('Error actualizando historial con filtros:', e);
         });
@@ -126,6 +137,9 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     latitudeDelta: number;
     longitudeDelta: number;
   } | null>(null);
+  // useMemo para que el OBJETO sea estable — así React.memo en PropertyMap
+  // no re-renderiza si los valores no cambiaron realmente.
+  const stableFocusRegion = useMemo(() => focusRegion, [focusRegion?.latitude, focusRegion?.longitude, focusRegion?.latitudeDelta, focusRegion?.longitudeDelta]);
   const lastFocusRef = useRef<typeof focusRegion>(null);
   const setFocusRegionThrottled = useCallback((region: typeof focusRegion) => {
     lastFocusRef.current = region;
@@ -382,17 +396,17 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   };
 
   // ── Handlers de marker ──
-  const handleMarkerPress = (propertyId: string, _property: Property) => {
+  const handleMarkerPress = useCallback((propertyId: string, _property: Property) => {
     // Pre-cache del shape del mapa (normalizePropertyData lo convierte a crudo
     // en el detalle → render instantáneo sin shimmer en fotos/precio/stats).
     if (_property?.id) {
       usePropertyCacheStore.getState().setProperty(_property.id, _property);
     }
     router.push({ pathname: "/property/[id]", params: { id: propertyId } });
-  };
+  }, []);
 
   // Varias propiedades en la misma coordenada: abrir el selector para elegir.
-  const handleStackPress = (propertyIds: string[]) => {
+  const handleStackPress = useCallback((propertyIds: string[]) => {
     if (propertyIds.length === 1) {
       const single = properties.find((p) => p.id === propertyIds[0]);
       handleMarkerPress(propertyIds[0], single as Property);
@@ -400,7 +414,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     }
     setStackPropertyIds(propertyIds);
     if (Platform.OS !== "web") Haptics.selectionAsync();
-  };
+  }, [properties, handleMarkerPress]);
 
   const stackProperties = useMemo(() => {
     if (!stackPropertyIds) return null;
@@ -416,15 +430,15 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   // ~0.0004° ≈ 40 m, funciona bien a zoom de barrio/ciudad.
   const POLYGON_CLOSE_THRESHOLD = 0.0004;
 
-  const handleLongPressMap = (coord: PolygonCoord) => {
-    if (drawingMode) return;
+  const handleLongPressMap = useCallback((coord: PolygonCoord) => {
+    if (drawingModeRef.current) return;
     if (Platform.OS !== "web") Haptics.selectionAsync();
     setDrawingMode(true);
     setDraftPoints([coord]);
-  };
+  }, []);
 
-  const handleMapPress = (coord: PolygonCoord) => {
-    if (!drawingMode || draining) return;
+  const handleMapPress = useCallback((coord: PolygonCoord) => {
+    if (!drawingModeRef.current || drainingRef.current) return;
 
     // Auto-cerrar polígono si el usuario presiona cerca del primer punto (3+ pts)
     if (draftPoints.length >= 3) {
@@ -433,7 +447,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         Math.abs(coord.latitude - first.latitude) < POLYGON_CLOSE_THRESHOLD &&
         Math.abs(coord.longitude - first.longitude) < POLYGON_CLOSE_THRESHOLD
       ) {
-        handleConfirmPolygon();
+        handleConfirmPolygonRef.current?.();
         return;
       }
     }
@@ -441,7 +455,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     // Vibración leve por cada nuevo punto
     if (Platform.OS !== "web") Haptics.selectionAsync();
     setDraftPoints((prev) => [...prev, coord]);
-  };
+  }, [draftPoints]);
 
   /**
    * Vacía el borrador quitando un punto por frame, en vez de golpe.
@@ -475,23 +489,33 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     return () => cancelAnimationFrame(frame);
   }, [draining, draftPoints.length]);
 
-  const handleCancelDrawing = () => {
+  const handleCancelDrawing = useCallback(() => {
     drainDraftPoints(() => setDrawingMode(false));
-  };
+  }, [drainDraftPoints]);
 
-  const handleUndoPoint = () => setDraftPoints((prev) => prev.slice(0, -1));
-  const handleClearDraft = () => drainDraftPoints();
+  const handleUndoPoint = useCallback(() => setDraftPoints((prev) => prev.slice(0, -1)), []);
 
-  const handleConfirmPolygon = () => {
+  const handleClearDraft = useCallback(() => drainDraftPoints(), [drainDraftPoints]);
+
+  // Handler para cuando se selecciona una propiedad desde CoincidentPropertiesSheet
+  const handleCoincidentSelect = useCallback((p: Property) => {
+    setStackPropertyIds(null);
+    if (p?.id) {
+      usePropertyCacheStore.getState().setProperty(p.id, p);
+    }
+    router.push({ pathname: "/property/[id]", params: { id: p.id } });
+  }, []);
+
+  // Ref estable para handleConfirmPolygon — se usa dentro de handleMapPress sin ciclo de deps
+  const handleConfirmPolygonRef = useRef<(() => void) | null>(null);
+  const handleConfirmPolygon = useCallback(() => {
     if (draftPoints.length < 3) return;
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Se captura el borrador y se confirma solo tras vaciarlo, para no montar el
-    // polígono definitivo en el mismo commit en que se desmontan los vértices.
     const coords = draftPoints;
     drainDraftPoints(() => {
       addPolygon(coords);
       setDrawingMode(false);
-      
+
       // Actualizar historial de búsquedas (polígono completado cuenta como ubicación)
       const currentFilters = usePropertyFiltersStore.getState().filters;
       if (currentSearchId && userId) {
@@ -500,7 +524,9 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         });
       }
     });
-  };
+  }, [draftPoints, drainDraftPoints, currentSearchId, userId, updateSearchWithFilters, addPolygon]);
+  // Mantener ref actualizado para que handleMapPress lo use sin ciclo de deps
+  handleConfirmPolygonRef.current = handleConfirmPolygon;
 
   // ── Limpiar todo ──
   const handleClearAll = () => {
@@ -520,12 +546,12 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     <View style={styles.container}>
       {/* ── Mapa — renderizado PRIMERO, llena TODO el contenedor ── */}
       <View style={styles.mapContainer}>
-        <PropertyMap
+        <MemoizedPropertyMap
           properties={filteredProperties}
-          onMarkerPress={drawingMode ? () => {} : handleMarkerPress}
-          onStackPress={drawingMode ? undefined : handleStackPress}
+          onMarkerPress={handleMarkerPress}
+          onStackPress={handleStackPress}
           googleApiKey={googleApiKey}
-          focusRegion={focusRegion}
+          focusRegion={stableFocusRegion}
           searchedLocationPins={locationPins}
           drawingMode={drawingMode}
           draftPolygonPoints={draftPoints}
@@ -550,13 +576,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
       <CoincidentPropertiesSheet
         properties={stackProperties}
         onClose={() => setStackPropertyIds(null)}
-        onSelect={(p) => {
-          setStackPropertyIds(null);
-          if (p?.id) {
-            usePropertyCacheStore.getState().setProperty(p.id, p);
-          }
-          router.push({ pathname: "/property/[id]", params: { id: p.id } });
-        }}
+        onSelect={handleCoincidentSelect}
       />
 
       {/* Barra inferior — SIEMPRE en el DOM para evitar que el mapa cambie de tamaño.

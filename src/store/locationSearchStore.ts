@@ -258,6 +258,23 @@ const RESIDENTIAL_KEYWORDS = [
 ];
 
 /**
+ * Lista de nombres CONCRETOS que SIEMPRE deben mostrarse, aunque Google los
+ * clasifique con tipos de ruido (route, establishment, point_of_interest...).
+ *
+ * Sirve para fraccionamientos o zonas conocidas que Google etiqueta mal (por
+ * ejemplo "Loretta II", que Google devuelve como type "route" y por eso se
+ * confundía con una avenida y se descartaba).
+ *
+ * IMPORTANTE: es una lista curada a propósito. Agrega aquí SOLO lugares reales
+ * confirmados; NO uses palabras genéricas, porque eso volvería a colar ruido.
+ */
+const ALLOWED_PLACES = [
+  "loretta ii",
+  "reserva couvet",
+  "reserva san nicolas",
+];
+
+/**
  * Verifica si el nombre indica que es una zona residencial/fraccionamiento.
  */
 function isResidentialArea(name: string): boolean {
@@ -266,10 +283,21 @@ function isResidentialArea(name: string): boolean {
 }
 
 /**
+ * Verifica si el nombre corresponde a un lugar de la lista de permitidos.
+ * Los permitidos nunca se filtran como ruido.
+ */
+function isAllowedPlace(name: string): boolean {
+  const lower = name.toLowerCase();
+  return ALLOWED_PLACES.some((p) => lower.includes(p));
+}
+
+/**
  * Verifica si una sugerencia de Google Places es "ruido" (establecimiento, calle, POI).
  * Retorna true si es ruido y debe filtrarse.
  */
 function isNoiseSuggestion(types: string[] | undefined, name: string): boolean {
+  // Los lugares de la lista de permitidos NUNCA son ruido
+  if (isAllowedPlace(name)) return false;
   // Las zonas residenciales/fraccionamientos NO son ruido aunque Google
   // los marque como establishment o point_of_interest
   if (isResidentialArea(name)) return false;
@@ -441,6 +469,15 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
 
     const biasCoords = effectiveEstado ? config.level1Coords[effectiveEstado] : undefined;
 
+    // DEBUG: parámetros de la request a Google Places
+    console.log("[DEBUG locationSearch] REQUEST:", {
+      searchTerm,
+      types: types ?? "(todos - sin filtro)",
+      effectiveEstado: effectiveEstado ?? "(sin estado)",
+      biasCoords: biasCoords ?? "(sin bias)",
+      radius: biasCoords ? 100000 : undefined,
+    });
+
     try {
       const { sessionToken } = get();
       const results = await searchLocations(
@@ -452,10 +489,27 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
       // Respuesta obsoleta (se escribió más mientras esta volaba): se descarta.
       if (requestId !== get().latestSearchRequestId) return;
 
+      // DEBUG: resultados CRUDOS de Google (antes de enriquecer/filtrar)
+      console.log("[DEBUG locationSearch] GOOGLE CRUDO:", results.map((r, i) => ({
+        orden: i + 1,
+        name: r.name,
+        type: r.type,
+        secondaryText: r.secondaryText,
+        types: r.types,
+      })));
+
       const enriched: LocationSuggestionWithCount[] = results.map((loc) => ({
         ...loc,
         ...extractMunicipioEstado(loc, country),
       }));
+
+      // DEBUG: resultados enriquecidos (con municipio/estado derivados)
+      console.log("[DEBUG locationSearch] ENRIQUECIDO:", enriched.map((s) => ({
+        name: s.name,
+        type: s.type,
+        estado_nombre: s.estado_nombre,
+        municipio_nombre: s.municipio_nombre,
+      })));
 
       // Re-rank + fallback geográfico:
       // 1) Google Places bias (location+radius) es insuficiente: ciudades grandes
@@ -470,10 +524,26 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
         ).length;
         if (localCount < 2) {
           const fallbackSearchTerm = `${searchTerm}, ${effectiveEstado}`;
+          // DEBUG: se dispara el fallback porque hay menos de 2 resultados locales
+          console.log("[DEBUG locationSearch] FALLBACK TRIGGER:", {
+            reason: `localCount=${localCount} < 2`,
+            fallbackSearchTerm,
+            localCount,
+          });
           const fallbackResults = await searchLocations(
             fallbackSearchTerm, 5, sessionToken, country, "(regions)",
           );
           if (requestId !== get().latestSearchRequestId) return;
+
+          // DEBUG: resultados CRUDOS del fallback
+          console.log("[DEBUG locationSearch] FALLBACK CRUDO:", fallbackResults.map((r, i) => ({
+            orden: i + 1,
+            name: r.name,
+            type: r.type,
+            secondaryText: r.secondaryText,
+            types: r.types,
+          })));
+
           const fallbackEnriched = fallbackResults.map((loc) => ({
             ...loc,
             ...extractMunicipioEstado(loc, country),
@@ -483,13 +553,141 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
           combined = [...enriched, ...nonDuplicated];
         }
       }
-      // FILTRAR RUIDO: eliminar establecimientos, calles y POIs
-      // que no son relevantes para bienes raíces (solo interesan colonias,
-      // fraccionamientos, municipios, estados).
+
+      // ── FILTRAR RUIDO (antes del fallback a BD) ───────────────────────────
+      // Eliminamos establecimientos, calles y POIs que no son relevantes para
+      // bienes raíces (solo interesan colonias, fraccionamientos, municipios, estados).
       // NOTA: Los fraccionamientos y residenciales en México son marcados por Google
       // como "establishment" o "point_of_interest", así que los dejamos pasar si el
       // nombre contiene palabras clave residenciales.
       combined = combined.filter((s) => !isNoiseSuggestion(s.types, s.name));
+
+      // DEBUG: después de filtrar ruido (antes de decidir el fallback a BD)
+      console.log("[DEBUG locationSearch] POST-FILTRO-RUIDO:", combined.map((s) => ({
+        name: s.name,
+        estado: s.estado_nombre,
+        types: s.types,
+        propertyCount: s.propertyCount,
+      })));
+
+      // ── FALLBACK A PROPIEDADES ────────────────────────────────────────────
+      // Si después del filtro de ruido seguimos con muy pocos resultados locales,
+      // buscamos en las direcciones de las propiedades activas.
+      // Esto cubre zonas que Google no conoce pero que existen en la BD.
+      const localCountPostNoise = combined.filter(
+        (s) => s.estado_nombre?.toLowerCase() === effectiveEstado?.toLowerCase(),
+      ).length;
+
+      if (localCountPostNoise < 2) {
+        const { data: propLocations } = await supabase.rpc(
+          "buscar_ubicaciones_desde_propiedades",
+          {
+            q: searchTerm,
+            p_estado_usuario: effectiveEstado ?? null,
+            lim: 5,
+            p_pais: country ?? null,
+          },
+        );
+        if (requestId !== get().latestSearchRequestId) return;
+
+        // DEBUG: resultados CRUDOS del fallback a propiedades
+        console.log("[DEBUG locationSearch] FALLBACK DB CRUDO:", propLocations);
+
+        if (Array.isArray(propLocations) && propLocations.length > 0) {
+          const propSuggestions: LocationSuggestionWithCount[] = propLocations
+            .filter((p: any) => {
+              // Evitar duplicados: si ya tenemos un resultado con el mismo nombre
+              // y estado, no agregarlo
+              return !combined.some(
+                (c) =>
+                  c.name.toLowerCase() === (p.nombre ?? "").toLowerCase() &&
+                  c.estado_nombre?.toLowerCase() === (p.estado ?? "").toLowerCase(),
+              );
+            })
+            .map((p: any) => ({
+              placeId: `prop-${p.nombre}-${p.municipio}-${p.estado}`,
+              name: p.nombre ?? "",
+              secondaryText: [p.municipio, p.estado].filter(Boolean).join(", "),
+              fullDescription: p.full_description ?? "",
+              type: (p.tipo ?? "colonia") as "estado" | "municipio" | "colonia",
+              types: ["colonia"],
+              municipio_nombre: p.municipio ?? undefined,
+              estado_nombre: p.estado ?? undefined,
+              propertyCount: Number(p.total) || 0,
+            }));
+
+          combined = [...combined, ...propSuggestions];
+          console.log("[DEBUG locationSearch] POST-FALLBACK-DB:", combined.map((s) => ({
+            name: s.name,
+            estado: s.estado_nombre,
+            types: s.types,
+            propertyCount: s.propertyCount,
+            placeId: s.placeId,
+          })));
+        } else {
+          console.log("[DEBUG locationSearch] FALLBACK DB: sin resultados");
+        }
+      }
+
+      // ── NORMALIZAR NOMBRES SIMILARES ──────────────────────────────────
+      // Cuando un resultado de la BD (ej. "Loretta") y uno de Google (ej. "Loretta II")
+      // son essentially la misma zona, agruparlos y conservar el MEJOR de ambos.
+      // Criterio: mismo estado, y un nombre contiene al otro (sin distinción de
+      // número romano / cardinal / "II", "III", "Norte", "Sur", etc.)
+      const NORMALIZE_SUFFIXES = [
+        " ii", " iii", " iv", " v",
+        " i", " norte", " sur", " oriente", " poniente",
+        " este", " oeste",
+      ];
+      function normalizeForMatch(name: string): string {
+        const n = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        for (const s of NORMALIZE_SUFFIXES) {
+          if (n.endsWith(s)) return n.slice(0, -s.length).trim();
+        }
+        return n;
+      }
+      // DEBUG: normalizacion
+      const preNormalizeDebug = combined.map((s) => ({
+        name: s.name,
+        normalizedName: normalizeForMatch(s.name),
+      }));
+      console.log("[DEBUG locationSearch] PRE-NORMALIZE:", preNormalizeDebug);
+      const seenRoots = new Map<string, number>(); // root → first index
+      const normalized: typeof combined = [];
+      for (let i = 0; i < combined.length; i++) {
+        const item = combined[i];
+        const root = normalizeForMatch(item.name);
+        if (!seenRoots.has(root)) {
+          seenRoots.set(root, normalized.length);
+          normalized.push(item);
+        } else {
+          const existingIdx = seenRoots.get(root)!;
+          const existing = normalized[existingIdx];
+          // Reemplazar si: el nuevo tiene más propertyCount O es de Google (placeId no empieza con "prop-")
+          const existingFromGoogle = !existing.placeId.startsWith("prop-");
+          const itemFromGoogle = !item.placeId.startsWith("prop-");
+          if (itemFromGoogle && !existingFromGoogle) {
+            // El de Google gana sobre el de BD → reemplazar
+            normalized[existingIdx] = item;
+            console.log("[DEBUG locationSearch] NORMALIZE: reemplazo", existing.name, "→", item.name, "(google > db)");
+          } else if ((item.propertyCount ?? 0) > (existing.propertyCount ?? 0)) {
+            // Mismo source (ambos BD o ambos Google): gana el de más propiedades
+            normalized[existingIdx] = item;
+            console.log("[DEBUG locationSearch] NORMALIZE: reemplazo", existing.name, "→", item.name, "(más propiedades)");
+          } else {
+            console.log("[DEBUG locationSearch] NORMALIZE: descarte", item.name, "por", existing.name);
+          }
+        }
+      }
+      combined = normalized;
+
+      // DEBUG: combinado final (post-fallback + normalize) listo para scoring
+      console.log("[DEBUG locationSearch] COMBINADO FINAL:", combined.map((s) => ({
+        name: s.name,
+        type: s.type,
+        estado_nombre: s.estado_nombre,
+        types: s.types,
+      })));
       // Score textual: priorizar coincidencia exacta, empieza con, contiene
       // Normalizar acentos para que "Nicolás" == "Nicolas" (el usuario escribe sin acentos)
       const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -519,6 +717,14 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
       // Mostrar las sugerencias de inmediato (y quitar el spinner); el conteo
       // se rellena después sin bloquear la UI.
       set({ suggestions: ranked, isLoading: false });
+
+      // DEBUG: resultado FINAL ordenado que ve la UI
+      console.log("[DEBUG locationSearch] FINAL ORDENADO:", ranked.map((s) => ({
+        name: s.name,
+        type: s.type,
+        estado_nombre: s.estado_nombre,
+        _score: s._score,
+      })));
 
       // Conteo de propiedades por zona (diferido, no bloquea la UI).
       // Se cuenta usando la JERARQUÍA de la sugerencia (nombre + municipio +

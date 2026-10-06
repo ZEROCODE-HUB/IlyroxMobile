@@ -147,8 +147,22 @@ export default function TagsModal({
   };
 
   return (
-    <Modal visible={visible} animationType="fade" transparent>
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.overlay}>
+        {/* Backdrop: DETRÁS del contenedor. Los toques sobre el fondo oscuro
+            cierran; los que caen sobre la tarjeta blanca la intercepta ella. */}
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Cerrar"
+        />
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>

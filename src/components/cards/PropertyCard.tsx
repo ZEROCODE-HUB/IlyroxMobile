@@ -689,18 +689,29 @@ const styles = StyleSheet.create({
   priceRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     marginTop: 2,
+    // Garantía anti-desborde: la fila nunca crece más allá del card y se
+    // corta en vez de salirse.
+    flexWrap: "nowrap",
+    overflow: "hidden",
   },
   priceText: {
     fontSize: 16,
     fontWeight: "700",
     color: COLORS.textPrimary,
+    // flex:1 + minWidth:0 es IMPRESCINDIBLE en RN: sin minWidth el Text no
+    // baja de su ancho intrínseco dentro de la fila y empuja el badge de
+    // comisión fuera del card cuando el precio es largo (venta + renta).
+    flex: 1,
+    minWidth: 0,
   },
   commissionBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
+    // Nunca se aplasta: el texto de comisión siempre se ve completo.
+    flexShrink: 0,
   },
   commissionText: {
     fontSize: 10,

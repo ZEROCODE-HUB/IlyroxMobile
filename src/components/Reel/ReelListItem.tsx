@@ -365,6 +365,7 @@ const ReelListItem: React.FC<ReelListItemProps> = ({
           onClose={() => setShowComments(false)}
           feedItemId={item.id}
           currentUserId={currentUserId}
+          heightRatio={0.8}
         />
       )}
     </View>
