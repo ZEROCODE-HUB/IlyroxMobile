@@ -34,6 +34,9 @@ export function useUserBlock(
     queryClient.invalidateQueries({ queryKey: ["mapFeedItems"] });
     queryClient.invalidateQueries({ queryKey: ["propertyFeedItems"] });
     queryClient.invalidateQueries({ queryKey: ["property"] });
+    // Invalidar la lista de conversaciones para que el chat del usuario
+    // bloqueado/desbloqueado aparezca o desaparezca de inmediato.
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
   }, [queryClient]);
 
   const block = useCallback(async () => {

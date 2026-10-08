@@ -275,6 +275,55 @@ const ALLOWED_PLACES = [
 ];
 
 /**
+ * Lista negra de nombres de lugares que NUNCA deben mostrarse en las sugerencias.
+ * Estos son puntos de interés, aeropuertos, terminales, etc. que no son zonas
+ * inmobiliarias relevantes aunque Google los devuelva.
+ *
+ * IMPORTANTE: usa nombres normalizados (minúsculas, sin acentos). Se compara
+ * como substring del nombre.
+ */
+const PLACE_BLACKLIST = [
+  "international airport",
+  "aeropuerto internacional",
+  "bus station",
+  "estacion de autobuses",
+  "central de autobuses",
+  "transit station",
+  "casa club",
+  "fisioterapia",
+  "consultorio",
+  "clinica",
+  "hospital",
+  "laboratorio",
+  "pharmacy",
+  "farmacia",
+  "doctor",
+  "clinica dental",
+  "dentista",
+  "dental",
+  "dentist",
+  "clinica dental",
+  "medical",
+  "laboratorio clinique",
+  "sure smile",
+  "funeraria",
+  "funerarias",
+  "capillas funerarias",
+  "premier english",
+  "english school",
+  "academia",
+  "escuela de ingles",
+  "colegio",
+  "preparatoria",
+  "universidad",
+  " kinder",
+  "guarderia",
+  "salon de fiestas",
+  "salon de eventos",
+  "banquetes",
+];
+
+/**
  * Verifica si el nombre indica que es una zona residencial/fraccionamiento.
  */
 function isResidentialArea(name: string): boolean {
@@ -292,10 +341,20 @@ function isAllowedPlace(name: string): boolean {
 }
 
 /**
+ * Verifica si el nombre está en la lista negra.
+ */
+function isBlacklistedPlace(name: string): boolean {
+  const lower = name.toLowerCase();
+  return PLACE_BLACKLIST.some((b) => lower.includes(b));
+}
+
+/**
  * Verifica si una sugerencia de Google Places es "ruido" (establecimiento, calle, POI).
  * Retorna true si es ruido y debe filtrarse.
  */
 function isNoiseSuggestion(types: string[] | undefined, name: string): boolean {
+  // Los lugares de la lista negra SIEMPRE se filtran (override)
+  if (isBlacklistedPlace(name)) return true;
   // Los lugares de la lista de permitidos NUNCA son ruido
   if (isAllowedPlace(name)) return false;
   // Las zonas residenciales/fraccionamientos NO son ruido aunque Google
@@ -635,9 +694,7 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
       // Criterio: mismo estado, y un nombre contiene al otro (sin distinción de
       // número romano / cardinal / "II", "III", "Norte", "Sur", etc.)
       const NORMALIZE_SUFFIXES = [
-        " ii", " iii", " iv", " v",
-        " i", " norte", " sur", " oriente", " poniente",
-        " este", " oeste",
+        " ii", " iii", " iv", " v", " vi", " vii", " viii", " ix", " x",
       ];
       function normalizeForMatch(name: string): string {
         const n = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");

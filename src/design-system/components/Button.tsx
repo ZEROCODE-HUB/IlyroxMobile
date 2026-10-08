@@ -187,7 +187,6 @@ export const Button: React.FC<ButtonProps> = ({
                       variantStyles.label,
                       labelStyle,
                     ]}
-                    numberOfLines={1}
                   >
                     {label}
                   </Text>
@@ -223,5 +222,6 @@ const styles = StyleSheet.create({
   label: {
     fontWeight: theme.typography.fontWeights.semibold,
     textAlign: "center",
+    flexShrink: 1,
   },
 });

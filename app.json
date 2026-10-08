@@ -24,7 +24,7 @@
     "updates": {
       "enabled": true,
       "url": "https://u.expo.dev/fc0a5782-4733-40f7-9c7e-efa6d3550f31",
-      "fallbackToCacheTimeout": 0,
+      "fallbackToCacheTimeout": 3000,
       "checkAutomatically": "ON_LOAD"
     },
     "ios": {

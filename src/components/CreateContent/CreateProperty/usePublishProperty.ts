@@ -27,6 +27,7 @@ import type {
 import type { usePropertyForm } from "./usePropertyForm";
 import { logger } from "@/utils/logger";
 import { notifyMatchingUsers } from "@/hooks/useMatchNotifier";
+import { warmOgCache } from "@/utils/ogWarmup";
 
 const log = logger.scoped("usePublishProperty");
 
@@ -518,6 +519,10 @@ export function usePublishProperty(
           prependPublishedFeedItem(queryClient, newPropertyId, user?.id).catch(
             () => {},
           );
+          // Pre-calentar el cache del OG para que el primer share en WhatsApp
+          // sea HIT (no MISS). El route tarda 2-3s en frío y WhatsApp aborta.
+          // Fire-and-forget: si falla, no pasa nada.
+          warmOgCache("property", newPropertyId);
         }
 
         setTimeout(() => {

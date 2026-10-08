@@ -945,7 +945,38 @@ function PropertyFichaCard({ property, onPress }: { property: SearchProperty; on
 }
 
 function LocationRow({ location, onPress, query = "" }: { location: SearchLocation; onPress: () => void; query?: string }) {
-  // Normalizar sin acentos para encontrar coincidencia
+  // Nombre para display: quitar sufijos como II, III, Norte, Sur, etc.
+  const DISPLAY_PREFIXES = [
+    "avenida", "av.", "av ",
+    "calle", "c/", "c ",
+    "boulevard", "blvd", "bulevar",
+    "prolongacion", "prolongación",
+    "circuito",
+    "carretera", "carr.",
+    "camino",
+    "paseo",
+    "privada",
+  ];
+  const DISPLAY_SUFFIXES = [
+    " ii", " iii", " iv", " v", " vi", " vii", " viii", " ix", " x",
+  ];
+  const getDisplayName = (name: string) => {
+    const lower = name.toLowerCase();
+    for (const p of DISPLAY_PREFIXES) {
+      if (lower.startsWith(p)) {
+        return name.slice(p.length).trim();
+      }
+    }
+    for (const s of DISPLAY_SUFFIXES) {
+      if (lower.endsWith(s)) {
+        return name.slice(0, name.length - s.length).trim();
+      }
+    }
+    return name;
+  };
+  const displayName = getDisplayName(location.name);
+
+  // Normalizar sin acentos para encontrar coincidencia en el nombre original
   const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const normQuery = norm(query).toLowerCase();
 
@@ -953,8 +984,8 @@ function LocationRow({ location, onPress, query = "" }: { location: SearchLocati
   const parts: Array<{ text: string; bold: boolean }> = [];
   let qIdx = 0;
 
-  for (let i = 0; i < location.name.length; i++) {
-    const char = location.name[i];
+  for (let i = 0; i < displayName.length; i++) {
+    const char = displayName[i];
     const normChar = norm(char).toLowerCase();
     if (qIdx < normQuery.length && normChar === normQuery[qIdx]) {
       // Este carácter coincide con la query → bold

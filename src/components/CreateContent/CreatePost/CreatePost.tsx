@@ -475,7 +475,18 @@ export default function CreatePost({ post, onBack, onUpdated }: CreatePostProps)
         setContent("");
         setImages([]);
         setUploadProgress(0);
+        // 1) Cerrar el modal INTERNO de progreso en su propio commit de React.
+        //    Si esto se hace en el MISMO commit que el cierre del modal de
+        //    edición externo (vía onBack → setShowEditModal(false) en el
+        //    padre), iOS intenta desmontar dos RCTModalHostView nativos en un
+        //    solo frame: el <View style={{flex:1, backgroundColor: white}}>
+        //    de CreatePost desaparece antes de que termine la animación de
+        //    dismiss del modal externo y queda el UIWindow raíz sin
+        //    backgroundColor → pantalla negra. Es el MISMO motivo por el que
+        //    CreateProperty/index.tsx usa setTimeout(..., 350) para diferir
+        //    su onBack; aquí se documenta con la misma forma.
         setIsUploadingManual(false);
+
         if (!isEditing) {
           // Publicación nueva: se crea y se lleva al feed (la tarjeta hace prepend).
           router.replace({
@@ -488,7 +499,11 @@ export default function CreatePost({ post, onBack, onUpdated }: CreatePostProps)
           // invalida ["feed"] (reordenaba la lista por engagement_score). El
           // contenedor refresca solo este post con patchFeedItem.
           if (post?.id) onUpdated?.(post.id);
-          onBack();
+          // 2) Cerrar el modal de edición EXTERNO en un commit POSTERIOR al
+          //    cierre del modal interno. Android ignora el delay; en iOS
+          //    serializa las dos transiciones nativas y vuelve a la feed
+          //    sin pantalla negra.
+          setTimeout(() => onBack(), 250);
         }
       }, 500);
     } catch (error) {

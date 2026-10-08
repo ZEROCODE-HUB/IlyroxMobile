@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { AppInput } from "../../design-system/components/AppInput";
 import ConversationsSelectionModal from "./ConversationsSelectionModal";
 import TagFilterBar from "./TagFilterBar";
@@ -20,6 +21,7 @@ import TagsModal from "./TagsModal";
 import { NotificationItem } from "../Notificaciones/NotificationItem";
 import { useRouter } from "expo-router";
 import { useTags } from "../../hooks/messaging/useTags";
+import { blockService } from "../../services/blockService";
 import { COLORS } from "../../constants";
 import { Avatar } from "../shared";
 
@@ -71,6 +73,19 @@ export default function ConversationsList({
 
   const router = useRouter();
 
+  // Red de seguridad: oculta conversaciones de usuarios bloqueados incluso si
+  // el cache de React Query aún tiene datos sin revalidar.
+  const { data: blockedIds = [] } = useQuery({
+    queryKey: ["blocked-user-ids", userId],
+    queryFn: () => blockService.getBlockedUserIds(userId),
+    enabled: Boolean(userId),
+    staleTime: 60_000,
+  });
+  const blockedSet = React.useMemo(
+    () => new Set(blockedIds),
+    [blockedIds],
+  );
+
   // Aplica el refetch en segundo plano y, al terminar, suelta el override
   // optimista de esa agrupación (la data real ya trae la etiqueta).
   const reconcileTagsFor = (groupingId: string) => {
@@ -92,6 +107,14 @@ export default function ConversationsList({
         ? { ...conv, etiquetas: optimisticTags[conv.id] }
         : conv,
     );
+
+    // Filtro de usuarios bloqueados (red de seguridad si el cache de la query
+    // padre aún contiene la conversación de un usuario recién bloqueado).
+    if (blockedSet.size > 0) {
+      result = result.filter(
+        (conv) => !blockedSet.has(conv.other_user?.id),
+      );
+    }
 
     // Filtro de búsqueda
     if (searchQuery.trim()) {
@@ -120,7 +143,7 @@ export default function ConversationsList({
     }
 
     return result;
-  }, [conversations, searchQuery, selectedTagIds, optimisticTags]);
+  }, [conversations, searchQuery, selectedTagIds, optimisticTags, blockedSet]);
 
   const handleGroupingPress = (grouping: any) => {
     const otherUserId = grouping.other_user?.id;

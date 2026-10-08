@@ -6,6 +6,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/utils/logger";
+import { blockService } from "@/services/blockService";
 
 const log = logger.scoped("conversationsService");
 
@@ -93,6 +94,11 @@ function countUnread(convs: any[], userId: string) {
 
 export const conversationsService = {
   async listConversations(userId: string): Promise<GroupedConversation[]> {
+    // Obtener IDs de usuarios bloqueados para excluirlos de la lista.
+    // Se hace en paralelo con las otras queries para no añadir latencia.
+    const blockedUserIds = await blockService.getBlockedUserIds(userId);
+    const blockedSet = new Set(blockedUserIds);
+
     const [agrupacionesRes, allConversationsRes] = await Promise.all([
       supabase
         .from("agrupaciones_conversaciones")
@@ -195,7 +201,15 @@ export const conversationsService = {
       return dateB - dateA;
     });
 
-    return processed;
+    // Filtrar conversaciones cuyo otro participante esté bloqueado por el usuario actual.
+    // Esto evita que el chat aparezca en la lista de conversaciones.
+    if (blockedSet.size === 0) {
+      return processed;
+    }
+
+    return processed.filter(
+      (conv) => !blockedSet.has(conv.other_user?.id),
+    );
   },
 
   async getConversationsForUser(
