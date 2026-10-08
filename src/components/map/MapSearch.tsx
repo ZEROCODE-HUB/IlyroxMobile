@@ -141,14 +141,24 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   // no re-renderiza si los valores no cambiaron realmente.
   const stableFocusRegion = useMemo(() => focusRegion, [focusRegion?.latitude, focusRegion?.longitude, focusRegion?.latitudeDelta, focusRegion?.longitudeDelta]);
   const lastFocusRef = useRef<typeof focusRegion>(null);
+  // Throttle inteligente: si NO hay un focusRegion previo (caso típico:
+  // "seleccioné Aguascalientes en el buscador y acabo de entrar al mapa"),
+  // aplicar inmediatamente. Solo throttlear cuando el usuario está CAMBIANDO
+  // de ubicación rápidamente (digita, selecciona A, digita, selecciona B en
+  // sucesión), para evitar una cola de animaciones encadenadas.
   const setFocusRegionThrottled = useCallback((region: typeof focusRegion) => {
     lastFocusRef.current = region;
     if (focusThrottleRef.current) return;
+    if (focusRegion == null) {
+      // Sin focus previo → aplicar de inmediato (sin delay gratuito).
+      setFocusRegion(region);
+      return;
+    }
     focusThrottleRef.current = setTimeout(() => {
       focusThrottleRef.current = null;
       setFocusRegion(lastFocusRef.current);
-    }, 400);
-  }, []);
+    }, 250);
+  }, [focusRegion]);
 
   // Evita re-agregar el chip de la ubicación elegida en el buscador de inicio.
   const addedSelectedChipRef = useRef<string | null>(null);

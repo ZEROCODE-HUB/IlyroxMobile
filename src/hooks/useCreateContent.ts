@@ -10,7 +10,9 @@ import { useImageUpload } from "./useImageUpload";
 import { prependPublishedFeedItem } from "./useFeed";
 import * as Burnt from "burnt";
 import { useModal } from "@/context/ModalContext";
-import { logger } from "@/utils/logger";const log = logger.scoped("useCreateContent");
+import { logger } from "@/utils/logger";
+import { warmOgCache } from "@/utils/ogWarmup";
+const log = logger.scoped("useCreateContent");
 
 export function useCreateContent(userId?: string) {
   const {
@@ -66,7 +68,13 @@ export function useCreateContent(userId?: string) {
 
       if (postError) throw postError;
 
-      // 3. El feed_item lo crea automáticamente el trigger `trigger_crear_feed_item`
+      // 3. Pre-calentar el cache del OG para que cuando alguien comparta este
+      // post en WhatsApp/Facebook, el primer HIT sea HIT (no MISS). El route
+      // /api/og tarda 2-3s en frío y WhatsApp aborta + cachea "falló" si pasa
+      // de 3s. Sin await: fire-and-forget, no bloquea la publicación.
+      warmOgCache("post", post.id);
+
+      // 4. El feed_item lo crea automáticamente el trigger `trigger_crear_feed_item`
       // (AFTER INSERT en posts → crear_feed_item_from_post). NO insertarlo aquí: hacerlo
       // generaba un feed_item duplicado por cada post (el trigger no lo deduplica con la
       // inserción manual del cliente).

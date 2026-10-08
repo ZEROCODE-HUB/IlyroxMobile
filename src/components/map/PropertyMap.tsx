@@ -21,6 +21,139 @@ const log = logger.scoped("PropertyMap");
 /** Estable: cada nueva referencia reescribe la prop nativa de la Polyline. */
 const DRAFT_DASH_PATTERN = [8, 4];
 
+/** Estilo del contador dentro de ClusterBubble. Se declara aquí (módulo) en
+ *  vez de leerse desde `styles` (que vive al final del archivo) para evitar
+ *  la referencia adelantada con `const`/`StyleSheet.create` y mantener
+ *  legible el orden top-down. */
+const clusterCountStyle = { color: "white", fontSize: 13, fontWeight: "bold" as const };
+
+// ── Componentes de overlay memoizados a NIVEL DE MÓDULO ───────────────────────
+// IMPORTANTE: nunca definir componentes dentro de otro componente/render. Si se
+// hace, React los ve como un tipo nuevo en cada render → desmonta y remonta el
+// árbol completo de Views cada vez, lo cual inunda el commit de Fabric con
+// mounts/unmounts innecesarios. En iOS con react-native-maps (legacy interop)
+// este patrón ha causado crashes en el `RCTLegacyViewManagerInteropComponentView`
+// durante transacciones grandes. Es el mismo anti-patrón que ya corregimos con
+// `MemoizedPropertyMap` a nivel de módulo en `MapSearch.tsx`.
+interface PriceBadgeProps {
+  x: number;
+  y: number;
+  priceText: string;
+  bgColor: string;
+  stackCount: number;
+}
+const PriceBadge = React.memo(({ x, y, priceText, bgColor, stackCount }: PriceBadgeProps) => (
+  <View
+    style={{
+      position: "absolute",
+      left: Math.max(6, x - 35),
+      top: Math.max(6, y - 35),
+      alignItems: "center",
+      justifyContent: "center",
+    }}
+  >
+    <View
+      style={{
+        backgroundColor: bgColor,
+        paddingVertical: 5,
+        paddingHorizontal: 8,
+        borderRadius: 6,
+        borderWidth: 1.5,
+        borderColor: "white",
+        elevation: 5,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 2,
+      }}
+    >
+      <Text style={{ color: "white", fontSize: 11, fontWeight: "bold" }}>
+        {priceText}
+      </Text>
+    </View>
+    <View
+      style={{
+        width: 0,
+        height: 0,
+        borderLeftWidth: 5,
+        borderRightWidth: 5,
+        borderTopWidth: 7,
+        borderLeftColor: "transparent",
+        borderRightColor: "transparent",
+        borderTopColor: bgColor,
+        marginTop: -1,
+      }}
+    />
+    {stackCount > 1 && (
+      <View
+        style={{
+          position: "absolute",
+          top: -8,
+          right: -10,
+          minWidth: 20,
+          height: 20,
+          paddingHorizontal: 4,
+          borderRadius: 10,
+          backgroundColor: COLORS.error,
+          borderWidth: 1.5,
+          borderColor: "white",
+          alignItems: "center",
+          justifyContent: "center",
+          elevation: 6,
+        }}
+      >
+        <Text style={{ color: "white", fontSize: 10, fontWeight: "bold" }}>
+          {stackCount > 99 ? "99+" : stackCount}
+        </Text>
+      </View>
+    )}
+  </View>
+));
+PriceBadge.displayName = "PriceBadge";
+
+interface ClusterBubbleProps {
+  x: number;
+  y: number;
+  count: number;
+}
+const ClusterBubble = React.memo(({ x, y, count }: ClusterBubbleProps) => {
+  const size = count < 10 ? 44 : count < 50 ? 56 : 68;
+  const bg = count < 10 ? COLORS.primary : count < 50 ? "#E07B00" : COLORS.error;
+  return (
+    <View
+      style={{
+        position: "absolute",
+        left: x - size / 2,
+        top: y - size / 2,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: bg + "30",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <View
+        style={{
+          width: size * 0.7,
+          height: size * 0.7,
+          borderRadius: (size * 0.7) / 2,
+          backgroundColor: bg,
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: 2,
+          borderColor: "white",
+        }}
+      >
+        <Text style={clusterCountStyle}>
+          {count > 999 ? "999+" : count}
+        </Text>
+      </View>
+    </View>
+  );
+});
+ClusterBubble.displayName = "ClusterBubble";
+
 interface PropertyMapProps {
   properties: Property[];
   onMarkerPress: (propertyId: string, property: Property) => void;
@@ -249,9 +382,19 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   const focusRegionRef = useRef(focusRegion);
   useEffect(() => { focusRegionRef.current = focusRegion; }, [focusRegion]);
 
+  // Refs para evitar closures obsoletos en useCallback([]).
+  // Si leemos `mapReady` y `properties` directamente del closure, el callback
+  // queda congelado al primer render y deja de funcionar cuando el estado
+  // cambia (era el bug que rompía badges/burbujas/cierre-de-polígono en
+  // iteración 9).
+  const mapReadyRef = useRef(mapReady);
+  useEffect(() => { mapReadyRef.current = mapReady; }, [mapReady]);
+  const propertiesRef = useRef(properties);
+  useEffect(() => { propertiesRef.current = properties; }, [properties]);
+
   // Optimized function to calculate positions only for visible elements
   const updateOverlayPositions = useCallback(async (region?: any) => {
-    if (Platform.OS === "web" || !nativeMapRef.current || !mapReady) return;
+    if (Platform.OS === "web" || !nativeMapRef.current || !mapReadyRef.current) return;
     if (!mountedRef.current) return;
 
     const activeRegion = region || regionRef.current;
@@ -260,8 +403,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     if (isCalculatingRef.current) return;
 
     const now = Date.now();
-    // 120ms throttle — imperceptible visually (badges already lag from async calls)
-    // but reduces bridge load by ~75% vs 32ms
+    // 120ms throttle — imperceptible visualmente (los badges ya llevan lag por
+    // las llamadas async), pero reduce ~75% la carga del bridge vs 32 ms.
     if (region && now - lastUpdateRef.current < 120) return;
 
     isCalculatingRef.current = true;
@@ -278,7 +421,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
       // Solo non-clustered (las únicas que renderizan badge) — intersect BEFORE
       // calling pointForCoordinate para reducir bridge calls hasta ~90%
-      const visibleNonClustered = properties
+      const currentProperties = propertiesRef.current;
+      const visibleNonClustered = currentProperties
         .filter((p) => {
           const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
           const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
@@ -351,7 +495,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     } finally {
       isCalculatingRef.current = false;
     }
-  }, []); // sin deps — usa solo refs
+  }, []); // sin deps — usa solo refs (mapReadyRef, propertiesRef, etc.)
 
   useEffect(() => {
     if (mapReady) {
@@ -425,10 +569,18 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     };
   };
 
-  // Sincronizar currentRegion con focusRegion inmediatamente (para el bbox de Supercluster)
+  // Sincronizar regionRef inmediatamente (para que `updateOverlayPositions` ya
+  // pueda calcular posiciones de overlay durante la animación de cámara), pero
+  // NO llamar `setCurrentRegion` aquí. Si lo hacemos, `clusters` se recalcula
+  // síncronamente y React re-keyea todos los `<Marker>` en la MISMA transacción
+  // de Fabric que dispara el `animateToRegion` y el mount inicial — eso fue el
+  // crash: `RCTLegacyViewManagerInteropComponentView finalizeUpdates` recibía
+  // un child `nil` durante un commit masivo. Dejamos que `onRegionChangeComplete`
+  // (más abajo) actualice `currentRegion` cuando la cámara llegue; así, el
+  // re-cluster/re-key ocurre en una transacción separada, pequeña, y al final
+  // de los 700 ms de animación.
   useEffect(() => {
     if (focusRegion) {
-      setCurrentRegion(focusRegion);
       regionRef.current = focusRegion;
     }
   }, [focusRegion]);
@@ -437,8 +589,25 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   useEffect(() => {
     if (Platform.OS === "web" || !nativeMapRef.current || !mapReady) return;
     if (!focusRegion) return;
-    nativeMapRef.current?.animateToRegion(focusRegion, 700);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Validación defensiva: si por alguna razón la región tiene NaN/Infinity
+    // (p. ej. bounds malformados de geocoding), abortamos en vez de enviarlo a
+    // MapKit (que lanza `NSInvalidArgumentException` con valores inválidos).
+    if (
+      !Number.isFinite(focusRegion.latitude) ||
+      !Number.isFinite(focusRegion.longitude) ||
+      !Number.isFinite(focusRegion.latitudeDelta) ||
+      !Number.isFinite(focusRegion.longitudeDelta) ||
+      focusRegion.latitudeDelta <= 0 ||
+      focusRegion.longitudeDelta <= 0
+    ) {
+      log.warn("focusRegion inválido — abortando animateToRegion:", focusRegion);
+      return;
+    }
+    // 400 ms es suficiente: el delta ya viene dimensionado por boundsToRegion
+    // (no necesita una transición larga para "acercarse"), y reduce el tiempo
+    // total desde que el usuario selecciona una ubicación hasta que la ve.
+    nativeMapRef.current?.animateToRegion(focusRegion, 400);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
   }, [focusRegion, mapReady]);
 
   // Auto-fit inicial solo cuando no hay focusRegion (carga sin ubicación seleccionada)
@@ -574,7 +743,14 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     });
   }, [properties, highlightedPropertyId]);
 
+  // `initialRegion` SOLO se usa en el primer mount de MapView. Si al montar ya
+  // tenemos un `focusRegion` (caso típico: el usuario seleccionó una ubicación
+  // en el buscador y navegó al mapa con `selectedLocation` en el contexto),
+  // partimos directamente de esa región en vez del fallback de Monterrey +
+  // auto-fit posterior. Eso elimina el "flash" de mapa genérico y la espera
+  // del geocoding antes de que la cámara llegue a la zona.
   const initialRegion = useMemo(() => {
+    if (focusRegion) return focusRegion;
     const region = calculateRegionWithPadding();
     return (
       region || {
@@ -584,118 +760,15 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         longitudeDelta: 0.5,
       }
     );
-  }, []);
+    // calculateRegionWithPadding lee `properties`, así que depende de él.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [properties, focusRegion]);
 
-  // ── Badge de precio (memoizado — solo re-renderiza si cambian sus props) ──
-  const PriceBadge = React.memo(({
-    x, y, priceText, bgColor, stackCount,
-  }: {
-    x: number; y: number; priceText: string; bgColor: string; stackCount: number;
-  }) => (
-    <View
-      style={{
-        position: "absolute",
-        left: Math.max(6, x - 35),
-        top: Math.max(6, y - 35),
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <View
-        style={{
-          backgroundColor: bgColor,
-          paddingVertical: 5,
-          paddingHorizontal: 8,
-          borderRadius: 6,
-          borderWidth: 1.5,
-          borderColor: "white",
-          elevation: 5,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.3,
-          shadowRadius: 2,
-        }}
-      >
-        <Text style={{ color: "white", fontSize: 11, fontWeight: "bold" }}>
-          {priceText}
-        </Text>
-      </View>
-      <View
-        style={{
-          width: 0,
-          height: 0,
-          borderLeftWidth: 5,
-          borderRightWidth: 5,
-          borderTopWidth: 7,
-          borderLeftColor: "transparent",
-          borderRightColor: "transparent",
-          borderTopColor: bgColor,
-          marginTop: -1,
-        }}
-      />
-      {stackCount > 1 && (
-        <View
-          style={{
-            position: "absolute",
-            top: -8,
-            right: -10,
-            minWidth: 20,
-            height: 20,
-            paddingHorizontal: 4,
-            borderRadius: 10,
-            backgroundColor: COLORS.error,
-            borderWidth: 1.5,
-            borderColor: "white",
-            alignItems: "center",
-            justifyContent: "center",
-            elevation: 6,
-          }}
-        >
-          <Text style={{ color: "white", fontSize: 10, fontWeight: "bold" }}>
-            {stackCount > 99 ? "99+" : stackCount}
-          </Text>
-        </View>
-      )}
-    </View>
-  ));
-
-  // ── Burbuja de cluster (memoizada) ──
-  const ClusterBubble = React.memo(({ x, y, count }: { x: number; y: number; count: number }) => {
-    const size = count < 10 ? 44 : count < 50 ? 56 : 68;
-    const bg = count < 10 ? COLORS.primary : count < 50 ? "#E07B00" : COLORS.error;
-    return (
-      <View
-        style={{
-          position: "absolute",
-          left: x - size / 2,
-          top: y - size / 2,
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: bg + "30",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <View
-          style={{
-            width: size * 0.7,
-            height: size * 0.7,
-            borderRadius: (size * 0.7) / 2,
-            backgroundColor: bg,
-            alignItems: "center",
-            justifyContent: "center",
-            borderWidth: 2,
-            borderColor: "white",
-          }}
-        >
-          <Text style={styles.clusterCount}>
-            {count > 999 ? "999+" : count}
-          </Text>
-        </View>
-      </View>
-    );
-  });
+  // ── PriceBadge y ClusterBubble están definidos a NIVEL DE MÓDULO arriba.
+  // Definirlos aquí dentro causaría que React los viera como un tipo nuevo en
+  // cada render y desmontara/remontara todo su árbol de Views, lo que inunda
+  // el commit de Fabric con mounts/unmounts innecesarios (mismo anti-patrón
+  // que ya corregimos con `MemoizedPropertyMap` en MapSearch.tsx). ──
 
   const makeFocusRegion = (lat: number, lng: number) => {
     const baseDelta = 0.06;
@@ -736,6 +809,118 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       </View>
     );
   }
+
+  // ── Markers memoizados por id para estabilizar la identidad de los hijos
+  // del MapView. Sin esto, cada recálculo de `clusters` (cambio de region,
+  // filtro, etc.) genera un array de React elements NUEVO, lo que obliga a
+  // reconciliar TODOS los `<Marker>` aunque la mayoría no hayan cambiado.
+  // En iOS, ese recambio masivo de children en un solo commit de Fabric ha
+  // llegado a romper el `RCTLegacyViewManagerInteropComponentView` (mismo
+  // síntoma que el workaround `drainDraftPoints` para vértices). ──
+
+  // Handles estables para los markers (la lista cambia de referencia, pero los
+  // handlers leen refs/estado, así que no necesitamos recrearlos en cada render).
+  // Usamos un ref para que la callback siempre llame al `handleClusterPress`
+  // más reciente (que a su vez lee `superclusterIndex`/refs, no se queda
+  // obsoleto entre renders).
+  const handleClusterPressRef = useRef<(clusterId: number) => void>(() => {});
+  handleClusterPressRef.current = handleClusterPress;
+  const handleClusterPressStable = useCallback(
+    (clusterId: number) => handleClusterPressRef.current(clusterId),
+    []
+  );
+
+  // 1) Cluster touch targets.
+  const clusterTouchMarkers = useMemo(() => {
+    return clusters
+      .filter((c: any) => c.properties.cluster)
+      .map((cluster: any) => {
+        if (!cluster?.geometry?.coordinates) return null;
+        const [lng, lat] = cluster.geometry.coordinates;
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          // Render puro: solo loguear, no insertar en la BD desde el render
+          console.warn("[MapDebug] cluster_coord_invalida:", cluster.id, lat, lng);
+          return null;
+        }
+        return (
+          <Marker
+            key={`cluster-touch-${cluster.id}`}
+            coordinate={{ latitude: lat, longitude: lng }}
+            onPress={() => handleClusterPressStable(cluster.id)}
+            tracksViewChanges={false}
+            anchor={{ x: 0.5, y: 0.5 }}
+            opacity={0}
+          />
+        );
+      })
+      .filter(Boolean) as React.ReactNode[];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clusters, handleClusterPressStable]);
+
+  // 2) Individual property markers (invisibles, capturan el toque).
+  // NOTA: el onPress se construye dentro del .map y se reasigna por marker;
+  // eso NO genera churn masivo (cada `<Marker>` solo cambia su propio handler)
+  // porque cada Marker está memoizado por `key={p.id}`.
+  const individualPropertyMarkers = useMemo(() => {
+    return clusters
+      .filter((c: any) => !c.properties.cluster)
+      .map((point: any) => {
+        const propertyId = point.properties.propertyId as string;
+        const p = propertyMap.get(propertyId);
+        if (!p) return null;
+        const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
+        const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
+        if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return null;
+        return (
+          <Marker
+            key={p.id}
+            coordinate={{ latitude: Number(lat), longitude: Number(lng) }}
+            onPress={() => {
+              // Si en esta misma coordenada hay varias propiedades (zoom
+              // cercano, sin agrupar), abrir el selector en vez de una sola.
+              const group = coincidentGroups.get(
+                coincidenceKey(Number(lat), Number(lng)),
+              );
+              if (group && group.length > 1 && onStackPress) {
+                if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+                onStackPress(group);
+                return;
+              }
+              const r = makeFocusRegion(Number(lat), Number(lng));
+              nativeMapRef.current?.animateToRegion(r, 600);
+              if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+              onMarkerPress(p.id, p);
+            }}
+            opacity={0}
+            tracksViewChanges={false}
+          />
+        );
+      })
+      .filter(Boolean) as React.ReactNode[];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clusters, propertyMap, coincidentGroups, onStackPress, onMarkerPress]);
+
+  // 3) Searched location pins (los del buscador de inicio / chips).
+  const searchedLocationPinMarkers = useMemo(() => {
+    if (!searchedLocationPins) return [] as React.ReactNode[];
+    return searchedLocationPins
+      .filter((pin) =>
+        Number.isFinite(pin.latitude) &&
+        Number.isFinite(pin.longitude) &&
+        Math.abs(pin.latitude) <= 90 &&
+        Math.abs(pin.longitude) <= 180
+      )
+      .map((pin) => (
+        <Marker
+          key={`searched-pin-${pin.key}`}
+          coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
+          pinColor={COLORS.error}
+          title="Ubicación buscada"
+          zIndex={9999}
+          tracksViewChanges={false}
+        />
+      ));
+  }, [searchedLocationPins]);
 
   return (
     <View style={styles.container}>
@@ -823,76 +1008,16 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
             onPress={idx === 0 ? handleFirstVertexPress : undefined}
           />
         ))}
-        {/* Invisible cluster touch targets */}
-        {clusters
-          .filter((c: any) => c.properties.cluster)
-          .map((cluster: any) => {
-            if (!cluster?.geometry?.coordinates) return null;
-            const [lng, lat] = cluster.geometry.coordinates;
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-              // Render puro: solo loguear, no insertar en la BD desde el render
-              console.warn("[MapDebug] cluster_coord_invalida:", cluster.id, lat, lng);
-              return null;
-            }
-            return (
-              <Marker
-                key={`cluster-touch-${cluster.id}`}
-                coordinate={{ latitude: lat, longitude: lng }}
-                onPress={() => handleClusterPress(cluster.id)}
-                tracksViewChanges={false}
-                anchor={{ x: 0.5, y: 0.5 }}
-                opacity={0}
-              />
-            );
-          })}
+        {/* Invisible cluster touch targets. Memoizado por cluster-id para
+            estabilizar la identidad: si la región se recalcula y un cluster
+            mantiene su id, React reusa el mismo `<Marker>` (no se desmonta). */}
+        {clusterTouchMarkers}
 
-        {/* Markers individuales — invisibles (detectan toque), solo para props no agrupadas */}
-        {clusters
-          .filter((c: any) => !c.properties.cluster)
-          .map((point: any) => {
-            const propertyId = point.properties.propertyId as string;
-            const p = propertyMap.get(propertyId);
-            if (!p) return null;
-            const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
-            const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
-            if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return null;
-            return (
-              <Marker
-                key={p.id}
-                coordinate={{ latitude: Number(lat), longitude: Number(lng) }}
-                onPress={() => {
-                  // Si en esta misma coordenada hay varias propiedades (zoom
-                  // cercano, sin agrupar), abrir el selector en vez de una sola.
-                  const group = coincidentGroups.get(
-                    coincidenceKey(Number(lat), Number(lng)),
-                  );
-                  if (group && group.length > 1 && onStackPress) {
-                    if (Platform.OS !== "web") Haptics.selectionAsync();
-                    onStackPress(group);
-                    return;
-                  }
-                  const r = makeFocusRegion(Number(lat), Number(lng));
-                  nativeMapRef.current?.animateToRegion(r, 600);
-                  if (Platform.OS !== "web") Haptics.selectionAsync();
-                  onMarkerPress(p.id, p);
-                }}
-                opacity={0}
-                tracksViewChanges={false}
-              />
-            );
-          })}
+        {/* Markers individuales — invisibles (detectan toque), solo para props no agrupadas. */}
+        {individualPropertyMarkers}
 
         {/* Pins clásicos de las ubicaciones buscadas (color distinto al de las propiedades) */}
-        {searchedLocationPins?.map((pin) => (
-          <Marker
-            key={`searched-pin-${pin.key}`}
-            coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
-            pinColor={COLORS.error}
-            title="Ubicación buscada"
-            zIndex={9999}
-            tracksViewChanges={false}
-          />
-        ))}
+        {searchedLocationPinMarkers}
       </MapView>
 
       {/* Overlay absoluto para los precios (Inmune a los recortes de Android).
