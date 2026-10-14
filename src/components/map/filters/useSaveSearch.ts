@@ -49,15 +49,44 @@ function serializeAgricolaFilters(ag: any): any {
 /**
  * Garantiza que `data.bounds` exista para el matching geográfico server-side.
  * Si no hay bounds (p. ej. búsqueda por filtros de texto, sin chip de zona),
- * geocodifica la ubicación más específica (colonia > municipio > estado) para
- * obtener su área. Así una búsqueda por colonia trae propiedades del municipio
- * que la contiene y viceversa, sin depender de comparar nombres.
+ * geocodifica la ubicación más específica (municipio > estado, NUNCA colonia) para
+ * obtener su área.
+ *
+ * ¿Por qué NO geocodificamos con colonia? El "viewport" que Google devuelve
+ * para una colonia suele ser mucho más grande que la colonia real y arrastra
+ * propiedades de colonias vecinas (mismo motivo por el que el cliente ignora
+ * los bounds de chips de colonia en `usePropertyFilters.chipTextMatch`).
+ * Así, una búsqueda por colonia cae al fallback de texto en
+ * `v_texto_match` (rescata por nombre de colonia, sin importar la distancia
+ * del pin), que es lo que el cliente ya hace en vivo.
  */
 async function ensureSearchBounds(data: any, filters: any): Promise<void> {
   if (data.bounds) return;
   const lf = filters?.locationFilter || {};
-  const coloniaTxt = Array.isArray(lf.colonia) ? lf.colonia[0] : lf.colonia;
-  const partes = [coloniaTxt, lf.municipio, lf.estado].filter(Boolean);
+
+  // Si la búsqueda tiene criterio de COLONIA (chip o locationFilter.colonia),
+  // NO guardar bounds: el matching del cliente para colonia es SOLO texto
+  // (no usa bounds de Google — son aprox y arrastran colonias vecinas).
+  // Guardar bounds para colonia causa que el SQL haga
+  //   bounds OR texto  →  incluye todas las props dentro del bounds,
+  //   independientemente de la colonia  (ej: Ruscello → 22 matches en SQL
+  //   vs 1 en el cliente).
+  const coloniasFromChips =
+    (filters?.locationChips ?? [])
+      .filter((c: any) => c?.type === "colonia")
+      .map((c: any) => c?.locationFilter?.colonia ?? c?.label ?? "")
+      .filter(Boolean);
+
+  const tieneColonia = !!(
+    lf.colonia ||
+    (Array.isArray(lf.colonia) ? lf.colonia[0] : lf.colonia) ||
+    coloniasFromChips.length > 0
+  );
+
+  if (tieneColonia) return; // colonia → texto puro, sin bounds
+
+  // Para municipio/estado sí我们可以guardar bounds geocodificado.
+  const partes = [lf.municipio, lf.estado].filter(Boolean);
   if (partes.length === 0) return;
   try {
     const geo = await geocodeAddress(partes.join(", "), filters?.pais);
@@ -65,6 +94,57 @@ async function ensureSearchBounds(data: any, filters: any): Promise<void> {
   } catch {
     // Si la geocodificación falla, el matching cae al texto normalizado.
   }
+}
+
+/**
+ * Decide qué bounds guardar en la búsqueda para que coincidan EXACTAMENTE con
+ * los que el cliente usa al filtrar en vivo (`usePropertyFilters`).
+ *
+ * Regla (espejo del cliente):
+ *   - Sin chips         → null  (no hay info geográfica; `ensureSearchBounds`
+ *                                 geocodificará municipio/estado si los hay).
+ *   - Polígono dibujado → null  (el polígono manda y el SQL ya lo trata
+ *                                 estricto; un bounds adicional ensancha
+ *                                 el área y mete props fuera del polígono).
+ *   - Solo colonias     → null  (el "viewport" de Google para una colonia es
+ *                                 aprox e incluye colonias vecinas; el cliente
+ *                                 no usa esos bounds, solo el match por texto
+ *                                 de colonia).
+ *   - Mezcla con municipio/estado → unión SOLO de los bounds de
+ *                                   municipio/estado (los de colonia se
+ *                                   excluyen explícitamente).
+ *
+ * Devuelve `null` o un `{ north, south, east, west }` con la unión de los
+ * bounds confiables. El caller debe asignar `data.bounds` solo si el
+ * resultado no es null.
+ */
+function computeReliableBounds(
+  chips: any[] | undefined,
+  polygons: any[] | undefined,
+): { north: number; south: number; east: number; west: number } | null {
+  if (!chips || chips.length === 0) return null;
+  // Polígono dibujado manda: el SQL ya hace filtro estricto por polígono,
+  // y un bounds adicional solo agrega ruido.
+  if (polygons && polygons.length > 0) return null;
+
+  // Solo conservar bounds de chips de municipio/estado. Los de colonia se
+  // excluyen porque su viewport de Google es aprox.
+  const chipsConfiables = chips.filter(
+    (c) => (c?.type === "municipio" || c?.type === "estado") && c.bounds,
+  );
+  if (chipsConfiables.length === 0) return null;
+
+  let north = chipsConfiables[0].bounds.north;
+  let south = chipsConfiables[0].bounds.south;
+  let east = chipsConfiables[0].bounds.east;
+  let west = chipsConfiables[0].bounds.west;
+  for (const chip of chipsConfiables) {
+    north = Math.max(north, chip.bounds.north);
+    south = Math.min(south, chip.bounds.south);
+    east = Math.max(east, chip.bounds.east);
+    west = Math.min(west, chip.bounds.west);
+  }
+  return { north, south, east, west };
 }
 
 export const useSaveSearch = (userId?: string) => {
@@ -341,20 +421,15 @@ export const useSaveSearch = (userId?: string) => {
         locationFilter: c.locationFilter,
       }));
 
-      // Guardar bounds del primer chip (o unión de todos) en el campo de nivel superior
-      const chipsConBounds = filters.locationChips.filter((c: any) => c.bounds);
-      if (chipsConBounds.length > 0) {
-        let north = chipsConBounds[0].bounds.north;
-        let south = chipsConBounds[0].bounds.south;
-        let east = chipsConBounds[0].bounds.east;
-        let west = chipsConBounds[0].bounds.west;
-        for (const chip of chipsConBounds) {
-          north = Math.max(north, chip.bounds.north);
-          south = Math.min(south, chip.bounds.south);
-          east = Math.max(east, chip.bounds.east);
-          west = Math.min(west, chip.bounds.west);
-        }
-        criterios_busqueda.bounds = { north, south, east, west };
+      // Guardar bounds solo si hay al menos un chip de municipio/estado
+      // (los de colonia se ignoran, mismo motivo que el cliente). Ver
+      // `computeReliableBounds` para los detalles.
+      const reliableBounds = computeReliableBounds(
+        filters.locationChips,
+        filters.polygons,
+      );
+      if (reliableBounds) {
+        criterios_busqueda.bounds = reliableBounds;
       }
     }
 
@@ -423,18 +498,53 @@ export const useSaveSearch = (userId?: string) => {
         : [filters.locationFilter.colonia];
     }
 
-    // Si se usaron chips sin locationFilter base, extraer estados de los chips
-    // para que el trigger de match pueda filtrar por ubicación correctamente
-    if (filters.locationChips?.length > 0 && !filters.locationFilter?.estado) {
-      const estadosDeChips = [
-        ...new Set(
-          filters.locationChips
-            .map((c: any) => c.locationFilter?.estado)
-            .filter((e: string) => e && e.trim())
-        ),
-      ] as string[];
-      if (estadosDeChips.length > 0) {
-        insertData.estado = estadosDeChips;
+    // Si se usaron chips sin locationFilter base, extraer estado/municipio/
+    // colonia de los chips para que el trigger de match pueda filtrar por
+    // ubicación correctamente. El SQL `evaluar_par_match` usa estas columnas
+    // directas para el fallback `v_texto_match` (rescata propiedades cuyo pin
+    // cae fuera del bounds de Google pero sí son de la colonia buscada — el
+    // caso típico de EasyBroker con coords imprecisas).
+    if (filters.locationChips?.length > 0) {
+      if (!filters.locationFilter?.estado) {
+        const estadosDeChips = [
+          ...new Set(
+            filters.locationChips
+              .map((c: any) => c.locationFilter?.estado)
+              .filter((e: string) => e && e.trim())
+          ),
+        ] as string[];
+        if (estadosDeChips.length > 0) {
+          insertData.estado = estadosDeChips;
+        }
+      }
+      // Municipio: igual que estado — si no viene del locationFilter base,
+      // extraerlo de los chips.
+      if (!filters.locationFilter?.municipio) {
+        const municipiosDeChips = [
+          ...new Set(
+            filters.locationChips
+              .map((c: any) => c.locationFilter?.municipio)
+              .filter((m: string) => m && m.trim())
+          ),
+        ] as string[];
+        if (municipiosDeChips.length > 0) {
+          insertData.municipio = municipiosDeChips;
+        }
+      }
+      // Colonia: si el locationFilter base no tiene colonia pero los chips sí
+      // (caso típico al filtrar por chip de Google Places), poblar `colonias`
+      // para que el SQL la use en el fallback `v_texto_match`.
+      if (!filters.locationFilter?.colonia) {
+        const coloniasDeChips = [
+          ...new Set(
+            filters.locationChips
+              .map((c: any) => c.locationFilter?.colonia)
+              .filter((c: string) => c && c.trim())
+          ),
+        ] as string[];
+        if (coloniasDeChips.length > 0) {
+          insertData.colonias = coloniasDeChips;
+        }
       }
     }
 
@@ -485,23 +595,25 @@ export const useSaveSearch = (userId?: string) => {
       insertData.polygon_coords = filters.polygons;
     }
 
-    // Bounds y place_name de la zona buscada (nuevo sistema Google Places)
+    // Bounds y place_name de la zona buscada (nuevo sistema Google Places).
+    // IMPORTANTE: solo se guardan los bounds de chips de municipio/estado; los
+    // de colonia se ignoran porque su viewport de Google es aprox y arrastra
+    // colonias vecinas. Ver `computeReliableBounds`.
+    //
+    // `place_name` siempre se asigna (incluso para búsquedas solo de colonia)
+    // porque es solo cosmético: la UI lo muestra al usuario como etiqueta de
+    // la búsqueda guardada en el historial.
     if (filters.locationChips?.length > 0) {
-      const chipsConBounds = filters.locationChips.filter((c: any) => c.bounds);
-      if (chipsConBounds.length > 0) {
-        let north = chipsConBounds[0].bounds.north;
-        let south = chipsConBounds[0].bounds.south;
-        let east = chipsConBounds[0].bounds.east;
-        let west = chipsConBounds[0].bounds.west;
-        for (const chip of chipsConBounds) {
-          north = Math.max(north, chip.bounds.north);
-          south = Math.min(south, chip.bounds.south);
-          east = Math.max(east, chip.bounds.east);
-          west = Math.min(west, chip.bounds.west);
-        }
-        insertData.bounds = { north, south, east, west };
-        insertData.place_name = chipsConBounds.map((c: any) => c.label).join(", ");
+      const reliableBounds = computeReliableBounds(
+        filters.locationChips,
+        filters.polygons,
+      );
+      if (reliableBounds) {
+        insertData.bounds = reliableBounds;
       }
+      insertData.place_name = filters.locationChips
+        .map((c: any) => c.label)
+        .join(", ");
     }
 
     if (filters.moneda) {
@@ -572,15 +684,13 @@ export const useSaveSearch = (userId?: string) => {
       criterios_busqueda.location_chips = filters.locationChips.map((c: any) => ({
         label: c.label, type: c.type, bounds: c.bounds, locationFilter: c.locationFilter,
       }));
-      const chipsConBounds = filters.locationChips.filter((c: any) => c.bounds);
-      if (chipsConBounds.length > 0) {
-        let north = chipsConBounds[0].bounds.north, south = chipsConBounds[0].bounds.south;
-        let east = chipsConBounds[0].bounds.east, west = chipsConBounds[0].bounds.west;
-        for (const chip of chipsConBounds) {
-          north = Math.max(north, chip.bounds.north); south = Math.min(south, chip.bounds.south);
-          east = Math.max(east, chip.bounds.east); west = Math.min(west, chip.bounds.west);
-        }
-        criterios_busqueda.bounds = { north, south, east, west };
+      // Solo guardamos bounds de municipio/estado; los de colonia se ignoran.
+      const reliableBounds = computeReliableBounds(
+        filters.locationChips,
+        filters.polygons,
+      );
+      if (reliableBounds) {
+        criterios_busqueda.bounds = reliableBounds;
       }
     }
     if (filters.comisionVentaMin) criterios_busqueda.comision_venta_min = parseFloat(filters.comisionVentaMin);
@@ -616,17 +726,16 @@ export const useSaveSearch = (userId?: string) => {
     if (filters.m2TerrenoMin) { const v = parseFloat(String(filters.m2TerrenoMin).replace(/,/g, "")); if (!isNaN(v)) updateData.metros_terreno = v; }
     if (filters.polygons?.length > 0) updateData.polygon_coords = filters.polygons;
     if (filters.locationChips?.length > 0) {
-      const chipsConBounds = filters.locationChips.filter((c: any) => c.bounds);
-      if (chipsConBounds.length > 0) {
-        let north = chipsConBounds[0].bounds.north, south = chipsConBounds[0].bounds.south;
-        let east = chipsConBounds[0].bounds.east, west = chipsConBounds[0].bounds.west;
-        for (const chip of chipsConBounds) {
-          north = Math.max(north, chip.bounds.north); south = Math.min(south, chip.bounds.south);
-          east = Math.max(east, chip.bounds.east); west = Math.min(west, chip.bounds.west);
-        }
-        updateData.bounds = { north, south, east, west };
-        updateData.place_name = chipsConBounds.map((c: any) => c.label).join(", ");
+      const reliableBounds = computeReliableBounds(
+        filters.locationChips,
+        filters.polygons,
+      );
+      if (reliableBounds) {
+        updateData.bounds = reliableBounds;
       }
+      updateData.place_name = filters.locationChips
+        .map((c: any) => c.label)
+        .join(", ");
     }
     if (filters.moneda) {
       const { data: monedaData } = await supabase

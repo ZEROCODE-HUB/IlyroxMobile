@@ -412,8 +412,13 @@ export const feedService = {
       .select(FEED_SELECT)
       .eq("estado_moderacion", "activo")
       .is("deleted_at", null)
-      .order("engagement_score", { ascending: false })
+      // Orden cronológico estricto: lo más reciente primero. `engagement_score`
+      // queda como desempate secundario para que dos publicaciones del mismo
+      // segundo no queden en orden arbitrario entre reloads, y `id` como
+      // desempate final determinístico.
       .order("publicado_en", { ascending: false })
+      .order("engagement_score", { ascending: false })
+      .order("id", { ascending: false })
       .range(pageNum * pageSize, (pageNum + 1) * pageSize - 1),
       blockedUserIds,
     );

@@ -528,15 +528,6 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
 
     const biasCoords = effectiveEstado ? config.level1Coords[effectiveEstado] : undefined;
 
-    // DEBUG: parámetros de la request a Google Places
-    console.log("[DEBUG locationSearch] REQUEST:", {
-      searchTerm,
-      types: types ?? "(todos - sin filtro)",
-      effectiveEstado: effectiveEstado ?? "(sin estado)",
-      biasCoords: biasCoords ?? "(sin bias)",
-      radius: biasCoords ? 100000 : undefined,
-    });
-
     try {
       const { sessionToken } = get();
       const results = await searchLocations(
@@ -548,27 +539,10 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
       // Respuesta obsoleta (se escribió más mientras esta volaba): se descarta.
       if (requestId !== get().latestSearchRequestId) return;
 
-      // DEBUG: resultados CRUDOS de Google (antes de enriquecer/filtrar)
-      console.log("[DEBUG locationSearch] GOOGLE CRUDO:", results.map((r, i) => ({
-        orden: i + 1,
-        name: r.name,
-        type: r.type,
-        secondaryText: r.secondaryText,
-        types: r.types,
-      })));
-
       const enriched: LocationSuggestionWithCount[] = results.map((loc) => ({
         ...loc,
         ...extractMunicipioEstado(loc, country),
       }));
-
-      // DEBUG: resultados enriquecidos (con municipio/estado derivados)
-      console.log("[DEBUG locationSearch] ENRIQUECIDO:", enriched.map((s) => ({
-        name: s.name,
-        type: s.type,
-        estado_nombre: s.estado_nombre,
-        municipio_nombre: s.municipio_nombre,
-      })));
 
       // Re-rank + fallback geográfico:
       // 1) Google Places bias (location+radius) es insuficiente: ciudades grandes
@@ -583,25 +557,10 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
         ).length;
         if (localCount < 2) {
           const fallbackSearchTerm = `${searchTerm}, ${effectiveEstado}`;
-          // DEBUG: se dispara el fallback porque hay menos de 2 resultados locales
-          console.log("[DEBUG locationSearch] FALLBACK TRIGGER:", {
-            reason: `localCount=${localCount} < 2`,
-            fallbackSearchTerm,
-            localCount,
-          });
           const fallbackResults = await searchLocations(
             fallbackSearchTerm, 5, sessionToken, country, "(regions)",
           );
           if (requestId !== get().latestSearchRequestId) return;
-
-          // DEBUG: resultados CRUDOS del fallback
-          console.log("[DEBUG locationSearch] FALLBACK CRUDO:", fallbackResults.map((r, i) => ({
-            orden: i + 1,
-            name: r.name,
-            type: r.type,
-            secondaryText: r.secondaryText,
-            types: r.types,
-          })));
 
           const fallbackEnriched = fallbackResults.map((loc) => ({
             ...loc,
@@ -620,14 +579,6 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
       // como "establishment" o "point_of_interest", así que los dejamos pasar si el
       // nombre contiene palabras clave residenciales.
       combined = combined.filter((s) => !isNoiseSuggestion(s.types, s.name));
-
-      // DEBUG: después de filtrar ruido (antes de decidir el fallback a BD)
-      console.log("[DEBUG locationSearch] POST-FILTRO-RUIDO:", combined.map((s) => ({
-        name: s.name,
-        estado: s.estado_nombre,
-        types: s.types,
-        propertyCount: s.propertyCount,
-      })));
 
       // ── FALLBACK A PROPIEDADES ────────────────────────────────────────────
       // Si después del filtro de ruido seguimos con muy pocos resultados locales,
@@ -648,9 +599,6 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
           },
         );
         if (requestId !== get().latestSearchRequestId) return;
-
-        // DEBUG: resultados CRUDOS del fallback a propiedades
-        console.log("[DEBUG locationSearch] FALLBACK DB CRUDO:", propLocations);
 
         if (Array.isArray(propLocations) && propLocations.length > 0) {
           const propSuggestions: LocationSuggestionWithCount[] = propLocations
@@ -676,15 +624,6 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
             }));
 
           combined = [...combined, ...propSuggestions];
-          console.log("[DEBUG locationSearch] POST-FALLBACK-DB:", combined.map((s) => ({
-            name: s.name,
-            estado: s.estado_nombre,
-            types: s.types,
-            propertyCount: s.propertyCount,
-            placeId: s.placeId,
-          })));
-        } else {
-          console.log("[DEBUG locationSearch] FALLBACK DB: sin resultados");
         }
       }
 
@@ -703,12 +642,6 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
         }
         return n;
       }
-      // DEBUG: normalizacion
-      const preNormalizeDebug = combined.map((s) => ({
-        name: s.name,
-        normalizedName: normalizeForMatch(s.name),
-      }));
-      console.log("[DEBUG locationSearch] PRE-NORMALIZE:", preNormalizeDebug);
       const seenRoots = new Map<string, number>(); // root → first index
       const normalized: typeof combined = [];
       for (let i = 0; i < combined.length; i++) {
@@ -726,25 +659,14 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
           if (itemFromGoogle && !existingFromGoogle) {
             // El de Google gana sobre el de BD → reemplazar
             normalized[existingIdx] = item;
-            console.log("[DEBUG locationSearch] NORMALIZE: reemplazo", existing.name, "→", item.name, "(google > db)");
           } else if ((item.propertyCount ?? 0) > (existing.propertyCount ?? 0)) {
             // Mismo source (ambos BD o ambos Google): gana el de más propiedades
             normalized[existingIdx] = item;
-            console.log("[DEBUG locationSearch] NORMALIZE: reemplazo", existing.name, "→", item.name, "(más propiedades)");
-          } else {
-            console.log("[DEBUG locationSearch] NORMALIZE: descarte", item.name, "por", existing.name);
           }
         }
       }
       combined = normalized;
 
-      // DEBUG: combinado final (post-fallback + normalize) listo para scoring
-      console.log("[DEBUG locationSearch] COMBINADO FINAL:", combined.map((s) => ({
-        name: s.name,
-        type: s.type,
-        estado_nombre: s.estado_nombre,
-        types: s.types,
-      })));
       // Score textual: priorizar coincidencia exacta, empieza con, contiene
       // Normalizar acentos para que "Nicolás" == "Nicolas" (el usuario escribe sin acentos)
       const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -774,14 +696,6 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
       // Mostrar las sugerencias de inmediato (y quitar el spinner); el conteo
       // se rellena después sin bloquear la UI.
       set({ suggestions: ranked, isLoading: false });
-
-      // DEBUG: resultado FINAL ordenado que ve la UI
-      console.log("[DEBUG locationSearch] FINAL ORDENADO:", ranked.map((s) => ({
-        name: s.name,
-        type: s.type,
-        estado_nombre: s.estado_nombre,
-        _score: s._score,
-      })));
 
       // Conteo de propiedades por zona (diferido, no bloquea la UI).
       // Se cuenta usando la JERARQUÍA de la sugerencia (nombre + municipio +

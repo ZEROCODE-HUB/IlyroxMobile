@@ -103,6 +103,19 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   useEffect(() => { drawingModeRef.current = drawingMode; }, [drawingMode]);
   useEffect(() => { drainingRef.current = draining; }, [draining]);
 
+  // ── LOG TEMPORAL DE DIAGNÓSTICO (crash iOS al entrar al mapa) ─────────────
+  // ⚠️ ELIMINAR cuando se resuelva.
+  useEffect(() => {
+    if (!__DEV__) return;
+    log.warn("[MapEntry] MapSearch MOUNT | properties=", properties.length);
+    return () => log.warn("[MapEntry] MapSearch UNMOUNT");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!__DEV__) return;
+    log.warn("[MapEntry] selectedLocation:", JSON.stringify(selectedLocation ?? null));
+  }, [selectedLocation]);
+
   // Actualizar búsqueda en BD cuando los filtros cambian (con debounce)
   const filtersUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentFilters = usePropertyFiltersStore(useShallow((s) => s.filters));
@@ -192,6 +205,27 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     return pins;
   }, [filters.locationChips]);
 
+  // ── LOG TEMPORAL DE DIAGNÓSTICO (crash iOS al entrar al mapa) ─────────────
+  // ⚠️ ELIMINAR cuando se resuelva.
+  useEffect(() => {
+    if (!__DEV__) return;
+    log.warn("[MapEntry] locationPins:", JSON.stringify(locationPins, null, 2));
+  }, [locationPins]);
+  useEffect(() => {
+    if (!__DEV__) return;
+    log.warn(
+      `[MapEntry] filteredProperties=${filteredProperties.length} (input=${properties.length}) | ` +
+        `chips=${filters.locationChips.length} polygons=${filters.polygons.length} ` +
+        `locationFilter=${JSON.stringify(filters.locationFilter)}`,
+    );
+  }, [
+    filteredProperties,
+    properties.length,
+    filters.locationChips.length,
+    filters.polygons.length,
+    filters.locationFilter,
+  ]);
+
   // ── Geocodificar selectedLocation para navegación inicial del mapa ──
   // selectedLocation viene del contexto (home page). Si tiene placeId, usa Place Details
   // directamente para obtener los bounds. Si no, usa Geocoding API como fallback.
@@ -256,9 +290,18 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         const placeId = sel.placeId;
         if (placeId) {
           const details = await getPlaceDetails(placeId);
+          if (__DEV__)
+            log.warn(
+              "[MapEntry] getPlaceDetails(",
+              placeId,
+              ") →",
+              JSON.stringify(details ?? null),
+            );
           if (cancelledRef.current) return;
           if (details?.bounds) {
-            setFocusRegionThrottled(boundsToRegion(details.bounds, selectedLocation.type));
+            const region = boundsToRegion(details.bounds, selectedLocation.type);
+            if (__DEV__) log.warn("[MapEntry] focusRegion desde Place Details.bounds:", JSON.stringify(region));
+            setFocusRegionThrottled(region);
             addSelectedAsChip(details.bounds);
             return;
           }
@@ -284,6 +327,15 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         const json = await res.json();
         if (cancelledRef.current) return;
         const result = json.results?.[0];
+        if (__DEV__)
+          log.warn(
+            "[MapEntry] geocode fallback status=",
+            json.status,
+            "| results=",
+            Array.isArray(json.results) ? json.results.length : "n/a",
+            "| first=",
+            JSON.stringify(result ?? null),
+          );
         if (result?.geometry) {
           const { location, bounds, viewport } = result.geometry;
           const b = bounds || viewport;
@@ -294,7 +346,9 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
               east: b.northeast.lng,
               west: b.southwest.lng,
             };
-            setFocusRegionThrottled(boundsToRegion(gb, selectedLocation.type));
+            const region = boundsToRegion(gb, selectedLocation.type);
+            if (__DEV__) log.warn("[MapEntry] focusRegion desde geocode.bounds:", JSON.stringify(region));
+            setFocusRegionThrottled(region);
             addSelectedAsChip(gb);
           } else if (location) {
             const type = selectedLocation.type;

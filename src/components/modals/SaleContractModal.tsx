@@ -43,12 +43,14 @@ export const SaleContractModal: React.FC<SaleContractModalProps> = ({
 
   const [moneda, setMoneda] = useState<"USD" | "MXN">("MXN");
   const [precio, setPrecio] = useState("");
+  const [precioError, setPrecioError] = useState<string | null>(null);
 
   // Reiniciar al abrir
   useEffect(() => {
     if (visible) {
       setMoneda("MXN");
       setPrecio("");
+      setPrecioError(null);
     }
   }, [visible]);
 
@@ -58,13 +60,19 @@ export const SaleContractModal: React.FC<SaleContractModalProps> = ({
       const parts = rawValue.split(".");
       parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
       setPrecio(parts.join("."));
+      // Limpia el error en cuanto el usuario vuelve a teclear un valor
+      if (precioError) setPrecioError(null);
     }
   };
 
   const handleConfirm = () => {
-    const numericPrecio = parseFloat(precio.replace(/,/g, ""));
-    if (!numericPrecio || numericPrecio <= 0) {
-      return; // No permitir sin precio
+    const rawPrecio = precio.replace(/,/g, "");
+    const numericPrecio = parseFloat(rawPrecio);
+    if (!rawPrecio || isNaN(numericPrecio) || numericPrecio <= 0) {
+      setPrecioError(
+        "Ingresa un precio válido mayor a 0 para continuar.",
+      );
+      return;
     }
     onConfirm({
       tipo_contrato: tipoContrato,
@@ -159,7 +167,12 @@ export const SaleContractModal: React.FC<SaleContractModalProps> = ({
             <Text style={styles.label}>
               Precio de {statusType === "Vendida" ? "Venta" : "Renta"}
             </Text>
-            <View style={styles.priceInputContainer}>
+            <View
+              style={[
+                styles.priceInputContainer,
+                precioError && styles.priceInputContainerError,
+              ]}
+            >
               <Text style={styles.pricePrefix}>
                 {moneda === "MXN" ? "$" : "US$"}
               </Text>
@@ -172,6 +185,16 @@ export const SaleContractModal: React.FC<SaleContractModalProps> = ({
                 keyboardType="numeric"
               />
             </View>
+            {precioError && (
+              <View style={styles.errorRow}>
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={14}
+                  color={COLORS.error}
+                />
+                <Text style={styles.errorText}>{precioError}</Text>
+              </View>
+            )}
           </View>
 
           {/* Botones */}
@@ -188,10 +211,10 @@ export const SaleContractModal: React.FC<SaleContractModalProps> = ({
               style={[
                 styles.button,
                 styles.confirmButton,
-                (!precio || loading) && styles.buttonDisabled,
+                loading && styles.buttonDisabled,
               ]}
               onPress={handleConfirm}
-              disabled={!precio || loading}
+              disabled={loading}
             >
               {loading ? (
                 <Text style={styles.confirmText}>Guardando...</Text>
@@ -310,6 +333,22 @@ const styles = StyleSheet.create({
     borderColor: COLORS.cardBorder,
     borderRadius: 12,
     paddingHorizontal: 14,
+  },
+  priceInputContainerError: {
+    borderColor: COLORS.error,
+    backgroundColor: COLORS.errorTransparent,
+  },
+  errorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.error,
+    fontWeight: "500",
   },
   pricePrefix: {
     fontSize: 15,

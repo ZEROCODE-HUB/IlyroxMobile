@@ -12,6 +12,12 @@ interface ConfirmationModalProps {
     onCancel?: () => void;
     loading?: boolean;
     confirmVariant?: "primary" | "danger";
+    /**
+     * Si es true, el botón "Confirmar" se renderiza con menos padding horizontal
+     * y el label 1px más pequeño. Útil para textos largos como "Desbloquear"
+     * en modales estrechos.
+     */
+    compactConfirmButton?: boolean;
 }
 
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -24,11 +30,17 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     onCancel,
     loading = false,
     confirmVariant,
+    compactConfirmButton = false,
 }) => {
     const handleClose = () => {
         if (loading) return;
         if (onCancel) onCancel();
     };
+
+    const confirmStyle = compactConfirmButton ? styles.buttonCompact : styles.button;
+    const confirmLabelStyle = compactConfirmButton
+        ? styles.confirmLabelCompact
+        : undefined;
 
     return (
         <Modal
@@ -57,7 +69,8 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                     label={confirmText}
                     loading={loading}
                     onPress={onConfirm}
-                    style={styles.button}
+                    style={confirmStyle}
+                    labelStyle={confirmLabelStyle}
                 />
             </View>
         </Modal>
@@ -83,5 +96,12 @@ const styles = StyleSheet.create({
     },
     button: {
         flex: 1,
+    },
+    buttonCompact: {
+        flex: 1,
+        paddingHorizontal: 6,
+    },
+    confirmLabelCompact: {
+        fontSize: 13,
     },
 });

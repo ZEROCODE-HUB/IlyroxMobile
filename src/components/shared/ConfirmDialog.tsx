@@ -19,6 +19,12 @@ interface ConfirmDialogProps {
   onCancel: () => void;
   danger?: boolean;
   loading?: boolean;
+  /**
+   * Si es true, el botón "Confirmar" se renderiza con menos padding horizontal
+   * y el label 1px más pequeño. Útil para textos largos como "Desbloquear"
+   * en modales estrechos.
+   */
+  compactConfirmButton?: boolean;
 }
 
 const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -31,7 +37,16 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onCancel,
   danger = false,
   loading = false,
+  compactConfirmButton = false,
 }) => {
+  // El Button base no permite tocar el fontSize por tamaño desde fuera, pero sí
+  // acepta `style` (para padding) y `labelStyle` (para el texto). Reducimos el
+  // padding horizontal 4px y el fontSize 1px cuando `compactConfirmButton`.
+  const confirmStyle = compactConfirmButton ? styles.buttonCompact : styles.button;
+  const confirmLabelStyle = compactConfirmButton
+    ? styles.confirmLabelCompact
+    : undefined;
+
   return (
     <Modal
       visible={visible}
@@ -70,7 +85,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           label={confirmText}
           loading={loading}
           onPress={onConfirm}
-          style={styles.button}
+          style={confirmStyle}
+          labelStyle={confirmLabelStyle}
         />
       </View>
     </Modal>
@@ -112,6 +128,13 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
+  },
+  buttonCompact: {
+    flex: 1,
+    paddingHorizontal: 6,
+  },
+  confirmLabelCompact: {
+    fontSize: 13,
   },
 });
 

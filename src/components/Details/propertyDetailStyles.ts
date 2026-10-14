@@ -324,36 +324,6 @@ export const propertyDetailStyles = StyleSheet.create({
     lineHeight: 20,
     flex: 1,
   },
-  commissionBox: {
-    backgroundColor: COLORS.infoLight,
-    borderWidth: 1,
-    borderColor: COLORS.info,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-  },
-  commissionTitle: {
-    fontWeight: "bold",
-    color: COLORS.infoDark,
-    marginBottom: 8,
-    fontSize: 14,
-  },
-  commissionRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  commissionLabel: {
-    fontSize: 13,
-    color: COLORS.info,
-  },
-  commissionValue: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.infoDark,
-    maxWidth: "60%",
-    textAlign: "right",
-  },
   profileSection: {
     flexDirection: "row",
     alignItems: "center",

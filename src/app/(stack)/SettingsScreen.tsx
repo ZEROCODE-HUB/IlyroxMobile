@@ -404,7 +404,7 @@ const SettingsScreen: React.FC = () => {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.versionText}>Versión {appVersion} - Beta 1.4</Text>
+          <Text style={styles.versionText}>Versión {appVersion} - Beta 1.10</Text>
         </View>
 
       </ScrollView>
@@ -537,6 +537,7 @@ const SettingsScreen: React.FC = () => {
             }}
             loading={!!unblockingUserId}
             confirmVariant="primary"
+            compactConfirmButton
           />
         </View>
       </Modal>
