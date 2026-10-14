@@ -34,6 +34,17 @@ export interface GroupedConversation {
   ultima_actividad: string | null;
   other_user: ConversationOtherUser;
   etiquetas: ConversationTag[];
+  /** ID de la propiedad asociada al último mensaje (null = chat general). */
+  propiedad_id: string | null;
+  /** Resumen de la propiedad del último mensaje para mostrar en la fila. */
+  propiedad_resumen: {
+    id: string;
+    tipo: string;
+    subtipo: string | null;
+    ciudad: string | null;
+    codigo_propiedad: string | null;
+    foto: string | null;
+  } | null;
 }
 
 export interface ConversationForUser {
@@ -109,7 +120,9 @@ export const conversationsService = {
           usuario2:perfiles!usuario2_id(id, nombre, apellido_paterno, foto),
           conversacion_mas_reciente:conversaciones!conversacion_mas_reciente_id(
             ultimo_mensaje_preview,
-            ultimo_mensaje_en
+            ultimo_mensaje_en,
+            propiedad_id,
+            propiedad:propiedades(id, tipo, subtipo, ciudad, codigo_propiedad, fotos)
           )
         `,
         )
@@ -118,7 +131,7 @@ export const conversationsService = {
       supabase
         .from("conversaciones")
         .select(
-          "id, usuario1_id, usuario2_id, mensajes_no_leidos_usuario1, mensajes_no_leidos_usuario2, ultimo_mensaje_en, ultimo_mensaje_preview",
+          "id, usuario1_id, usuario2_id, mensajes_no_leidos_usuario1, mensajes_no_leidos_usuario2, ultimo_mensaje_en, ultimo_mensaje_preview, propiedad_id",
         )
         .or(`usuario1_id.eq.${userId},usuario2_id.eq.${userId}`),
     ]);
@@ -164,6 +177,30 @@ export const conversationsService = {
         const latestConvInGroup = mostRecent(groupConvs);
         const unreadCount = countUnread(groupConvs, userId);
 
+        // Resolver propiedad del último mensaje:
+        // 1) preferir la del `latestConvInGroup` (más reciente real dentro del grupo)
+        // 2) fallback a la del `conversacion_mas_reciente` traído por la vista
+        const latestProp = latestConvInGroup
+          ? (allConversations || []).find(
+              (c: any) => c.id === latestConvInGroup.id,
+            )?.propiedad_id
+          : null;
+        const propiedadId =
+          latestProp ?? group.conversacion_mas_reciente?.propiedad_id ?? null;
+        const propRow = group.conversacion_mas_reciente?.propiedad || null;
+        const propiedadResumen = propiedadId && propRow
+          ? {
+              id: propRow.id,
+              tipo: propRow.tipo,
+              subtipo: propRow.subtipo ?? null,
+              ciudad: propRow.ciudad ?? null,
+              codigo_propiedad: propRow.codigo_propiedad ?? null,
+              foto: Array.isArray(propRow.fotos) && propRow.fotos.length > 0
+                ? propRow.fotos[0]
+                : null,
+            }
+          : null;
+
         const allTags = new Map<string, ConversationTag>();
         groupConvs.forEach((conv) => {
           (tagsMap.get(conv.id) || []).forEach((tag) => {
@@ -191,6 +228,8 @@ export const conversationsService = {
             null,
           other_user: otherUser,
           etiquetas: Array.from(allTags.values()),
+          propiedad_id: propiedadId,
+          propiedad_resumen: propiedadResumen,
         };
       },
     );

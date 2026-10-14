@@ -42,28 +42,39 @@ export const PropertyTypeSelector: React.FC<PropertyTypeSelectorProps> = ({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chipsContainer}
       >
-        {tipoProperty.map((tipo) => (
-          <TouchableOpacity
-            key={tipo.value}
-            style={[
-              styles.chip,
-              tipoPropiedad === tipo.value && styles.chipActive,
-            ]}
-            onPress={() => {
-              onChangeTipo(tipo.value as TipoPrincipal);
-              onChangeSubtipo([]);
-            }}
-          >
-            <Text
+        {tipoProperty.map((tipo) => {
+          const isSelected = tipoPropiedad === tipo.value;
+          return (
+            <TouchableOpacity
+              key={tipo.value}
               style={[
-                styles.chipText,
-                tipoPropiedad === tipo.value && styles.chipTextActive,
+                styles.chip,
+                isSelected && styles.chipActive,
               ]}
+              onPress={() => {
+                // Toggle: si ya está seleccionado, deseleccionar (pasar string
+                // vacío). Si no, seleccionar este tipo. Al deseleccionar también
+                // limpiamos los subtipos porque no aplican sin tipo padre.
+                // `onChangeTipo` está tipado como `(tipo: string) => void`.
+                // Pasar "" es válido: el store lo trata como falsy en el
+                // filtro (`if (filters.tipoPropiedad && ...)`) y como valor
+                // por defecto inicial, exactamente igual que el estado sin
+                // filtro de tipo aplicado.
+                onChangeTipo(isSelected ? "" : tipo.value);
+                onChangeSubtipo([]);
+              }}
             >
-              {tipo.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Text
+                style={[
+                  styles.chipText,
+                  isSelected && styles.chipTextActive,
+                ]}
+              >
+                {tipo.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
       {tipoPropiedad && (

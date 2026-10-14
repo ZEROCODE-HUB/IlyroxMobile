@@ -596,6 +596,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
           confirmVariant="primary"
           onConfirm={desbloquearUser}
           onCancel={() => setUnblockUserToConfirm(null)}
+          compactConfirmButton
         />
       </>
     );
@@ -617,6 +618,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
         confirmVariant="primary"
         onConfirm={desbloquearUser}
         onCancel={() => setUnblockUserToConfirm(null)}
+        compactConfirmButton
       />
     </>
   );

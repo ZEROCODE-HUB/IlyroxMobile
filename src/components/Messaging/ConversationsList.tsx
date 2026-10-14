@@ -39,6 +39,11 @@ interface ConversationsListProps {
   refresh: () => void;
 }
 
+function capitalize(s?: string | null): string {
+  if (!s) return "";
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 export default function ConversationsList({
   userId,
   onSelectConversation,
@@ -249,6 +254,7 @@ export default function ConversationsList({
     const unreadCount = item.total_mensajes_no_leidos || 0;
     const totalConvs = item.total_conversaciones || 0;
     const conversationTags = item.etiquetas || [];
+    const propiedad = item.propiedad_resumen;
 
     return (
       <TouchableOpacity
@@ -271,6 +277,36 @@ export default function ConversationsList({
 
           <View style={styles.conversationFooter}>
             <View style={{ flex: 1 }}>
+              {/* Badge del contexto del último mensaje: de qué propiedad / chat general
+                  viene. Permite saber antes de tocar a qué conversación corresponde. */}
+              {propiedad ? (
+                <View style={styles.propertyBadge}>
+                  <Ionicons
+                    name="home-outline"
+                    size={12}
+                    color={COLORS.primary}
+                  />
+                  <Text style={styles.propertyBadgeText} numberOfLines={1}>
+                    {propiedad.subtipo || capitalize(propiedad.tipo)}
+                    {propiedad.ciudad ? ` · ${propiedad.ciudad}` : ""}
+                    {propiedad.codigo_propiedad
+                      ? ` · #${propiedad.codigo_propiedad}`
+                      : ""}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.propertyBadgeGeneral}>
+                  <Ionicons
+                    name="chatbubble-ellipses-outline"
+                    size={12}
+                    color={COLORS.textTertiary}
+                  />
+                  <Text style={styles.propertyBadgeTextGeneral} numberOfLines={1}>
+                    Chat general
+                  </Text>
+                </View>
+              )}
+
               <Text style={styles.lastMessage} numberOfLines={1}>
                 {item.ultimo_mensaje_preview || "Sin mensajes"}
               </Text>
@@ -538,6 +574,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary,
     marginBottom: 4,
+  },
+  propertyBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    maxWidth: "90%",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: COLORS.primary + "1A", // ~10% opacity
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  propertyBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: COLORS.primary,
+    flexShrink: 1,
+  },
+  propertyBadgeGeneral: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    maxWidth: "90%",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: COLORS.backgroundDark,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  propertyBadgeTextGeneral: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: COLORS.textTertiary,
+    flexShrink: 1,
   },
   tagsContainer: {
     flexDirection: "row",

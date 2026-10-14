@@ -421,8 +421,8 @@ export default function CreateProperty({
         onBack={confirmDiscard}
       />
 
-      {/* El footer va DENTRO del KeyboardAvoidingView para que suba con el
-          teclado; antes era `position:absolute` y quedaba tapado en iOS. */}
+      {/* El KAV solo envuelve el ScrollView: el footer queda FIJO abajo, fuera
+          del KAV, para que NO se empuje cuando se abre el teclado. */}
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -517,8 +517,9 @@ export default function CreateProperty({
       </ScrollView>
       </View>
       </FieldAnchorContext.Provider>
+      </KeyboardAvoidingView>
 
-      {/* FOOTER - BOTÓN PUBLICAR */}
+      {/* FOOTER - BOTÓN PUBLICAR (FIJO, fuera del KeyboardAvoidingView) */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={[
@@ -547,7 +548,6 @@ export default function CreateProperty({
           )}
         </TouchableOpacity>
       </View>
-      </KeyboardAvoidingView>
 
       {/* MODAL DE PROGRESO MEJORADO */}
       <ProgressModal 

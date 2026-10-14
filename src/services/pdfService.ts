@@ -184,6 +184,36 @@ const safeText = (text: string | null | undefined): string => {
     .replace(/'/g, "&#039;");
 };
 
+/**
+ * Convierte saltos de línea a HTML respetando el formato del texto:
+ * - Doble salto (\n\n) → párrafo nuevo
+ * - Salto simple (\n) → <br> dentro del mismo párrafo
+ *
+ * Se aplica ANTES de pasar por `safeText` para que las entidades HTML no
+ * rompan las coincidencias. Aquí solo dividimos el texto plano.
+ */
+const splitByLineBreaks = (text: string | null | undefined): string[] => {
+  if (text === null || text === undefined) return [];
+  return String(text)
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+};
+
+/**
+ * Renderiza texto multilinea en HTML escapado, respetando saltos de línea.
+ * \n\n → nuevo párrafo, \n → <br> dentro del mismo párrafo.
+ */
+const multilineTextToHtml = (text: string | null | undefined): string => {
+  const paragraphs = splitByLineBreaks(text);
+  if (paragraphs.length === 0) return "";
+  return paragraphs
+    .map(
+      (p) => `<p>${safeText(p).replace(/\n/g, "<br>")}</p>`,
+    )
+    .join("");
+};
+
 const formatPrice = (
   price: number | null | undefined,
   currency: string = "MXN",
@@ -428,13 +458,13 @@ const generatePropertyHtml = (
   // Descripción por plantas
   let descripcionHtml = "";
   if (data.descripcion) {
-    descripcionHtml += `<p>${safeText(data.descripcion)}</p>`;
+    descripcionHtml += multilineTextToHtml(data.descripcion);
   }
   if (config.showDescripcionPlantaBaja && data.descripcion_planta_baja) {
-    descripcionHtml += `<h3>Planta Baja</h3><p>${safeText(data.descripcion_planta_baja)}</p>`;
+    descripcionHtml += `<h3>Planta Baja</h3>${multilineTextToHtml(data.descripcion_planta_baja)}`;
   }
   if (config.showDescripcionPlantaAlta && data.descripcion_planta_alta) {
-    descripcionHtml += `<h3>Planta Alta</h3><p>${safeText(data.descripcion_planta_alta)}</p>`;
+    descripcionHtml += `<h3>Planta Alta</h3>${multilineTextToHtml(data.descripcion_planta_alta)}`;
   }
 
   // --- RETURN HTML ---

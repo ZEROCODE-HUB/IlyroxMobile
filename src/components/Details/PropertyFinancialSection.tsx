@@ -105,48 +105,76 @@ export const PropertyFinancialSection: React.FC<PropertyFinancialSectionProps> =
               op.porcentaje_comision_compartida != null ||
               op.monto_comision_compartida != null;
 
+            const comisionValue = op.comision_meses != null
+              ? `${Number(op.comision_meses)} ${Number(op.comision_meses) === 1 ? "mes" : "meses"}`
+              : op.comision_porcentaje != null
+                ? `${Number(op.comision_porcentaje)}%`
+                : op.comision_monto_fijo != null
+                  ? `$${Number(op.comision_monto_fijo).toLocaleString("es-MX")}`
+                  : "No especificada";
+
+            const comparteValue = op.porcentaje_comision_compartida != null
+              ? `${op.porcentaje_comision_compartida}%`
+              : op.monto_comision_compartida != null
+                ? `$${Number(op.monto_comision_compartida).toLocaleString("es-MX")}`
+                : "No especificado";
+
             return (
-              <View key={i} style={styles.commissionBox}>
-                <Text style={styles.commissionTitle}>
-                  {op.tipo_operacion === "venta" ? "Venta" : "Renta"}
-                </Text>
+              <View key={i} style={styles.statsGrid}>
                 {hasComision && (
-                  <View style={styles.commissionRow}>
-                    <Text style={styles.commissionLabel}>Comisión:</Text>
-                    <Text style={styles.commissionValue}>
-                      {op.comision_meses != null
-                        ? `${Number(op.comision_meses)} ${Number(op.comision_meses) === 1 ? "mes" : "meses"}`
-                        : op.comision_porcentaje != null
-                          ? `${Number(op.comision_porcentaje)}%`
-                          : op.comision_monto_fijo != null
-                            ? `$${Number(op.comision_monto_fijo).toLocaleString("es-MX")}`
-                            : "No especificada"}
-                    </Text>
+                  <View style={styles.statItem}>
+                    <View style={styles.statIconContainer}>
+                      <Ionicons
+                        name={
+                          op.tipo_operacion === "venta"
+                            ? "cash-outline"
+                            : "calendar-outline"
+                        }
+                        size={16}
+                        color={COLORS.primary}
+                      />
+                    </View>
+                    <View style={styles.statTextContainer}>
+                      <Text style={styles.statLabel}>
+                        {op.tipo_operacion === "venta" ? "Comisión venta" : "Comisión renta"}
+                      </Text>
+                      <Text style={styles.statValue}>{comisionValue}</Text>
+                    </View>
                   </View>
                 )}
                 {hasComparte && (
-                  <View style={styles.commissionRow}>
-                    <Text style={styles.commissionLabel}>Comparte:</Text>
-                    <Text style={styles.commissionValue}>
-                      {op.porcentaje_comision_compartida != null
-                        ? `${op.porcentaje_comision_compartida}%`
-                        : op.monto_comision_compartida != null
-                          ? `$${Number(op.monto_comision_compartida).toLocaleString("es-MX")}`
-                          : "No especificado"}
-                    </Text>
-                  </View>
-                )}
-                {op.condiciones_comision_compartida && (
-                  <View style={styles.commissionRow}>
-                    <Text style={styles.commissionLabel}>Condiciones:</Text>
-                    <Text style={styles.commissionValue} numberOfLines={2}>
-                      {op.condiciones_comision_compartida}
-                    </Text>
+                  <View style={styles.statItem}>
+                    <View style={styles.statIconContainer}>
+                      <Ionicons
+                        name="people-outline"
+                        size={16}
+                        color={COLORS.primary}
+                      />
+                    </View>
+                    <View style={styles.statTextContainer}>
+                      <Text style={styles.statLabel}>Comparte</Text>
+                      <Text style={styles.statValue}>{comparteValue}</Text>
+                    </View>
                   </View>
                 )}
               </View>
             );
           })}
+          {validOps.some(
+            (op) => op.condiciones_comision_compartida,
+          ) && (
+            <View style={{ marginTop: 12 }}>
+              <Text style={[styles.label, { marginBottom: 4 }]}>
+                Condiciones
+              </Text>
+              <Text style={styles.descriptionText}>
+                {validOps
+                  .map((op) => op.condiciones_comision_compartida)
+                  .filter(Boolean)
+                  .join("\n")}
+              </Text>
+            </View>
+          )}
         </View>
       )}
     </>

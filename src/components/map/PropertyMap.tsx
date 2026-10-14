@@ -27,6 +27,103 @@ const DRAFT_DASH_PATTERN = [8, 4];
  *  legible el orden top-down. */
 const clusterCountStyle = { color: "white", fontSize: 13, fontWeight: "bold" as const };
 
+/**
+ * Validación defensiva de coordenadas para evitar el crash iOS
+ * `RCTLegacyViewManagerInteropComponentView finalizeUpdates → insertObject:atIndex: nil`.
+ *
+ * ¿Por qué? `react-native-maps@1.20.1` con New Architecture / Fabric en iOS
+ * tiene un bug conocido (#5521 / #5217) en el legacy interop: cuando un child
+ * del `<MapView>` llega con `coordinate` inválida (null, NaN, fuera de rango)
+ * o cuando un re-render rápido desmonta un marker antes de que el interop lo
+ * procese, `[_reactSubviews insertObject:subview atIndex:]` recibe `nil` y
+ * lanza `*** -[__NSArrayM insertObject:atIndex:]: object cannot be nil` → SIGABRT.
+ *
+ * La fix oficial del repo (#5871, #5940) está en 1.29.3/1.29.4, pero mientras
+ * actualizamos, esta validación JS evita que children con coords inválidas
+ * lleguen al interop. Si una propiedad tiene coords corruptas (null, NaN,
+ * > 90° lat o > 180° lng), simplemente no se renderiza su marker.
+ */
+function isValidCoord(lat: unknown, lng: unknown): lat is number {
+  return (
+    typeof lat === "number" &&
+    typeof lng === "number" &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    Math.abs(lat) <= 90 &&
+    Math.abs(lng) <= 180
+  );
+}
+
+/**
+ * Valida un array de coordenadas (un polígono). Retorna `true` solo si tiene
+ * al menos 3 vértices y todos tienen coords válidas. Usar para polígonos
+ * confirmados por la búsqueda guardada o para el polígono en borrador.
+ */
+function isValidPolygon(polygon: unknown): polygon is Array<{ latitude: number; longitude: number }> {
+  return (
+    Array.isArray(polygon) &&
+    polygon.length >= 3 &&
+    polygon.every((p) => isValidCoord((p as any)?.latitude, (p as any)?.longitude))
+  );
+}
+
+/**
+ * Proyección inversa Mercator: convierte (lat, lng) → coordenadas de pantalla
+ * (x, y) en píxeles del MapView, usando la MISMA fórmula de proyección
+ * Mercator que usan Apple Maps y Google Maps internamente.
+ *
+ * ¿Por qué no basta con una fórmula lineal?
+ * La fórmula naive `x = (lng - lng0) / deltaLng * width` funciona para
+ * longitud (Mercator es lineal en X), pero NO funciona para latitud:
+ * Mercator comprime las latitudes altas (cerca de los polos) y estira las
+ * bajas (cerca del ecuador). Una fórmula lineal da desfases de varios
+ * píxeles en latitudes medias-altas, que es exactamente el bug que se veía
+ * (los badges se quedaban "rezagados" al arrastrar el mapa).
+ *
+ * La fórmula correcta proyecta lat a un espacio logarítmico:
+ *   y_mercator(lat) = ln(tan(π/4 + lat_rad/2))
+ * y luego interpola linealmente entre el top y el bottom del mapa.
+ *
+ * IMPORTANTE: el resultado es relativo al wrapper de RN del MapView, no al
+ * MKMapView nativo. En iOS estos pueden diferir (safe area, elementos UI).
+ * Por eso el resultado se suma a un offset calibrado con `pointForCoordinate`.
+ *
+ * Si `mapSize` aún no está disponible (antes del primer onLayout), devuelve
+ * null y el caller cae al fallback de `pointForCoordinate`.
+ */
+function latLngToScreen(
+  lat: number,
+  lng: number,
+  region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number },
+  mapSize: { width: number; height: number } | null,
+  offset: { dx: number; dy: number } = { dx: 0, dy: 0 },
+): { x: number; y: number } | null {
+  if (!mapSize || mapSize.width <= 0 || mapSize.height <= 0) return null;
+  if (region.longitudeDelta === 0 || region.latitudeDelta === 0) return null;
+
+  // Longitud: lineal en X (Mercator es equidistante en longitud).
+  const x = ((lng - (region.longitude - region.longitudeDelta / 2)) / region.longitudeDelta) * mapSize.width;
+
+  // Latitud: proyección Mercator.
+  const project = (latDeg: number) => {
+    const latRad = (latDeg * Math.PI) / 180;
+    return Math.log(Math.tan(Math.PI / 4 + latRad / 2));
+  };
+
+  const topLat = region.latitude + region.latitudeDelta / 2;
+  const bottomLat = region.latitude - region.latitudeDelta / 2;
+  const topY = project(topLat);
+  const bottomY = project(bottomLat);
+  const pointY = project(lat);
+
+  const yRange = topY - bottomY;
+  if (yRange === 0 || !Number.isFinite(yRange)) return null;
+  const y = ((topY - pointY) / yRange) * mapSize.height;
+
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x: x + offset.dx, y: y + offset.dy };
+}
+
 // ── Componentes de overlay memoizados a NIVEL DE MÓDULO ───────────────────────
 // IMPORTANTE: nunca definir componentes dentro de otro componente/render. Si se
 // hace, React los ve como un tipo nuevo en cada render → desmonta y remonta el
@@ -204,10 +301,59 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const [mapReady, setMapReady] = useState(false);
+  // Tamaño del wrapper de RN del MapView. Se usa como base para el cálculo
+  // matemático de posiciones de badges/burbujas/vértices. Sin embargo, el
+  // wrapper de RN puede tener un tamaño DIFERENTE al MKMapView nativo en
+  // iOS (por safe area, paddingAdjustmentBehavior, elementos UI como
+  // brújula/escala que se renderizan dentro del MKMapView pero NO afectan
+  // su área de coordenadas). Por eso `mapOffset` captura la diferencia entre
+  // la posición que calcula mi fórmula y la posición real del MKMapView
+  // (obtenida con `pointForCoordinate`), y se aplica a todos los cálculos
+  // subsiguientes. Esto da posiciones exactas con cálculo instantáneo.
+  const [mapSize, setMapSize] = useState<{ width: number; height: number } | null>(null);
+  const mapSizeRef = useRef<{ width: number; height: number } | null>(null);
+  mapSizeRef.current = mapSize;
+  // Offset en píxeles entre el wrapper de RN y el MKMapView nativo. Se
+  // calibra con `pointForCoordinate` y se re-calibra si cambia. Aplicar este
+  // offset a las posiciones calculadas con `latLngToScreen` es lo que hace
+  // que los badges/burbujas/vértice caigan EXACTAMENTE sobre los markers
+  // nativos del mapa, sin desfase durante el drag.
+  const mapOffsetRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+
+  // ── Mitigación del crash de Fabric (RCTLegacyViewManagerInteropComponentView) ──
+  //
+  // El bug: en `react-native-maps@1.20.1` con New Architecture (Fabric) en iOS,
+  // cuando los children del `<MapView>` se montan/desmontan en varios commits
+  // seguidos (mount→unmount→mount), el interop legacy entrega `subview = nil`
+  // en `-[AIRMap insertReactSubview:atIndex:]` y crashea con
+  // "*** -[__NSArrayM insertObject:atIndex:]: object cannot be nil"
+  // (ver react-native-maps#5217 / PR #5871).
+  //
+  // ANTES: teníamos un "drenado" que ponía `markersDraining = true` durante
+  // ~32 ms cuando había un cambio masivo de propiedades, devolviendo `[]` en
+  // los `useMemo` de markers. La idea era separar el commit de remoción del
+  // commit de inserción. PERO los logs de TestFlight mostraron que ese drenado
+  // generaba exactamente el patrón mount→unmount→mount que rompe el interop,
+  // sobre todo cuando se combinaba con la transición de `pins` (searched
+  // location pins) al mismo tiempo. En el caso "Ruscello" el crash era
+  // reproducible 100% con el drenado activo.
+  //
+  // AHORA:
+  //   1) Sin drenado. Los markers se renderizan siempre (módulo inicial y al
+  //      cambiar filtros). React reconcilia naturalmente.
+  //   2) Los markers se difieren hasta que `mapReady === true` (el primer
+  //      `onMapReady` del MapView nativo). Eso separa el commit de mount del
+  //      MapView del commit de mount de sus children, evitando la condición de
+  //      carrera del interop. Una vez `mapReady`, los markers se mantienen
+  //      montados durante toda la vida del componente.
+  //   3) Se mantienen `isValidCoord` / `isValidPolygon` como red de seguridad
+  //      para no enviar coordenadas corruptas al lado nativo.
+  //
+  // Si tras este cambio el crash reaparece, el siguiente paso es actualizar
+  // `react-native-maps` a `^1.29.11` (incluye el nil-check nativo de PR #5871).
 
   // ── Cleanup refs ──
   const mountedRef = useRef(true);
-  const rafRef = useRef<number | null>(null);
   const autoFitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftPolygonPointsRef = useRef<PolygonCoord[]>(draftPolygonPoints);
   draftPolygonPointsRef.current = draftPolygonPoints;
@@ -217,7 +363,6 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   useEffect(() => {
     return () => {
       mountedRef.current = false;
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (autoFitTimerRef.current) clearTimeout(autoFitTimerRef.current);
     };
   }, []);
@@ -330,6 +475,23 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     const isCluster = result.filter((c: any) => c.properties.cluster).length;
     const isPoint = result.filter((c: any) => !c.properties.cluster).length;
     log.debug(`clusters: ${result.length} (${isCluster} agrupados, ${isPoint} individuales) | zoom: ${zoom} | latDelta: ${latitudeDelta.toFixed(3)} | center: ${latitude.toFixed(3)},${longitude.toFixed(3)}`);
+    // LOG TEMPORAL — detalle de cada clúster/punto cuando son pocos.
+    if (__DEV__ && result.length > 0 && result.length <= 20) {
+      log.warn(
+        `[MapCluster] detalle (${result.length}):`,
+        JSON.stringify(
+          result.map((c: any) => ({
+            id: c.id ?? c.properties.cluster_id,
+            esCluster: Boolean(c.properties.cluster),
+            count: c.properties.point_count ?? 1,
+            lng: c.geometry?.coordinates?.[0],
+            lat: c.geometry?.coordinates?.[1],
+          })),
+          null,
+          2,
+        ),
+      );
+    }
     return result;
   }, [superclusterIndex, currentRegion]);
 
@@ -368,15 +530,51 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       onStackPress(leaves.map((l: any) => l.properties.propertyId as string));
       return;
     }
-    nativeMapRef.current?.fitToCoordinates(coords, {
-      edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
-      animated: true,
-    });
+    try {
+      nativeMapRef.current?.fitToCoordinates(coords, {
+        edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+        animated: true,
+      });
+    } catch (e) {
+      // `fitToCoordinates` puede lanzar si el mapa se está desmontando o si
+      // las coords son inválidas. Silenciar para no crashear.
+      if (__DEV__) log.warn("fitToCoordinates falló:", (e as Error)?.message);
+    }
   };
+
+  // Handler estable para los markers individuales (invisibles). Se usa en
+  // lugar de un `onPress={() => {...}}` inline dentro del `.map` del
+  // useMemo, para que la referencia del handler sea estable entre renders.
+  // Esto evita que el interop de react-native-maps vea un cambio de prop en
+  // cada render y re-serialize el marker (lo cual puede contribuir a
+  // `insertObject:atIndex: nil` durante commits grandes de Fabric).
+  const handleIndividualMarkerPressRef = useRef<
+    (propertyId: string, lat: number, lng: number, property: Property) => void
+  >(() => {});
+  handleIndividualMarkerPressRef.current = (propertyId, lat, lng, property) => {
+    const group = coincidentGroups.get(coincidenceKey(lat, lng));
+    if (group && group.length > 1 && onStackPress) {
+      if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+      onStackPress(group);
+      return;
+    }
+    const r = makeFocusRegion(lat, lng);
+    try {
+      nativeMapRef.current?.animateToRegion(r, 600);
+    } catch (e) {
+      if (__DEV__) log.warn("animateToRegion (individual marker) falló:", (e as Error)?.message);
+    }
+    if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+    onMarkerPress(propertyId, property);
+  };
+  const handleIndividualMarkerPress = useCallback(
+    (propertyId: string, lat: number, lng: number, property: Property) =>
+      handleIndividualMarkerPressRef.current(propertyId, lat, lng, property),
+    [],
+  );
 
   const lastUpdateRef = useRef<number>(0);
   const regionRef = useRef<any>(null);
-  const isCalculatingRef = useRef(false);
   const drawingModeRef = useRef(drawingMode);
   useEffect(() => { drawingModeRef.current = drawingMode; }, [drawingMode]);
   const focusRegionRef = useRef(focusRegion);
@@ -391,111 +589,181 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   useEffect(() => { mapReadyRef.current = mapReady; }, [mapReady]);
   const propertiesRef = useRef(properties);
   useEffect(() => { propertiesRef.current = properties; }, [properties]);
+  // Re-calibrar offset cuando el tamaño del wrapper cambia. NO se hace dentro
+  // del setMapSize updater (sería un side-effect durante render, anti-patrón
+  // que puede causar crashes con React 18 / Fabric).
+  useEffect(() => {
+    if (mapSize && mapReady) {
+      calibrateOffset(true).catch(() => {});
+    }
+    // calibrateOffset es estable (useCallback con deps en updateOverlayPositions,
+    // que es estable). No lo pongo en deps para no crear un loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapSize, mapReady]);
 
-  // Optimized function to calculate positions only for visible elements
-  const updateOverlayPositions = useCallback(async (region?: any) => {
+  // Optimized function to calculate positions only for visible elements.
+  // Implementación SÍNCRONA con matemática pura (latLngToScreen) + offset
+  // calibrado con `pointForCoordinate`. Esto da posiciones EXACTAS (no
+  // desfasadas) sin pasar por el bridge en cada frame. Antes era async con
+  // `pointForCoordinate` (round-trip al bridge) → delay 80-150ms. Antes
+  // también intentamos matemática pura sin calibrar, pero en iOS el
+  // wrapper de RN puede tener un tamaño distinto al MKMapView nativo
+  // (safe area, elementos UI), causando que los badges se quedaran
+  // desfasados del marker nativo. La calibración con pointForCoordinate
+  // captura esa diferencia y la corrige.
+  const updateOverlayPositions = useCallback((region?: any) => {
     if (Platform.OS === "web" || !nativeMapRef.current || !mapReadyRef.current) return;
     if (!mountedRef.current) return;
 
     const activeRegion = region || regionRef.current;
     if (!activeRegion) return;
 
-    if (isCalculatingRef.current) return;
-
     const now = Date.now();
-    // 120ms throttle — imperceptible visualmente (los badges ya llevan lag por
-    // las llamadas async), pero reduce ~75% la carga del bridge vs 32 ms.
-    if (region && now - lastUpdateRef.current < 120) return;
-
-    isCalculatingRef.current = true;
+    // Sin throttle: la fórmula + offset es O(n) y muy rápida. Llamar setState
+    // en cada onRegionChange a 60fps triggerea un re-render, pero React
+    // reconcilia badges/burbujas con keys estables y solo cambia sus
+    // posiciones (left/top) → mount/unmount cero, solo updates de estilo.
+    if (region && now - lastUpdateRef.current < 16) return; // máx 1 llamada por frame
     lastUpdateRef.current = now;
 
-    try {
-      const { latitude, longitude, latitudeDelta, longitudeDelta } = activeRegion;
-      const latBuffer = latitudeDelta * 0.5;
-      const lngBuffer = longitudeDelta * 0.5;
-      const minLat = latitude - latitudeDelta - latBuffer;
-      const maxLat = latitude + latitudeDelta + latBuffer;
-      const minLng = longitude - longitudeDelta - lngBuffer;
-      const maxLng = longitude + longitudeDelta + lngBuffer;
+    const { latitude, longitude, latitudeDelta, longitudeDelta } = activeRegion;
+    const latBuffer = latitudeDelta * 0.5;
+    const lngBuffer = longitudeDelta * 0.5;
+    const minLat = latitude - latitudeDelta - latBuffer;
+    const maxLat = latitude + latitudeDelta + latBuffer;
+    const minLng = longitude - longitudeDelta - lngBuffer;
+    const maxLng = longitude + longitudeDelta + lngBuffer;
 
-      // Solo non-clustered (las únicas que renderizan badge) — intersect BEFORE
-      // calling pointForCoordinate para reducir bridge calls hasta ~90%
-      const currentProperties = propertiesRef.current;
-      const visibleNonClustered = currentProperties
-        .filter((p) => {
-          const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
-          const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
-          if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) return false;
-          if (lat < minLat || lat > maxLat || lng < minLng || lng > maxLng) return false;
-          return individualPropertyIdsRef.current.has(p.id);
-        })
-        .slice(0, 150); // cap 150 — no-clustered visibles rara vez superan ~50
-
-      const newPositions: any = {};
-      const propPromises = visibleNonClustered.map(async (p) => {
+    const size = mapSizeRef.current;
+    const offset = mapOffsetRef.current;
+    const currentProperties = propertiesRef.current;
+    const visibleNonClustered = currentProperties
+      .filter((p) => {
         const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
         const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
-        if (!mountedRef.current || !nativeMapRef.current) return;
-        try {
-          const point = await nativeMapRef.current.pointForCoordinate({
-            latitude: Number(lat),
-            longitude: Number(lng),
-          });
-          newPositions[p.id] = point;
-        } catch { /* ignore */ }
-      });
-      await Promise.all(propPromises);
-      if (!mountedRef.current) return;
+        if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) return false;
+        if (lat < minLat || lat > maxLat || lng < minLng || lng > maxLng) return false;
+        return individualPropertyIdsRef.current.has(p.id);
+      })
+      .slice(0, 150);
 
-      // Clusters (pocos — necesarios para burbujas)
-      const currentClusters = superclusterRef.current?.getClusters(
-        [minLng, minLat, maxLng, maxLat],
-        latDeltaToZoom(latitudeDelta),
-      ) ?? [];
-      const clusterFeatures = currentClusters.filter((c: any) => c.properties.cluster);
-      const newClusterPositions: any = {};
-      const clusterPromises = clusterFeatures.map(async (c: any) => {
-        const [lng, lat] = c.geometry.coordinates;
-        if (!mountedRef.current || !nativeMapRef.current) return;
-        try {
-          const point = await nativeMapRef.current.pointForCoordinate({ latitude: lat, longitude: lng });
-          newClusterPositions[`cluster-${c.id}`] = {
-            x: point.x,
-            y: point.y,
-            count: c.properties.point_count as number,
-            clusterId: c.id,
-          };
-        } catch { /* ignore */ }
-      });
-      await Promise.all(clusterPromises);
+    const newPositions: any = {};
+    visibleNonClustered.forEach((p) => {
+      const lat = p.coordinates?.lat ?? p.latitud;
+      const lng = p.coordinates?.lng ?? p.longitud;
+      if (lat == null || lng == null) return;
+      const screen = latLngToScreen(Number(lat), Number(lng), activeRegion, size, offset);
+      if (screen) newPositions[p.id] = screen;
+    });
 
-      // Primer vértice del polígono (botón de cierre)
-      let firstVertexPos: { x: number; y: number } | null = null;
-      if (
-        drawingModeRef.current &&
-        draftPolygonPointsRef.current.length >= 3 &&
-        mountedRef.current &&
-        nativeMapRef.current
-      ) {
-        try {
-          const fp = await nativeMapRef.current.pointForCoordinate({
-            latitude: draftPolygonPointsRef.current[0].latitude,
-            longitude: draftPolygonPointsRef.current[0].longitude,
-          });
-          firstVertexPos = { x: fp.x, y: fp.y };
-        } catch { /* ignore */ }
+    // Clusters
+    const currentClusters = superclusterRef.current?.getClusters(
+      [minLng, minLat, maxLng, maxLat],
+      latDeltaToZoom(latitudeDelta),
+    ) ?? [];
+    const clusterFeatures = currentClusters.filter((c: any) => c.properties.cluster);
+    const newClusterPositions: any = {};
+    clusterFeatures.forEach((c: any) => {
+      const [lng, lat] = c.geometry.coordinates;
+      const screen = latLngToScreen(lat, lng, activeRegion, size, offset);
+      if (screen) {
+        newClusterPositions[`cluster-${c.id}`] = {
+          x: screen.x,
+          y: screen.y,
+          count: c.properties.point_count as number,
+          clusterId: c.id,
+        };
       }
+    });
 
-      if (mountedRef.current) {
-        setOverlayPositions(newPositions);
-        setClusterOverlayPositions(newClusterPositions);
-        setFirstVertexScreenPos(firstVertexPos);
-      }
-    } finally {
-      isCalculatingRef.current = false;
+    // Primer vértice del polígono (botón de cierre)
+    let firstVertexPos: { x: number; y: number } | null = null;
+    if (
+      drawingModeRef.current &&
+      draftPolygonPointsRef.current.length >= 3
+    ) {
+      const first = draftPolygonPointsRef.current[0];
+      const screen = latLngToScreen(first.latitude, first.longitude, activeRegion, size, offset);
+      if (screen) firstVertexPos = screen;
     }
-  }, []); // sin deps — usa solo refs (mapReadyRef, propertiesRef, etc.)
+
+    if (mountedRef.current) {
+      setOverlayPositions(newPositions);
+      setClusterOverlayPositions(newClusterPositions);
+      setFirstVertexScreenPos(firstVertexPos);
+    }
+  }, []); // sin deps — usa solo refs (mapSizeRef, mapOffsetRef, mapReadyRef, propertiesRef)
+
+  // Calibra el offset entre el wrapper de RN y el MKMapView nativo usando
+  // `pointForCoordinate` del nativo. Esto captura cualquier diferencia entre
+  // el wrapper de RN (que es lo que mide `onLayout`) y el MKMapView nativo
+  // (que es donde se renderizan los markers). En iOS, el wrapper puede
+  // tener un tamaño distinto por safe area, paddingAdjustmentBehavior, o
+  // elementos UI nativos (brújula, escala, logo de Apple) que se renderizan
+  // DENTRO del MKMapView pero no afectan su área visible. Sin esta
+  // calibración, los badges/burbujas se calculan respecto al wrapper pero
+  // los markers nativos están en el MKMapView → hay un offset visible.
+  const calibrationCounterRef = useRef(0);
+  const calibrateOffset = useCallback(async (force = false) => {
+    if (Platform.OS === "web" || !nativeMapRef.current || !mapReadyRef.current) return;
+    if (!mountedRef.current) return;
+    calibrationCounterRef.current += 1;
+    if (!force && calibrationCounterRef.current % 5 !== 0) return;
+
+    const size = mapSizeRef.current;
+    const region = regionRef.current;
+    if (!size || !region) return;
+
+    // Usamos el centro del mapa como punto de calibración.
+    const centerLat = region.latitude;
+    const centerLng = region.longitude;
+    // try/catch defensivo: `pointForCoordinate` puede lanzar si el mapa
+    // nativo se está desmontando, o si el centro es NaN (en cuyo caso
+    // MKMapView lanza NSInvalidArgumentException → promesa rechazada).
+    // Sin este catch, un rechazo se propagaría como unhandled promise
+    // rejection, que en builds de iOS puede aparecer como crash.
+    let nativePoint: { x: number; y: number } | null = null;
+    try {
+      nativePoint = await nativeMapRef.current.pointForCoordinate({
+        latitude: centerLat,
+        longitude: centerLng,
+      });
+    } catch (e) {
+      // Silenciar: la próxima calibración lo intentará de nuevo. Logueamos
+      // solo en dev para no spamear producción.
+      if (__DEV__) log.debug("[mapOffset] pointForCoordinate falló:", (e as Error)?.message);
+      return;
+    }
+    if (!mountedRef.current || !nativePoint) return;
+    if (
+      !Number.isFinite(nativePoint.x) ||
+      !Number.isFinite(nativePoint.y)
+    ) {
+      // El nativo devolvió NaN/Infinity (no debería, pero por seguridad).
+      return;
+    }
+    const mathPoint = latLngToScreen(centerLat, centerLng, region, size, { dx: 0, dy: 0 });
+    if (!mathPoint) return;
+    const newOffset = {
+      dx: nativePoint.x - mathPoint.x,
+      dy: nativePoint.y - mathPoint.y,
+    };
+    // Solo actualizar si el offset cambió significativamente (más de 0.5px)
+    // para evitar jitter innecesario.
+    if (
+      Math.abs(newOffset.dx - mapOffsetRef.current.dx) > 0.5 ||
+      Math.abs(newOffset.dy - mapOffsetRef.current.dy) > 0.5
+    ) {
+      log.debug(
+        `[mapOffset] recalibrado: dx=${newOffset.dx.toFixed(1)} dy=${newOffset.dy.toFixed(1)} (antes: dx=${mapOffsetRef.current.dx.toFixed(1)} dy=${mapOffsetRef.current.dy.toFixed(1)})`,
+      );
+      mapOffsetRef.current = newOffset;
+      // Re-aplicar inmediatamente el offset a las posiciones actuales para
+      // que el usuario no vea un frame con el offset anterior antes de la
+      // próxima actualización.
+      updateOverlayPositions();
+    }
+  }, [updateOverlayPositions]);
 
   useEffect(() => {
     if (mapReady) {
@@ -606,7 +874,13 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     // 400 ms es suficiente: el delta ya viene dimensionado por boundsToRegion
     // (no necesita una transición larga para "acercarse"), y reduce el tiempo
     // total desde que el usuario selecciona una ubicación hasta que la ve.
-    nativeMapRef.current?.animateToRegion(focusRegion, 400);
+    try {
+      nativeMapRef.current?.animateToRegion(focusRegion, 400);
+    } catch (e) {
+      // El mapa se está desmontando o `focusRegion` no es válido (poco
+      // probable, ya validamos arriba). Silenciar para no crashear.
+      if (__DEV__) log.warn("animateToRegion (focus) falló:", (e as Error)?.message);
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
   }, [focusRegion, mapReady]);
 
@@ -623,7 +897,13 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       setCurrentRegion(region);
       autoFitTimerRef.current = setTimeout(() => {
         if (focusRegionRef.current) return;
-        nativeMapRef.current?.animateToRegion(region, 1000);
+        if (!mountedRef.current) return; // se desmontó durante el setTimeout
+        if (!nativeMapRef.current) return;
+        try {
+          nativeMapRef.current.animateToRegion(region, 1000);
+        } catch (e) {
+          if (__DEV__) log.warn("animateToRegion (auto-fit) falló:", (e as Error)?.message);
+        }
       }, 700);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -792,7 +1072,11 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     const lng = target.coordinates?.lng ?? target.longitud ?? undefined;
     if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return;
     const region = makeFocusRegion(Number(lat), Number(lng));
-    nativeMapRef.current?.animateToRegion(region, 600);
+    try {
+      nativeMapRef.current?.animateToRegion(region, 600);
+    } catch (e) {
+      if (__DEV__) log.warn("animateToRegion (highlighted) falló:", (e as Error)?.message);
+    }
   }, [highlightedPropertyId]);
 
   if (Platform.OS === "web" && googleApiKey) {
@@ -830,16 +1114,122 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     []
   );
 
+  // ── LOG TEMPORAL DE DIAGNÓSTICO (crash iOS al entrar al mapa) ─────────────
+  // Vuelca TODO lo que llega al mapa: props, coords por propiedad, polígonos,
+  // pins, region y clústeres. Sirve para ver qué devuelve la búsqueda y detectar
+  // datos anómalos (coords faltantes/NaN, polígonos raros, etc.).
+  // ⚠️ ELIMINAR cuando se resuelva el crash de iOS.
+  const mapEntrySigRef = useRef<string>("");
+  useEffect(() => {
+    if (!__DEV__) return;
+    const sig = `${properties.length}|${confirmedPolygons?.length ?? 0}|${searchedLocationPins?.length ?? 0}|${draftPolygonPoints?.length ?? 0}`;
+    if (sig === mapEntrySigRef.current) return;
+    mapEntrySigRef.current = sig;
+
+    const coordsOf = (p: any) => ({
+      lat: p.coordinates?.lat ?? p.latitud ?? null,
+      lng: p.coordinates?.lng ?? p.longitud ?? null,
+    });
+    const sample = properties.slice(0, 10).map((p: any) => ({
+      id: p.id,
+      titulo: p.titulo,
+      ...coordsOf(p),
+      colonia: p.colonia,
+      municipio: p.municipio,
+      estado: p.estado,
+      tipo: p.tipo_propiedad,
+      valid: isValidCoord(coordsOf(p).lat, coordsOf(p).lng),
+    }));
+    const invalid = properties.filter((p: any) => {
+      const c = coordsOf(p);
+      return !isValidCoord(c.lat, c.lng);
+    });
+
+    log.warn(
+      `[MapEntry] properties=${properties.length} | conCoordsInvalidas=${invalid.length} | highlighted=${highlightedPropertyId ?? "-"} | drawingMode=${drawingMode}`,
+    );
+    log.warn(`[MapEntry] muestra (10 de ${properties.length}):`, JSON.stringify(sample, null, 2));
+    if (invalid.length > 0) {
+      log.warn(
+        "[MapEntry] PROPS CON COORDS INVÁLIDAS:",
+        JSON.stringify(
+          invalid.slice(0, 20).map((p: any) => ({
+            id: p.id,
+            titulo: p.titulo,
+            ...coordsOf(p),
+            raw_coordinates: p.coordinates,
+            raw_latitud: p.latitud,
+            raw_longitud: p.longitud,
+          })),
+          null,
+          2,
+        ),
+      );
+    }
+    if (properties.length > 0 && properties.length <= 40) {
+      log.warn(
+        "[MapEntry] TODAS las props (<=40):",
+        JSON.stringify(properties.map((p: any) => ({ id: p.id, ...coordsOf(p) })), null, 2),
+      );
+    }
+    log.warn(
+      "[MapEntry] confirmedPolygons:",
+      JSON.stringify(
+        (confirmedPolygons ?? []).map((poly, i) => ({
+          i,
+          vertices: poly?.length ?? 0,
+          valid: isValidPolygon(poly),
+          first: poly?.[0] ?? null,
+          last: poly?.[poly.length - 1] ?? null,
+        })),
+        null,
+        2,
+      ),
+    );
+    log.warn(
+      "[MapEntry] searchedLocationPins:",
+      JSON.stringify(searchedLocationPins ?? [], null, 2),
+    );
+    log.warn(
+      "[MapEntry] draftPolygonPoints:",
+      JSON.stringify(
+        (draftPolygonPoints ?? []).map((pt, i) => ({
+          i,
+          pt,
+          valid: isValidCoord(pt?.latitude, pt?.longitude),
+        })),
+        null,
+        2,
+      ),
+    );
+    log.warn("[MapEntry] focusRegion:", JSON.stringify(focusRegion ?? null));
+  }, [properties, confirmedPolygons, searchedLocationPins, draftPolygonPoints, highlightedPropertyId, drawingMode, focusRegion]);
+
+  // Log de montaje/desmontaje: si la pantalla entra/sale o el MapView se remonta
+  // por un key/X en un padre, se ve claramente aquí.
+  useEffect(() => {
+    if (!__DEV__) return;
+    log.warn("[MapEntry] PropertyMap MOUNT");
+    return () => log.warn("[MapEntry] PropertyMap UNMOUNT");
+  }, []);
+
   // 1) Cluster touch targets.
+  // NOTA: NO se renderean hasta que el MapView nativo haya disparado
+  // `onMapReady` (mapReady === true). Eso separa el commit de mount del
+  // MapView del commit de mount de sus children — clave para evitar el
+  // crash iOS del interop legacy de react-native-maps.
   const clusterTouchMarkers = useMemo(() => {
-    return clusters
+    if (!mapReady) return [] as React.ReactNode[];
+    const result = clusters
       .filter((c: any) => c.properties.cluster)
       .map((cluster: any) => {
         if (!cluster?.geometry?.coordinates) return null;
         const [lng, lat] = cluster.geometry.coordinates;
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-          // Render puro: solo loguear, no insertar en la BD desde el render
-          console.warn("[MapDebug] cluster_coord_invalida:", cluster.id, lat, lng);
+        if (!isValidCoord(lat, lng)) {
+          // Render puro: solo loguear, no insertar en la BD desde el render.
+          // El marker con coords inválidas NO se renderiza para evitar el
+          // crash iOS de `RCTLegacyViewManagerInteropComponentView`.
+          log.warn("[MapDebug] cluster_coord_invalida:", cluster.id, lat, lng);
           return null;
         }
         return (
@@ -854,62 +1244,91 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         );
       })
       .filter(Boolean) as React.ReactNode[];
+    // LOG TEMPORAL — diagnóstico crash iOS
+    if (__DEV__ && result.length > 0 && result.length < 20) {
+      log.debug(
+        `[MapDebug] clusterTouchMarkers=${result.length} (${clusters.filter((c: any) => c.properties.cluster).length} total clusters, ${clusters.length - result.length} filtrados como null)`,
+      );
+    }
+    return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clusters, handleClusterPressStable]);
+  }, [clusters, handleClusterPressStable, mapReady]);
 
   // 2) Individual property markers (invisibles, capturan el toque).
-  // NOTA: el onPress se construye dentro del .map y se reasigna por marker;
-  // eso NO genera churn masivo (cada `<Marker>` solo cambia su propio handler)
-  // porque cada Marker está memoizado por `key={p.id}`.
+  // El `onPress` se pasa a través de `handleIndividualMarkerPress` (estable,
+  // definido arriba) que lee refs internamente para no cambiar la identidad
+  // del handler entre renders. Esto evita que el interop de react-native-maps
+  // vea un cambio de prop en cada render y re-serialize el marker.
+  // También se difiere hasta `mapReady` (mismo motivo que clusterTouchMarkers).
   const individualPropertyMarkers = useMemo(() => {
-    return clusters
-      .filter((c: any) => !c.properties.cluster)
+    if (!mapReady) return [] as React.ReactNode[];
+    const candidates = clusters.filter((c: any) => !c.properties.cluster);
+    const result = candidates
       .map((point: any) => {
         const propertyId = point.properties.propertyId as string;
         const p = propertyMap.get(propertyId);
         if (!p) return null;
         const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
         const lng = p.coordinates?.lng ?? p.longitud ?? undefined;
-        if (lat === undefined || lng === undefined || isNaN(lat) || isNaN(lng)) return null;
+        if (!isValidCoord(lat, lng)) {
+          // LOG TEMPORAL — diagnóstico crash iOS
+          if (__DEV__) {
+            log.warn(
+              "[MapDebug] INDIVIDUAL_MARKER_COORD_INVALIDA:",
+              "id=", p.id,
+              "lat=", lat,
+              "lng=", lng,
+              "raw.coordinates=", JSON.stringify(p.coordinates),
+              "raw.latitud=", p.latitud,
+              "raw.longitud=", p.longitud,
+            );
+          }
+          return null;
+        }
+        const numLat = Number(lat);
+        const numLng = Number(lng);
         return (
           <Marker
             key={p.id}
-            coordinate={{ latitude: Number(lat), longitude: Number(lng) }}
-            onPress={() => {
-              // Si en esta misma coordenada hay varias propiedades (zoom
-              // cercano, sin agrupar), abrir el selector en vez de una sola.
-              const group = coincidentGroups.get(
-                coincidenceKey(Number(lat), Number(lng)),
-              );
-              if (group && group.length > 1 && onStackPress) {
-                if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
-                onStackPress(group);
-                return;
-              }
-              const r = makeFocusRegion(Number(lat), Number(lng));
-              nativeMapRef.current?.animateToRegion(r, 600);
-              if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
-              onMarkerPress(p.id, p);
-            }}
+            coordinate={{ latitude: numLat, longitude: numLng }}
+            onPress={() => handleIndividualMarkerPress(p.id, numLat, numLng, p)}
             opacity={0}
             tracksViewChanges={false}
           />
         );
       })
       .filter(Boolean) as React.ReactNode[];
+    // LOG TEMPORAL — diagnóstico crash iOS
+    if (__DEV__) {
+      const filtered = candidates.length - result.length;
+      log.debug(
+        `[MapDebug] individualPropertyMarkers=${result.length} (candidatos=${candidates.length}, filtrados=${filtered})`,
+      );
+      // Muestra hasta 3 props con sus coords (las primeras) para ver si hay algo raro
+      if (result.length > 0 && result.length <= 5) {
+        const ids = clusters
+          .filter((c: any) => !c.properties.cluster)
+          .slice(0, 3)
+          .map((c: any) => {
+            const p = propertyMap.get(c.properties.propertyId);
+            return p
+              ? { id: p.id, lat: p.coordinates?.lat ?? p.latitud, lng: p.coordinates?.lng ?? p.longitud, colonia: p.colonia, municipio: p.municipio, estado: (p as any).estado }
+              : { id: c.properties.propertyId, missing: true };
+          });
+        log.debug("[MapDebug] individualPropertyMarkers sample:", JSON.stringify(ids, null, 2));
+      }
+    }
+    return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clusters, propertyMap, coincidentGroups, onStackPress, onMarkerPress]);
+  }, [clusters, propertyMap, mapReady, handleIndividualMarkerPress]);
 
   // 3) Searched location pins (los del buscador de inicio / chips).
+  // También se difiere hasta `mapReady` (mismo motivo).
   const searchedLocationPinMarkers = useMemo(() => {
+    if (!mapReady) return [] as React.ReactNode[];
     if (!searchedLocationPins) return [] as React.ReactNode[];
-    return searchedLocationPins
-      .filter((pin) =>
-        Number.isFinite(pin.latitude) &&
-        Number.isFinite(pin.longitude) &&
-        Math.abs(pin.latitude) <= 90 &&
-        Math.abs(pin.longitude) <= 180
-      )
+    const result = searchedLocationPins
+      .filter((pin) => isValidCoord(pin.latitude, pin.longitude))
       .map((pin) => (
         <Marker
           key={`searched-pin-${pin.key}`}
@@ -920,19 +1339,94 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           tracksViewChanges={false}
         />
       ));
-  }, [searchedLocationPins]);
+    if (__DEV__ && result.length > 0) {
+      log.debug(
+        `[MapDebug] searchedLocationPinMarkers=${result.length} (input=${searchedLocationPins.length})`,
+      );
+    }
+    return result;
+  }, [searchedLocationPins, mapReady]);
+
+  // ── LOG TEMPORAL DE DIAGNÓSTICO — resumen de TODO lo que se renderiza como
+  // hijo del <MapView>. Cada cambio aquí equivale a un commit de Fabric que
+  // inserta/elimina annotations nativas. ⚠️ ELIMINAR cuando se resuelva el crash.
+  useEffect(() => {
+    if (!__DEV__) return;
+    log.warn(
+      `[MapRender] clusters=${clusterTouchMarkers.length} individuales=${individualPropertyMarkers.length} ` +
+        `pins=${searchedLocationPinMarkers.length} ` +
+        `polygonsValidos=${(confirmedPolygons ?? []).filter(isValidPolygon).length}/${confirmedPolygons?.length ?? 0} ` +
+        `draftPts=${draftPolygonPoints.length} mapReady=${mapReady}`,
+    );
+    // KEYS exactos de cada tipo de child del <MapView>. Si entre renders los
+    // keys se conservan, React reconcilia; si cambian, hay unmount/mount y por
+    // tanto mount/unmount de AIRMapMarker nativo → es justo el path que rompe
+    // el interop de Fabric en iOS. Si vemos keys que aparecen/desaparecen
+    // sin razón entre dos renders consecutivos, eso es lo que dispara el
+    // `insertObject:atIndex: nil`.
+    if (__DEV__) {
+      const ck = clusterTouchMarkers.map((m: any) => m?.key).slice(0, 30);
+      const ik = individualPropertyMarkers.map((m: any) => m?.key).slice(0, 30);
+      const pk = searchedLocationPinMarkers.map((m: any) => m?.key).slice(0, 30);
+      const fk = (draftPolygonPoints ?? [])
+        .map((_, i) => `vertex-${i}`)
+        .slice(0, 30);
+      const polK = (confirmedPolygons ?? [])
+        .map((_, i) => `confirmed-polygon-${i}`)
+        .slice(0, 30);
+      log.warn(
+        `[MapKeys] clusters=${JSON.stringify(ck)} individuales=${JSON.stringify(ik)} ` +
+          `pins=${JSON.stringify(pk)} draftVertices=${JSON.stringify(fk)} ` +
+          `polygons=${JSON.stringify(polK)}`,
+      );
+    }
+  }, [
+    clusterTouchMarkers,
+    individualPropertyMarkers,
+    searchedLocationPinMarkers,
+    confirmedPolygons,
+    draftPolygonPoints,
+    mapReady,
+  ]);
+
+  // Contador de renders del componente (sube con cada re-render). Útil para
+  // correlacionar logs de MapSearch con logs de PropertyMap cuando el flujo
+  // asíncrono genera muchos renders seguidos.
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+  if (__DEV__) {
+    if (renderCountRef.current === 1 || renderCountRef.current % 10 === 0) {
+      log.warn(`[MapRender] renderCount=${renderCountRef.current}`);
+    }
+  }
 
   return (
     <View style={styles.container}>
       <MapView
         ref={nativeMapRef}
         style={styles.mapNative}
+        onLayout={(e) => {
+          const { width, height } = e.nativeEvent.layout;
+          if (width > 0 && height > 0) {
+            setMapSize((prev) =>
+              prev && prev.width === width && prev.height === height
+                ? prev
+                : { width, height }
+            );
+          }
+        }}
         mapType={mapTypeId}
         provider={
           Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT
         }
         initialRegion={initialRegion}
-        onMapReady={() => setMapReady(true)}
+        onMapReady={() => {
+          if (__DEV__) log.warn("[MapEntry] onMapReady | initialRegion=", JSON.stringify(initialRegion));
+          setMapReady(true);
+          // Calibrar offset cuando el mapa está listo (puede haber un inset
+          // por safe area en iOS que el wrapper de RN no refleja).
+          calibrateOffset(true).catch(() => {});
+        }}
         onRegionChange={(region) => {
           regionRef.current = region;
           updateOverlayPositions(region);
@@ -941,6 +1435,10 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           regionRef.current = region;
           setCurrentRegion(region);
           updateOverlayPositions(region);
+          // Re-calibrar después de cada gesto completado, por si la UI del
+          // MKMapView (brújula, escala) cambió y eso afecta el offset entre
+          // wrapper y MKMapView nativo.
+          calibrateOffset().catch(() => {});
           log.debug(`onRegionChangeComplete: latDelta=${region.latitudeDelta.toFixed(3)} center=${region.latitude.toFixed(3)},${region.longitude.toFixed(3)}`);
         }}
         // Dibujando, un toque simple añade punto. Antes solo servía el long
@@ -966,7 +1464,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       >
         {/* Polígonos confirmados (múltiples) */}
         {confirmedPolygons.map((polygon, i) =>
-          polygon.length >= 3 ? (
+          isValidPolygon(polygon) ? (
             <Polygon
               key={`confirmed-polygon-${i}`}
               coordinates={polygon}
@@ -978,7 +1476,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         )}
 
         {/* Polígono en borrador */}
-        {draftPolygonPoints.length >= 2 && (
+        {isValidCoord(draftPolygonPoints[0]?.latitude, draftPolygonPoints[0]?.longitude) &&
+          draftPolygonPoints.length >= 2 && (
           <Polyline
             coordinates={draftPolygonPoints}
             strokeColor={COLORS.primary}
@@ -986,7 +1485,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
             lineDashPattern={DRAFT_DASH_PATTERN}
           />
         )}
-        {draftPolygonPoints.length >= 3 && (
+        {isValidPolygon(draftPolygonPoints) && draftPolygonPoints.length >= 3 && (
           <Polygon
             coordinates={draftPolygonPoints}
             fillColor="rgba(69,160,165,0.12)"
@@ -998,16 +1497,18 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         {/* Vértices del borrador. El primero cierra el polígono al tocarlo:
             en iOS el marker intercepta el toque y nunca llegaba al MapView,
             así que el "presiona el primer punto para cerrar" no funcionaba. */}
-        {draftPolygonPoints.map((pt, idx) => (
-          <DraftVertex
-            key={`vertex-${idx}`}
-            coord={pt}
-            isFirst={idx === 0}
-            // El primer vértice lleva onPress SIEMPRE (estable) para que iOS lo
-            // registre al crearse; no hace nada hasta que hay 3+ puntos.
-            onPress={idx === 0 ? handleFirstVertexPress : undefined}
-          />
-        ))}
+        {draftPolygonPoints.map((pt, idx) =>
+          isValidCoord(pt?.latitude, pt?.longitude) ? (
+            <DraftVertex
+              key={`vertex-${idx}`}
+              coord={pt}
+              isFirst={idx === 0}
+              // El primer vértice lleva onPress SIEMPRE (estable) para que iOS lo
+              // registre al crearse; no hace nada hasta que hay 3+ puntos.
+              onPress={idx === 0 ? handleFirstVertexPress : undefined}
+            />
+          ) : null,
+        )}
         {/* Invisible cluster touch targets. Memoizado por cluster-id para
             estabilizar la identidad: si la región se recalcula y un cluster
             mantiene su id, React reusa el mismo `<Marker>` (no se desmonta). */}
@@ -1095,8 +1596,12 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
             <Pressable
               onPress={() => {
                 if (Platform.OS !== "web")
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                onCloseDraftPolygon?.();
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                try {
+                  onCloseDraftPolygon?.();
+                } catch (e) {
+                  if (__DEV__) log.warn("onCloseDraftPolygon falló:", (e as Error)?.message);
+                }
               }}
               hitSlop={10}
               style={{
@@ -1167,7 +1672,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
                       onPress={() => {
                         setMapTypeId(option.id);
                         setMapTypeMenuOpen(false);
-                        if (Platform.OS !== "web") Haptics.selectionAsync();
+                        if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
                       }}
                     >
                       <OptionIcon size={14} />

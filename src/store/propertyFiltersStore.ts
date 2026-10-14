@@ -260,6 +260,17 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
         filters: {
           ...state.filters,
           locationChips: [...state.filters.locationChips, chip],
+          // FIX: poblar locationFilter con los datos del chip para que
+          // matchesLocationFilter() siga funcionando y el historial de
+          // búsquedas se guarde completo (sin esto, el locationFilter
+          // quedaba vacío y al restaurar desde historial se filtraba
+          // con criterios incorrectos).
+          locationFilter: {
+            estado: chip.locationFilter.estado || state.filters.locationFilter.estado,
+            ciudad: chip.locationFilter.ciudad || state.filters.locationFilter.ciudad,
+            municipio: chip.locationFilter.municipio || state.filters.locationFilter.municipio,
+            colonia: chip.locationFilter.colonia || state.filters.locationFilter.colonia,
+          },
         },
       })),
 
