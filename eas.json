@@ -8,6 +8,9 @@
       "channel": "preview",
       "distribution": "internal",
       "environment": "preview",
+      "ios": {
+        "prebuild": true
+      },
       "android": {
         "buildType": "apk"
       }
@@ -17,6 +20,9 @@
       "credentialsSource": "remote",
       "autoIncrement": true,
       "environment": "production",
+      "ios": {
+        "prebuild": true
+      },
       "android": {
         "buildType": "app-bundle"
       }
