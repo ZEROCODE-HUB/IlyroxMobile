@@ -406,6 +406,19 @@ export type HistorialBusqueda = {
   municipio: string | null;
   colonia: string | null;
   place_name: string | null;
+  /**
+   * Google Places placeId (real) o identificador del fallback de propiedades
+   * (formato "prop-..."). Permite al restaurar la busqueda centrar el mapa
+   * en el lugar exacto sin depender de geocoding generico.
+   */
+  place_id: string | null;
+  /**
+   * Latitud del centroide real (de la BD de propiedades) o de Google.
+   * Si esta presente, se usa directamente sin geocoding.
+   */
+  lat: number | null;
+  /** Longitud del centroide real o de Google. */
+  lng: number | null;
   tipo_propiedad: string | null;
   tipo_operacion: string | null;
   precio_min: number | null;

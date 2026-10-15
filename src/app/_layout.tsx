@@ -7,6 +7,7 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import {
   QueryClientProvider,
   focusManager,
@@ -262,9 +263,11 @@ export default function RootLayout() {
                 <ModalProvider>
                   <SafeInsetsProvider>
                     <BottomSheetModalProvider>
-                      <QueryClientProvider client={queryClient}>
-                        <RootLayoutNav />
-                      </QueryClientProvider>
+                      <KeyboardProvider>
+                        <QueryClientProvider client={queryClient}>
+                          <RootLayoutNav />
+                        </QueryClientProvider>
+                      </KeyboardProvider>
                     </BottomSheetModalProvider>
                   </SafeInsetsProvider>
                 </ModalProvider>

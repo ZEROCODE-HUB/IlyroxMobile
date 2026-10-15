@@ -14,14 +14,21 @@ import { PROPERTY_TYPES, TipoPrincipal } from "../../constants/propertyData";
 interface PropertyTypeSelectorProps {
   tipoPropiedad: string;
   subtipo: string[];
-  onChangeTipo: (tipo: string) => void;
+  /**
+   * Callback unificado para cambios que afectan tipo + subtipo al mismo tiempo
+   * (ej. toggle del chip de tipo). Esto evita renders intermedios con
+   * estado inconsistente (tipo="" pero subtipo con valores viejos) que pueden
+   * causar crashes en componentes nativos.
+   */
+  onChangeTipoYSubtipo: (tipo: string, subtipos: string[]) => void;
+  /** Solo para cambios de subtipo sin cambiar tipo. */
   onChangeSubtipo: (subtipos: string[]) => void;
 }
 
 export const PropertyTypeSelector: React.FC<PropertyTypeSelectorProps> = ({
   tipoPropiedad,
   subtipo,
-  onChangeTipo,
+  onChangeTipoYSubtipo,
   onChangeSubtipo,
 }) => {
   const [showSubtipoModal, setShowSubtipoModal] = React.useState(false);
@@ -55,13 +62,14 @@ export const PropertyTypeSelector: React.FC<PropertyTypeSelectorProps> = ({
                 // Toggle: si ya está seleccionado, deseleccionar (pasar string
                 // vacío). Si no, seleccionar este tipo. Al deseleccionar también
                 // limpiamos los subtipos porque no aplican sin tipo padre.
-                // `onChangeTipo` está tipado como `(tipo: string) => void`.
-                // Pasar "" es válido: el store lo trata como falsy en el
-                // filtro (`if (filters.tipoPropiedad && ...)`) y como valor
-                // por defecto inicial, exactamente igual que el estado sin
-                // filtro de tipo aplicado.
-                onChangeTipo(isSelected ? "" : tipo.value);
-                onChangeSubtipo([]);
+                // AMBOS cambios se aplican en un solo set atómico (vía
+                // onChangeTipoYSubtipo) para evitar renders intermedios con
+                // estado inconsistente (tipo="" pero subtipo con valores
+                // viejos) que pueden causar crashes en iOS.
+                onChangeTipoYSubtipo(
+                  isSelected ? "" : tipo.value,
+                  [],
+                );
               }}
             >
               <Text

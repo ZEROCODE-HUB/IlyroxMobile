@@ -325,7 +325,11 @@ export const usePropertyFilters = (
         p.type?.toString().toLowerCase() !== filters.tipoPropiedad.toLowerCase()
       ) return false;
 
-      if (filters.subtipo && filters.subtipo.length > 0) {
+      // Subtipo solo aplica si hay tipoPropiedad set. Esto es defensivo:
+      // con el fix atómico en PropertyTypeSelector (un solo set para tipo+subtipo)
+      // esto no debería pasar, pero si por algún error de flujo subtipo queda
+      // con valores sin tipo padre, no se filtra incorrectamente.
+      if (filters.tipoPropiedad && filters.subtipo && filters.subtipo.length > 0) {
         const propSubtipo = p.subtipo?.toString().toLowerCase();
         if (!filters.subtipo.some((s) => s.toLowerCase() === propSubtipo)) return false;
       }
@@ -542,6 +546,15 @@ export const usePropertyFilters = (
       return true;
     });
   }, [properties, filters, geofenceBounds]);
+
+  // DEBUG: log resultado del filtrado
+  console.log("[DEBUG usePropertyFilters]", {
+    inputCount: properties.length,
+    outputCount: filteredProperties.length,
+    chipsCount: filters.locationChips.length,
+    chips: filters.locationChips.map(c => ({ id: c.id, label: c.label, type: c.type })),
+    locationFilter: filters.locationFilter,
+  });
 
   const cf = filters.comercialFilters;
   const inf = filters.industrialFilters;

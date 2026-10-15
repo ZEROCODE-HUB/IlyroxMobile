@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
 } from "react-native";
 import {
-  KeyboardProvider,
   KeyboardAwareScrollView,
 } from "react-native-keyboard-controller";
 import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
@@ -79,13 +78,41 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   };
 
   // Estados para modals
-  const [showRecamarasModal, setShowRecamarasModal] = useState(false);
-  const [showBanosModal, setShowBanosModal] = useState(false);
-  const [showMediosBanosModal, setShowMediosBanosModal] = useState(false);
-  const [showEstacionamientosModal, setShowEstacionamientosModal] =
-    useState(false);
-  const [showNivelesModal, setShowNivelesModal] = useState(false);
-  const [showAntiguedadModal, setShowAntiguedadModal] = useState(false);
+  // Estado consolidado para todos los modales de selección.
+  // Buena práctica: un solo useState en lugar de 6, reduce renders y
+  // centraliza el control. Usa discriminated union para type-safety.
+  const [activeModal, setActiveModal] = useState<
+    | "recamaras"
+    | "banos"
+    | "mediosBanos"
+    | "estacionamientos"
+    | "niveles"
+    | "antiguedad"
+    | null
+  >(null);
+
+  // Helpers para abrir/cerrar modales por tipo
+  const openModal = (type: NonNullable<typeof activeModal>) => setActiveModal(type);
+  const closeModal = () => setActiveModal(null);
+  // Back-compat: variables con la misma firma para no tocar CharacteristicsSection
+  const setShowRecamarasModal = (show: boolean) =>
+    show ? openModal("recamaras") : closeModal();
+  const setShowBanosModal = (show: boolean) =>
+    show ? openModal("banos") : closeModal();
+  const setShowMediosBanosModal = (show: boolean) =>
+    show ? openModal("mediosBanos") : closeModal();
+  const setShowEstacionamientosModal = (show: boolean) =>
+    show ? openModal("estacionamientos") : closeModal();
+  const setShowNivelesModal = (show: boolean) =>
+    show ? openModal("niveles") : closeModal();
+  const setShowAntiguedadModal = (show: boolean) =>
+    show ? openModal("antiguedad") : closeModal();
+  const showRecamarasModal = activeModal === "recamaras";
+  const showBanosModal = activeModal === "banos";
+  const showMediosBanosModal = activeModal === "mediosBanos";
+  const showEstacionamientosModal = activeModal === "estacionamientos";
+  const showNivelesModal = activeModal === "niveles";
+  const showAntiguedadModal = activeModal === "antiguedad";
 
   // Number Input Modal
   const [showNumberInput, setShowNumberInput] = useState(false);
@@ -142,33 +169,32 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   return (
     <AppBottomSheet visible={visible} onClose={onClose}>
       <View style={styles.modalContent}>
-        <KeyboardProvider>
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <View>
-              <Text style={styles.modalTitle}>
-                {isEditMode ? "Editar búsqueda" : "Filtros de Búsqueda"}
-              </Text>
-              <Text style={styles.modalSubtitle}>
-                {isEditMode
-                  ? "Modifica los criterios y guarda los cambios"
-                  : "Ajusta los criterios para encontrar tu propiedad"}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={24} color={COLORS.textTertiary} />
-            </TouchableOpacity>
+        {/* Header */}
+        <View style={styles.modalHeader}>
+          <View>
+            <Text style={styles.modalTitle}>
+              {isEditMode ? "Editar búsqueda" : "Filtros de Búsqueda"}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {isEditMode
+                ? "Modifica los criterios y guarda los cambios"
+                : "Ajusta los criterios para encontrar tu propiedad"}
+            </Text>
           </View>
+          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <Ionicons name="close" size={24} color={COLORS.textTertiary} />
+          </TouchableOpacity>
+        </View>
 
-          <KeyboardAwareScrollView
-            showsVerticalScrollIndicator={false}
-            style={styles.modalScroll}
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
-            bottomOffset={100}
-            scrollEnabled={scrollEnabled}
-          >
+        <KeyboardAwareScrollView
+          showsVerticalScrollIndicator={false}
+          style={styles.modalScroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          bottomOffset={100}
+          scrollEnabled={scrollEnabled}
+        >
             {/* 1. TIPO DE OPERACIÓN (Venta y/o Renta) */}
             <View style={styles.formSection}>
               <Text style={styles.operacionLabel}>Tipo de Operación</Text>
@@ -230,7 +256,13 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
               <PropertyTypeSelector
                 tipoPropiedad={filters.tipoPropiedad}
                 subtipo={filters.subtipo}
-                onChangeTipo={(tipo) => onUpdateFilter("tipoPropiedad", tipo)}
+                // Cambio atómico: tipo + subtipo en un solo set para evitar
+                // renders intermedios con estado inconsistente.
+                onChangeTipoYSubtipo={(tipo, subtipo) => {
+                  usePropertyFiltersStore
+                    .getState()
+                    .updateFilters({ tipoPropiedad: tipo, subtipo });
+                }}
                 onChangeSubtipo={(subtipo) =>
                   onUpdateFilter("subtipo", subtipo)
                 }
@@ -311,7 +343,6 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
               </TouchableOpacity>
             )}
           </View>
-        </KeyboardProvider>
       </View>
 
       {/* Number Input Modal */}
