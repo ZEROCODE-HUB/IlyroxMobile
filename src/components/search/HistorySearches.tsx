@@ -38,24 +38,71 @@ export const HistorySearches: React.FC<HistorySearchesProps> = ({
     return null;
   }
 
-  const groupedItems: { busqueda: HistorialBusqueda; ids: string[] }[] = [];
+  // Genera una firma estable de la búsqueda (sin timestamps ni IDs).
+// Dos búsquedas son "iguales" si tienen el mismo nombre, tipo y los mismos
+// filtros que afectan el resultado (precio, tipo, operación, amenidades,
+// locationChips, polygons, filtros especializados).
+const buildSignature = (b: HistorialBusqueda): string => {
+  // Firma SIMPLE: solo los campos clave que identifican la búsqueda.
+  // No usamos filtros_completos porque contiene objetos con coordenadas
+  // exactas (bounds, polygons) que pueden variar entre runs y romper
+  // la agrupación. Si el usuario quiere diferenciar por filtros, lo
+  // hacemos por separado.
+  const normalize = (s: string | null | undefined) =>
+    (s ?? "").toLowerCase().trim();
+  return JSON.stringify({
+    tipo: b.tipo_busqueda,
+    query: normalize(b.query_original),
+    place_name: normalize(b.place_name),
+    estado: normalize(b.estado),
+    municipio: normalize(b.municipio),
+    colonia: normalize(typeof b.colonia === "string" ? b.colonia : ""),
+  });
+};
 
-  for (const busqueda of historial) {
-    const previous = groupedItems[groupedItems.length - 1];
-    const isSearch = busqueda.tipo_busqueda === 'draft' || busqueda.tipo_busqueda === null;
+const groupedItems: { busqueda: HistorialBusqueda; ids: string[] }[] = [];
 
-    if (
-      isSearch &&
-      busqueda.query_original &&
-      previous &&
-      previous.busqueda.tipo_busqueda === busqueda.tipo_busqueda &&
-      previous.busqueda.query_original === busqueda.query_original
-    ) {
-      previous.ids.push(busqueda.id);
-    } else {
-      groupedItems.push({ busqueda, ids: [busqueda.id] });
+for (const busqueda of historial) {
+  // Agrupar búsquedas: drafts (mientras se escribe) y ubicaciones guardadas
+  // (cuando se selecciona una zona). El resto (usuario/propiedad/post/reel)
+  // se agrupa por resultado_tipo_id.
+  const isSearch = busqueda.tipo_busqueda === 'draft' || busqueda.tipo_busqueda === null || busqueda.tipo_busqueda === 'ubicacion';
+
+  if (isSearch) {
+    // Búsquedas de ubicación: agrupar por firma completa (query + filtros)
+    const sig = buildSignature(busqueda);
+    const existing = groupedItems.find(
+      (g) => g.busqueda.tipo_busqueda === busqueda.tipo_busqueda &&
+             buildSignature(g.busqueda) === sig
+    );
+    if (existing) {
+      existing.ids.push(busqueda.id);
+      if (new Date(busqueda.updated_at) > new Date(existing.busqueda.updated_at)) {
+        existing.busqueda = busqueda;
+      }
+      continue;
+    }
+    groupedItems.push({ busqueda, ids: [busqueda.id] });
+    continue;
+  }
+
+  // Resultados (usuario, propiedad, post, reel, ubicacion): agrupar por
+  // (tipo_busqueda, resultado_tipo_id) — ej. "click en Daniel 5 veces" → 1 entrada.
+  if (busqueda.resultado_tipo_id) {
+    const existing = groupedItems.find(
+      (g) => g.busqueda.tipo_busqueda === busqueda.tipo_busqueda &&
+             g.busqueda.resultado_tipo_id === busqueda.resultado_tipo_id
+    );
+    if (existing) {
+      existing.ids.push(busqueda.id);
+      if (new Date(busqueda.updated_at) > new Date(existing.busqueda.updated_at)) {
+        existing.busqueda = busqueda;
+      }
+      continue;
     }
   }
+  groupedItems.push({ busqueda, ids: [busqueda.id] });
+}
 
   const displayedItems = showAll ? groupedItems : groupedItems.slice(0, 5);
 
@@ -208,7 +255,7 @@ export const HistorySearches: React.FC<HistorySearchesProps> = ({
     const subtitulo = getSubtitulo(item);
     const filtros = getFiltrosPreview(item);
     const iconName = getIcon(item);
-    
+
     return (
       <Pressable
         style={styles.item}

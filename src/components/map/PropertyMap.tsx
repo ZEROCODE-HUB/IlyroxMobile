@@ -463,6 +463,19 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
   const clusters = useMemo(() => {
     if (Platform.OS === "web") return [];
+    // Guard: si currentRegion es null o tiene NaN, retornar array vacío
+    // para evitar crash en supercluster.getClusters (que no valida internamente).
+    if (
+      !currentRegion ||
+      !Number.isFinite(currentRegion.latitude) ||
+      !Number.isFinite(currentRegion.longitude) ||
+      !Number.isFinite(currentRegion.latitudeDelta) ||
+      !Number.isFinite(currentRegion.longitudeDelta) ||
+      currentRegion.latitudeDelta <= 0 ||
+      currentRegion.longitudeDelta <= 0
+    ) {
+      return [];
+    }
     const zoom = latDeltaToZoom(currentRegion.latitudeDelta);
     const { latitude, longitude, latitudeDelta, longitudeDelta } = currentRegion;
     const bbox: [number, number, number, number] = [
@@ -1232,9 +1245,16 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           log.warn("[MapDebug] cluster_coord_invalida:", cluster.id, lat, lng);
           return null;
         }
+        // Key estable basado en coordenadas: cuando supercluster re-clusteriza
+        // (ej. cambio de zoom), el `cluster.id` cambia pero las coordenadas
+        // del centroide se mantienen similares. Usar coords como key evita
+        // que React desmonte/remonte el marker nativo en cada re-clustering,
+        // lo que es una causa conocida de crashes iOS en react-native-maps.
+        const stableKey = `cluster-${lat.toFixed(5)}-${lng.toFixed(5)}-${cluster.properties.point_count ?? 1}`;
         return (
           <Marker
-            key={`cluster-touch-${cluster.id}`}
+            key={stableKey}
+            identifier={stableKey}
             coordinate={{ latitude: lat, longitude: lng }}
             onPress={() => handleClusterPressStable(cluster.id)}
             tracksViewChanges={false}
@@ -1290,6 +1310,11 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         return (
           <Marker
             key={p.id}
+            // identifier estable por propiedad: React reconcilia el marker nativo
+            // (mismo AIRMapMarker) en lugar de desmontar/remontar. Esto evita
+            // el crash iOS de react-native-maps 1.20.x al re-add markers
+            // durante cambios rápidos de filtros.
+            identifier={`prop-${p.id}`}
             coordinate={{ latitude: numLat, longitude: numLng }}
             onPress={() => handleIndividualMarkerPress(p.id, numLat, numLng, p)}
             opacity={0}

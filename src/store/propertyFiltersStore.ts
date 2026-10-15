@@ -101,6 +101,14 @@ interface PropertyFiltersState {
     key: K,
     value: PropertyFilters[K],
   ) => void;
+  /**
+   * Actualiza múltiples campos en una sola operación atómica.
+   * Útil para evitar renders intermedios cuando un cambio lógico requiere
+   * tocar varios campos a la vez (ej. cambiar tipo de propiedad limpia
+   * subtipo en el mismo ciclo, evitando un render con estado inconsistente
+   * que puede causar crashes en componentes nativos).
+   */
+  updateFilters: (partial: Partial<PropertyFilters>) => void;
   updateLocationFilter: (location: PropertyFilters["locationFilter"]) => void;
   updateComercialFilter: <K extends keyof ComercialFilters>(key: K, value: ComercialFilters[K]) => void;
   updateIndustrialFilter: <K extends keyof IndustrialFilters>(key: K, value: IndustrialFilters[K]) => void;
@@ -163,6 +171,14 @@ export const initialAgricolaFilters: AgricolaFilters = {
   accesCamiones: false,
 };
 
+/**
+ * Máximo de chips de ubicación que se pueden acumular.
+ * Más allá de este límite, el rendimiento del filtrado cliente
+ * y la legibilidad de la UI se degradan. El usuario puede quitar
+ * chips con la X para liberar espacio.
+ */
+export const MAX_LOCATION_CHIPS = 5;
+
 const initialFilters: PropertyFilters = {
   tipoPropiedad: "",
   subtipo: [],
@@ -203,6 +219,11 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
     updateFilter: (key, value) =>
       set((state) => ({
         filters: { ...state.filters, [key]: value },
+      })),
+
+    updateFilters: (partial) =>
+      set((state) => ({
+        filters: { ...state.filters, ...partial },
       })),
 
     updateLocationFilter: (location) =>
@@ -256,23 +277,47 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
       })),
 
     addLocationChip: (chip) =>
-      set((state) => ({
-        filters: {
-          ...state.filters,
-          locationChips: [...state.filters.locationChips, chip],
-          // FIX: poblar locationFilter con los datos del chip para que
-          // matchesLocationFilter() siga funcionando y el historial de
-          // búsquedas se guarde completo (sin esto, el locationFilter
-          // quedaba vacío y al restaurar desde historial se filtraba
-          // con criterios incorrectos).
-          locationFilter: {
-            estado: chip.locationFilter.estado || state.filters.locationFilter.estado,
-            ciudad: chip.locationFilter.ciudad || state.filters.locationFilter.ciudad,
-            municipio: chip.locationFilter.municipio || state.filters.locationFilter.municipio,
-            colonia: chip.locationFilter.colonia || state.filters.locationFilter.colonia,
+      set((state) => {
+        // Límite máximo de chips acumulados. Esto evita que el cliente filtre
+        // demasiadas zonas a la vez (rendimiento) y mantiene la búsqueda
+        // acotada. El usuario debe quitar un chip (con la X) para agregar otro.
+        if (state.filters.locationChips.length >= MAX_LOCATION_CHIPS) {
+          console.log("[DEBUG addLocationChip] BLOQUEADO: límite de chips alcanzado", {
+            current: state.filters.locationChips.length,
+            max: MAX_LOCATION_CHIPS,
+          });
+          return state;
+        }
+        // DEBUG: log para diagnosticar acumulación de chips
+        const prevChipsCount = state.filters.locationChips.length;
+        const prevLocationFilter = { ...state.filters.locationFilter };
+        const next = {
+          filters: {
+            ...state.filters,
+            locationChips: [...state.filters.locationChips, chip],
+            // FIX: poblar locationFilter con los datos del chip para que
+            // matchesLocationFilter() siga funcionando y el historial de
+            // búsquedas se guarde completo (sin esto, el locationFilter
+            // quedaba vacío y al restaurar desde historial se filtraba
+            // con criterios incorrectos).
+            locationFilter: {
+              estado: chip.locationFilter.estado || state.filters.locationFilter.estado,
+              ciudad: chip.locationFilter.ciudad || state.filters.locationFilter.ciudad,
+              municipio: chip.locationFilter.municipio || state.filters.locationFilter.municipio,
+              colonia: chip.locationFilter.colonia || state.filters.locationFilter.colonia,
+            },
           },
-        },
-      })),
+        };
+        console.log("[DEBUG addLocationChip]", {
+          prevChipsCount,
+          prevChips: state.filters.locationChips.map(c => ({ id: c.id, label: c.label })),
+          newChip: { id: chip.id, label: chip.label, type: chip.type },
+          newChipsCount: next.filters.locationChips.length,
+          prevLocationFilter,
+          newLocationFilter: next.filters.locationFilter,
+        });
+        return next;
+      }),
 
     removeLocationChip: (id) =>
       set((state) => {

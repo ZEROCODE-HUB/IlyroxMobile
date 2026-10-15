@@ -379,6 +379,12 @@ export interface LocationSuggestionWithCount extends LocationSuggestion {
    * @deprecated Era el ID en Supabase Geo. Se mantiene como 0 para compat.
    */
   estado_id?: number;
+  /**
+   * Centroide de la zona (promedio de lat/lng de las propiedades).
+   * Solo se popula para resultados del fallback a la BD de propiedades.
+   * Se usa para centrar el mapa en el lugar EXACTO sin Google Geocoding.
+   */
+  centroide?: { lat: number; lng: number };
 }
 
 interface LocationSearchState {
@@ -473,6 +479,23 @@ function normalizeStateAbbrev(
     .replace(/\.$/, "")
     .trim();
   return map[key] ?? value;
+}
+
+// ── Normalización de nombres para deduplicación ─────────────────────────
+// Sufijos que se quitan al agrupar nombres similares en el algoritmo de
+// dedup. Solo se incluyen números romanos para que "Loretta" y "Loretta II"
+// se agrupen; cardinales (Norte/Sur) NO se incluyen para que las colonias
+// con dirección distinta NO se colapsen.
+const NORMALIZE_SUFFIXES = [
+  " ii", " iii", " iv", " v", " vi", " vii", " viii", " ix", " x",
+];
+
+function normalizeForMatch(name: string): string {
+  const n = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  for (const s of NORMALIZE_SUFFIXES) {
+    if (n.endsWith(s)) return n.slice(0, -s.length).trim();
+  }
+  return n;
 }
 
 export const useLocationSearchStore = create<LocationSearchState>((set, get) => ({
@@ -621,6 +644,16 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
               municipio_nombre: p.municipio ?? undefined,
               estado_nombre: p.estado ?? undefined,
               propertyCount: Number(p.total) || 0,
+              // Centroide (promedio de lat/lng de las propiedades de esta zona).
+              // Se usa para centrar el mapa en el lugar EXACTO sin depender
+              // de Google Place Details ni Geocoding.
+              centroide:
+                p.lat_centroide != null && p.lng_centroide != null
+                  ? {
+                      lat: Number(p.lat_centroide),
+                      lng: Number(p.lng_centroide),
+                    }
+                  : undefined,
             }));
 
           combined = [...combined, ...propSuggestions];
@@ -630,18 +663,6 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
       // ── NORMALIZAR NOMBRES SIMILARES ──────────────────────────────────
       // Cuando un resultado de la BD (ej. "Loretta") y uno de Google (ej. "Loretta II")
       // son essentially la misma zona, agruparlos y conservar el MEJOR de ambos.
-      // Criterio: mismo estado, y un nombre contiene al otro (sin distinción de
-      // número romano / cardinal / "II", "III", "Norte", "Sur", etc.)
-      const NORMALIZE_SUFFIXES = [
-        " ii", " iii", " iv", " v", " vi", " vii", " viii", " ix", " x",
-      ];
-      function normalizeForMatch(name: string): string {
-        const n = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        for (const s of NORMALIZE_SUFFIXES) {
-          if (n.endsWith(s)) return n.slice(0, -s.length).trim();
-        }
-        return n;
-      }
       const seenRoots = new Map<string, number>(); // root → first index
       const normalized: typeof combined = [];
       for (let i = 0; i < combined.length; i++) {
@@ -671,31 +692,35 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
       // Normalizar acentos para que "Nicolás" == "Nicolas" (el usuario escribe sin acentos)
       const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
       const q = norm(searchTerm);
-      const withScore = combined.map((s) => {
+      // Calcular scores en un array paralelo en lugar de mutar el item.
+      // Así el item final no arrastra _score (propiedad interna del sort).
+      const scores = combined.map((s) => {
         const name = norm(s.name);
-        const score = name === q ? 0
+        return name === q ? 0
           : name.startsWith(q) ? 1
           : name.includes(q) ? 2
           : 3;
-        return { ...s, _score: score };
       });
       // La pertenencia geográfica es el criterio PRINCIPAL (partición
       // dura), el score de texto ordena dentro de cada grupo. Así los
       // resultados del estado del usuario quedan TODOS agrupados antes que
       // los de fuera (nunca intercalados), y un match exacto de texto fuera
       // del estado ya no le gana a un resultado local (caso "Rosello").
-      const ranked = withScore.sort((a, b) => {
-        if (effectiveEstado) {
-          const aLocal = a.estado_nombre?.toLowerCase() === effectiveEstado.toLowerCase();
-          const bLocal = b.estado_nombre?.toLowerCase() === effectiveEstado.toLowerCase();
-          if (aLocal !== bLocal) return aLocal ? -1 : 1;
-        }
-        return a._score - b._score;
-      });
+      const indexed = combined.map((s, i) => ({ s, i }));
+      const ranked = indexed
+        .sort((a, b) => {
+          if (effectiveEstado) {
+            const aLocal = a.s.estado_nombre?.toLowerCase() === effectiveEstado.toLowerCase();
+            const bLocal = b.s.estado_nombre?.toLowerCase() === effectiveEstado.toLowerCase();
+            if (aLocal !== bLocal) return aLocal ? -1 : 1;
+          }
+          return scores[a.i] - scores[b.i];
+        })
+        .map(({ s }) => s);
 
       // Mostrar las sugerencias de inmediato (y quitar el spinner); el conteo
       // se rellena después sin bloquear la UI.
-      set({ suggestions: ranked, isLoading: false });
+      set({ suggestions: ranked });
 
       // Conteo de propiedades por zona (diferido, no bloquea la UI).
       // Se cuenta usando la JERARQUÍA de la sugerencia (nombre + municipio +

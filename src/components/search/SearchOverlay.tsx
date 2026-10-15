@@ -157,15 +157,30 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
           touchTimestamp(busqueda.id, userId!);
           setCurrentSearchId(busqueda.id);
           usePropertyFiltersStore.getState().setFiltersFromHistory(busqueda as any);
-          // Restaurar selectedLocation desde historial para que el mapa se centre correctamente
+          // Restaurar selectedLocation desde historial para que el mapa se centre correctamente.
+          // Si el historial tiene placeId/centroide, se usan para que el mapa
+          // se centre en el lugar exacto sin geocoding generico (que podria
+          // devolver un lugar equivocado, ej. "Tamarindos" en Guerrero).
           if (busqueda.place_name || busqueda.estado) {
-            setSelectedLocation({
-              type: busqueda.colonia ? 'colonia' : (busqueda.municipio ? 'municipio' : 'estado'),
+            const restored = {
+              type: busqueda.colonia ? 'colonia' : (busqueda.municipio ? 'municipio' : 'estado') as 'estado' | 'municipio' | 'colonia',
               name: busqueda.place_name || busqueda.query_original || '',
               estado_id: 0,
               municipio_nombre: busqueda.municipio || '',
               estado_nombre: busqueda.estado || '',
+              placeId: busqueda.place_id ?? undefined,
+              lat: busqueda.lat ?? undefined,
+              lng: busqueda.lng ?? undefined,
+            };
+            console.log("[DEBUG SearchOverlay] Restaurando busqueda:", {
+              busquedaId: busqueda.id,
+              hasPlaceId: !!busqueda.place_id,
+              hasLatLng: busqueda.lat != null && busqueda.lng != null,
+              lat: busqueda.lat,
+              lng: busqueda.lng,
+              restored,
             });
+            setSelectedLocation(restored);
           }
           router.push('/map');
           break;
@@ -186,7 +201,9 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
       touchTimestamp(busqueda.id, userId!);
       setCurrentSearchId(busqueda.id);
       usePropertyFiltersStore.getState().setFiltersFromHistory(busqueda as any);
-      // Restaurar selectedLocation desde historial para que el mapa se centre correctamente
+      // Restaurar selectedLocation desde historial. Si tiene placeId/centroide
+      // guardados, se usan para que el mapa se centre en el lugar exacto sin
+      // geocoding generico (que podria devolver un lugar equivocado).
       if (busqueda.place_name || busqueda.estado) {
         setSelectedLocation({
           type: busqueda.colonia ? 'colonia' : (busqueda.municipio ? 'municipio' : 'estado'),
@@ -194,6 +211,9 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
           estado_id: 0,
           municipio_nombre: busqueda.municipio || '',
           estado_nombre: busqueda.estado || '',
+          placeId: busqueda.place_id ?? undefined,
+          lat: busqueda.lat ?? undefined,
+          lng: busqueda.lng ?? undefined,
         });
       }
       router.push('/map');

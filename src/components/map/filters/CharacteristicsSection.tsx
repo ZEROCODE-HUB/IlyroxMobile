@@ -62,259 +62,263 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
   );
   const onUpdateFilter = usePropertyFiltersStore((s) => s.updateFilter);
 
-  if (!filters.tipoPropiedad) return null;
-
   const isTerreno = esTerreno(filters.subtipo);
 
   return (
     <View style={styles.formSection}>
       <Text style={styles.sectionLabel}>Características</Text>
 
-      {/* Recámaras */}
-      {camposVisibles.recamaras && (
+      {/* Renderizar siempre el contenedor para evitar re-mounts al cambiar
+          tipoPropiedad. Sin tipoPropiedad, no hay nada que mostrar. */}
+      {!filters.tipoPropiedad ? null : (
         <>
-          <Text style={styles.label}>
-            {getLabelRecamaras(filters.tipoPropiedad as TipoPrincipal)}
-          </Text>
-          <TouchableOpacity
-            style={styles.selector}
-            onPress={() => setShowRecamarasModal(true)}
-          >
-            <Text style={styles.selectorText}>
-              {filters.habitaciones || "Cualquiera"}
-            </Text>
-            <Ionicons
-              name="chevron-down"
-              size={20}
-              color={COLORS.textTertiary}
-            />
-          </TouchableOpacity>
-          <SelectionMoreModal
-            visible={showRecamarasModal}
-            onClose={() => setShowRecamarasModal(false)}
-            onSelect={(val) => {
-              onUpdateFilter("habitaciones", val);
-            }}
-            title={getLabelRecamaras(filters.tipoPropiedad as TipoPrincipal)}
-            currentValue={filters.habitaciones}
-          />
-        </>
-      )}
+          {/* Recámaras */}
+          {camposVisibles.recamaras && (
+            <>
+              <Text style={styles.label}>
+                {getLabelRecamaras(filters.tipoPropiedad as TipoPrincipal)}
+              </Text>
+              <TouchableOpacity
+                style={styles.selector}
+                onPress={() => setShowRecamarasModal(true)}
+              >
+                <Text style={styles.selectorText}>
+                  {filters.habitaciones || "Cualquiera"}
+                </Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={20}
+                  color={COLORS.textTertiary}
+                />
+              </TouchableOpacity>
+              <SelectionMoreModal
+                visible={showRecamarasModal}
+                onClose={() => setShowRecamarasModal(false)}
+                onSelect={(val) => {
+                  onUpdateFilter("habitaciones", val);
+                }}
+                title={getLabelRecamaras(filters.tipoPropiedad as TipoPrincipal)}
+                currentValue={filters.habitaciones}
+              />
+            </>
+          )}
 
-      {/* Baños */}
-      {camposVisibles.banos && (
-        <>
-          <Text style={[styles.label, { marginTop: 12 }]}>Baños</Text>
-          <TouchableOpacity
-            style={styles.selector}
-            onPress={() => setShowBanosModal(true)}
-          >
-            <Text style={styles.selectorText}>
-              {filters.banos || "Cualquiera"}
-            </Text>
-            <Ionicons
-              name="chevron-down"
-              size={20}
-              color={COLORS.textTertiary}
-            />
-          </TouchableOpacity>
-          <SelectionMoreModal
-            visible={showBanosModal}
-            onClose={() => setShowBanosModal(false)}
-            onSelect={(val) => {
-              onUpdateFilter("banos", val);
-            }}
-            title="Baños"
-            currentValue={filters.banos}
-          />
-        </>
-      )}
+          {/* Baños */}
+          {camposVisibles.banos && (
+            <>
+              <Text style={[styles.label, { marginTop: 12 }]}>Baños</Text>
+              <TouchableOpacity
+                style={styles.selector}
+                onPress={() => setShowBanosModal(true)}
+              >
+                <Text style={styles.selectorText}>
+                  {filters.banos || "Cualquiera"}
+                </Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={20}
+                  color={COLORS.textTertiary}
+                />
+              </TouchableOpacity>
+              <SelectionMoreModal
+                visible={showBanosModal}
+                onClose={() => setShowBanosModal(false)}
+                onSelect={(val) => {
+                  onUpdateFilter("banos", val);
+                }}
+                title="Baños"
+                currentValue={filters.banos}
+              />
+            </>
+          )}
 
-      {/* Medios baños */}
-      {camposVisibles.mediosBanos && (
-        <>
-          <Text style={[styles.label, { marginTop: 12 }]}>Medios baños</Text>
-          <TouchableOpacity
-            style={styles.selector}
-            onPress={() => setShowMediosBanosModal(true)}
-          >
-            <Text style={styles.selectorText}>
-              {filters.mediosBanos || "Cualquiera"}
-            </Text>
-            <Ionicons
-              name="chevron-down"
-              size={20}
-              color={COLORS.textTertiary}
-            />
-          </TouchableOpacity>
-          <SelectionMoreModal
-            visible={showMediosBanosModal}
-            onClose={() => setShowMediosBanosModal(false)}
-            onSelect={(val) => {
-              onUpdateFilter("mediosBanos", val);
-            }}
-            title="Medios baños"
-            currentValue={filters.mediosBanos}
-          />
-        </>
-      )}
+          {/* Medios baños */}
+          {camposVisibles.mediosBanos && (
+            <>
+              <Text style={[styles.label, { marginTop: 12 }]}>Medios baños</Text>
+              <TouchableOpacity
+                style={styles.selector}
+                onPress={() => setShowMediosBanosModal(true)}
+              >
+                <Text style={styles.selectorText}>
+                  {filters.mediosBanos || "Cualquiera"}
+                </Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={20}
+                  color={COLORS.textTertiary}
+                />
+              </TouchableOpacity>
+              <SelectionMoreModal
+                visible={showMediosBanosModal}
+                onClose={() => setShowMediosBanosModal(false)}
+                onSelect={(val) => {
+                  onUpdateFilter("mediosBanos", val);
+                }}
+                title="Medios baños"
+                currentValue={filters.mediosBanos}
+              />
+            </>
+          )}
 
-      {/* Estacionamientos */}
-      {camposVisibles.estacionamientos && (
-        <>
-          <Text style={[styles.label, { marginTop: 12 }]}>
-            Estacionamientos
-          </Text>
-          <TouchableOpacity
-            style={styles.selector}
-            onPress={() => setShowEstacionamientosModal(true)}
-          >
-            <Text style={styles.selectorText}>
-              {filters.estacionamientos || "Cualquiera"}
-            </Text>
-            <Ionicons
-              name="chevron-down"
-              size={20}
-              color={COLORS.textTertiary}
-            />
-          </TouchableOpacity>
-          <SelectionMoreModal
-            visible={showEstacionamientosModal}
-            onClose={() => setShowEstacionamientosModal(false)}
-            onSelect={(val) => {
-              onUpdateFilter("estacionamientos", val);
-            }}
-            title="Estacionamientos"
-            currentValue={filters.estacionamientos}
-          />
-        </>
-      )}
+          {/* Estacionamientos */}
+          {camposVisibles.estacionamientos && (
+            <>
+              <Text style={[styles.label, { marginTop: 12 }]}>
+                Estacionamientos
+              </Text>
+              <TouchableOpacity
+                style={styles.selector}
+                onPress={() => setShowEstacionamientosModal(true)}
+              >
+                <Text style={styles.selectorText}>
+                  {filters.estacionamientos || "Cualquiera"}
+                </Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={20}
+                  color={COLORS.textTertiary}
+                />
+              </TouchableOpacity>
+              <SelectionMoreModal
+                visible={showEstacionamientosModal}
+                onClose={() => setShowEstacionamientosModal(false)}
+                onSelect={(val) => {
+                  onUpdateFilter("estacionamientos", val);
+                }}
+                title="Estacionamientos"
+                currentValue={filters.estacionamientos}
+              />
+            </>
+          )}
 
-      {/* Niveles */}
-      {camposVisibles.niveles && (
-        <>
-          <Text style={[styles.label, { marginTop: 12 }]}>Niveles</Text>
-          <TouchableOpacity
-            style={styles.selector}
-            onPress={() => setShowNivelesModal(true)}
-          >
-            <Text style={styles.selectorText}>
-              {filters.niveles ? formatNivelLabel(filters.niveles) : "Cualquiera"}
-            </Text>
-            <Ionicons
-              name="chevron-down"
-              size={20}
-              color={COLORS.textTertiary}
-            />
-          </TouchableOpacity>
-          <SelectionMoreModal
-            visible={showNivelesModal}
-            onClose={() => setShowNivelesModal(false)}
-            onSelect={(val) => {
-              onUpdateFilter("niveles", val);
-            }}
-            title="Niveles"
-            quantityLabel="Plantas"
-            minQuantity={1}
-            currentValue={filters.niveles}
-          />
-        </>
-      )}
+          {/* Niveles */}
+          {camposVisibles.niveles && (
+            <>
+              <Text style={[styles.label, { marginTop: 12 }]}>Niveles</Text>
+              <TouchableOpacity
+                style={styles.selector}
+                onPress={() => setShowNivelesModal(true)}
+              >
+                <Text style={styles.selectorText}>
+                  {filters.niveles ? formatNivelLabel(filters.niveles) : "Cualquiera"}
+                </Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={20}
+                  color={COLORS.textTertiary}
+                />
+              </TouchableOpacity>
+              <SelectionMoreModal
+                visible={showNivelesModal}
+                onClose={() => setShowNivelesModal(false)}
+                onSelect={(val) => {
+                  onUpdateFilter("niveles", val);
+                }}
+                title="Niveles"
+                quantityLabel="Plantas"
+                minQuantity={1}
+                currentValue={filters.niveles}
+              />
+            </>
+          )}
 
-      {/* Antigüedad */}
-      {camposVisibles.antiguedad && (
-        <>
-          <Text style={[styles.label, { marginTop: 12 }]}>Antigüedad</Text>
-          <TouchableOpacity
-            style={styles.selector}
-            onPress={() => setShowAntiguedadModal(true)}
-          >
-            <Text style={styles.selectorText}>
-              {filters.antiguedad || "Cualquiera"}
-            </Text>
-            <Ionicons
-              name="chevron-down"
-              size={20}
-              color={COLORS.textTertiary}
-            />
-          </TouchableOpacity>
-          <SelectionModal
-            visible={showAntiguedadModal}
-            onClose={() => setShowAntiguedadModal(false)}
-            onSelect={(val) => {
-              if (val === "Más de 50" || val.includes("Más")) {
-                setShowAntiguedadModal(false);
-                openNumberInput("Antigüedad", (value) => {
-                  onUpdateFilter("antiguedad", value);
-                  setShowNumberInput(false);
-                });
-              } else {
-                onUpdateFilter("antiguedad", val);
-              }
-            }}
-            title="Antigüedad"
-            options={[
-              "No indicado",
-              "0 (Nueva)",
-              "1-5",
-              "6-10",
-              "11-20",
-              "21-50",
-              "Más de 50",
-            ]}
-            currentValue={filters.antiguedad}
-          />
-        </>
-      )}
+          {/* Antigüedad */}
+          {camposVisibles.antiguedad && (
+            <>
+              <Text style={[styles.label, { marginTop: 12 }]}>Antigüedad</Text>
+              <TouchableOpacity
+                style={styles.selector}
+                onPress={() => setShowAntiguedadModal(true)}
+              >
+                <Text style={styles.selectorText}>
+                  {filters.antiguedad || "Cualquiera"}
+                </Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={20}
+                  color={COLORS.textTertiary}
+                />
+              </TouchableOpacity>
+              <SelectionModal
+                visible={showAntiguedadModal}
+                onClose={() => setShowAntiguedadModal(false)}
+                onSelect={(val) => {
+                  if (val === "Más de 50" || val.includes("Más")) {
+                    setShowAntiguedadModal(false);
+                    openNumberInput("Antigüedad", (value) => {
+                      onUpdateFilter("antiguedad", value);
+                      setShowNumberInput(false);
+                    });
+                  } else {
+                    onUpdateFilter("antiguedad", val);
+                  }
+                }}
+                title="Antigüedad"
+                options={[
+                  "No indicado",
+                  "0 (Nueva)",
+                  "1-5",
+                  "6-10",
+                  "11-20",
+                  "21-50",
+                  "Más de 50",
+                ]}
+                currentValue={filters.antiguedad}
+              />
+            </>
+          )}
 
-      {/* Superficies */}
-      <View style={[styles.row, { marginTop: 12 }]}>
-        {camposVisibles.m2Terreno && (
-          <View style={styles.halfWidth}>
-            <Text style={styles.label}>m² Terreno Mín.</Text>
-            <AppInput
-              value={filters.m2TerrenoMin}
-              onChangeText={(val) => onUpdateFilter("m2TerrenoMin", val)}
-              keyboardType="numeric"
-              placeholder="Mínimo"
-            />
+          {/* Superficies */}
+          <View style={[styles.row, { marginTop: 12 }]}>
+            {camposVisibles.m2Terreno && (
+              <View style={styles.halfWidth}>
+                <Text style={styles.label}>m² Terreno Mín.</Text>
+                <AppInput
+                  value={filters.m2TerrenoMin}
+                  onChangeText={(val) => onUpdateFilter("m2TerrenoMin", val)}
+                  keyboardType="numeric"
+                  placeholder="Mínimo"
+                />
+              </View>
+            )}
+            {camposVisibles.m2Construccion && (
+              <View style={styles.halfWidth}>
+                <Text style={styles.label}>m² Constr. Mín.</Text>
+                <AppInput
+                  value={filters.m2ConstruccionMin}
+                  onChangeText={(val) => onUpdateFilter("m2ConstruccionMin", val)}
+                  keyboardType="numeric"
+                  placeholder="Mínimo"
+                />
+              </View>
+            )}
           </View>
-        )}
-        {camposVisibles.m2Construccion && (
-          <View style={styles.halfWidth}>
-            <Text style={styles.label}>m² Constr. Mín.</Text>
-            <AppInput
-              value={filters.m2ConstruccionMin}
-              onChangeText={(val) => onUpdateFilter("m2ConstruccionMin", val)}
-              keyboardType="numeric"
-              placeholder="Mínimo"
-            />
-          </View>
-        )}
-      </View>
 
-      {/* Dimensiones del terreno (frente/fondo), solo terrenos */}
-      {isTerreno && (
-        <View style={styles.row}>
-          <View style={styles.halfWidth}>
-            <Text style={styles.label}>Frente (m) mín.</Text>
-            <AppInput
-              value={filters.anchoTerrenoMin}
-              onChangeText={(val) => onUpdateFilter("anchoTerrenoMin", val)}
-              keyboardType="numeric"
-              placeholder="Mínimo"
-            />
-          </View>
-          <View style={styles.halfWidth}>
-            <Text style={styles.label}>Fondo (m) mín.</Text>
-            <AppInput
-              value={filters.largoTerrenoMin}
-              onChangeText={(val) => onUpdateFilter("largoTerrenoMin", val)}
-              keyboardType="numeric"
-              placeholder="Mínimo"
-            />
-          </View>
-        </View>
+          {/* Dimensiones del terreno (frente/fondo), solo terrenos */}
+          {isTerreno && (
+            <View style={styles.row}>
+              <View style={styles.halfWidth}>
+                <Text style={styles.label}>Frente (m) mín.</Text>
+                <AppInput
+                  value={filters.anchoTerrenoMin}
+                  onChangeText={(val) => onUpdateFilter("anchoTerrenoMin", val)}
+                  keyboardType="numeric"
+                  placeholder="Mínimo"
+                />
+              </View>
+              <View style={styles.halfWidth}>
+                <Text style={styles.label}>Fondo (m) mín.</Text>
+                <AppInput
+                  value={filters.largoTerrenoMin}
+                  onChangeText={(val) => onUpdateFilter("largoTerrenoMin", val)}
+                  keyboardType="numeric"
+                  placeholder="Mínimo"
+                />
+              </View>
+            </View>
+          )}
+        </>
       )}
     </View>
   );
@@ -328,6 +332,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: COLORS.primaryDark,
+    marginBottom: 16,
   },
   label: {
     fontSize: 14,

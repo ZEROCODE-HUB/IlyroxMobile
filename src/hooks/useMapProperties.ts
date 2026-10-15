@@ -359,6 +359,13 @@ export function useMapProperties(serverFilters?: MapServerFilters) {
       ? JSON.stringify(serverFilters)
       : "default";
 
+  // DEBUG: log filtros enviados al servidor
+  console.log("[DEBUG useMapProperties] filtros:", {
+    filterKey,
+    serverFilters: serverFilters ?? null,
+    hasActive: serverFilters ? hasActiveServerFilters(serverFilters) : false,
+  });
+
   return useQuery({
     queryKey: [BASE_KEY, filterKey, currentUserId ?? "anon"],
     queryFn: () => fetchMapProperties(serverFilters, currentUserId),

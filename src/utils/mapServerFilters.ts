@@ -28,9 +28,17 @@ export function extractServerFilters(filters: StoreFilters): MapServerFilters {
 
   // Ubicación base (texto libre legacy). Los chips y polígonos se filtran en
   // cliente; aquí solo pasa el locationFilter base si estuviera poblado.
+  //
+  // IMPORTANTE: si hay chips de ubicación acumulados, NO enviamos municipio al
+  // server. Razón: cada chip sobrescribe locationFilter con su propio municipio,
+  // pero al acumular chips de distintos municipios (ej. Ruscello en Jesús María
+  // + Tamarindos en Aguascalientes) el server filtraría por uno solo, dejando
+  // fuera las props del otro. El filtrado fino por chip se hace en el cliente.
   const loc = filters.locationFilter;
   if (loc.estado) f.estado = loc.estado;
-  if (loc.municipio) f.municipio = loc.municipio;
+  if (loc.municipio && filters.locationChips.length <= 1) {
+    f.municipio = loc.municipio;
+  }
 
   if (filters.habitaciones && filters.habitaciones !== "No indicado") {
     const n = parseInt(filters.habitaciones);

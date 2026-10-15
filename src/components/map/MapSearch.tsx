@@ -31,6 +31,7 @@ import {
   PolygonCoord,
   LocationChip,
   usePropertyFiltersStore,
+  MAX_LOCATION_CHIPS,
 } from "@/store/propertyFiltersStore";
 import {
   useLocationSearchStore,
@@ -230,7 +231,10 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   // selectedLocation viene del contexto (home page). Si tiene placeId, usa Place Details
   // directamente para obtener los bounds. Si no, usa Geocoding API como fallback.
   useEffect(() => {
-    const cancelledRef = { current: false };
+    // Cleanup-based cancellation: cuando selectedLocation cambia, el effect
+    // anterior se cancela antes de que el nuevo corra. Esto evita race
+    // conditions donde respuestas obsoletas sobrescriben el estado.
+    let cancelled = false;
 
     if (!selectedLocation) {
       setFocusRegion(null);
@@ -248,11 +252,29 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     const addSelectedAsChip = async (
       bounds?: { north: number; south: number; east: number; west: number },
     ) => {
+      // DEBUG: log cuando se agrega el chip
+      console.log("[DEBUG addSelectedAsChip] ENTRADA:", {
+        selKey,
+        bounds,
+        selType: sel.type,
+        selName: sel.name,
+        selPlaceId: sel.placeId,
+        selEstado: sel.estado_nombre,
+        selMunicipio: sel.municipio_nombre,
+      });
       if (addedSelectedChipRef.current === selKey) return;
       addedSelectedChipRef.current = selKey;
       const chipId = `selected-${selKey}`;
       const existing = usePropertyFiltersStore.getState().filters.locationChips;
       if (existing.some((c) => c.id === chipId)) return;
+      // Límite máximo de chips: si ya hay MAX, no agregar y avisar al usuario
+      if (existing.length >= MAX_LOCATION_CHIPS) {
+        showToast(
+          `Máximo ${MAX_LOCATION_CHIPS} ubicaciones. Quita una para agregar otra.`,
+          "warning",
+        );
+        return;
+      }
       const chip: LocationChip = {
         id: chipId,
         label: sel.name,
@@ -275,6 +297,11 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           municipio: sel.municipio_nombre || (sel.type === "municipio" ? sel.name : undefined),
           colonia: sel.type === "colonia" ? sel.name : undefined,
           placeName: sel.name,
+          // Guardar el placeId/centroide para que al restaurar la busqueda
+          // el mapa pueda centrarse en el lugar exacto sin geocoding.
+          placeId: sel.placeId,
+          lat: sel.lat,
+          lng: sel.lng,
         }, userId).catch((e) => {
           log.warn('Error guardando ubicación en historial:', e);
         });
@@ -282,14 +309,66 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     };
 
     const geocode = async () => {
-      if (cancelledRef.current) return;
+      if (cancelled) return;
       try {
         if (!googleApiKey) return;
+
+        // DEBUG: inicio de geocode
+        console.log("[DEBUG geocode] INICIO:", {
+          placeId: sel.placeId,
+          isPlaceIdSynthetic: sel.placeId?.startsWith("prop-") ?? false,
+          hasExplicitCoords: typeof sel.lat === "number" && typeof sel.lng === "number",
+          lat: sel.lat,
+          lng: sel.lng,
+          name: sel.name,
+          estado: sel.estado_nombre,
+          municipio: sel.municipio_nombre,
+          // Debug adicional: ¿se restauró desde historial?
+          source: (sel as any)._source,
+        });
+
+        // ── Prioridad 1: coordenadas explícitas (centroide de la BD) ──
+        // Si el lugar viene del fallback a la BD de propiedades, ya tenemos
+        // las coordenadas exactas del centroide. Las usamos directamente,
+        // sin pasar por Google Place Details ni Geocoding.
+        if (typeof sel.lat === "number" && typeof sel.lng === "number") {
+          const delta = 0.03; // ~3km, suficiente para colonias
+          const region = {
+            latitude: sel.lat,
+            longitude: sel.lng,
+            latitudeDelta: delta,
+            longitudeDelta: delta,
+          };
+          // Construir un recuadro (bounds) alrededor del centroide para el chip.
+          const centroidBounds = {
+            north: sel.lat + delta,
+            south: sel.lat - delta,
+            east: sel.lng + delta,
+            west: sel.lng - delta,
+          };
+          console.log("[DEBUG geocode] USANDO CENTROIDE DE BD:", {
+            lat: sel.lat,
+            lng: sel.lng,
+            region,
+            centroidBounds,
+          });
+          setFocusRegionThrottled(region);
+          addSelectedAsChip(centroidBounds);
+          return;
+        }
 
         // Intentar con Place Details si hay placeId
         const placeId = sel.placeId;
         if (placeId) {
           const details = await getPlaceDetails(placeId);
+          console.log("[DEBUG geocode] getPlaceDetails respuesta:", {
+            placeId,
+            hasDetails: !!details,
+            hasBounds: !!details?.bounds,
+            hasLocation: !!details?.location,
+            bounds: details?.bounds,
+            location: details?.location,
+          });
           if (__DEV__)
             log.warn(
               "[MapEntry] getPlaceDetails(",
@@ -297,9 +376,10 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
               ") →",
               JSON.stringify(details ?? null),
             );
-          if (cancelledRef.current) return;
+          if (cancelled) return;
           if (details?.bounds) {
             const region = boundsToRegion(details.bounds, selectedLocation.type);
+            console.log("[DEBUG geocode] focusRegion desde Place Details.bounds:", JSON.stringify(region));
             if (__DEV__) log.warn("[MapEntry] focusRegion desde Place Details.bounds:", JSON.stringify(region));
             setFocusRegionThrottled(region);
             addSelectedAsChip(details.bounds);
@@ -319,14 +399,39 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           }
         }
 
-        // Fallback: Geocoding API con el nombre del lugar
-        const q = encodeURIComponent(`${selectedLocation.name}, Mexico`);
+        // Fallback: Geocoding API con el nombre del lugar.
+        // Si hay municipio y estado en selectedLocation (caso típico al
+        // restaurar desde historial sin coords guardadas), los incluimos
+        // para que Google devuelva el lugar correcto del estado, no el
+        // primer match del país (ej. "Tamarindos, Ags." vs "Tamarindos, Gro.").
+        const geocodeParts = [
+          selectedLocation.name,
+          selectedLocation.municipio_nombre,
+          selectedLocation.estado_nombre,
+          "Mexico",
+        ].filter(Boolean);
+        const geocodeQuery = geocodeParts.join(", ");
+        const q = encodeURIComponent(geocodeQuery);
         const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${q}&region=mx&key=${googleApiKey}`;
+        console.log("[DEBUG geocode] FALLBACK GEOCODE URL:", {
+          query: geocodeQuery,
+          url: url.replace(googleApiKey, "API_KEY"),
+        });
         const res = await fetch(url);
-        if (cancelledRef.current) return;
+        if (cancelled) return;
         const json = await res.json();
-        if (cancelledRef.current) return;
+        if (cancelled) return;
         const result = json.results?.[0];
+        console.log("[DEBUG geocode] FALLBACK GEOCODE respuesta:", {
+          status: json.status,
+          resultsCount: Array.isArray(json.results) ? json.results.length : "n/a",
+          firstResult: result ? {
+            formattedAddress: result.formatted_address,
+            location: result.geometry?.location,
+            bounds: result.geometry?.bounds,
+            viewport: result.geometry?.viewport,
+          } : null,
+        });
         if (__DEV__)
           log.warn(
             "[MapEntry] geocode fallback status=",
@@ -347,6 +452,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
               west: b.southwest.lng,
             };
             const region = boundsToRegion(gb, selectedLocation.type);
+            console.log("[DEBUG geocode] focusRegion desde geocode.bounds:", JSON.stringify(region));
             if (__DEV__) log.warn("[MapEntry] focusRegion desde geocode.bounds:", JSON.stringify(region));
             setFocusRegionThrottled(region);
             addSelectedAsChip(gb);
@@ -369,7 +475,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     geocode();
 
     return () => {
-      cancelledRef.current = true;
+      cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLocation]);
@@ -411,22 +517,51 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
     closeZoneSearch();
 
-    // Obtener bounds del lugar via Place Details API
+    // Detectar si viene del fallback a la BD de propiedades
+    const isFromDbFallback = loc.placeId?.startsWith("prop-") ?? false;
+
+    // Obtener bounds del lugar via Place Details API o usar el centroide de la BD
     let bounds = undefined;
     try {
-      if (loc.placeId) {
+      if (isFromDbFallback && loc.centroide) {
+        // DB fallback: usar el centroide real de la BD (no hacer Place Details)
+        const delta = 0.03;
+        const centroidBounds = {
+          north: loc.centroide.lat + delta,
+          south: loc.centroide.lat - delta,
+          east: loc.centroide.lng + delta,
+          west: loc.centroide.lng - delta,
+        };
+        bounds = centroidBounds;
+        setFocusRegionThrottled({
+          latitude: loc.centroide.lat,
+          longitude: loc.centroide.lng,
+          latitudeDelta: delta,
+          longitudeDelta: delta,
+        });
+      } else if (loc.placeId) {
         const details = await getPlaceDetails(loc.placeId, sessionTokenRef.current);
         if (!mountedRef.current) return;
         // Refrescar token después de completar la sesión
         sessionTokenRef.current = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-          if (details?.bounds) {
-            bounds = details.bounds;
-            // Centrar el mapa en la zona seleccionada
-            setFocusRegionThrottled(boundsToRegion(bounds, loc.type));
-          }
+        if (details?.bounds) {
+          bounds = details.bounds;
+          // Centrar el mapa en la zona seleccionada
+          setFocusRegionThrottled(boundsToRegion(bounds, loc.type));
+        }
       }
     } catch (e) {
       log.warn("Error obteniendo bounds del chip:", e);
+    }
+
+    // Límite máximo de chips: si ya hay MAX, no agregar y avisar al usuario
+    const currentChips = usePropertyFiltersStore.getState().filters.locationChips;
+    if (currentChips.length >= MAX_LOCATION_CHIPS) {
+      showToast(
+        `Máximo ${MAX_LOCATION_CHIPS} ubicaciones. Quita una para agregar otra.`,
+        "warning",
+      );
+      return;
     }
 
     const chip: LocationChip = {
@@ -448,11 +583,20 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     // NO esperamos - la UI ya está actualizada con el chip
     // El usuario no debe esperar por una operación de BD
     const currentFilters = usePropertyFiltersStore.getState().filters;
+    // Usar el centroide de la BD si está disponible (DB fallback). Si no,
+    // usar el selectedLocation global. Si ninguno, placeId/lat/lng quedan
+    // undefined y se guardan como null en la BD.
+    const latToSave = isFromDbFallback && loc.centroide ? loc.centroide.lat : selectedLocation?.lat;
+    const lngToSave = isFromDbFallback && loc.centroide ? loc.centroide.lng : selectedLocation?.lng;
+    const placeIdToSave = isFromDbFallback ? undefined : selectedLocation?.placeId;
     createSearchFromMap(currentFilters, {
       estado: loc.estado_nombre || (loc.type === "estado" ? loc.name : undefined),
       municipio: loc.municipio_nombre || (loc.type === "municipio" ? loc.name : undefined),
       colonia: loc.type === "colonia" ? loc.name : undefined,
       placeName: loc.name,
+      placeId: placeIdToSave,
+      lat: latToSave,
+      lng: lngToSave,
     }, userId).catch((e) => {
       log.warn('Error guardando en historial:', e);
       showToast('No se pudo guardar la búsqueda', 'error');

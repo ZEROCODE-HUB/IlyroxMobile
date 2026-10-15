@@ -32,7 +32,7 @@ interface SearchStore {
   isUpdating: boolean;
   
   startSearch: (query: string, userId: string) => Promise<string>;
-  createSearchFromMap: (filtros: PropertyFilters, ubicacion?: { estado?: string; municipio?: string; colonia?: string; placeName?: string }, userId?: string) => Promise<string>;
+  createSearchFromMap: (filtros: PropertyFilters, ubicacion?: { estado?: string; municipio?: string; colonia?: string; placeName?: string; placeId?: string; lat?: number; lng?: number }, userId?: string) => Promise<string>;
   updateSearchWithResult: (id: string, resultData: ResultData, userId: string) => Promise<void>;
   createSearchFromResult: (resultData: ResultData, userId: string) => Promise<void>;
   updateSearchWithFilters: (id: string, filtros: PropertyFilters, userId: string) => Promise<void>;
@@ -135,6 +135,9 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       municipio: null,
       colonia: null,
       place_name: null,
+      place_id: null,
+      lat: null,
+      lng: null,
       tipo_propiedad: null,
       tipo_operacion: null,
       precio_min: null,
@@ -211,7 +214,7 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
 
   createSearchFromMap: async (
     filtros: PropertyFilters,
-    ubicacion?: { estado?: string; municipio?: string; colonia?: string; placeName?: string },
+    ubicacion?: { estado?: string; municipio?: string; colonia?: string; placeName?: string; placeId?: string; lat?: number; lng?: number },
     userId?: string
   ): Promise<string> => {
     if (!userId) throw new Error('User not authenticated');
@@ -220,6 +223,19 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
     const queryOriginal = ubicacion?.placeName || ubicacion?.colonia || ubicacion?.municipio || ubicacion?.estado || null;
     const tempId = `temp_${Date.now()}`;
     const now = new Date().toISOString();
+
+    // DEBUG: log para diagnosticar guardado de coordenadas
+    console.log("[DEBUG createSearchFromMap] ENTRADA:", {
+      placeName: ubicacion?.placeName,
+      estado: ubicacion?.estado,
+      municipio: ubicacion?.municipio,
+      colonia: ubicacion?.colonia,
+      placeId: ubicacion?.placeId,
+      lat: ubicacion?.lat,
+      lng: ubicacion?.lng,
+      hasLat: typeof ubicacion?.lat === "number",
+      hasLng: typeof ubicacion?.lng === "number",
+    });
 
     // 1. IMMEDIATAMENTE agregar al caché (optimistic update)
     const optimisticSearch: HistorialBusqueda = {
@@ -234,6 +250,9 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       municipio: ubicacion?.municipio || null,
       colonia: ubicacion?.colonia || null,
       place_name: ubicacion?.placeName || null,
+      place_id: ubicacion?.placeId ?? null,
+      lat: ubicacion?.lat ?? null,
+      lng: ubicacion?.lng ?? null,
       tipo_propiedad: preview.tipo_propiedad || null,
       tipo_operacion: preview.tipo_operacion || null,
       precio_min: preview.precio_min || null,
@@ -268,6 +287,9 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
         municipio: ubicacion?.municipio || null,
         colonia: ubicacion?.colonia || null,
         place_name: ubicacion?.placeName || null,
+        place_id: ubicacion?.placeId ?? null,
+        lat: ubicacion?.lat ?? null,
+        lng: ubicacion?.lng ?? null,
         ...preview,
       })
       .select('id')
@@ -411,6 +433,9 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
             municipio: municipio || null,
             colonia: colonia || null,
             place_name: placeName || null,
+            place_id: null,
+            lat: null,
+            lng: null,
             tipo_propiedad: null,
             tipo_operacion: null,
             precio_min: null,
@@ -506,6 +531,9 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
       municipio: municipio || null,
       colonia: colonia || null,
       place_name: placeName || null,
+      place_id: null,
+      lat: null,
+      lng: null,
       tipo_propiedad: null,
       tipo_operacion: null,
       precio_min: null,

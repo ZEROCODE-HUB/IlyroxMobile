@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLocationSearchStore } from "@/store/locationSearchStore";
+import { useSearchStore } from "@/store/searchStore";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 import { usePropertyCacheStore } from "@/store/propertyCacheStore";
 import { useApp } from "@/context/AppContext";
@@ -55,6 +56,12 @@ export interface SearchLocation {
   fullDescription?: string;
   /** placeId de Google Places: identifica unívocamente el lugar para centrar el mapa exacto */
   placeId?: string;
+  /**
+   * Centroide (promedio de lat/lng de las propiedades de la zona).
+   * Solo presente para sugerencias del fallback a la BD de propiedades.
+   * Permite centrar el mapa en el lugar exacto sin depender de Google.
+   */
+  centroide?: { lat: number; lng: number };
 }
 
 export interface SearchProperty {
@@ -255,6 +262,7 @@ export function useSearch() {
   const { profile, user } = useAuth();
   const { searchLocations, suggestions, isLoading: locLoading } = useLocationSearchStore();
   const { clearFilters, setPendingOpenMap } = usePropertyFiltersStore();
+  const { setCurrentSearchId } = useSearchStore();
   const { setSelectedLocation } = useApp();
 
   useEffect(() => {
@@ -326,6 +334,7 @@ export function useSearch() {
       estadoId: s.estado_id,
       fullDescription: s.fullDescription,
       placeId: s.placeId,
+      centroide: s.centroide,
     }));
     setResults((prev) => ({ ...prev, locations }));
   }, [suggestions]);
@@ -333,19 +342,51 @@ export function useSearch() {
   const selectLocation = useCallback(
     (loc: SearchLocation, isRestoring = false) => {
       const baseName = loc.name.split(",")[0].trim();
-      // Solo limpiar filtros si NO estamos restaurando desde historial
+      // Detectar si viene del fallback a la BD de propiedades (placeId sintético).
+      const isFromDbFallback = loc.placeId?.startsWith("prop-") ?? false;
+      // DEBUG: log al recibir la ubicación seleccionada
+      console.log("[DEBUG selectLocation] ENTRADA:", {
+        source: isFromDbFallback ? "DB_FALLBACK" : "GOOGLE",
+        placeId: loc.placeId,
+        name: loc.name,
+        baseName,
+        type: loc.type,
+        municipio: loc.municipio,
+        estado: loc.estado,
+        fullDescription: loc.fullDescription,
+        hasCentroide: !!loc.centroide,
+        centroide: loc.centroide,
+      });
+      // Limpiar filtros si NO estamos restaurando desde historial.
+      // Esta función se llama SOLO desde el SearchOverlay (Home), NO desde
+      // el buscador del mapa (que usa addLocationChip directamente). Por lo
+      // tanto, limpiar aquí no rompe la acumulación de chips: cada nueva
+      // búsqueda desde el Home es una búsqueda "fresca".
+      // Excepción: si se está restaurando desde historial, NO limpiar
+      // (la búsqueda guardada se aplica tal cual).
       if (!isRestoring) {
-        clearFilters({ estado: "", ciudad: "", municipio: "", colonia: "" });
+        usePropertyFiltersStore.getState().clearFilters();
+        // También limpiar el currentSearchId del searchStore para que cuando
+        // entremos al mapa se cree una NUEVA búsqueda en el historial (con
+        // coords) en vez de actualizar la anterior.
+        setCurrentSearchId(null);
       }
+      // Regla de centrado:
+      //   - Google (placeId real): usar getPlaceDetails en el mapa
+      //   - DB fallback (placeId sintético): usar el centroide real de la BD
+      //   - Sin nada: caer al geocode fallback con texto completo
+      const useCentroide = isFromDbFallback && loc.centroide != null;
       setSelectedLocation({
         type: loc.type ?? "colonia",
         name: baseName,
         estado_id: loc.estadoId ?? 0,
         municipio_nombre: loc.municipio,
         estado_nombre: loc.estado,
-        // El placeId centra el mapa en el lugar EXACTO (vía Place Details),
-        // evitando que se geocodifique otra zona con el mismo nombre.
-        placeId: loc.placeId,
+        // Si hay centroide real, lo usamos y NO pasamos el placeId falso.
+        // Si no, pasamos el placeId (real o sintético) para que el mapa decida.
+        placeId: useCentroide ? undefined : loc.placeId,
+        lat: useCentroide ? loc.centroide!.lat : undefined,
+        lng: useCentroide ? loc.centroide!.lng : undefined,
       });
       setPendingOpenMap(true);
     },
