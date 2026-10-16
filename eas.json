@@ -8,9 +8,6 @@
       "channel": "preview",
       "distribution": "internal",
       "environment": "preview",
-      "env": {
-        "EAS_BUILD_DISABLE_COCOAPODS_CACHE": "1"
-      },
       "android": {
         "buildType": "apk"
       }
@@ -20,9 +17,6 @@
       "credentialsSource": "remote",
       "autoIncrement": true,
       "environment": "production",
-      "env": {
-        "EAS_BUILD_DISABLE_COCOAPODS_CACHE": "1"
-      },
       "android": {
         "buildType": "app-bundle"
       }
