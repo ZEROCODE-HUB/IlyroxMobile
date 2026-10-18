@@ -112,6 +112,9 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
 
   // Lista de ubicaciones agregadas como chips multi-nivel
   const [ubicaciones, setUbicaciones] = useState<LocationChipItem[]>([]);
+  // Zonas dibujadas en el mapa (polígonos de la búsqueda). Se muestran como
+  // chips en "Ubicación" y bastan por sí solas para publicar.
+  const [zonas, setZonas] = useState<Array<{ id?: string; label: string; type?: string }>>([]);
 
   // Características
   const [habitaciones, setHabitaciones] = useState("");
@@ -137,9 +140,8 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
   const [agricolaFilters, setAgricolaFilters] = useState<AgricolaFilters | null>(null);
 
   const [publishing, setPublishing] = useState(false);
-  // Marca el campo Ubicación en rojo cuando se intenta publicar sin una
-  // ubicación con nombre. Una zona dibujada en el mapa NO cuenta aquí: la
-  // búsqueda necesita al menos una colonia/municipio/estado con nombre.
+  // Marca el campo Ubicación en rojo cuando se intenta publicar sin ninguna
+  // ubicación: ni una colonia/municipio/estado ni una zona dibujada.
   const [ubicacionError, setUbicacionError] = useState(false);
 
   // Cargar el metadata SOLO una vez por apertura del modal. Evita re-ejecutar
@@ -232,6 +234,11 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
         }
       }
       setUbicaciones(finalUbicaciones);
+      setZonas(
+        Array.isArray(f.zonas_interes)
+          ? f.zonas_interes.filter((z: any) => z && typeof z.label === "string")
+          : [],
+      );
 
       const car = f.caracteristicas ?? {};
       setHabitaciones(car.habitaciones ? String(car.habitaciones) : "");
@@ -294,13 +301,12 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
   const handlePublish = async () => {
     if (!initialMetadata) return;
 
-    // Validación: se requiere al menos una ubicación CON NOMBRE en el picker.
-    // Ojo: una zona dibujada en el mapa no llega hasta aquí como ubicación, por
-    // eso el mensaje es explícito (el usuario cree que ya eligió una zona).
-    if (ubicaciones.length === 0) {
+    // Validación: se requiere al menos una ubicación con nombre o una zona
+    // dibujada en el mapa.
+    if (ubicaciones.length === 0 && zonas.length === 0) {
       setUbicacionError(true);
       showToast(
-        "Falta la ubicación: escribe y selecciona una colonia o zona en el campo Ubicación.",
+        "Falta la ubicación: selecciona una colonia o zona en el campo Ubicación, o dibuja una zona en el mapa.",
         "error",
       );
       return;
@@ -352,7 +358,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
         precio_renta_max: parseNum(precioRentaMax) ?? initialMetadata.filtros?.precio_renta_max ?? null,
         ubicacion: legacyUbicacion,
         ubicaciones,
-        zonas_interes: [],
+        zonas_interes: zonas,
         caracteristicas: {
           ...initialMetadata.filtros?.caracteristicas,
           habitaciones: parseNum(habitaciones) ?? initialMetadata.filtros?.caracteristicas?.habitaciones,
@@ -577,6 +583,25 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
 
           {/* ── Ubicación (multi-nivel) ──────────────────── */}
           <SectionCard label="Ubicación">
+            {zonas.length > 0 && (
+              <View style={styles.zonasRow}>
+                {zonas.map((zona, i) => (
+                  <View key={zona.id ?? `zona-${i}`} style={styles.zonaChip}>
+                    <Ionicons name="shapes-outline" size={14} color={COLORS.primary} />
+                    <Text style={styles.zonaChipText} numberOfLines={1}>
+                      {zona.label} (dibujada en el mapa)
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setZonas((prev) => prev.filter((_, j) => j !== i))}
+                      hitSlop={8}
+                      accessibilityLabel={`Quitar ${zona.label}`}
+                    >
+                      <Ionicons name="close" size={14} color={COLORS.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
             <MultiLevelLocationPicker
               value={ubicaciones}
               onChange={(next) => {
@@ -587,10 +612,9 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
             {ubicacionError ? (
               <Text style={styles.ubicacionError}>
                 Agrega al menos una ubicación: escribe una colonia o zona y
-                selecciónala de la lista. Dibujar una zona en el mapa no basta
-                para publicar la búsqueda.
+                selecciónala de la lista, o dibuja una zona en el mapa.
               </Text>
-            ) : ubicaciones.length === 0 ? (
+            ) : ubicaciones.length === 0 && zonas.length === 0 ? (
               <Text style={styles.ubicacionHint}>
                 Escribe una colonia o zona y selecciónala de la lista para
                 agregarla.
@@ -974,6 +998,29 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.textSecondary,
     marginTop: 14,
+  },
+  zonasRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  zonaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: COLORS.primaryTransparent,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  zonaChipText: {
+    fontSize: 12,
+    color: COLORS.textPrimary,
+    fontWeight: "500",
+    maxWidth: 220,
   },
   ubicacionHint: {
     fontSize: 12,

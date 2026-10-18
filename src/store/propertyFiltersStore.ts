@@ -330,9 +330,10 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
             locationFilter: noChipsLeft
               ? initialFilters.locationFilter
               : state.filters.locationFilter,
-            // Si ya no hay chips, también limpiar los polígonos dibujados
-            // ya que están relacionados con la zona seleccionada
-            polygons: noChipsLeft ? [] : state.filters.polygons,
+            // Los polígonos dibujados se conservan: quitar la última ubicación
+            // con nombre (p. ej. "Aguascalientes") debe dejar la búsqueda solo
+            // por la zona dibujada, no borrarla. Para limpiar zonas está
+            // clearPolygons.
           },
         };
       }),
