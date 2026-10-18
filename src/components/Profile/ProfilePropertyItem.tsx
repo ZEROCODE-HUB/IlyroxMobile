@@ -252,7 +252,7 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
             </View>
 
             <View>
-              {isOwnProfile && item.precio_contrato && (item.status === "Vendida" || item.status === "Rentada") && (
+              {isOwnProfile && !!item.precio_contrato && (item.status === "Vendida" || item.status === "Rentada") && (
                 <View style={styles.contractPriceRow}>
                   <Text style={styles.contractPriceLabel}>
                     {item.status === "Rentada" ? "Rentada en" : "Vendida en"}

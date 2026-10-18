@@ -573,7 +573,9 @@ export default function CreateProperty({
         onConfirm={(data) => {
           form.setContractData(data);
           setShowSaleContractModal(false);
-          setTimeout(() => handlePublish(data), 100);
+          // handlePublish abre el modal de progreso: esperar a que el del
+          // contrato termine de cerrarse (fade) o iOS lo muestra en negro.
+          setTimeout(() => handlePublish(data), 350);
         }}
         onCancel={() => {
           setShowSaleContractModal(false);

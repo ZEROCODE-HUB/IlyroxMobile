@@ -13,6 +13,7 @@ import {
   ViewStyle,
   Modal,
   Dimensions,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
@@ -51,6 +52,17 @@ const ThreeDotsMenu: React.FC<ThreeDotsMenuProps> = ({
     height: 0,
   });
   const buttonRef = useRef<View>(null);
+
+  // En iOS no se puede presentar un modal mientras otro se está cerrando: si la
+  // opción abre un modal (p. ej. "Editar"), este aparece vacío, en negro. Por
+  // eso la acción se ejecuta cuando el menú terminó de cerrarse (onDismiss),
+  // con un respaldo por si onDismiss no llega.
+  const pendingActionRef = useRef<(() => void) | null>(null);
+  const runPendingAction = useCallback(() => {
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null;
+    action?.();
+  }, []);
 
   const handleToggleMenu = useCallback(
     (e: any) => {
@@ -128,6 +140,7 @@ const ThreeDotsMenu: React.FC<ThreeDotsMenuProps> = ({
         transparent
         animationType="fade"
         onRequestClose={() => setShowMenu(false)}
+        onDismiss={runPendingAction}
       >
         {/* Backdrop */}
         <TouchableOpacity
@@ -146,7 +159,12 @@ const ThreeDotsMenu: React.FC<ThreeDotsMenuProps> = ({
                 ]}
                 onPress={() => {
                   setShowMenu(false);
-                  option.onPress();
+                  if (Platform.OS === "ios") {
+                    pendingActionRef.current = option.onPress;
+                    setTimeout(runPendingAction, 600);
+                  } else {
+                    option.onPress();
+                  }
                 }}
                 activeOpacity={0.7}
               >
