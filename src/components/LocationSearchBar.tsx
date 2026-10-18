@@ -65,7 +65,9 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
   // Buscar ubicaciones con debounce
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      searchLocations(query, undefined, { estado: profile?.estado });
+      // Sin "(regions)", como el resto de buscadores: así aparecen también los
+      // fraccionamientos, que Google clasifica como establishment.
+      searchLocations(query, undefined, { estado: profile?.estado, restrictToRegions: false });
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
