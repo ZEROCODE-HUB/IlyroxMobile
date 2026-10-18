@@ -422,7 +422,7 @@ export const usePropertyFilters = (
 
       // ── Antigüedad ──
       if (filters.antiguedad && filters.antiguedad !== "No indicado" && rawP.antiguedad) {
-        if (rawP.antiguedad.toString() !== filters.antiguedad) return false;
+        if (String(rawP.antiguedad) !== String(filters.antiguedad)) return false;
       }
 
       // ── M² ──

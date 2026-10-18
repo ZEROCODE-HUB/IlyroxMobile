@@ -442,8 +442,13 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
             ? String((search as any).medios_banos)
             : (criterios?.medios_banos ? String(criterios.medios_banos) : ""),
           estacionamientos: search.estacionamientos ? String(search.estacionamientos) : "",
-          antiguedad: (search as any).antiguedad || criterios?.antiguedad || "",
-          niveles: (search as any).pisos ? String((search as any).pisos) : (criterios?.niveles || ""),
+          antiguedad: String((search as any).antiguedad || criterios?.antiguedad || ""),
+          // `criterios.niveles` guarda el valor tal cual se eligió ("3+", "Más…");
+          // la columna `pisos` es solo el entero y, si se usaba primero, "3+"
+          // volvía como "3" y el filtro pasaba de mínimo a exacto.
+          niveles: criterios?.niveles
+            ? String(criterios.niveles)
+            : ((search as any).pisos ? String((search as any).pisos) : ""),
           m2TerrenoMin: search.metros_terreno ? String(search.metros_terreno) : "",
           m2ConstruccionMin: search.metros_construccion ? String(search.metros_construccion) : "",
           anchoTerrenoMin: criterios?.ancho_terreno_min ? String(criterios.ancho_terreno_min) : "",

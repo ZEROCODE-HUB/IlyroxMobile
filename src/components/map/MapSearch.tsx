@@ -74,9 +74,6 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   // ── Polígonos (múltiples) ──
   const [drawingMode, setDrawingMode] = useState(false);
   const [draftPoints, setDraftPoints] = useState<PolygonCoord[]>([]);
-  // Vaciado progresivo del borrador (ver `drainDraftPoints`).
-  const [draining, setDraining] = useState(false);
-  const onDrainedRef = useRef<(() => void) | null>(null);
 
   // ── Búsqueda de zonas ──
   const [isZoneSearchOpen, setIsZoneSearchOpen] = useState(false);
@@ -99,10 +96,8 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   const mountedRef = useRef(true);
   const focusThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const drawingModeRef = useRef(drawingMode);
-  const drainingRef = useRef(draining);
   useEffect(() => { return () => { mountedRef.current = false; if (focusThrottleRef.current) clearTimeout(focusThrottleRef.current); }; }, []);
   useEffect(() => { drawingModeRef.current = drawingMode; }, [drawingMode]);
-  useEffect(() => { drainingRef.current = draining; }, [draining]);
 
   // ── LOG TEMPORAL DE DIAGNÓSTICO (crash iOS al entrar al mapa) ─────────────
   // ⚠️ ELIMINAR cuando se resuelva.
@@ -646,7 +641,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   }, []);
 
   const handleMapPress = useCallback((coord: PolygonCoord) => {
-    if (!drawingModeRef.current || drainingRef.current) return;
+    if (!drawingModeRef.current) return;
 
     // Auto-cerrar polígono si el usuario presiona cerca del primer punto (3+ pts)
     if (draftPoints.length >= 3) {
@@ -666,44 +661,26 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
   }, [draftPoints]);
 
   /**
-   * Vacía el borrador quitando un punto por frame, en vez de golpe.
+   * Vacía el borrador y luego ejecuta `onDone`.
    *
-   * En iOS, `setDraftPoints([])` desmontaba la Polyline, el Polygon y todos los
-   * Markers en un mismo commit. react-native-maps 1.20 no tiene implementación
-   * Fabric en iOS, así que RN pasa por el shim legacy, que elimina los hijos
-   * *por posición* contra el array que `AIRMap` mantiene a mano: cada borrado lo
-   * encoge y el siguiente índice apunta a otro elemento. De ahí el cierre de la
-   * app al pulsar "Limpiar" (y no al pulsar "Deshacer", que quita un solo hijo).
+   * Antes se vaciaba un punto por frame: react-native-maps 1.20 eliminaba los
+   * hijos del mapa por posición y borrar varios en un mismo commit cerraba la
+   * app en iOS. Desde 1.29 se eliminan por referencia, así que basta con
+   * vaciarlo de golpe; el vaciado progresivo, además, podía perder el polígono
+   * si se pulsaba Limpiar/Cancelar mientras corría.
    */
-  const drainDraftPoints = useCallback((onDone?: () => void) => {
-    onDrainedRef.current = onDone ?? null;
-    setDraining(true);
+  const clearDraftPoints = useCallback((onDone?: () => void) => {
+    setDraftPoints([]);
+    onDone?.();
   }, []);
 
-  useEffect(() => {
-    if (!draining) return;
-
-    if (draftPoints.length === 0) {
-      setDraining(false);
-      const done = onDrainedRef.current;
-      onDrainedRef.current = null;
-      done?.();
-      return;
-    }
-
-    const frame = requestAnimationFrame(() =>
-      setDraftPoints((prev) => prev.slice(0, -1)),
-    );
-    return () => cancelAnimationFrame(frame);
-  }, [draining, draftPoints.length]);
-
   const handleCancelDrawing = useCallback(() => {
-    drainDraftPoints(() => setDrawingMode(false));
-  }, [drainDraftPoints]);
+    clearDraftPoints(() => setDrawingMode(false));
+  }, [clearDraftPoints]);
 
   const handleUndoPoint = useCallback(() => setDraftPoints((prev) => prev.slice(0, -1)), []);
 
-  const handleClearDraft = useCallback(() => drainDraftPoints(), [drainDraftPoints]);
+  const handleClearDraft = useCallback(() => clearDraftPoints(), [clearDraftPoints]);
 
   // Handler para cuando se selecciona una propiedad desde CoincidentPropertiesSheet
   const handleCoincidentSelect = useCallback((p: Property) => {
@@ -720,7 +697,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     if (draftPoints.length < 3) return;
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const coords = draftPoints;
-    drainDraftPoints(() => {
+    clearDraftPoints(() => {
       addPolygon(coords);
       setDrawingMode(false);
 
@@ -732,13 +709,13 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
         });
       }
     });
-  }, [draftPoints, drainDraftPoints, currentSearchId, userId, updateSearchWithFilters, addPolygon]);
+  }, [draftPoints, clearDraftPoints, currentSearchId, userId, updateSearchWithFilters, addPolygon]);
   // Mantener ref actualizado para que handleMapPress lo use sin ciclo de deps
   handleConfirmPolygonRef.current = handleConfirmPolygon;
 
   // ── Limpiar todo ──
   const handleClearAll = () => {
-    drainDraftPoints(() => {
+    clearDraftPoints(() => {
       clearFilters();
       setDrawingMode(false);
     });
