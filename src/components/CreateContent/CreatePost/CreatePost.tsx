@@ -31,7 +31,11 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Burnt from "burnt";
 import { supabase } from "@/lib/supabase";
 import { useCreateContent } from "@/hooks/useCreateContent";
-import { uploadImage as uploadImageService } from "@/services/uploadService";
+import {
+  uploadImage as uploadImageService,
+  isMediaUnavailable,
+  MEDIA_UNAVAILABLE_MESSAGE,
+} from "@/services/uploadService";
 import { AppHeader } from "@/components/AppHeader";
 import { OpenHousePost } from "./OpenHousePost";
 import { BusquedaPost } from "./BusquedaPost";
@@ -508,7 +512,8 @@ export default function CreatePost({ post, onBack, onUpdated }: CreatePostProps)
       }, 500);
     } catch (error) {
       log.error("Error publishing:", error);
-      showToast("No se pudo guardar el post", "error");
+      if (isMediaUnavailable(error)) showToast(MEDIA_UNAVAILABLE_MESSAGE, "error", 5000);
+      else showToast("No se pudo guardar el post", "error");
       setUploadProgress(0);
       setIsUploadingManual(false);
     }

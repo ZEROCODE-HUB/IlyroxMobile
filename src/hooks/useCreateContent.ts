@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import { useImageUpload } from "./useImageUpload";
+import { isMediaUnavailable, MEDIA_UNAVAILABLE_MESSAGE } from "../services/uploadService";
 import { prependPublishedFeedItem } from "./useFeed";
 import * as Burnt from "burnt";
 import { useModal } from "@/context/ModalContext";
@@ -94,7 +95,7 @@ export function useCreateContent(userId?: string) {
     } catch (error: any) {
       log.error("Error creating post:", error);
       Burnt.toast({
-        title: "Error al publicar el post",
+        title: isMediaUnavailable(error) ? MEDIA_UNAVAILABLE_MESSAGE : "Error al publicar el post",
         preset: "error",
       });
       return false;
@@ -174,7 +175,7 @@ export function useCreateContent(userId?: string) {
     } catch (error: any) {
       log.error("Error creating reel:", error);
       Burnt.toast({
-        title: "Error al publicar el reel",
+        title: isMediaUnavailable(error) ? MEDIA_UNAVAILABLE_MESSAGE : "Error al publicar el reel",
         preset: "error",
       });
       return false;

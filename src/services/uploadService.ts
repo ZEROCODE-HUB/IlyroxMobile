@@ -6,6 +6,29 @@ const log = logger.scoped("uploadService");
 
 const VIDEO_API_URL = "https://video.109.205.178.162.sslip.io";
 
+/** Mensaje para el usuario cuando el servidor de fotos y videos no responde. */
+export const MEDIA_UNAVAILABLE_MESSAGE =
+  "Actualmente presentamos fallas con archivos multimedia, favor de intentarlo más tarde.";
+
+/**
+ * La subida de una foto o video falló (servidor caído, sin red, timeout, 5xx o
+ * respuesta inválida). Quien publica debe avisar con `MEDIA_UNAVAILABLE_MESSAGE`
+ * y NO publicar sin el archivo.
+ */
+export class MediaUnavailableError extends Error {
+  constructor(readonly cause?: unknown) {
+    super(MEDIA_UNAVAILABLE_MESSAGE);
+    this.name = "MediaUnavailableError";
+  }
+}
+
+export const isMediaUnavailable = (err: unknown): err is MediaUnavailableError =>
+  err instanceof MediaUnavailableError ||
+  (err as { name?: string } | null)?.name === "MediaUnavailableError";
+
+/** Tiempo máximo por intento de subida de una foto. Sin esto, un servidor que no responde deja la subida colgada. */
+const IMAGE_UPLOAD_TIMEOUT_MS = 30000;
+
 /** Ancho máximo de una foto subida. Ver `compressForUpload`. */
 const MAX_IMAGE_WIDTH = 1920;
 
@@ -73,10 +96,18 @@ export async function uploadImage(
 
       formData.append("folder", folder);
 
-      const response = await fetch(`${VIDEO_API_URL}/upload-image`, {
-        method: "POST",
-        body: formData,
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), IMAGE_UPLOAD_TIMEOUT_MS);
+      let response: Response;
+      try {
+        response = await fetch(`${VIDEO_API_URL}/upload-image`, {
+          method: "POST",
+          body: formData,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
       if (!response.ok) {
         // Si es error 5xx, reintentamos
@@ -94,16 +125,17 @@ export async function uploadImage(
       }
 
       const data = await response.json();
-      return data.url || data.image_url;
+      const url = data.url || data.image_url;
+      if (!url) throw new Error("Upload response without url");
+      return url;
     } catch (error: any) {
       log.error(
         `Error uploading image (attempt ${attempt + 1}/${retries}):`,
         error,
       );
 
-      // Si es el último intento o no es un error que queramos reintentar (opcional), lanzamos
       if (attempt >= retries - 1) {
-        throw error;
+        throw new MediaUnavailableError(error);
       }
 
       // Reintentar en caso de error de red o timeout
@@ -112,7 +144,7 @@ export async function uploadImage(
     }
   }
 
-  throw new Error("Upload failed after multiple retries");
+  throw new MediaUnavailableError();
 }
 
 export async function uploadMultipleImages(
@@ -156,6 +188,10 @@ export async function uploadVideo(
           if (xhr.status >= 200 && xhr.status < 300) {
             log.debug(`✅ Video processed successfully in ${duration}s`);
             const response = JSON.parse(xhr.responseText);
+            if (!(response.videoUrl || response.video_url)) {
+              reject(new MediaUnavailableError(new Error("Response without videoUrl")));
+              return;
+            }
             resolve({
               videoUrl: response.videoUrl || response.video_url,
               thumbnailUrl: response.thumbnailUrl || undefined,
@@ -164,22 +200,22 @@ export async function uploadVideo(
             log.error(
               `❌ Upload failed after ${duration}s with status ${xhr.status}: ${xhr.responseText}`,
             );
-            reject(new Error(`Error al subir el video: ${xhr.status}`));
+            reject(new MediaUnavailableError(new Error(`HTTP ${xhr.status}`)));
           }
         } catch (e: any) {
           log.error(`❌ Error parsing server response after ${duration}s:`, e);
-          reject(new Error(`Error en el formato de respuesta: ${e.message}`));
+          reject(new MediaUnavailableError(e));
         }
       });
       xhr.addEventListener("error", () => {
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
         log.error(`❌ Network error after ${duration}s`);
-        reject(new Error("Error de red al subir el video"));
+        reject(new MediaUnavailableError(new Error("network")));
       });
       xhr.addEventListener("timeout", () => {
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
         log.error(`❌ Timeout after ${duration}s`);
-        reject(new Error("La subida tardó demasiado (Timeout)"));
+        reject(new MediaUnavailableError(new Error("timeout")));
       });
       xhr.addEventListener("abort", () => {
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);

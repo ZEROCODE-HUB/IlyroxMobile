@@ -11,6 +11,8 @@ import { logger } from "@/utils/logger";
 import { OneSignal } from "react-native-onesignal";
 import { useImageUpload } from "@/hooks";
 import { applyStoredAdvisorInvite } from "@/services/communityService";
+import * as Burnt from "burnt";
+import { isMediaUnavailable, MEDIA_UNAVAILABLE_MESSAGE } from "@/services/uploadService";
 
 const log = logger.scoped("auth-form");
 
@@ -376,11 +378,21 @@ export function useAuthForm() {
         let finalAvatarUrl = "";
         if (formState.avatarUri) {
           log.info("handleRegister: Subiendo foto");
-          const url = await uploadImage(
-            formState.avatarUri,
-            "fotos",
-            "perfiles",
-          );
+          // La cuenta ya está creada: si el servidor de archivos falla, se
+          // termina el registro sin foto y se avisa.
+          let url: string | null = null;
+          try {
+            url = await uploadImage(formState.avatarUri, "fotos", "perfiles");
+          } catch (err) {
+            log.warn("handleRegister: no se pudo subir la foto", err);
+            if (isMediaUnavailable(err)) {
+              Burnt.toast({
+                title: `${MEDIA_UNAVAILABLE_MESSAGE} Podrás agregar tu foto desde tu perfil.`,
+                preset: "error",
+                duration: 5,
+              });
+            }
+          }
           if (url) {
             finalAvatarUrl = url;
             log.info("handleRegister: Foto subida", { url });

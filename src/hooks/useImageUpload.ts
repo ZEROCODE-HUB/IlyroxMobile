@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { uploadImage as uploadImageService } from "../services/uploadService";
+import {
+  uploadImage as uploadImageService,
+  isMediaUnavailable,
+} from "../services/uploadService";
 import { logger } from "@/utils/logger";const log = logger.scoped("useImageUpload");
 
 export const useImageUpload = () => {
@@ -11,6 +14,8 @@ export const useImageUpload = () => {
    * @param bucket Kept for backward compatibility (ignored)
    * @param folder Folder path within the service (default: 'uploads')
    * @returns Public URL of the uploaded image or null if failed
+   * @throws MediaUnavailableError si el servidor de archivos no responde: quien
+   *   publica debe avisar y no publicar sin la imagen.
    */
   const uploadImage = async (
     imageUri: string,
@@ -34,6 +39,7 @@ export const useImageUpload = () => {
       return url;
     } catch (err) {
       log.error("Error uploading image with service:", err);
+      if (isMediaUnavailable(err)) throw err;
       return null;
     } finally {
       setUploading(false);

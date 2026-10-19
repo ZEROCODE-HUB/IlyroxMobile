@@ -11,7 +11,12 @@ import { prependPublishedFeedItem } from "@/hooks/useFeed";
 import { useModal } from "@/context/ModalContext";
 import type { LocalModalOptions } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
-import { uploadImage as uploadImageService } from "../../../services/uploadService";
+import {
+  uploadImage as uploadImageService,
+  isMediaUnavailable,
+  MediaUnavailableError,
+  MEDIA_UNAVAILABLE_MESSAGE,
+} from "../../../services/uploadService";
 import { usePropertyMutation } from "@/hooks/usePropertyMutation";
 import { useAuth } from "../../../context/AuthContext";
 import {
@@ -53,7 +58,7 @@ async function uploadImageWithTimeout(
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error(`Tiempo agotado subiendo imagen`));
+      reject(new MediaUnavailableError(new Error("Tiempo agotado subiendo imagen")));
     }, timeoutMs);
 
     uploadImageService(uri, folder)
@@ -306,17 +311,11 @@ export function usePublishProperty(
 
         if (cancelledRef.current) throw new Error("CANCELLED");
 
-        if (uploadedUrls.length === 0) {
-          throw new Error(
-            "No se pudo subir ninguna imagen. Verifica tu conexión a internet.",
-          );
-        }
-
-        if (failedImages > 0 && uploadedUrls.length > 0) {
-          // Algunas imágenes fallaron pero hay al menos una exitosa
-          log.warn(
-            `${failedImages} imágenes no se pudieron subir. Continuando con ${uploadedUrls.length} imágenes.`,
-          );
+        // Si alguna foto no subió, no se publica a medias: antes se publicaba
+        // sin las fotos fallidas y sin avisar al usuario.
+        if (failedImages > 0) {
+          log.warn(`${failedImages} de ${totalImages} imágenes no se pudieron subir.`);
+          throw new MediaUnavailableError();
         }
 
         if (cancelledRef.current) throw new Error("CANCELLED");
@@ -598,8 +597,9 @@ export function usePublishProperty(
 
         log.error("Error publishing property:", error);
 
-        const errorMessage =
-          error.message || "No se pudo publicar la propiedad";
+        const errorMessage = isMediaUnavailable(error)
+          ? MEDIA_UNAVAILABLE_MESSAGE
+          : error.message || "No se pudo publicar la propiedad";
 
         setPublishState({
           uploading: false,

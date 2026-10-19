@@ -15,6 +15,8 @@ import { useModal } from "@/context/ModalContext";
 import { logger } from "@/utils/logger";
 import { collapseSpaces } from "@/utils/stringNormalizer";
 import { applyStoredAdvisorInvite } from "@/services/communityService";
+import * as Burnt from "burnt";
+import { isMediaUnavailable, MEDIA_UNAVAILABLE_MESSAGE } from "@/services/uploadService";
 
 const log = logger.scoped("useExternalAuth");
 
@@ -193,12 +195,20 @@ export function useExternalAuth() {
         // Subir avatar si hay uno nuevo
         let finalAvatarUrl = pendingUser.avatarUrl || "";
         if (formData.avatarUri) {
-          const url = await uploadImage(
-            formData.avatarUri,
-            "fotos",
-            "fotoperfil",
-          );
-          if (url) finalAvatarUrl = url;
+          // Si el servidor de archivos falla, se sigue sin foto y se avisa.
+          try {
+            const url = await uploadImage(formData.avatarUri, "fotos", "fotoperfil");
+            if (url) finalAvatarUrl = url;
+          } catch (err) {
+            log.warn("No se pudo subir la foto de perfil", err);
+            if (isMediaUnavailable(err)) {
+              Burnt.toast({
+                title: `${MEDIA_UNAVAILABLE_MESSAGE} Podrás agregar tu foto desde tu perfil.`,
+                preset: "error",
+                duration: 5,
+              });
+            }
+          }
         }
 
         const newProfile: perfiles = {

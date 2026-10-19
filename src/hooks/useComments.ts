@@ -28,6 +28,7 @@ import {
 import { supabase } from "../lib/supabase";
 import { Comment } from "../types";
 import { useToast } from "../context/ToastContext";
+import { isMediaUnavailable, MEDIA_UNAVAILABLE_MESSAGE } from "../services/uploadService";
 import { useImageUpload } from "./useImageUpload";
 import { logger } from "@/utils/logger";
 import { PAGINATION } from "@/constants/config";
@@ -605,11 +606,14 @@ export function useComments({
         );
       }
       log.error("Error adding comment:", err);
-      showToast("Error de conexión", "error");
+      if (isMediaUnavailable(err)) showToast(MEDIA_UNAVAILABLE_MESSAGE, "error", 5000);
+      else showToast("Error de conexión", "error");
     },
     retry: (failureCount, error: any) => {
       if (
         error?.message === "No auth" ||
+        // La subida ya reintentó: no repetir toda la mutación.
+        isMediaUnavailable(error) ||
         error?.status === 400 ||
         error?.status === 403 ||
         error?.status === 401
