@@ -1,13 +1,18 @@
 import { useMemo, useEffect, useRef } from "react";
 import { Property } from "@/types";
 import { useExchangeRate } from "./useExchangeRate";
+import {
+  buildLocationCriteria,
+  hasLocationCriteria,
+  matchesLocationCriteria,
+} from "@/utils/locationMatch";
+import { pickOperacion } from "@/utils/operaciones";
 import { normalizeStr } from "@/utils/stringNormalizer";
 import { useShallow } from "zustand/react/shallow";
 import {
   usePropertyFiltersStore,
   PropertyFilters,
   PolygonCoord,
-  LocationChip,
 } from "@/store/propertyFiltersStore";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -21,6 +26,7 @@ type RawOperacion = {
   comision_porcentaje?: number | null;
   comision_meses?: number | null;
   comparte_comision?: boolean | null;
+  activa?: boolean | null;
 };
 
 type RawProperty = Property & {
@@ -90,82 +96,6 @@ const isPointInPolygon = (
   return inside;
 };
 
-type LocationFilter = PropertyFilters["locationFilter"];
-
-const matchesLocationFilter = (
-  p: Property,
-  rawP: RawProperty,
-  locationFilter: LocationFilter,
-): boolean => {
-  if (locationFilter.estado) {
-    const pEstado = normalizeStr(rawP.estado || p.location?.state || "");
-    const fEstado = normalizeStr(locationFilter.estado);
-    if (!pEstado.includes(fEstado) && !fEstado.includes(pEstado)) return false;
-  }
-
-  const pCiudad = (rawP.ciudad || p.location?.city || "").toString().trim().toLowerCase();
-  const pMunicipio = (p.municipio || p.location?.municipio || "").toString().trim().toLowerCase();
-
-  if (locationFilter.municipio) {
-    const fMunicipio = normalizeStr(locationFilter.municipio);
-    const matchMunicipio = normalizeStr(pMunicipio).includes(fMunicipio) || fMunicipio.includes(normalizeStr(pMunicipio));
-    const matchCiudad = normalizeStr(pCiudad).includes(fMunicipio) || fMunicipio.includes(normalizeStr(pCiudad));
-    if (!matchMunicipio && !matchCiudad) return false;
-  }
-
-  if (locationFilter.colonia && locationFilter.colonia.length > 0) {
-    const pColonia = normalizeStr(p.colonia || p.location?.colony || "");
-    if (Array.isArray(locationFilter.colonia)) {
-      const fColonias = locationFilter.colonia.map(normalizeStr);
-      const isMatch = fColonias.some((f) => pColonia.includes(f) || f.includes(pColonia));
-      if (!isMatch) return false;
-    } else {
-      const fColonia = normalizeStr(locationFilter.colonia);
-      if (!pColonia.includes(fColonia) && !fColonia.includes(pColonia)) return false;
-    }
-  }
-
-  return true;
-};
-
-/**
- * Match por TEXTO según el nivel del chip (colonia/municipio/estado), tolerante.
- * A diferencia de `matchesLocationFilter`, NO exige que coincidan los tres
- * campos: compara solo el del nivel buscado. Así una propiedad de la colonia
- * correcta coincide aunque Google haya abreviado el estado ("Ags.") o el pin
- * esté corrido. La "zona" (polígono dibujado) no tiene texto → solo bounds.
- */
-const includesEither = (a: string, b: string) =>
-  !!a && !!b && (a.includes(b) || b.includes(a));
-
-function chipTextMatch(
-  p: Property,
-  rawP: RawProperty,
-  chip: LocationChip,
-): boolean {
-  const lf = chip.locationFilter;
-  // Respaldo del término con la etiqueta del chip (primer componente) por si el
-  // locationFilter del nivel viniera vacío.
-  const label = normalizeStr((chip.label || "").split(",")[0]);
-  if (chip.type === "colonia") {
-    const c = Array.isArray(lf.colonia) ? lf.colonia[0] : lf.colonia;
-    const term = normalizeStr(c || "") || label;
-    const pColonia = normalizeStr(p.colonia || p.location?.colony || "");
-    return includesEither(pColonia, term);
-  }
-  if (chip.type === "municipio") {
-    const f = normalizeStr(lf.municipio || "") || label;
-    const pMunicipio = normalizeStr(p.municipio || p.location?.municipio || "");
-    const pCiudad = normalizeStr(rawP.ciudad || p.location?.city || "");
-    return includesEither(pMunicipio, f) || includesEither(pCiudad, f);
-  }
-  if (chip.type === "estado") {
-    const pEstado = normalizeStr(p.location?.state || rawP.estado || "");
-    return includesEither(pEstado, normalizeStr(lf.estado || "") || label);
-  }
-  return false;
-}
-
 const log = logger.scoped("usePropertyFilters");
 
 export const usePropertyFilters = (
@@ -196,7 +126,15 @@ export const usePropertyFilters = (
   const debugLogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const filteredProperties = useMemo(() => {
-    return properties.filter((p) => {
+    // Criterios de ubicación tal como se guardarían en la búsqueda; el mapa
+    // aplica la misma regla que el matching (evaluar_par_match).
+    const locationCriteria = buildLocationCriteria(
+      filters.locationFilter,
+      filters.locationChips,
+    );
+    const hasTextCriteria = hasLocationCriteria(locationCriteria);
+
+    const result = properties.filter((p) => {
       const rawP = p as RawProperty;
 
       // Status check
@@ -235,52 +173,39 @@ export const usePropertyFilters = (
         );
         if (!geoMatch) return false;
       } else if (hasChips || hasBaseLocation) {
-        // NO POLYGON: Sin polígonos, se usa chips o base location.
-        let geoMatch = false;
-
-        // Coordenadas de la propiedad (latitud/longitud ya son number en la BD)
-        const propLat = p.coordinates?.lat ?? p.latitud ?? undefined;
-        const propLng = p.coordinates?.lng ?? p.longitud ?? undefined;
-        const hasCoords =
-          propLat != null && propLng != null &&
-          !isNaN(propLat) && !isNaN(propLng);
-
-        if (hasChips && !geoMatch) {
-          geoMatch = filters.locationChips.some((chip) => {
-            // 1) Dentro del recuadro geográfico (sistema por bounds).
-            //    OJO: para chips de COLONIA NO usamos los bounds de Google. El
-            //    "viewport" que Google devuelve para una colonia suele ser mucho
-            //    más grande que la colonia real y arrastraba propiedades de
-            //    colonias vecinas (p. ej. buscar "Santa Imelda" mostraba las de
-            //    "Tamarindos"). Como la columna `colonia` está bien poblada, para
-            //    colonia confiamos en el match por TEXTO (paso 2). Los bounds
-            //    siguen valiendo para municipio/estado, donde el recuadro sí es
-            //    el área correcta.
-            if (chip.type !== "colonia" && chip.bounds && hasCoords) {
-              const b = chip.bounds;
-              const inBounds =
-                propLat! >= b.south &&
-                propLat! <= b.north &&
-                propLng! >= b.west &&
-                propLng! <= b.east;
-              if (inBounds) return true;
-            }
-            // 2) O por texto, SEGÚN EL NIVEL del chip. Recupera propiedades con
-            //    la ubicación correcta aunque su pin (impreciso en EasyBroker)
-            //    caiga fuera del recuadro. Se compara SOLO el campo del nivel
-            //    (colonia/municipio/estado), no los tres a la vez: Google
-            //    abrevia el estado ("Ags." vs "Aguascalientes") y exigir que
-            //    coincidieran todos rompía el match aunque la colonia fuera la
-            //    correcta.
-            return chipTextMatch(p, rawP, chip);
-          });
+        // NO POLYGON: misma regla que evaluar_par_match. Si hay texto de
+        // ubicación (estado, municipio, colonia o ciudad), el texto decide y
+        // los bounds de Google no rescatan propiedades de otra zona. Solo si
+        // ningún chip trae texto se usa su recuadro geográfico.
+        if (hasTextCriteria) {
+          const textMatch = matchesLocationCriteria(
+            {
+              estado: rawP.estado || p.location?.state,
+              municipio: p.municipio || p.location?.municipio,
+              colonia: p.colonia || p.location?.colony,
+              ciudad: rawP.ciudad || p.location?.city,
+            },
+            locationCriteria,
+          );
+          if (!textMatch) return false;
+        } else {
+          const propLat = p.coordinates?.lat ?? p.latitud ?? undefined;
+          const propLng = p.coordinates?.lng ?? p.longitud ?? undefined;
+          const hasCoords =
+            propLat != null && propLng != null &&
+            !isNaN(propLat) && !isNaN(propLng);
+          const inChipBounds =
+            hasCoords &&
+            filters.locationChips.some(
+              (chip) =>
+                !!chip.bounds &&
+                propLat! >= chip.bounds.south &&
+                propLat! <= chip.bounds.north &&
+                propLng! >= chip.bounds.west &&
+                propLng! <= chip.bounds.east,
+            );
+          if (!inChipBounds) return false;
         }
-
-        if (hasBaseLocation && !geoMatch) {
-          geoMatch = matchesLocationFilter(p, rawP, filters.locationFilter);
-        }
-
-        if (!geoMatch) return false;
       } else if (geofenceBounds) {
         // Sin filtros explícitos: solo geobounds del mapa
         const lat = p.coordinates?.lat ?? p.latitud ?? undefined;
@@ -299,7 +224,7 @@ export const usePropertyFilters = (
         if (operaciones && Array.isArray(operaciones)) {
           hasMatchingOperation = operaciones.some((op) => {
             const tipoOp = op?.tipo_operacion;
-            if (!tipoOp) return false;
+            if (!tipoOp || op.activa === false) return false;
             const lower = String(tipoOp).toLowerCase();
             let normalized = lower;
             if (lower === "sale") normalized = "venta";
@@ -544,6 +469,20 @@ export const usePropertyFilters = (
       }
 
       return true;
+    });
+
+    // Con filtro de operación, una propiedad en venta y renta debe mostrar el
+    // precio de la operación filtrada, no el de la que venga primero.
+    if (!filters.operacion) return result;
+    return result.map((p) => {
+      const rawP = p as RawProperty;
+      const op = pickOperacion(rawP.operaciones_propiedad || rawP.operaciones, filters.operacion);
+      if (!op || op.precio == null || op.precio === p.price) return p;
+      return {
+        ...p,
+        price: op.precio,
+        currency: (op.moneda || p.currency) as Property["currency"],
+      };
     });
   }, [properties, filters, geofenceBounds]);
 
