@@ -1,0 +1,38 @@
+[
+ {
+  "id": "10fd35b4-9c0f-488b-a898-e555dec29b38",
+  "propiedad_id": "5f0db3ee-2cf2-4a21-a730-8ddcf16762d8",
+  "busqueda_id": "3ae08840-03fb-4f62-a174-9b547f74ede5",
+  "usuario_id": "903d45bf-8d6a-4fda-bfb1-ec22b8c5a9b2",
+  "tipo_match": "coincidencia",
+  "detalle": {
+   "precio": 6850000,
+   "mensaje": "Cumple con todos tus filtros",
+   "tipo_operacion": "venta",
+   "match_ubicacion": "geografico"
+  },
+  "estado": "pendiente",
+  "created_at": "2026-10-19 18:28:39.630695+00",
+  "notificado_en": null,
+  "visto_en": "2026-10-19 19:57:18.758+00",
+  "activo": true
+ },
+ {
+  "id": "34341cea-7706-4986-95d6-6258cc1fea67",
+  "propiedad_id": "b23dffab-72cc-4f0f-9986-924f24b847f4",
+  "busqueda_id": "3ae08840-03fb-4f62-a174-9b547f74ede5",
+  "usuario_id": "903d45bf-8d6a-4fda-bfb1-ec22b8c5a9b2",
+  "tipo_match": "coincidencia",
+  "detalle": {
+   "precio": 1080000,
+   "mensaje": "Cumple con todos tus filtros",
+   "tipo_operacion": "venta",
+   "match_ubicacion": "geografico"
+  },
+  "estado": "pendiente",
+  "created_at": "2026-10-19 18:28:39.630695+00",
+  "notificado_en": null,
+  "visto_en": "2026-10-19 19:57:18.758+00",
+  "activo": true
+ }
+]

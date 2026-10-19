@@ -1,0 +1,428 @@
+[
+ {
+  "id": "d96612fa-cd09-422d-a470-4a18b4ee81b0",
+  "codigo_propiedad": "0126041180",
+  "tipo": "habitacional",
+  "subtipo": "Departamento"
+ },
+ {
+  "id": "0d7f1068-2f95-4b71-b3b2-8b0f5136cb22",
+  "codigo_propiedad": "0315235975",
+  "tipo": "habitacional",
+  "subtipo": "Casa"
+ },
+ {
+  "id": "8afb3c37-589f-41c0-8b48-518db1da34c2",
+  "codigo_propiedad": "0325579836",
+  "tipo": "comercial",
+  "subtipo": "Local en centro comercial"
+ },
+ {
+  "id": "eabb7b92-e599-4056-ad82-8e130039fc6b",
+  "codigo_propiedad": "0517025789",
+  "tipo": "habitacional",
+  "subtipo": "Departamento"
+ },
+ {
+  "id": "b9abefba-a905-4c07-92ce-15911059b015",
+  "codigo_propiedad": "1028824475",
+  "tipo": "habitacional",
+  "subtipo": "Casa en condominio"
+ },
+ {
+  "id": "af04a5ae-2150-4994-8bb2-3a5a507d24e3",
+  "codigo_propiedad": "1152107633",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "83b7d818-971c-43f1-9bd8-bc13c13f1475",
+  "codigo_propiedad": "1322685644",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "28d8eff3-de3f-467c-8c26-e21f3f014fd0",
+  "codigo_propiedad": "1875350889",
+  "tipo": "habitacional",
+  "subtipo": "Departamento"
+ },
+ {
+  "id": "bde172b5-fa4d-42e2-a623-055bbb0c3448",
+  "codigo_propiedad": "2053820880",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "cf32774e-5158-4f90-88d6-6683ce50e49a",
+  "codigo_propiedad": "2386034590",
+  "tipo": "habitacional",
+  "subtipo": "Departamento"
+ },
+ {
+  "id": "decf6bb7-cedf-45ff-84b2-92ab6ef385a1",
+  "codigo_propiedad": "2473366738",
+  "tipo": "comercial",
+  "subtipo": "Local en centro comercial"
+ },
+ {
+  "id": "ec889c97-1df6-435d-8b1e-9a394fd97f00",
+  "codigo_propiedad": "2531598783",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "97e4d10c-6d45-4de1-80eb-b69b76f40291",
+  "codigo_propiedad": "2628824873",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "24f212d0-ce48-4cb8-a0d0-5e4f02b5acb2",
+  "codigo_propiedad": "2736793565",
+  "tipo": "habitacional",
+  "subtipo": "Casa en condominio"
+ },
+ {
+  "id": "ca3725e3-fefd-40ef-b28a-7434a3acd20e",
+  "codigo_propiedad": "2887167513",
+  "tipo": "comercial",
+  "subtipo": "Bodega comercial"
+ },
+ {
+  "id": "689e4920-6949-470e-9196-9f0a8130d20b",
+  "codigo_propiedad": "3234919515",
+  "tipo": "comercial",
+  "subtipo": "Bodega comercial"
+ },
+ {
+  "id": "7e37df65-2caa-4ec8-a0b8-b20c7149a40b",
+  "codigo_propiedad": "3419604922",
+  "tipo": "habitacional",
+  "subtipo": "Casa"
+ },
+ {
+  "id": "8271ebde-1f8c-4638-9622-0f3d397ff582",
+  "codigo_propiedad": "3531913933",
+  "tipo": "habitacional",
+  "subtipo": "Casa en condominio"
+ },
+ {
+  "id": "a3ec8a27-e5bb-4275-b690-4cf2fc580c5f",
+  "codigo_propiedad": "3770266270",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "4645b00f-29db-4cb0-afe1-9558f3022adb",
+  "codigo_propiedad": "3819261975",
+  "tipo": "comercial",
+  "subtipo": "Local en centro comercial"
+ },
+ {
+  "id": "8678ed2f-407b-4b0b-975b-668f8b137de4",
+  "codigo_propiedad": "3834744519",
+  "tipo": "habitacional",
+  "subtipo": "Casa en condominio"
+ },
+ {
+  "id": "ec221e7a-a54f-49b5-9309-832cc6a25950",
+  "codigo_propiedad": "3934861429",
+  "tipo": "habitacional",
+  "subtipo": "Casa en condominio"
+ },
+ {
+  "id": "9fcb5993-8a12-41ef-96f8-b14188ad5ca7",
+  "codigo_propiedad": "3958288666",
+  "tipo": "habitacional",
+  "subtipo": "Casa en condominio"
+ },
+ {
+  "id": "23766329-bc12-4f36-abcc-d948364fe02d",
+  "codigo_propiedad": "3961714251",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "9940125c-7b51-4f61-a52c-b18d1448b210",
+  "codigo_propiedad": "4016367167",
+  "tipo": "habitacional",
+  "subtipo": "Casa en condominio"
+ },
+ {
+  "id": "6df37c5b-1e00-4ed8-bffd-4693fc0602a6",
+  "codigo_propiedad": "4159006634",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "d7c5a07b-326c-4560-baf5-7ba583987630",
+  "codigo_propiedad": "4225168876",
+  "tipo": "comercial",
+  "subtipo": "Local comercial"
+ },
+ {
+  "id": "94782045-f2f9-476e-a309-eb561738eb46",
+  "codigo_propiedad": "4298958418",
+  "tipo": "comercial",
+  "subtipo": "Bodega comercial"
+ },
+ {
+  "id": "55989e0e-88fa-42b3-8afc-09398c391881",
+  "codigo_propiedad": "4326387208",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "0ce6247d-1e68-44b3-b84e-eef67e65244f",
+  "codigo_propiedad": "4381158318",
+  "tipo": "habitacional",
+  "subtipo": "Casa"
+ },
+ {
+  "id": "09af184a-84a0-46b4-b934-e9ec4376cf5c",
+  "codigo_propiedad": "4527058766",
+  "tipo": "habitacional",
+  "subtipo": "Casa en condominio"
+ },
+ {
+  "id": "0bddcb70-49ea-4f27-8a57-9263277c839f",
+  "codigo_propiedad": "4757451731",
+  "tipo": "comercial",
+  "subtipo": "Local en centro comercial"
+ },
+ {
+  "id": "185ba88a-93ef-4c91-9d14-8178c45f7c7b",
+  "codigo_propiedad": "4788914995",
+  "tipo": "habitacional",
+  "subtipo": "Casa en condominio"
+ },
+ {
+  "id": "56a54123-b4af-44fd-9c9d-f342ba937ae3",
+  "codigo_propiedad": "4889329797",
+  "tipo": "agricola",
+  "subtipo": "Terreno comercial"
+ },
+ {
+  "id": "19dfea21-0d8b-4ea5-b4b9-c30430d44b4c",
+  "codigo_propiedad": "5010828377",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "73be8578-e2e3-4593-ae72-a67b70917466",
+  "codigo_propiedad": "5020060339",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "5e1cb080-5dfb-4530-95c8-f9f500a0c6f0",
+  "codigo_propiedad": "5020766511",
+  "tipo": "habitacional",
+  "subtipo": "Departamento"
+ },
+ {
+  "id": "d3bcf18f-71eb-40af-b31f-bde53952d54b",
+  "codigo_propiedad": "5050311283",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "52f6e765-3556-48cc-b59b-d9f354996bb4",
+  "codigo_propiedad": "5254989701",
+  "tipo": "comercial",
+  "subtipo": "Local comercial"
+ },
+ {
+  "id": "cb0a1d99-36f3-4501-8eaf-b7c5abbd86d7",
+  "codigo_propiedad": "5369102593",
+  "tipo": "comercial",
+  "subtipo": "Local en centro comercial"
+ },
+ {
+  "id": "1be427ee-a249-46c6-8dca-44043e2f6fbb",
+  "codigo_propiedad": "5798332249",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "b87ddaca-08b8-4f2e-8ca6-644aee005fda",
+  "codigo_propiedad": "5872064010",
+  "tipo": "habitacional",
+  "subtipo": "Casa en condominio"
+ },
+ {
+  "id": "e0140bc1-9cae-4402-b5d4-dd025d7df930",
+  "codigo_propiedad": "6115221383",
+  "tipo": "habitacional",
+  "subtipo": "Casa en condominio"
+ },
+ {
+  "id": "5acdb60a-5adc-4cd1-9765-8ae6e7c4a6b5",
+  "codigo_propiedad": "6536080675",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "4084fb49-dd3f-4e6a-a03d-53a6c10a1afd",
+  "codigo_propiedad": "6664776600",
+  "tipo": "habitacional",
+  "subtipo": "Casa en condominio"
+ },
+ {
+  "id": "3c64ad3e-0188-4d79-860a-500579e1f6d5",
+  "codigo_propiedad": "6839884396",
+  "tipo": "comercial",
+  "subtipo": "Local comercial"
+ },
+ {
+  "id": "d9987662-a337-4354-95f7-e02a7d49e397",
+  "codigo_propiedad": "6925912209",
+  "tipo": "habitacional",
+  "subtipo": "Casa en condominio"
+ },
+ {
+  "id": "7839a448-2d9b-4d0d-9316-517f1edfae09",
+  "codigo_propiedad": "7015907964",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "3e178a70-3cdf-4524-b980-b96b482c4b6c",
+  "codigo_propiedad": "7059801794",
+  "tipo": "habitacional",
+  "subtipo": "Departamento"
+ },
+ {
+  "id": "50357d92-65e6-40d4-b968-27b7663b3295",
+  "codigo_propiedad": "7148627333",
+  "tipo": "comercial",
+  "subtipo": "Oficina"
+ },
+ {
+  "id": "427f84cc-a956-41e3-a3f2-dea486447cb2",
+  "codigo_propiedad": "7335323274",
+  "tipo": "comercial",
+  "subtipo": "Oficina"
+ },
+ {
+  "id": "b831ed2f-847c-4ff6-a58d-cd27d702f7b8",
+  "codigo_propiedad": "7572336961",
+  "tipo": "comercial",
+  "subtipo": "Oficina"
+ },
+ {
+  "id": "e7d79dc0-6dad-4ce5-b409-d77eb5bcccc2",
+  "codigo_propiedad": "7697670017",
+  "tipo": "habitacional",
+  "subtipo": "Casa en condominio"
+ },
+ {
+  "id": "88d0193b-aff9-4073-8658-26c85b4ba9cd",
+  "codigo_propiedad": "7770120250",
+  "tipo": "habitacional",
+  "subtipo": "Casa"
+ },
+ {
+  "id": "e23ca4f3-0f56-4a61-857e-fb8941112482",
+  "codigo_propiedad": "7943731103",
+  "tipo": "habitacional",
+  "subtipo": "Departamento"
+ },
+ {
+  "id": "f2fe2c2b-2e68-48a7-bbc5-a59e1b27b4e2",
+  "codigo_propiedad": "8185216122",
+  "tipo": "comercial",
+  "subtipo": "Local comercial"
+ },
+ {
+  "id": "2c763b3a-2ec7-4eda-9ec3-5a339b32dfe3",
+  "codigo_propiedad": "8303424908",
+  "tipo": "comercial",
+  "subtipo": "Oficina"
+ },
+ {
+  "id": "1b475e67-d8ee-4350-98a8-0f124ba91231",
+  "codigo_propiedad": "8341138276",
+  "tipo": "comercial",
+  "subtipo": "Oficina"
+ },
+ {
+  "id": "7ba4571b-0a23-4fbb-aa74-7c262e3bb7ee",
+  "codigo_propiedad": "8496537361",
+  "tipo": "habitacional",
+  "subtipo": "Departamento"
+ },
+ {
+  "id": "74865d2f-3fe1-4e31-ad70-7bb3af19b3d4",
+  "codigo_propiedad": "8609060974",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "eaad1b35-8675-459d-ac87-2b0c2c8db686",
+  "codigo_propiedad": "8798281945",
+  "tipo": "habitacional",
+  "subtipo": "Departamento"
+ },
+ {
+  "id": "e82e9552-f5f8-47a1-b120-7f1f39da46af",
+  "codigo_propiedad": "8819198164",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "a9f3c0b4-251c-4a57-92a2-825fbd3a7402",
+  "codigo_propiedad": "8953581649",
+  "tipo": "habitacional",
+  "subtipo": "Departamento"
+ },
+ {
+  "id": "ccfa409b-d50f-489e-96b5-718bc30124f7",
+  "codigo_propiedad": "8993783193",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "98c7f5af-3fcc-45a3-8497-f4b4977e47cf",
+  "codigo_propiedad": "9183731871",
+  "tipo": "comercial",
+  "subtipo": "Bodega comercial"
+ },
+ {
+  "id": "4f8c3956-5c09-499e-8487-1cd2469e78f7",
+  "codigo_propiedad": "9184988151",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "47c7c7a5-b428-4de8-ad4a-59595d82a931",
+  "codigo_propiedad": "9189413913",
+  "tipo": "habitacional",
+  "subtipo": "Departamento"
+ },
+ {
+  "id": "3679d9c6-31ac-40ae-abad-a8759e052e9e",
+  "codigo_propiedad": "9197921991",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "4a0a4110-499d-4217-83f8-fea8d2c03ec3",
+  "codigo_propiedad": "9322922331",
+  "tipo": "comercial",
+  "subtipo": "Local en centro comercial"
+ },
+ {
+  "id": "2b84e8d4-69ee-4ea1-b52a-250a2f697479",
+  "codigo_propiedad": "9787056451",
+  "tipo": "agricola",
+  "subtipo": "Terreno"
+ },
+ {
+  "id": "a84b3628-dbe1-40ec-ab67-8ee14033f191",
+  "codigo_propiedad": "9897697942",
+  "tipo": "habitacional",
+  "subtipo": "Departamento"
+ }
+]
