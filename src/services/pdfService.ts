@@ -8,6 +8,7 @@ import { logger } from "@/utils/logger";
 import { LogoBase64 } from "@/assets/logoBase64";
 import { COLORS } from "@/constants";
 import { buildPropertyShareTitle, propertyTitleToFileName } from "@/utils/propertyShareTitle";
+import { pickOperacion } from "@/utils/operaciones";
 
 const log = logger.scoped("pdfService");
 // ============================================================================
@@ -311,7 +312,7 @@ const generatePropertyHtml = (
     heroIsPortrait?: boolean;
   }, // Asumo que esta flag vendrá en tu config o puedes forzarla
 ): string => {
-  const operacionPrincipal = data.operaciones?.[0];
+  const operacionPrincipal = pickOperacion(data.operaciones);
   const statusLabel =
     data.status && data.status.toLowerCase() !== "publicada"
       ? data.status.toUpperCase()

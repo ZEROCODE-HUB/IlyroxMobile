@@ -7,6 +7,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants';
+import { pickOperacion } from "@/utils/operaciones";
 
 interface PropertyMessageBubbleProps {
   message: {
@@ -67,7 +68,7 @@ export default function PropertyMessageBubble({
 
   const { propiedad } = message;
   const mainImage = propiedad.fotos?.[0] || 'https://placehold.co/400x300';
-  const operation = propiedad.operaciones?.[0];
+  const operation = pickOperacion(propiedad.operaciones);
 
   return (
     <View style={[styles.container, isMe ? styles.containerMe : styles.containerOther]}>

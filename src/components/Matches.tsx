@@ -22,6 +22,7 @@ import { COLORS, FALLBACKS } from "../constants";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePropertyCacheStore } from "@/store/propertyCacheStore";
 import { closeThenNavigate } from "@/utils/closeThenNavigate";
+import { pickOperacion } from "@/utils/operaciones";
 
 export type MatchType = "coincidencia" | "similar";
 
@@ -478,7 +479,7 @@ const Matches: React.FC = () => {
       const prop = match.propiedad;
       if (!prop) return; // Seguridad extra
 
-      const operacion = prop.operaciones?.[0];
+      const operacion = pickOperacion(prop.operaciones, match.busqueda?.tipo_operacion);
 
       let perfil = prop.perfil;
       if (Array.isArray(perfil)) {

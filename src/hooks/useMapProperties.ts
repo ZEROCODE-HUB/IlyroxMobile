@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Property, PropertyType, GeoBounds } from "@/types";
 import { blockService } from "@/services/blockService";
 import { normalizePropertyStatus } from "@/services/propertyService";
+import { pickOperacion } from "@/utils/operaciones";
 
 /**
  * Filtros que se pueden aplicar directamente en Supabase.
@@ -130,7 +131,7 @@ interface SupabaseProperty {
 }
 
 function mapProperty(p: SupabaseProperty): Property {
-  const operacion = p.operaciones_propiedad?.[0];
+  const operacion = pickOperacion(p.operaciones_propiedad);
   return {
     ...p,
     id: p.id,

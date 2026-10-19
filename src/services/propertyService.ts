@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { Property } from "@/types";
 import { logger } from "@/utils/logger";
+import { pickOperacion } from "@/utils/operaciones";
 
 const log = logger.scoped("propertyService");
 
@@ -112,7 +113,7 @@ export const propertyService = {
     if (!propsData) return [];
 
     return propsData.map((p: any) => {
-      const operation = p.operaciones_propiedad?.[0];
+      const operation = pickOperacion(p.operaciones_propiedad);
       const status = normalizePropertyStatus(p.status, p.activo);
 
       let commission: Property["commission"] | undefined;

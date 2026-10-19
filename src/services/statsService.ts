@@ -5,6 +5,7 @@ import {
   SearchesByNeighborhoodData,
 } from "@/components/charts/types";
 import { logger } from "@/utils/logger";
+import { pickOperacion } from "@/utils/operaciones";
 
 const log = logger.scoped("statsService");
 
@@ -224,7 +225,7 @@ export const statsService = {
         .select(
           `
           habitaciones,
-          operaciones_propiedad!inner (precio)
+          operaciones_propiedad!inner (precio, tipo_operacion, activa)
         `,
         )
         .is("deleted_at", null)
@@ -247,7 +248,7 @@ export const statsService = {
       const grouped: Record<number, { total: number; count: number }> = {};
       data?.forEach((p) => {
         const rooms = p.habitaciones || 0;
-        const price = p.operaciones_propiedad?.[0]?.precio || 0;
+        const price = pickOperacion(p.operaciones_propiedad as any[], "venta")?.precio || 0;
         if (price > 0) {
           if (!grouped[rooms]) grouped[rooms] = { total: 0, count: 0 };
           grouped[rooms].total += price;
