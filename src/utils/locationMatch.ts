@@ -138,7 +138,10 @@ export function matchesLocationCriteria(
   if (c.ciudad.trim() && normalizarUbicacion(prop.ciudad) !== normalizarUbicacion(c.ciudad)) {
     return false;
   }
-  if (c.municipio.length > 0) {
+  // REV05-24: con colonia, el municipio que da Google puede no ser el de la BD
+  // (Google ubica St Angelo en Aguascalientes y la BD en Jesus Maria). La colonia y
+  // el estado bastan. Mismo criterio en evaluar_par_match (SQL 07).
+  if (c.municipio.length > 0 && c.colonias.length === 0) {
     const pMunicipio = normalizarUbicacion(prop.municipio);
     if (!c.municipio.some((m) => normalizarUbicacion(m) === pMunicipio)) return false;
   }
