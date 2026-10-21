@@ -19,9 +19,13 @@ export function normalizarUbicacion(t?: string | null): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "");
-  switch (n) {
+  // REV05-06: ademas de minusculas y sin acentos, cualquier signo o puntuacion
+  // cuenta como espacio ("ST. ANGELO RESIDENCE" == "St Angelo Residence").
+  // Misma regla que normalizar_texto_ubicacion() en la BD.
+  const s = n.replace(/[^a-z0-9]+/g, " ").trim();
+  switch (s) {
     case "ciudad de mexico":
-    case "ciudad de mexico (cdmx)":
+    case "ciudad de mexico cdmx":
     case "distrito federal":
     case "mexico city":
       return "cdmx";
@@ -36,7 +40,7 @@ export function normalizarUbicacion(t?: string | null): string {
     case "veracruz llave":
       return "veracruz";
     default:
-      return n;
+      return s;
   }
 }
 
