@@ -176,6 +176,11 @@ export const OpenHousePost = ({
             </Text>
           </Pressable>
         </View>
+        {!!errors.fechaFinalizacion && (
+          <Text style={{ color: COLORS.error, fontSize: 12, marginTop: 6 }}>
+            {errors.fechaFinalizacion}
+          </Text>
+        )}
       </View>
 
       <View style={styles.card}>
@@ -232,6 +237,7 @@ export const OpenHousePost = ({
         visible={showEndDatePicker}
         value={fechaFinalizacion || new Date()}
         mode="date"
+        minimumDate={fechaHora}
         onClose={() => setShowEndDatePicker(false)}
         onPicked={(selectedDate) => {
           const baseDate = fechaFinalizacion || new Date();
@@ -331,12 +337,15 @@ function DateTimeField({
   mode,
   onPicked,
   onClose,
+  minimumDate,
 }: {
   visible: boolean;
   value: Date;
   mode: "date" | "time";
   onPicked: (d: Date) => void;
   onClose: () => void;
+  /** REV05-37: fecha minima seleccionable (p. ej. el inicio del Open House). */
+  minimumDate?: Date;
 }) {
   if (!visible) return null;
 
@@ -346,6 +355,7 @@ function DateTimeField({
         value={value}
         mode={mode}
         display="default"
+        minimumDate={minimumDate}
         onChange={(event, selectedDate) => {
           onClose();
           if (event.type !== "dismissed" && selectedDate) onPicked(selectedDate);
@@ -367,6 +377,7 @@ function DateTimeField({
             value={value}
             mode={mode}
             display="spinner"
+            minimumDate={minimumDate}
             themeVariant="light"
             locale="es-MX"
             onChange={(_e, selectedDate) => {

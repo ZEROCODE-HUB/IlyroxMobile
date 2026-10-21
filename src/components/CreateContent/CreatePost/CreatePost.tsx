@@ -328,6 +328,23 @@ export default function CreatePost({ post, onBack, onUpdated }: CreatePostProps)
    * Publicar post
    */
   const handlePublish = async () => {
+    // REV05-37: en un Open House el termino debe ser posterior al inicio.
+    if (
+      post?.tipo === "openhouse" &&
+      fechaFinalizacion &&
+      fechaFinalizacion.getTime() <= fechaHora.getTime()
+    ) {
+      setErrors((prev) => ({
+        ...prev,
+        fechaFinalizacion: "El término debe ser posterior al inicio del Open House",
+      }));
+      showModal({
+        title: "Error",
+        message: "La fecha y hora de término debe ser posterior al inicio del Open House",
+        confirmText: "OK",
+      });
+      return;
+    }
     if (!validate()) {
       showModal({ title: "Error", message: "Por favor completa todos los campos", confirmText: "OK" });
       return;
