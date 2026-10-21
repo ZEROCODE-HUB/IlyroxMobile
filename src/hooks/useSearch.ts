@@ -10,6 +10,7 @@ import { logger } from "@/utils/logger";
 import { router } from "expo-router";
 import { blockService } from "@/services/blockService";
 import { normalizeStr } from "@/utils/stringNormalizer";
+import { pickOperacion } from "@/utils/operaciones";
 
 const log = logger.scoped("useSearch");
 
@@ -233,7 +234,7 @@ async function fetchProperties(
   const { data } = await query;
 
   return (data ?? []).map((p) => {
-    const op = Array.isArray(p.operaciones_propiedad) ? p.operaciones_propiedad[0] : null;
+    const op = pickOperacion(p.operaciones_propiedad) ?? null;
     return {
       id: p.id,
       codigo_propiedad: p.codigo_propiedad,

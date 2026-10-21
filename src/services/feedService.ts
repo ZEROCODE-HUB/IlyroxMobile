@@ -14,6 +14,7 @@ import {
   PropertyType,
   User,
 } from "@/types";
+import { pickOperacion } from "@/utils/operaciones";
 
 const log = logger.scoped("feedService");
 
@@ -257,9 +258,7 @@ const mapPropertyToFeedItem = (
   property: any,
   user: User,
 ): FeedItem => {
-  const operation = Array.isArray(property.operaciones_propiedad)
-    ? property.operaciones_propiedad[0]
-    : property.operaciones_propiedad;
+  const operation = pickOperacion(property.operaciones_propiedad);
 
   return {
     id: feedData.id,

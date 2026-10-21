@@ -580,8 +580,10 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
         ).length;
         if (localCount < 2) {
           const fallbackSearchTerm = `${searchTerm}, ${effectiveEstado}`;
+          // Mismos `types` que la búsqueda principal: con "(regions)" Google
+          // excluye los fraccionamientos (los clasifica como establishment).
           const fallbackResults = await searchLocations(
-            fallbackSearchTerm, 5, sessionToken, country, "(regions)",
+            fallbackSearchTerm, 5, sessionToken, country, types,
           );
           if (requestId !== get().latestSearchRequestId) return;
 
@@ -663,11 +665,13 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
       // ── NORMALIZAR NOMBRES SIMILARES ──────────────────────────────────
       // Cuando un resultado de la BD (ej. "Loretta") y uno de Google (ej. "Loretta II")
       // son essentially la misma zona, agruparlos y conservar el MEJOR de ambos.
-      const seenRoots = new Map<string, number>(); // root → first index
+      // Se agrupa por nombre Y estado: con solo el nombre, "Tamarindos, Gro." de
+      // Google se tragaba a "Tamarindos, Aguascalientes" de la BD.
+      const seenRoots = new Map<string, number>(); // root|estado → first index
       const normalized: typeof combined = [];
       for (let i = 0; i < combined.length; i++) {
         const item = combined[i];
-        const root = normalizeForMatch(item.name);
+        const root = `${normalizeForMatch(item.name)}|${normalizeForMatch(item.estado_nombre ?? "")}`;
         if (!seenRoots.has(root)) {
           seenRoots.set(root, normalized.length);
           normalized.push(item);

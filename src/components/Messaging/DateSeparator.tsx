@@ -6,56 +6,17 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { COLORS } from "../../constants";
+import { formatChatSeparatorDate } from "../../utils/dateFormatter";
 
 interface DateSeparatorProps {
   date: string; // ISO date string
 }
 
 export default function DateSeparator({ date }: DateSeparatorProps) {
-  const formatDate = (dateString: string) => {
-    const messageDate = new Date(dateString);
-    const now = new Date();
-    
-    // Reset hours to compare dates only
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    const messageDay = new Date(
-      messageDate.getFullYear(),
-      messageDate.getMonth(),
-      messageDate.getDate()
-    );
-
-    // Today
-    if (messageDay.getTime() === today.getTime()) {
-      return "Hoy";
-    }
-
-    // Yesterday
-    if (messageDay.getTime() === yesterday.getTime()) {
-      return "Ayer";
-    }
-
-    // This week (Sunday to Saturday)
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay());
-    
-    if (messageDay >= startOfWeek && messageDay < today) {
-      return messageDate.toLocaleDateString("es-MX", { weekday: "long" });
-    }
-
-    // Older dates
-    return messageDate.toLocaleDateString("es-MX", {
-      day: "numeric",
-      month: "short",
-    });
-  };
-
   return (
     <View style={styles.container}>
       <View style={styles.bubble}>
-        <Text style={styles.text}>{formatDate(date)}</Text>
+        <Text style={styles.text}>{formatChatSeparatorDate(date)}</Text>
       </View>
     </View>
   );

@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { uploadVideo as uploadVideoService } from "../services/uploadService";
+import {
+  uploadVideo as uploadVideoService,
+  isMediaUnavailable,
+} from "../services/uploadService";
 import { logger } from "@/utils/logger";const log = logger.scoped("useVideoUpload");
 
 export const useVideoUpload = () => {
@@ -12,6 +15,7 @@ export const useVideoUpload = () => {
    * @param bucket Kept for backward compatibility (ignored)
    * @param folder Kept for backward compatibility (ignored)
    * @returns Object with videoUrl and optionally thumbnailUrl, or null if failed
+   * @throws MediaUnavailableError si el servidor de archivos no responde.
    */
   const MAX_UPLOAD_RETRIES = 3;
 
@@ -63,6 +67,7 @@ export const useVideoUpload = () => {
     );
     setUploading(false);
     setTimeout(() => setUploadProgress(0), 1000);
+    if (isMediaUnavailable(lastError)) throw lastError;
     return null;
   };
 

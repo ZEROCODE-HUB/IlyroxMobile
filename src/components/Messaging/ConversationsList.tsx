@@ -24,6 +24,7 @@ import { useTags } from "../../hooks/messaging/useTags";
 import { blockService } from "../../services/blockService";
 import { COLORS } from "../../constants";
 import { Avatar } from "../shared";
+import { formatChatListDate } from "../../utils/dateFormatter";
 
 interface ConversationsListProps {
   userId: string;
@@ -222,31 +223,6 @@ export default function ConversationsList({
     return success;
   };
 
-  const formatTime = (dateString: string | null) => {
-    if (!dateString) return "";
-
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-    if (days === 0) {
-      return date.toLocaleTimeString("es-MX", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } else if (days === 1) {
-      return "Ayer";
-    } else if (days < 7) {
-      return date.toLocaleDateString("es-MX", { weekday: "short" });
-    } else {
-      return date.toLocaleDateString("es-MX", {
-        day: "numeric",
-        month: "short",
-      });
-    }
-  };
-
   const renderConversation = ({ item }: { item: any }) => {
     const otherUser = item.other_user;
     const fullName = `${otherUser?.nombre || "Usuario"} ${otherUser?.apellido_paterno || ""
@@ -271,7 +247,7 @@ export default function ConversationsList({
               {fullName}
             </Text>
             <Text style={styles.time}>
-              {formatTime(item.ultima_actividad || item.ultimo_mensaje_en)}
+              {formatChatListDate(item.ultima_actividad || item.ultimo_mensaje_en)}
             </Text>
           </View>
 

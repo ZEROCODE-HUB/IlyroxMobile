@@ -22,7 +22,10 @@ dist-ssr
 *.sln
 *.sw?
 
+# Carpetas nativas generadas por prebuild (CNG). Si no se ignoran, el fingerprint
+# de EAS las cuenta y no coincide con el calculado localmente.
 android
+ios
 
 # Custom build scripts and logs
 build-prod.ps1

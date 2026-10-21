@@ -328,7 +328,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                   </Text>
                 </View>
               ))}
-              {user?.id === propertyDetails.created_by && propertyDetails.precio_contrato && (propertyDetails.status === "Vendida" || propertyDetails.status === "Rentada") && (
+              {user?.id === propertyDetails.created_by && !!propertyDetails.precio_contrato && (propertyDetails.status === "Vendida" || propertyDetails.status === "Rentada") && (
                 <View style={styles.contractPriceBadge}>
                   <Text style={styles.contractPriceLabel}>
                     {propertyDetails.status === "Rentada" ? "Rentada en" : "Vendida en"}

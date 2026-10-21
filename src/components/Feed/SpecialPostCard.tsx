@@ -460,16 +460,20 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
         ? [f.ubicacion.colonia]
         : [];
 
-    // Fallback: priorizar las ubicaciones multi-nivel; si no hay, usar los datos legacy
-    const ubicacionFallback = !zonas.length
-      ? ubicacionesMulti.length > 0
+    // Ubicaciones con nombre: priorizar las multi-nivel; si no hay, usar los
+    // datos legacy. Se muestran junto a las zonas dibujadas. Los posts antiguos
+    // guardaban las ubicaciones con nombre en `zonas_interes`; se omiten las
+    // que ya aparecen ahí para no repetirlas.
+    const zonaLabels = new Set(zonas.map((z) => String(z?.label ?? "").trim().toLowerCase()));
+    const ubicacionFallback = (
+      ubicacionesMulti.length > 0
         ? ubicacionesMulti
         : coloniasArr.length > 0
           ? [coloniasArr.join(", ")]
           : [f.ubicacion?.ciudad, f.ubicacion?.municipio, f.ubicacion?.estado]
               .filter((s) => typeof s === "string" && s.trim().length > 0)
               .slice(0, 1)
-      : [];
+    ).filter((label) => !zonaLabels.has(String(label).trim().toLowerCase()));
 
     // Características y superficies: mostramos todo lo que el usuario llenó
     const num = (v: unknown): number | null =>

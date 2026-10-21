@@ -281,7 +281,7 @@ interface PropertyMapProps {
 }
 
 export const PropertyMap: React.FC<PropertyMapProps> = ({
-  properties,
+  properties: rawProperties,
   onMarkerPress,
   onStackPress,
   googleApiKey,
@@ -296,6 +296,19 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   searchedLocationPins,
   topOffset = 0,
 }) => {
+  // Solo entran al mapa las propiedades con coordenadas válidas. Antes cada
+  // cálculo (supercluster, auto-fit, overlays…) validaba por su cuenta y solo
+  // con `isNaN`: una lat/lng fuera de rango (p. ej. invertidas) pasaba y
+  // producía una región imposible que MapKit rechaza con una excepción nativa
+  // ("Invalid Region") que ningún try/catch de JS atrapa.
+  const properties = useMemo(
+    () =>
+      rawProperties.filter((p) =>
+        isValidCoord(p.coordinates?.lat ?? p.latitud, p.coordinates?.lng ?? p.longitud),
+      ),
+    [rawProperties],
+  );
+
   const mapRef = useRef<any>(null);
   const nativeMapRef = useRef<MapView>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -838,9 +851,11 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     latDelta = Math.max(latDelta, 0.02);
     lngDelta = Math.max(lngDelta, 0.02);
 
-    // Multiplicar por 3 para dar MUCHO espacio a los marcadores
-    latDelta *= 3;
-    lngDelta *= 3;
+    // Multiplicar por 3 para dar MUCHO espacio a los marcadores, sin pasar
+    // del máximo que acepta MapKit (180° / 360°): con propiedades muy
+    // dispersas el ×3 lo superaba y la región era inválida.
+    latDelta = Math.min(latDelta * 3, 180);
+    lngDelta = Math.min(lngDelta * 3, 360);
 
     return {
       latitude: centerLat,
@@ -1231,8 +1246,10 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   // `onMapReady` (mapReady === true). Eso separa el commit de mount del
   // MapView del commit de mount de sus children — clave para evitar el
   // crash iOS del interop legacy de react-native-maps.
+  // Dibujando no se montan: así cada toque llega al MapView y se añade como
+  // vértice, en vez de abrir la propiedad o hacer zoom en el clúster.
   const clusterTouchMarkers = useMemo(() => {
-    if (!mapReady) return [] as React.ReactNode[];
+    if (!mapReady || drawingMode) return [] as React.ReactNode[];
     const result = clusters
       .filter((c: any) => c.properties.cluster)
       .map((cluster: any) => {
@@ -1272,7 +1289,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     }
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clusters, handleClusterPressStable, mapReady]);
+  }, [clusters, handleClusterPressStable, mapReady, drawingMode]);
 
   // 2) Individual property markers (invisibles, capturan el toque).
   // El `onPress` se pasa a través de `handleIndividualMarkerPress` (estable,
@@ -1281,7 +1298,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   // vea un cambio de prop en cada render y re-serialize el marker.
   // También se difiere hasta `mapReady` (mismo motivo que clusterTouchMarkers).
   const individualPropertyMarkers = useMemo(() => {
-    if (!mapReady) return [] as React.ReactNode[];
+    if (!mapReady || drawingMode) return [] as React.ReactNode[];
     const candidates = clusters.filter((c: any) => !c.properties.cluster);
     const result = candidates
       .map((point: any) => {
@@ -1345,7 +1362,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     }
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clusters, propertyMap, mapReady, handleIndividualMarkerPress]);
+  }, [clusters, propertyMap, mapReady, drawingMode, handleIndividualMarkerPress]);
 
   // 3) Searched location pins (los del buscador de inicio / chips).
   // También se difiere hasta `mapReady` (mismo motivo).

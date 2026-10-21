@@ -7,6 +7,7 @@
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/utils/logger";
 import { blockService } from "@/services/blockService";
+import { pickOperacion } from "@/utils/operaciones";
 
 const log = logger.scoped("conversationsService");
 
@@ -281,7 +282,7 @@ export const conversationsService = {
 
       let propiedad: ConversationForUser["propiedad"] = null;
       if (conv.propiedad) {
-        const operation = conv.propiedad.operaciones_propiedad?.[0];
+        const operation = pickOperacion(conv.propiedad.operaciones_propiedad);
         propiedad = {
           id: conv.propiedad.id,
           tipo: conv.propiedad.tipo,

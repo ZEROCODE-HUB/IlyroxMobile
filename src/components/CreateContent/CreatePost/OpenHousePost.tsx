@@ -16,7 +16,11 @@ import { useToast } from "@/context/ToastContext";
 import { Post } from "@/types";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { uploadImage } from "../../../services/uploadService";
+import {
+  uploadImage,
+  isMediaUnavailable,
+  MEDIA_UNAVAILABLE_MESSAGE,
+} from "../../../services/uploadService";
 import { AppInput } from "@/design-system/components/AppInput";
 import { SelectionModal } from "@/components/modals";
 import { logger } from "@/utils/logger";
@@ -83,7 +87,8 @@ export const OpenHousePost = ({
       }
     } catch (error) {
       log.error("Error picking/uploading image:", error);
-      showToast("No se pudo subir la imagen", "error");
+      if (isMediaUnavailable(error)) showToast(MEDIA_UNAVAILABLE_MESSAGE, "error", 5000);
+      else showToast("No se pudo subir la imagen", "error");
     } finally {
       setUploading(false);
     }

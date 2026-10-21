@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { COLORS } from "@/constants/colors";
 import { supabase } from "../../lib/supabase";
+import { pickOperacion } from "@/utils/operaciones";
 
 interface ChatPropertyBannerProps {
   /** Propiedad asociada a la conversación. */
@@ -41,14 +42,12 @@ export const ChatPropertyBanner: React.FC<ChatPropertyBannerProps> = ({
       const { data, error } = await supabase
         .from("propiedades")
         .select(
-          "id, tipo, subtipo, ciudad, fotos, operaciones_propiedad(precio, moneda)",
+          "id, tipo, subtipo, ciudad, fotos, operaciones_propiedad(precio, moneda, tipo_operacion, activa)",
         )
         .eq("id", propertyId)
         .single();
       if (!active || error || !data) return;
-      const op = Array.isArray(data.operaciones_propiedad)
-        ? data.operaciones_propiedad[0]
-        : (data.operaciones_propiedad as any);
+      const op = pickOperacion(data.operaciones_propiedad as any) as any;
       setInfo({
         id: data.id,
         tipo: data.tipo,

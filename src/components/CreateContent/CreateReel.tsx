@@ -28,7 +28,11 @@ import { supabase } from "../../lib/supabase";
 import { useCreateContent } from "@/hooks/useCreateContent";
 import { useVideoUpload } from "@/hooks";
 import { AppHeader } from "../AppHeader";
-import { uploadImage } from "../../services/uploadService";
+import {
+  uploadImage,
+  isMediaUnavailable,
+  MEDIA_UNAVAILABLE_MESSAGE,
+} from "../../services/uploadService";
 import { logger } from "@/utils/logger";
 import { useGalleryPermission } from "@/hooks/useGalleryPermission";
 
@@ -301,7 +305,8 @@ export default function CreateReel({ onBack, reelId, onUpdated }: CreateReelProp
       }
     } catch (error) {
       log.error("Error publishing reel:", error);
-      showToast("Hubo un problema al publicar el reel", "error");
+      if (isMediaUnavailable(error)) showToast(MEDIA_UNAVAILABLE_MESSAGE, "error", 5000);
+      else showToast("Hubo un problema al publicar el reel", "error");
     }
   };
 

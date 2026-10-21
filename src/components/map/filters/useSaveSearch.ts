@@ -4,6 +4,7 @@ import { useToast } from "../../../context/ToastContext";
 import { useModal } from "../../../context/ModalContext";
 import { DEFAULT_COUNTRY } from "../../../lib/location/registry";
 import { geocodeAddress, boundsCenter } from "../../../lib/geocodingService";
+import { buildLocationCriteria } from "@/utils/locationMatch";
 
 /**
  * Normaliza los filtros comerciales para persistencia/matching. `tipoUbicacion`
@@ -55,7 +56,7 @@ function serializeAgricolaFilters(ag: any): any {
  * ¿Por qué NO geocodificamos con colonia? El "viewport" que Google devuelve
  * para una colonia suele ser mucho más grande que la colonia real y arrastra
  * propiedades de colonias vecinas (mismo motivo por el que el cliente ignora
- * los bounds de chips de colonia en `usePropertyFilters.chipTextMatch`).
+ * los bounds de chips de colonia en `utils/locationMatch`).
  * Así, una búsqueda por colonia cae al fallback de texto en
  * `v_texto_match` (rescata por nombre de colonia, sin importar la distancia
  * del pin), que es lo que el cliente ya hace en vivo.
@@ -486,67 +487,16 @@ export const useSaveSearch = (userId?: string) => {
       if (!isNaN(pMax)) insertData.precio_max = pMax;
     }
 
-    if (filters.locationFilter.estado)
-      insertData.estado = [filters.locationFilter.estado];
-    if (filters.locationFilter.ciudad)
-      insertData.ciudad = filters.locationFilter.ciudad;
-    if (filters.locationFilter.municipio)
-      insertData.municipio = [filters.locationFilter.municipio];
-    if (filters.locationFilter.colonia) {
-      insertData.colonias = Array.isArray(filters.locationFilter.colonia)
-        ? filters.locationFilter.colonia
-        : [filters.locationFilter.colonia];
-    }
-
-    // Si se usaron chips sin locationFilter base, extraer estado/municipio/
-    // colonia de los chips para que el trigger de match pueda filtrar por
-    // ubicación correctamente. El SQL `evaluar_par_match` usa estas columnas
-    // directas para el fallback `v_texto_match` (rescata propiedades cuyo pin
-    // cae fuera del bounds de Google pero sí son de la colonia buscada — el
-    // caso típico de EasyBroker con coords imprecisas).
-    if (filters.locationChips?.length > 0) {
-      if (!filters.locationFilter?.estado) {
-        const estadosDeChips = [
-          ...new Set(
-            filters.locationChips
-              .map((c: any) => c.locationFilter?.estado)
-              .filter((e: string) => e && e.trim())
-          ),
-        ] as string[];
-        if (estadosDeChips.length > 0) {
-          insertData.estado = estadosDeChips;
-        }
-      }
-      // Municipio: igual que estado — si no viene del locationFilter base,
-      // extraerlo de los chips.
-      if (!filters.locationFilter?.municipio) {
-        const municipiosDeChips = [
-          ...new Set(
-            filters.locationChips
-              .map((c: any) => c.locationFilter?.municipio)
-              .filter((m: string) => m && m.trim())
-          ),
-        ] as string[];
-        if (municipiosDeChips.length > 0) {
-          insertData.municipio = municipiosDeChips;
-        }
-      }
-      // Colonia: si el locationFilter base no tiene colonia pero los chips sí
-      // (caso típico al filtrar por chip de Google Places), poblar `colonias`
-      // para que el SQL la use en el fallback `v_texto_match`.
-      if (!filters.locationFilter?.colonia) {
-        const coloniasDeChips = [
-          ...new Set(
-            filters.locationChips
-              .map((c: any) => c.locationFilter?.colonia)
-              .filter((c: string) => c && c.trim())
-          ),
-        ] as string[];
-        if (coloniasDeChips.length > 0) {
-          insertData.colonias = coloniasDeChips;
-        }
-      }
-    }
+    // Ubicación: mismos criterios que usa el mapa para filtrar
+    // (utils/locationMatch), así lo guardado coincide con lo que se ve.
+    const ubicacion = buildLocationCriteria(
+      filters.locationFilter,
+      filters.locationChips ?? [],
+    );
+    if (ubicacion.estado.length > 0) insertData.estado = ubicacion.estado;
+    if (ubicacion.ciudad) insertData.ciudad = ubicacion.ciudad;
+    if (ubicacion.municipio.length > 0) insertData.municipio = ubicacion.municipio;
+    if (ubicacion.colonias.length > 0) insertData.colonias = ubicacion.colonias;
 
     if (filters.habitaciones && filters.habitaciones !== "No indicado") {
       const habNum = parseInt(filters.habitaciones);
