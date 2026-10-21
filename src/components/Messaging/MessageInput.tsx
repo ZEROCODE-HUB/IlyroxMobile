@@ -66,9 +66,18 @@ export default React.forwardRef<TextInput, MessageInputProps>(
       setSelectedFile(null);
       setUploading(true);
 
+      // REV05-34: si el archivo ya se envio y falla el texto, no se reenvia el archivo.
+      let fileSent = false;
       try {
         if (fileToSend && onSendFile) {
           await onSendFile(fileToSend.uri, fileToSend.name);
+          fileSent = true;
+          // REV05-34: el texto escrito junto al archivo se enviaba nunca; ahora va
+          // como mensaje de texto justo despues del archivo.
+          if (messageText) {
+            if (onSendCombined) await onSendCombined(messageText);
+            else if (onSendText) await onSendText(messageText);
+          }
         } else if (onSendCombined) {
           await onSendCombined(messageText, imageToSend || undefined);
         } else {
@@ -78,8 +87,10 @@ export default React.forwardRef<TextInput, MessageInputProps>(
       } catch (error) {
         log.error("Error sending message:", error);
         setText(messageText);
-        setSelectedImage(imageToSend);
-        setSelectedFile(fileToSend);
+        if (!fileSent) {
+          setSelectedImage(imageToSend);
+          setSelectedFile(fileToSend);
+        }
         showToast("No se pudo enviar el mensaje", "error");
       } finally {
         setUploading(false);
