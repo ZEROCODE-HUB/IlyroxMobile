@@ -278,6 +278,29 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
 
     addLocationChip: (chip) =>
       set((state) => {
+        // REV05-29: una zona ya agregada no se duplica. Se compara tipo + nombre
+        // + municipio + estado (sin acentos ni mayusculas) y NO el id: el mismo
+        // lugar llega con ids distintos desde la lupa del mapa, el historial y
+        // el buscador del feed. Dos zonas con el mismo nombre pero de distinto
+        // municipio o estado (p. ej. "Centro") siguen siendo chips distintos.
+        const chipKey = (c: LocationChip) =>
+          [
+            c.type,
+            c.label,
+            c.locationFilter?.municipio ?? "",
+            c.locationFilter?.estado ?? "",
+          ]
+            .map((v) =>
+              String(v ?? "")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .trim()
+                .toLowerCase(),
+            )
+            .join("|");
+        if (state.filters.locationChips.some((c) => chipKey(c) === chipKey(chip))) {
+          return state;
+        }
         // Límite máximo de chips acumulados. Esto evita que el cliente filtre
         // demasiadas zonas a la vez (rendimiento) y mantiene la búsqueda
         // acotada. El usuario debe quitar un chip (con la X) para agregar otro.
