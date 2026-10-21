@@ -837,9 +837,24 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
                   style={styles.zoneSearchItemIcon}
                 />
                 <View style={styles.zoneSearchItemText}>
+                  {/* REV05-27: mismo formato que el buscador del feed: nombre y,
+                      en gris, municipio y estado. Solo si la zona NO trae
+                      municipio ni estado se muestra, como segunda linea, la
+                      descripcion completa (para no repetir el mismo dato). */}
                   <Text style={styles.zoneSearchItemName} numberOfLines={2}>
-                    {item.fullDescription || item.name}
+                    {item.name}
+                    {[item.municipio_nombre, item.estado_nombre].filter(Boolean).length > 0 ? (
+                      <Text style={{ fontWeight: "400", color: COLORS.textSecondary }}>
+                        {`, ${[item.municipio_nombre, item.estado_nombre].filter(Boolean).join(", ")}`}
+                      </Text>
+                    ) : null}
                   </Text>
+                  {![item.municipio_nombre, item.estado_nombre].filter(Boolean).length &&
+                    !!item.fullDescription && item.fullDescription !== item.name && (
+                    <Text style={styles.zoneSearchItemSub} numberOfLines={1}>
+                      {item.fullDescription}
+                    </Text>
+                  )}
                   {item.propertyCount != null && item.propertyCount > 0 && (
                     <Text style={styles.zoneSearchItemSub}>
                       {item.propertyCount} props

@@ -1027,6 +1027,13 @@ function LocationRow({ location, onPress, query = "" }: { location: SearchLocati
           )}
           {suffix ? <Text style={{ fontWeight: "400", color: COLORS.textSecondary }}>{`, ${suffix}`}</Text> : null}
         </Text>
+        {/* REV05-27: igual que en la lupa del mapa: solo si la zona no trae
+            municipio ni estado se muestra, en gris, su descripcion completa. */}
+        {!suffix && !!location.fullDescription && location.fullDescription !== location.name && (
+          <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 1 }} numberOfLines={1}>
+            {location.fullDescription}
+          </Text>
+        )}
       </View>
       <Ionicons name="chevron-forward" size={18} color={COLORS.cardBorder} />
     </SafePressable>
