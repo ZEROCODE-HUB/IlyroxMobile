@@ -413,7 +413,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                 />
               )}
               {campos.m2Construccion &&
-                propertyDetails.metros_cuadrados_construccion && (
+                Number(propertyDetails.metros_cuadrados_construccion) > 0 && (
                   <View style={styles.statItem}>
                     <View style={styles.statIconContainer}>
                       <Building2 size={16} color={COLORS.textSecondary} />
@@ -429,7 +429,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                   </View>
                 )}
               {campos.m2Terreno &&
-                propertyDetails.metros_cuadrados_terreno && (
+                Number(propertyDetails.metros_cuadrados_terreno) > 0 && (
                   <StatItem
                     icon="resize-outline"
                     label="Terreno"
