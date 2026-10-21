@@ -767,7 +767,9 @@ export function usePropertyForm(
       payload.calle = data.calle || "";
       payload.numeroExterior = data.numero_exterior || "";
       payload.numeroInterior = data.numero_interior || "";
-      payload.codigoPostal = "";
+      // REV05-30: antes se cargaba "" y al guardar se escribia codigo_postal = null,
+      // borrando el codigo que ya tenia la propiedad (p. ej. el que manda Tokko).
+      payload.codigoPostal = data.codigo_postal ? String(data.codigo_postal) : "";
       payload.location = {
         latitude: data.latitud || 0,
         longitude: data.longitud || 0,
