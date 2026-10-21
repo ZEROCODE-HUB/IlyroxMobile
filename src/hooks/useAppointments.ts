@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Platform } from "react-native";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -448,6 +449,15 @@ export const useAppointments = () => {
         acceptingRef.current.add(id);
 
         try {
+            // REV07-02: quien confirma tambien debe tener Google Calendar conectado
+            // (igual que al crear la cita). Si cancela o falla, connect() ya avisa
+            // con su propio mensaje; no se confirma y se libera el boton.
+            // En web no hay conexion nativa posible: ahi se confirma como antes.
+            if (Platform.OS !== "web") {
+                const connection = await ensureConnection();
+                if (!connection?.serverSynced) return;
+            }
+
             const result = await googleCalendarService.syncAppointmentOnServer(
                 "accept",
                 id,
