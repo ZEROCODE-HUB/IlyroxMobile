@@ -15,6 +15,7 @@ import { Modal } from "@/design-system/components";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
 import { logger } from "@/utils/logger";
+import { warmOgCache } from "@/utils/ogWarmup";
 
 const log = logger.scoped("ShareContentModal");
 
@@ -71,6 +72,12 @@ const ShareContentModal: React.FC<ShareContentModalProps> = ({
     // diferencia de downloadPdf, que lo llama ANTES de cerrar, sin ese
     // problema). Un timeout fijo es menos elegante pero garantiza que el
     // share sí se ejecute.
+    // Pre-calienta la imagen OG con el MISMO id que lleva el link compartido
+    // (codigo de la propiedad o id del contenido). Antes solo se pre-calentaba al
+    // crear la propiedad y con su UUID, que no es el id del link (REV05-35).
+    // Fire-and-forget: si falla, el link se comparte igual.
+    warmOgCache(feedItemType, shareCode || contentId || feedItemId || "");
+
     setTimeout(async () => {
       const success = await shareContent({
         feedItemId: feedItemId || contentId,
