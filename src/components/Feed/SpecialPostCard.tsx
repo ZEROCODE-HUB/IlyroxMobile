@@ -23,6 +23,23 @@ const SPECIAL_COLORS = {
   textWhite: COLORS.white,
 };
 
+/**
+ * El post de cierre ('sold') se crea tanto para una venta como para una renta.
+ * La BD guarda en posts.status el estado de la propiedad ('Rentada' / 'Vendida')
+ * y el contenido dice "¡Propiedad Rentada! ...". La tarjeta solo tenia la
+ * variante de venta (REV05-43). Si no hay status, se usa el texto del contenido.
+ */
+const isRentedSoldPost = (item: FeedItem): boolean => {
+  const status = String(
+    (item.postDetails as any)?.status ?? (item as any).status ?? "",
+  )
+    .toLowerCase()
+    .trim();
+  if (status === "rentada" || status === "rented") return true;
+  if (status === "vendida" || status === "sold") return false;
+  return /rentad/i.test(String(item.content ?? ""));
+};
+
 export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
   item,
   mode = "preview",
@@ -73,7 +90,7 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
         item.status?.toLowerCase() === "vendida" ||
         item.status?.toLowerCase() === "sold";
       const mainColor = isSold ? SPECIAL_COLORS.sold : SPECIAL_COLORS.openhouse;
-      const bannerText = isSold ? "VENDIDO" : "OPEN\nHOUSE";
+      const bannerText = isSold ? (isRentedSoldPost(item) ? "RENTADA" : "VENDIDO") : "OPEN\nHOUSE";
       const formattedDate =
         eventDate !== "Próximamente"
           ? new Date(eventDate).toLocaleDateString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
@@ -185,7 +202,7 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
         item.status?.toLowerCase() === "sold";
       const mainColor = isSold ? SPECIAL_COLORS.sold : SPECIAL_COLORS.openhouse;
       // Usamos salto de línea para que quepa mejor en un cuadro pequeño
-      const centerText = isSold ? "VENDIDO" : "OPEN\nHOUSE";
+      const centerText = isSold ? (isRentedSoldPost(item) ? "RENTADA" : "VENDIDO") : "OPEN\nHOUSE";
 
       return (
         <View
@@ -291,7 +308,7 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
       item.status?.toLowerCase() === "sold";
 
     const mainColor = isSold ? SPECIAL_COLORS.sold : SPECIAL_COLORS.openhouse;
-    const bannerText = isSold ? "VENDIDO" : "OPEN HOUSE";
+    const bannerText = isSold ? (isRentedSoldPost(item) ? "RENTADA" : "VENDIDO") : "OPEN HOUSE";
     // Usamos item.foto_propiedad, o la primera imagen del post/propiedad
     const headerImage =
       item.foto_propiedad || images?.[0] || propertyDetails?.images?.[0];
@@ -342,7 +359,7 @@ export const SpecialPostCard: React.FC<SpecialPostCardProps> = ({
           {/* Textos (Right) */}
           <View style={styles.openHouseInfo}>
             <Text style={styles.joinUsText}>
-              {isSold ? "¡PROPIEDAD VENDIDA!" : "----- UNETENOS -----"}
+              {isSold ? (isRentedSoldPost(item) ? "¡PROPIEDAD RENTADA!" : "¡PROPIEDAD VENDIDA!") : "----- UNETENOS -----"}
             </Text>
 
             {!isSold && (
