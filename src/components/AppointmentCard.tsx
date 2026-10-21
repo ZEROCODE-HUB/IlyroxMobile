@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Linking,
   Modal,
   Pressable,
@@ -18,7 +19,7 @@ import { EMPTY_APPOINTMENT_TIME, formatAppointmentTimeLabel } from "@/utils/time
 interface AppointmentCardProps {
   appointment: AppointmentItem;
   onMarkCancel: (id: string) => void;
-  onAcceptAppointment: (id: string) => void;
+  onAcceptAppointment: (id: string) => void | Promise<void>;
   onOpenRating: (id: string) => void;
   onSyncCalendar: (id: string) => void;
   onContact?: (id: string) => void;
@@ -42,6 +43,19 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [showCoordinationSheet, setShowCoordinationSheet] = useState(false);
+  const [accepting, setAccepting] = useState(false);
+
+  // REV05-36: confirmar tarda (sincroniza con Google Calendar); el boton se
+  // bloquea mientras tanto para evitar el doble toque.
+  const handleConfirmPress = async () => {
+    if (accepting) return;
+    setAccepting(true);
+    try {
+      await onAcceptAppointment?.(appointment.id);
+    } finally {
+      setAccepting(false);
+    }
+  };
 
   const isRequester = !!currentUserId && appointment.created_by === currentUserId;
   const isInvited = !isRequester;
@@ -190,11 +204,18 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           {showGuestActions ? (
             <>
               <TouchableOpacity
-                style={[styles.actionBtn, styles.confirmBtn]}
-                onPress={() => onAcceptAppointment?.(appointment.id)}
+                style={[styles.actionBtn, styles.confirmBtn, accepting && { opacity: 0.6 }]}
+                onPress={handleConfirmPress}
+                disabled={accepting}
               >
-                <Ionicons name="checkmark-circle" size={18} color={COLORS.white} />
-                <Text style={[styles.actionBtnText, styles.confirmBtnText]}>Confirmar</Text>
+                {accepting ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <Ionicons name="checkmark-circle" size={18} color={COLORS.white} />
+                )}
+                <Text style={[styles.actionBtnText, styles.confirmBtnText]}>
+                  {accepting ? "Confirmando..." : "Confirmar"}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity

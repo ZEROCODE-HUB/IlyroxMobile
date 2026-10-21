@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -28,6 +28,8 @@ export const useAppointments = () => {
     const { handleContact } = useChatInitiator();
     const { ensureConnection } = useGoogleCalendar(profile?.id);
     const { handleCancelAppointment } = useAppointment(profile?.id);
+    // REV05-36: citas que se estan aceptando ahora mismo (evita el doble toque).
+    const acceptingRef = useRef<Set<string>>(new Set());
 
     const [activeTab, setActiveTab] = useState<"upcoming" | "past">("upcoming");
     const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
@@ -440,6 +442,11 @@ export const useAppointments = () => {
             return;
         }
 
+        // REV05-36: si ya se esta aceptando, se ignoran los toques repetidos
+        // (cada uno crearia otro evento en Google Calendar).
+        if (acceptingRef.current.has(id)) return;
+        acceptingRef.current.add(id);
+
         try {
             const result = await googleCalendarService.syncAppointmentOnServer(
                 "accept",
@@ -474,6 +481,8 @@ export const useAppointments = () => {
         } catch (error: any) {
             log.warn("Error accepting appointment:", error);
             showToast(error.message || "No se pudo aceptar la cita", "error");
+        } finally {
+            acceptingRef.current.delete(id);
         }
     };
 
