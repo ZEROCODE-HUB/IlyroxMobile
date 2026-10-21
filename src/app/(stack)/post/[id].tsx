@@ -1,6 +1,6 @@
 import React from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 
 import { useAuth } from "@/context/AuthContext";
 import { FeedDetail, PostDetailShimmer } from "@/components";
@@ -64,6 +64,19 @@ export default function PostDetailScreen() {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>No se encontró la publicación</Text>
+        {/* REV07-03: esta pantalla no tiene encabezado; sin este boton no hay salida. */}
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace("/(tabs)/profile");
+            }
+          }}
+        >
+          <Text style={styles.backButtonText}>Volver</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -112,5 +125,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#6b7280",
     textAlign: "center",
+  },
+  backButton: {
+    marginTop: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: 12,
+    backgroundColor: "#111827",
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#ffffff",
   },
 });
