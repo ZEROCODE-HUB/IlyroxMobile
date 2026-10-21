@@ -215,15 +215,41 @@ async function fetchReels(q: string, blockedUserIds: string[]): Promise<SearchRe
     .filter(Boolean) as SearchReel[];
 }
 
+/**
+ * Convierte lo escrito por el usuario en un patron ILIKE tolerante a acentos
+ * para colonia / municipio (REV05-25). PostgREST no admite funciones (unaccent)
+ * dentro de un filtro .or(), asi que cada vocal (con o sin acento) y la n con
+ * tilde se sustituyen por "_" (un caracter cualquiera) y los signos de
+ * puntuacion y los espacios por "%". Los comodines escritos por el usuario se
+ * descartan.
+ */
+function toZoneIlikeTerm(q: string): string {
+  return q
+    .normalize("NFC")
+    .trim()
+    .toLowerCase()
+    .replace(/[%_\\*]/g, " ")
+    .replace(/[,;:()"'.\-]/g, "%")
+    .replace(/[aeiouáéíóúüñ]/g, "_")
+    .replace(/\s+/g, "%")
+    .replace(/%+/g, "%");
+}
+
 async function fetchProperties(
   q: string,
   blockedUserIds: string[],
 ): Promise<SearchProperty[]> {
-  const plain = q.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  // Terminos para el filtro .or() de PostgREST (REV05-25).
+  //  - codeTerm: codigo de propiedad, sin comodines ni signos que rompen la
+  //    sintaxis del filtro.
+  //  - zoneTerm: patron tolerante a acentos para colonia / municipio.
+  const codeTerm = q.trim().replace(/[%_\\*,()"']/g, "");
+  const zoneTerm = toZoneIlikeTerm(q);
+  if (!codeTerm) return [];
   let query = supabase
     .from("propiedades")
     .select("id, created_by, codigo_propiedad, fotos, colonia, municipio, estado, habitaciones, banos, metros_cuadrados_construccion, metros_cuadrados_terreno, operaciones_propiedad(precio, moneda)")
-    .or(`codigo_propiedad.ilike.%${plain}%,unaccent(colonia).ilike.%${plain}%,unaccent(municipio).ilike.%${plain}%`)
+    .or(`codigo_propiedad.ilike.%${codeTerm}%,colonia.ilike.%${zoneTerm}%,municipio.ilike.%${zoneTerm}%`)
     .is("deleted_at", null)
     .limit(20);
 
@@ -231,7 +257,14 @@ async function fetchProperties(
     query = query.not("created_by", "in", `(${blockedUserIds.join(",")})`);
   }
 
-  const { data } = await query;
+  const { data, error } = await query;
+
+  if (error) {
+    // Antes el error se ignoraba: la consulta fallaba en silencio y la lupa
+    // mostraba "No encuentro ninguna propiedad" (REV05-25).
+    log.warn("fetchProperties fallo:", error.message, error.code);
+    return [];
+  }
 
   return (data ?? []).map((p) => {
     const op = pickOperacion(p.operaciones_propiedad) ?? null;
