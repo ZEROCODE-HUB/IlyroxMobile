@@ -29,15 +29,28 @@ export function extractServerFilters(filters: StoreFilters): MapServerFilters {
   // Ubicación base (texto libre legacy). Los chips y polígonos se filtran en
   // cliente; aquí solo pasa el locationFilter base si estuviera poblado.
   //
-  // IMPORTANTE: si hay chips de ubicación acumulados, NO enviamos municipio al
-  // server. Razón: cada chip sobrescribe locationFilter con su propio municipio,
-  // pero al acumular chips de distintos municipios (ej. Ruscello en Jesús María
-  // + Tamarindos en Aguascalientes) el server filtraría por uno solo, dejando
-  // fuera las props del otro. El filtrado fino por chip se hace en el cliente.
-  const loc = filters.locationFilter;
-  if (loc.estado) f.estado = loc.estado;
-  if (loc.municipio && filters.locationChips.length <= 1) {
-    f.municipio = loc.municipio;
+  // Ubicacion con chips (REV05-39 / REV05-24): el filtrado fino lo hace el
+  // cliente chip por chip (usePropertyFilters). El servidor NO recibe el
+  // municipio: el municipio del chip viene del texto de Google y puede no
+  // coincidir con el de la BD (Villas Tec: Google dice "Aguascalientes", la BD
+  // "Jesus Maria"), lo que descartaba propiedades antes de que el cliente las
+  // evaluara. Solo se manda el estado si TODOS los chips comparten el mismo.
+  // `ubicacionActiva` mantiene la consulta amplia (limit 3000) en vez de caer en
+  // las 500 mas recientes cuando la zona es el unico filtro.
+  const chips = filters.locationChips ?? [];
+  if (chips.length > 0) {
+    const normEstado = (s?: string | null) =>
+      (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+    const estados = chips.map((c) => normEstado(c.locationFilter?.estado));
+    if (estados.every((e) => !!e) && new Set(estados).size === 1) {
+      f.estado = chips[0].locationFilter.estado;
+    }
+    f.ubicacionActiva = true;
+  } else {
+    // Sin chips: ubicacion base (busquedas restauradas / texto libre legacy).
+    const loc = filters.locationFilter;
+    if (loc.estado) f.estado = loc.estado;
+    if (loc.municipio) f.municipio = loc.municipio;
   }
 
   if (filters.habitaciones && filters.habitaciones !== "No indicado") {

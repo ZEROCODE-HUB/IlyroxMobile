@@ -3,6 +3,7 @@ import { Property } from "@/types";
 import { useExchangeRate } from "./useExchangeRate";
 import {
   buildLocationCriteria,
+  criteriaFromChip,
   hasLocationCriteria,
   matchesLocationCriteria,
 } from "@/utils/locationMatch";
@@ -177,35 +178,42 @@ export const usePropertyFilters = (
         // ubicación (estado, municipio, colonia o ciudad), el texto decide y
         // los bounds de Google no rescatan propiedades de otra zona. Solo si
         // ningún chip trae texto se usa su recuadro geográfico.
-        if (hasTextCriteria) {
-          const textMatch = matchesLocationCriteria(
-            {
-              estado: rawP.estado || p.location?.state,
-              municipio: p.municipio || p.location?.municipio,
-              colonia: p.colonia || p.location?.colony,
-              ciudad: rawP.ciudad || p.location?.city,
-            },
-            locationCriteria,
-          );
-          if (!textMatch) return false;
-        } else {
+        // Se evalua POR CHIP (O entre chips): cada chip es un par colonia +
+        // municipio + estado con la misma regla que evaluar_par_match. Antes los
+        // criterios se aplanaban y el filtro base (copia del ultimo chip) mandaba,
+        // asi que con varias zonas solo se filtraba por la ultima (REV05-39). Un
+        // chip sin texto de ubicacion usa su recuadro geografico.
+        const propLocation = {
+          estado: rawP.estado || p.location?.state,
+          municipio: p.municipio || p.location?.municipio,
+          colonia: p.colonia || p.location?.colony,
+          ciudad: rawP.ciudad || p.location?.city,
+        };
+        let locationOk = false;
+        if (hasChips) {
           const propLat = p.coordinates?.lat ?? p.latitud ?? undefined;
           const propLng = p.coordinates?.lng ?? p.longitud ?? undefined;
           const hasCoords =
             propLat != null && propLng != null &&
             !isNaN(propLat) && !isNaN(propLng);
-          const inChipBounds =
-            hasCoords &&
-            filters.locationChips.some(
-              (chip) =>
-                !!chip.bounds &&
-                propLat! >= chip.bounds.south &&
-                propLat! <= chip.bounds.north &&
-                propLng! >= chip.bounds.west &&
-                propLng! <= chip.bounds.east,
+          locationOk = filters.locationChips.some((chip) => {
+            const chipCriteria = criteriaFromChip(chip);
+            if (hasLocationCriteria(chipCriteria)) {
+              return matchesLocationCriteria(propLocation, chipCriteria);
+            }
+            return (
+              hasCoords &&
+              !!chip.bounds &&
+              propLat! >= chip.bounds.south &&
+              propLat! <= chip.bounds.north &&
+              propLng! >= chip.bounds.west &&
+              propLng! <= chip.bounds.east
             );
-          if (!inChipBounds) return false;
+          });
+        } else if (hasTextCriteria) {
+          locationOk = matchesLocationCriteria(propLocation, locationCriteria);
         }
+        if (!locationOk) return false;
       } else if (geofenceBounds) {
         // Sin filtros explícitos: solo geobounds del mapa
         const lat = p.coordinates?.lat ?? p.latitud ?? undefined;

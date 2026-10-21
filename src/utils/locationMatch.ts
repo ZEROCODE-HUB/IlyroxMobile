@@ -66,6 +66,19 @@ export function buildLocationCriteria(
   const chipValues = (key: "estado" | "municipio" | "colonia") =>
     uniqueNonEmpty(chips.map((c) => c.locationFilter?.[key] as string | undefined));
 
+  // Con chips, los CHIPS son la fuente de verdad. El filtro base es una copia
+  // del ULTIMO chip agregado (propertyFiltersStore.addLocationChip) y antes
+  // mandaba sobre todos los demas: con varias zonas solo se filtraba por la
+  // ultima y al quitar un chip el base quedaba desactualizado (REV05-39).
+  if (chips.length > 0) {
+    return {
+      estado: chipValues("estado"),
+      municipio: chipValues("municipio"),
+      colonias: chipValues("colonia"),
+      ciudad: chips.map((c) => c.locationFilter?.ciudad).find((v) => !!v) || "",
+    };
+  }
+
   const baseColonias = Array.isArray(lf.colonia) ? lf.colonia : lf.colonia ? [lf.colonia] : [];
 
   return {
@@ -73,6 +86,25 @@ export function buildLocationCriteria(
     municipio: lf.municipio ? [lf.municipio] : chipValues("municipio"),
     colonias: baseColonias.length > 0 ? uniqueNonEmpty(baseColonias) : chipValues("colonia"),
     ciudad: lf.ciudad || "",
+  };
+}
+
+/**
+ * Criterios de UN solo chip (su estado, municipio y colonia). Sirve para evaluar
+ * cada chip como un par independiente y unir los chips con "o" (REV05-39).
+ */
+export function criteriaFromChip(chip: LocationChip): LocationCriteria {
+  const lf = chip.locationFilter;
+  const colonia = lf?.colonia as string | string[] | undefined;
+  return {
+    estado: lf?.estado ? [lf.estado] : [],
+    municipio: lf?.municipio ? [lf.municipio] : [],
+    colonias: Array.isArray(colonia)
+      ? colonia.filter((c) => !!c && !!c.trim())
+      : colonia
+        ? [colonia]
+        : [],
+    ciudad: lf?.ciudad || "",
   };
 }
 

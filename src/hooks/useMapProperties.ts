@@ -26,6 +26,8 @@ export interface MapServerFilters {
   estado?: string;
   municipio?: string;
   colonia?: string;
+  /** Hay chips de ubicacion: la consulta debe ser amplia (REV05-39). */
+  ubicacionActiva?: boolean;
   habitacionesMin?: number;
   banosMin?: number;
   estacionamientosMin?: number;
@@ -183,6 +185,7 @@ function hasActiveServerFilters(f: MapServerFilters): boolean {
     f.estado ||
     f.municipio ||
     f.colonia ||
+    f.ubicacionActiva ||
     (f.habitacionesMin && f.habitacionesMin > 0) ||
     (f.banosMin && f.banosMin > 0) ||
     (f.estacionamientosMin && f.estacionamientosMin > 0) ||
