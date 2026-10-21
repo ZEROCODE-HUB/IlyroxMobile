@@ -157,17 +157,22 @@ function normalizeLevel1(name: string): string {
 
 /**
  * Mapea address_components de Google a los niveles neutrales, con la estructura
- * administrativa de México (idéntico a la lógica histórica de parseAddressComponents):
+ * administrativa de Mexico:
  *  - level1 (estado)    = administrative_area_level_1 (normalizado)
+ *  - level2 (municipio) = administrative_area_level_2 (el MUNICIPIO real); si
+ *    Google no lo trae, la localidad. Excepcion CDMX: se conserva la regla
+ *    anterior (locality) hasta que negocio defina si se usa la alcaldia.
  *  - city               = locality, o administrative_area_level_2 si no hay locality
  *  - level3 (colonia)   = sublocality_level_1 | sublocality | neighborhood
- *  - level2 (municipio) = city  (en México municipio ≈ ciudad)
+ * Antes level2 era la localidad: "Pocitos" (localidad de Jesus Maria) se
+ * guardaba como municipio (REV05-03).
  */
 function mapGoogleComponents(
   components: GoogleAddressComponent[],
 ): MappedComponents {
   let estado = "";
-  let ciudad = "";
+  let localidad = "";
+  let nivel2 = "";
   let colonia = "";
   let postalCode = "";
 
@@ -177,10 +182,10 @@ function mapGoogleComponents(
       estado = normalizeLevel1(comp.long_name);
     }
     if (t.includes("locality")) {
-      ciudad = comp.long_name;
+      localidad = comp.long_name;
     }
-    if (t.includes("administrative_area_level_2") && !ciudad) {
-      ciudad = comp.long_name;
+    if (t.includes("administrative_area_level_2") && !nivel2) {
+      nivel2 = comp.long_name;
     }
     if (
       (t.includes("sublocality_level_1") ||
@@ -195,9 +200,14 @@ function mapGoogleComponents(
     }
   }
 
+  const nivel2Limpio = nivel2.replace(/^municipio\s+(de\s+)?/i, "").trim();
+  const esCdmx = estado === "CDMX";
+  const municipio = esCdmx ? localidad || nivel2Limpio : nivel2Limpio || localidad;
+  const ciudad = localidad || nivel2Limpio;
+
   return {
     level1: estado,
-    level2: ciudad, // municipio = ciudad en la mayoría de los casos de México
+    level2: municipio,
     level3: colonia,
     city: ciudad,
     postalCode,
