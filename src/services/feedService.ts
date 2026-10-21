@@ -55,6 +55,7 @@ const PROPERTY_SELECT = `
   created_at,
   created_by,
   codigo_propiedad,
+  status,
   tipo,
   subtipo,
   pais,
@@ -323,7 +324,7 @@ const mapPropertyToFeedItem = (
       type: (property.tipo || "habitacional").toLowerCase() as PropertyType,
       subtype: (property.subtipo || property.tipo || "").toLowerCase(),
       operation: operation?.tipo_operacion === "renta" ? "Rent" : "Sale",
-      status: "Publicada",
+      status: property.status || "Publicada",
       operations: Array.isArray(property.operaciones_propiedad)
         ? property.operaciones_propiedad
         : property.operaciones_propiedad

@@ -576,7 +576,7 @@ const Matches: React.FC = () => {
           type: prop.tipo,
           subtype: prop.subtipo,
           operation: operacion?.tipo_operacion === "venta" ? "Sale" : "Rent",
-          status: "Publicada",
+          status: prop.status || "Publicada",
           amenities: [],
           codigo_propiedad: prop.codigo_propiedad,
         },
