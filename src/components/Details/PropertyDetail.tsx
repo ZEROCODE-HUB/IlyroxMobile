@@ -186,6 +186,16 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
 
   const images = parseImages(propertyDetails.fotos);
   const operations = propertyDetails.operaciones || [];
+  // REV05-44: el estado de la propiedad se muestra a TODOS (no solo al dueno).
+  // Vendida / Rentada: no se muestra el precio como vigente y no se puede
+  // contactar. Reservada: se muestra la etiqueta y se sigue pudiendo contactar.
+  const propertyStatus: string = propertyDetails.status || "Publicada";
+  const isClosedProperty =
+    propertyStatus === "Vendida" || propertyStatus === "Rentada";
+  const isPropertyOwner =
+    !!user?.id && user.id === propertyDetails.created_by;
+  const showStatusBadge =
+    isClosedProperty || propertyStatus === "Reservada";
   const profile = propertyDetails.perfil;
   const amenities =
     propertyDetails.amenidades?.map((a: any) => a.amenidad.nombre) || [];
@@ -311,6 +321,31 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                   </Text>
                 </View>
               )}
+              {showStatusBadge && (
+                <View
+                  style={[
+                    styles.typeTag,
+                    {
+                      backgroundColor: isClosedProperty
+                        ? COLORS.errorLight
+                        : COLORS.warningLight,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.typeTagText,
+                      {
+                        color: isClosedProperty
+                          ? COLORS.errorDark
+                          : COLORS.warningDark,
+                      },
+                    ]}
+                  >
+                    {propertyStatus}
+                  </Text>
+                </View>
+              )}
             </View>
 
             <Text style={styles.title}>
@@ -318,7 +353,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
             </Text>
 
             <View style={styles.priceContainer}>
-              {operations.map((op: any, idx: number) => (
+              {(isClosedProperty && !isPropertyOwner ? [] : operations).map((op: any, idx: number) => (
                 <View key={idx} style={styles.priceBadge}>
                   <Text style={styles.operationType}>
                     {op.tipo_operacion === "venta" || op.tipo_operacion=="Sale" ? "Venta" : "Renta"}
@@ -328,6 +363,13 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                   </Text>
                 </View>
               ))}
+              {isClosedProperty && !isPropertyOwner && (
+                <View style={styles.priceBadge}>
+                  <Text style={styles.price}>
+                    {propertyStatus === "Rentada" ? "Propiedad rentada" : "Propiedad vendida"}
+                  </Text>
+                </View>
+              )}
               {user?.id === propertyDetails.created_by && !!propertyDetails.precio_contrato && (propertyDetails.status === "Vendida" || propertyDetails.status === "Rentada") && (
                 <View style={styles.contractPriceBadge}>
                   <Text style={styles.contractPriceLabel}>
@@ -546,6 +588,13 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
           <PropertyOwnerContact
             profile={profile}
             propertyId={propertyDetails.id}
+            unavailableMessage={
+              isClosedProperty
+                ? propertyStatus === "Rentada"
+                  ? "Propiedad rentada"
+                  : "Propiedad vendida"
+                : undefined
+            }
             currentUserId={user?.id}
             sinDatos={sinDatos}
             loadingEdit={loadingEdit}

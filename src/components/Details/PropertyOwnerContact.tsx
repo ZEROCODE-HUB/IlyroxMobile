@@ -30,6 +30,9 @@ export interface PropertyOwnerContactProps {
   /** Ejecuta una navegación cerrando antes el <Modal> contenedor, si lo hay.
       Ver `navigateAway` en PropertyDetail. Sin él se navega directo. */
   onNavigateAway?: (go: () => void) => void;
+  /** REV05-44: si viene, la propiedad ya no esta disponible (Vendida / Rentada):
+      se muestra este texto en lugar de "Contactar ahora" y se oculta el chat. */
+  unavailableMessage?: string;
 }
 
 export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
@@ -42,6 +45,7 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
   onContactInternal,
   onEditProperty,
   onNavigateAway,
+  unavailableMessage,
 }) => {
   const { showModal } = useModal();
   const navigate = onNavigateAway ?? ((go: () => void) => go());
@@ -129,7 +133,7 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
           />
         </View>
 
-        {!isOwnProperty && (
+        {!isOwnProperty && !unavailableMessage && (
           <TouchableOpacity
             style={styles.contactIconBtn}
             onPress={handleContactOwner}
@@ -162,6 +166,18 @@ export const PropertyOwnerContact: React.FC<PropertyOwnerContactProps> = ({
             </>
           )}
         </TouchableOpacity>
+      ) : unavailableMessage ? (
+        <View
+          style={[styles.mainContactBtn, { backgroundColor: COLORS.textTertiary }]}
+        >
+          <Ionicons
+            name="close-circle-outline"
+            size={20}
+            color={COLORS.white}
+            style={{ marginRight: 8 }}
+          />
+          <Text style={styles.mainContactBtnText}>{unavailableMessage}</Text>
+        </View>
       ) : (
         <TouchableOpacity style={styles.mainContactBtn} onPress={openContactSheet}>
           <Ionicons
