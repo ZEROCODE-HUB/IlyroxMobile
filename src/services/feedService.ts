@@ -559,6 +559,34 @@ export const feedService = {
       statsRows.map((s: any) => [s.profesional_id, s]),
     );
 
+    // IDs REALES de feed_items (REV05-42). Antes el item simulado usaba el id de
+    // la PROPIEDAD como feedItemId, asi que Like / comentarios / compartidos /
+    // vistas se insertaban contra un feed_item inexistente y fallaban
+    // ("Error al actualizar like"). Es la misma consulta de usePropertyFeedItems.
+    // Si una propiedad no tiene fila en feed_items se conserva el comportamiento
+    // anterior (id de la propiedad y contadores en 0).
+    const feedRowByPropertyId = new Map<string, any>();
+    try {
+      const { data: feedRows, error: feedRowsError } = await supabase
+        .from("feed_items")
+        .select(
+          "id, contenido_id, likes_count, comentarios_count, vistas_count, compartidos_count",
+        )
+        .eq("tipo_contenido", "propiedad")
+        .in(
+          "contenido_id",
+          properties.map((p: any) => p.id),
+        );
+      if (feedRowsError) {
+        log.warn(`[getPropertiesAsFeedItems] feed_items: ${feedRowsError.message}`);
+      }
+      (feedRows ?? []).forEach((row: any) => {
+        feedRowByPropertyId.set(row.contenido_id, row);
+      });
+    } catch (e) {
+      log.warn("[getPropertiesAsFeedItems] feed_items fallo", e);
+    }
+
     const result: FeedItem[] = properties.map((property: any) => {
       // Usar el perfil que viene en el join (created_by_profile)
       const perfil = property.created_by_profile;
@@ -567,17 +595,19 @@ export const feedService = {
       const user = buildUser(perfil, stats);
       log.info(`[getPropertiesAsFeedItems] user.name=${user.name}, user.nombre=${user.nombre}`);
 
-      // Crear un feedData simulado para mapPropertyToFeedItem
-      const fakeFeedData = {
-        id: property.id,
-        likes_count: 0,
-        comentarios_count: 0,
-        vistas_count: 0,
+      // feedData con el id REAL de feed_items cuando existe (REV05-42).
+      const realFeed = feedRowByPropertyId.get(property.id);
+      const feedData = {
+        id: realFeed?.id ?? property.id,
+        likes_count: realFeed?.likes_count ?? 0,
+        comentarios_count: realFeed?.comentarios_count ?? 0,
+        vistas_count: realFeed?.vistas_count ?? 0,
+        compartidos_count: realFeed?.compartidos_count ?? 0,
         publicados_count: 0,
         publicado_en: property.created_at,
       };
 
-      return mapPropertyToFeedItem(fakeFeedData, property, user);
+      return mapPropertyToFeedItem(feedData, property, user);
     });
 
     log.info(`[getPropertiesAsFeedItems] returning ${result.length} feed items`);
