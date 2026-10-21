@@ -78,6 +78,8 @@ export interface SearchProperty {
   banos: number | null;
   metros_cuadrados_construccion: number | null;
   metros_cuadrados_terreno: number | null;
+  /** Estado de la publicacion (Publicada, Suspendida, Vendida...). REV06-01 */
+  status?: string | null;
 }
 
 export interface SearchResults {
@@ -238,6 +240,7 @@ function toZoneIlikeTerm(q: string): string {
 async function fetchProperties(
   q: string,
   blockedUserIds: string[],
+  currentUserId?: string,
 ): Promise<SearchProperty[]> {
   // Terminos para el filtro .or() de PostgREST (REV05-25).
   //  - codeTerm: codigo de propiedad, sin comodines ni signos que rompen la
@@ -248,10 +251,19 @@ async function fetchProperties(
   if (!codeTerm) return [];
   let query = supabase
     .from("propiedades")
-    .select("id, created_by, codigo_propiedad, fotos, colonia, municipio, estado, habitaciones, banos, metros_cuadrados_construccion, metros_cuadrados_terreno, operaciones_propiedad(precio, moneda)")
+    .select("id, created_by, codigo_propiedad, status, fotos, colonia, municipio, estado, habitaciones, banos, metros_cuadrados_construccion, metros_cuadrados_terreno, operaciones_propiedad(precio, moneda)")
     .or(`codigo_propiedad.ilike.%${codeTerm}%,colonia.ilike.%${zoneTerm}%,municipio.ilike.%${zoneTerm}%`)
     .is("deleted_at", null)
     .limit(20);
+
+  // REV06-01: solo se ofrecen fichas DISPONIBLES (activo = true), igual que el
+  // mapa, mas las propias del usuario aunque no esten disponibles (Suspendida,
+  // Vendida, Rentada...). Un segundo .or() se combina con Y con el .or() de texto.
+  if (currentUserId && /^[0-9a-f-]{36}$/i.test(currentUserId)) {
+    query = query.or(`activo.eq.true,created_by.eq.${currentUserId}`);
+  } else {
+    query = query.eq("activo", true);
+  }
 
   if (blockedUserIds.length > 0) {
     query = query.not("created_by", "in", `(${blockedUserIds.join(",")})`);
@@ -277,6 +289,7 @@ async function fetchProperties(
       colonia: p.colonia ?? null,
       municipio: p.municipio ?? null,
       estado: p.estado ?? null,
+      status: p.status ?? null,
       habitaciones: p.habitaciones ?? null,
       banos: p.banos ?? null,
       metros_cuadrados_construccion: p.metros_cuadrados_construccion ?? null,
@@ -326,7 +339,7 @@ export function useSearch() {
           fetchUsers(trimmed, blockedUserIds),
           fetchPosts(trimmed, blockedUserIds),
           fetchReels(trimmed, blockedUserIds),
-          fetchProperties(trimmed, blockedUserIds),
+          fetchProperties(trimmed, blockedUserIds, user?.id),
         ]);
         if (!mountedRef.current) return;
         if (currentQueryRef.current !== trimmed) return;

@@ -932,6 +932,12 @@ function PropertyFichaCard({ property, onPress }: { property: SearchProperty; on
         <Text style={fichaStyles.codeText} numberOfLines={1}>{property.codigo_propiedad}</Text>
       </View>
 
+      {!!property.status && property.status !== "Publicada" && (
+        <View style={fichaStyles.statusBadge}>
+          <Text style={fichaStyles.statusText} numberOfLines={1}>{property.status}</Text>
+        </View>
+      )}
+
       <View style={fichaStyles.info}>
         {priceDisplay && (
           <View style={fichaStyles.priceRow}>
@@ -1349,6 +1355,20 @@ const fichaStyles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
     letterSpacing: 0.3,
+  },
+  statusBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    backgroundColor: COLORS.error,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  statusText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: "700",
   },
   info: {
     padding: 8,
