@@ -967,36 +967,13 @@ function PropertyFichaCard({ property, onPress }: { property: SearchProperty; on
 }
 
 function LocationRow({ location, onPress, query = "" }: { location: SearchLocation; onPress: () => void; query?: string }) {
-  // Nombre para display: quitar sufijos como II, III, Norte, Sur, etc.
-  const DISPLAY_PREFIXES = [
-    "avenida", "av.", "av ",
-    "calle", "c/", "c ",
-    "boulevard", "blvd", "bulevar",
-    "prolongacion", "prolongación",
-    "circuito",
-    "carretera", "carr.",
-    "camino",
-    "paseo",
-    "privada",
-  ];
-  const DISPLAY_SUFFIXES = [
-    " ii", " iii", " iv", " v", " vi", " vii", " viii", " ix", " x",
-  ];
-  const getDisplayName = (name: string) => {
-    const lower = name.toLowerCase();
-    for (const p of DISPLAY_PREFIXES) {
-      if (lower.startsWith(p)) {
-        return name.slice(p.length).trim();
-      }
-    }
-    for (const s of DISPLAY_SUFFIXES) {
-      if (lower.endsWith(s)) {
-        return name.slice(0, name.length - s.length).trim();
-      }
-    }
-    return name;
-  };
-  const displayName = getDisplayName(location.name);
+  // Nombre para display: se muestra el nombre COMPLETO de la zona. Antes se
+  // recortaban prefijos ("Paseo", "Camino", "Privada"...) con startsWith, sin
+  // respetar la palabra completa ("Paseos Loretta" -> "s Loretta", "Paseo de la
+  // Soledad" -> "de La soledad"), y sufijos romanos ("Loretta II" -> "Loretta"),
+  // lo que impedia distinguir zonas distintas (REV05-26). En esta lupa solo hay
+  // zonas (estado, municipio, colonia), no calles: no hay nada que recortar.
+  const displayName = location.name;
 
   // Normalizar sin acentos para encontrar coincidencia en el nombre original
   const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
