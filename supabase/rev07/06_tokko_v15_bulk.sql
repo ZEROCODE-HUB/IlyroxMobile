@@ -393,7 +393,7 @@ BEGIN
     --      (sin ella fallan Like y comentarios). Mismo patron que la app (propertyService).
     INSERT INTO feed_items (tipo_contenido, contenido_id, publicado_por, visibilidad, estado_moderacion)
     SELECT 'propiedad', p.id, p.created_by, 'publico',
-           CASE WHEN p.activo IS TRUE THEN 'activo' ELSE 'inactivo' END
+           'activo'
     FROM propiedades p
     WHERE p.created_by = p_usuario_id
       AND p.es_tokkobroker IS TRUE

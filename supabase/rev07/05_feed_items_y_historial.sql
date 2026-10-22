@@ -4,7 +4,7 @@
 -- PARTE A (REV06-06): las propiedades importadas desde Tokko no tienen fila en
 --   feed_items, por eso Like y comentarios fallan. Aqui se crea la fila que falta
 --   (mismo patron que supabase/fix_feeds.sql y que propertyService.createProperty:
---   estado 'activo' si la propiedad esta activa, 'inactivo' si no).
+--   estado 'activo' siempre: la tabla no acepta 'inactivo'; la visibilidad la controla propiedades.activo).
 -- PARTE B (REV07-03): el historial de busquedas guarda el id del feed_items del post/reel
 --   (no el del post). Al retirar un post, sync_post_to_feed borra su feed_items y el historial
 --   queda apuntando a algo que ya no existe ("No se encontro la publicacion").
@@ -30,7 +30,7 @@ SELECT
 -- ---- PARTE A: crear los feed_items que faltan ----
 INSERT INTO public.feed_items (tipo_contenido, contenido_id, publicado_por, visibilidad, estado_moderacion)
 SELECT 'propiedad', p.id, p.created_by, 'publico',
-       CASE WHEN p.activo IS TRUE THEN 'activo' ELSE 'inactivo' END
+       'activo'
 FROM public.propiedades p
 WHERE p.deleted_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM public.feed_items fi
