@@ -235,7 +235,7 @@ export const propertyService = {
       contenido_id: propiedadId,
       publicado_por: propertyData.created_by,
       visibilidad: "publico",
-      estado_moderacion: propertyData.activo ? "activo" : "inactivo",
+      estado_moderacion: "activo", // REV08-01: la tabla no acepta "inactivo"; la visibilidad la controla propiedades.activo
     });
 
     if (feedError) throw feedError;
