@@ -298,9 +298,8 @@ serve(async (req) => {
       console.log('[Tokko] Testing API key...');
       const testResult = await fetchWithRetry<TokkoApiResponse>(
         `${TOKKO_BASE_URL}/property/?limit=1&format=json&key=${config.api_key}`,
-        { method: 'GET' },
-        new CircuitBreaker(3, 15000)
-      );
+        { method: 'GET' }
+      );  // v15: se quito 'new CircuitBreaker(...)': esa clase no existe y la prueba fallaba con ReferenceError
       if (testResult.error) {
         console.error('[Tokko] API test failed:', testResult.error);
         return new Response(JSON.stringify({ error: 'API Key inválida o expirada' }), {
@@ -498,6 +497,11 @@ serve(async (req) => {
     }
 
     console.log(`[Tokko] Starting bulk insert with single RPC for ${allProperties.length} properties`);
+    // v15 (REV05-33): el listado esta completo solo si no hubo errores al bajar paginas,
+    // no se uso test_limit y llegaron tantas propiedades como declara Tokko.
+    const listingComplete =
+      state.errors === 0 && !test_limit && allProperties.length >= totalCount;
+    let bulkOk = false;
 
     try {
       const { data: bulkResult, error: bulkError } = await supabaseAdmin.rpc(
@@ -514,6 +518,7 @@ serve(async (req) => {
         state.errorDetails.push({ message: `Bulk insert: ${bulkError.message}` });
       } else if (bulkResult?.success) {
         console.log('[Tokko] Bulk insert success:', bulkResult);
+        bulkOk = true;
         state.new = bulkResult.nuevas || 0;
         state.updated = bulkResult.actualizadas || 0;
         state.unchanged = bulkResult.sin_cambios || 0;
@@ -536,6 +541,14 @@ serve(async (req) => {
     // Helper functions for parallel operations (Supabase doesn't return native Promises)
     const markEliminated = async () => {
       if (tokkoIds.length === 0) return { data: null };
+      // v15 (REV05-33): con un listado incompleto o un insert fallido NO se marca nada
+      // como eliminado: las propiedades que faltan en la lista no estan borradas en Tokko.
+      if (!listingComplete || !bulkOk) {
+        console.warn('[Tokko] Listado incompleto o insert fallido: se omite marcar eliminadas',
+          { listingComplete, bulkOk });
+        state.errorDetails.push({ message: 'No se marcaron propiedades eliminadas porque el listado de Tokko llego incompleto.' });
+        return { data: null };
+      }
       try {
         const { data, error } = await supabaseAdmin.rpc('marcar_propiedades_eliminadas_tokkobroker', {
           p_usuario_id: user.id,
