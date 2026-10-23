@@ -69,6 +69,19 @@ async function showSyncSummary(
           `${count} propiedad(es) tuya(s) sin comisión: no se muestran a otros usuarios hasta que captures la comisión.`,
         );
       }
+
+      // REV08-14: lo que Tokko dejo de mandar queda Suspendido (no se borra) y vuelve solo si Tokko lo manda otra vez.
+      const { count: ausentes } = await supabase
+        .from('propiedades')
+        .select('id', { count: 'exact', head: true })
+        .eq('created_by', userId)
+        .eq('tokkobroker_ausente', true)
+        .is('deleted_at', null);
+      if (ausentes && ausentes > 0) {
+        lines.push(
+          `${ausentes} propiedad(es) suspendida(s) por Tokko: Tokko ya no la(s) envía. Vuelve(n) sola(s) si Tokko la(s) manda otra vez.`,
+        );
+      }
     }
 
     if (lines.length === 0) return;
