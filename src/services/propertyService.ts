@@ -270,10 +270,11 @@ export const propertyService = {
         .eq("contenido_id", propertyId)
         .eq("tipo_contenido", "propiedad");
     } else if (propertyData.activo === false) {
-      // La propiedad queda suspendida: desactivar en el feed
+      // La propiedad queda suspendida: la visibilidad la controla propiedades.activo.
+      // feed_items NO acepta 'inactivo' (check_estado_moderacion), por eso se deja 'activo'.
       await supabase
         .from("feed_items")
-        .update({ estado_moderacion: "inactivo" })
+        .update({ estado_moderacion: "activo" })
         .eq("contenido_id", propertyId)
         .eq("tipo_contenido", "propiedad");
     }
