@@ -504,6 +504,7 @@ function normalizeForMatch(name: string): string {
 const GENERIC_ZONE_WORDS = new Set([
   "fraccionamiento", "fracc", "residencial", "colonia", "col", "privada", "coto",
   "condominio", "barrio", "unidad", "habitacional", "conjunto", "urbanizacion",
+  "residence", "residences", "residencia", "residencias",
   "de", "del", "la", "el", "los", "las",
 ]);
 
@@ -533,23 +534,73 @@ export function withColoniaType<T extends LocationSuggestionWithCount>(s: T): T 
   return isLocalityInsideMunicipio(s) ? { ...s, type: "colonia" } : s;
 }
 
-function canMergeGoogleDb(g: LocationSuggestionWithCount, d: LocationSuggestionWithCount): boolean {
-  if (g.type === "estado" || d.type === "estado") return false;
-  if (d.type === "municipio") return g.type === "municipio" && !isLocalityInsideMunicipio(g);
-  return g.type === "colonia" || isLocalityInsideMunicipio(g);
+interface DbRow { nombre: string; municipio?: string | null; estado?: string | null; total?: number | string | null; }
+
+function mergeGoogleWithDb(
+  google: LocationSuggestionWithCount[],
+  dbItems: LocationSuggestionWithCount[],
+  dbRows: DbRow[],
+  realMunis: Set<string> = new Set<string>(),
+): LocationSuggestionWithCount[] {
+  const est = (s?: string | null) => normalizeForMatch(s ?? "");
+  const usedDb = new Set<number>();
+  const mergedInto = new Set<number>();
+  const out: LocationSuggestionWithCount[] = [];
+  for (const g of google) {
+    if (g.type === "estado" || g.placeId?.startsWith("prop-")) { out.push(g); continue; }
+    const gCore = coreName(g.name);
+    // Municipio REAL: la BD tiene propiedades en un municipio con ese nombre.
+    const isRealMunicipio =
+      g.type === "municipio" &&
+      (realMunis.has(`${gCore}|${est(g.estado_nombre)}`) ||
+        dbRows.some((r) => est(r.estado) === est(g.estado_nombre) && coreName(r.municipio ?? "") === gCore));
+    if (isRealMunicipio) { out.push(g); continue; }
+    // Candidatas: colonias de la BD con el mismo nucleo y estado.
+    const idxs = dbItems
+      .map((d, i) => ({ d, i }))
+      .filter(({ d }) => coreName(d.name) === gCore && est(d.estado_nombre) === est(g.estado_nombre));
+    if (idxs.length === 0) { out.push(g); continue; }
+    // Si hay varias (misma colonia en varios municipios) gana la del municipio que Google indica; si no, la de mas propiedades.
+    const byMun = idxs.find(({ d }) => g.municipio_nombre && coreName(d.municipio_nombre ?? "") === coreName(g.municipio_nombre));
+    const best = byMun ?? idxs.slice().sort((a, b) => (b.d.propertyCount ?? 0) - (a.d.propertyCount ?? 0))[0];
+    idxs.forEach(({ i }) => usedDb.add(i));
+    // Dos sugerencias de Google que son la misma colonia de la BD (p. ej. "La Perla" y "Fraccionamiento La Perla"): se muestra una sola.
+    if (mergedInto.has(best.i)) {
+      idxs.forEach(({ i }) => { if (i !== best.i) usedDb.delete(i); });
+      continue;
+    }
+    mergedInto.add(best.i);
+    out.push({
+      ...g,
+      name: best.d.name,
+      type: best.d.type,
+      secondaryText: best.d.secondaryText || g.secondaryText,
+      municipio_nombre: best.d.municipio_nombre ?? g.municipio_nombre,
+      estado_nombre: best.d.estado_nombre ?? g.estado_nombre,
+      propertyCount: best.d.propertyCount,
+      centroide: best.d.centroide,
+    });
+    // Las otras colonias homonimas de la BD (otros municipios) siguen disponibles como opciones propias.
+    idxs.forEach(({ d, i }) => { if (i !== best.i) usedDb.delete(i); });
+  }
+  dbItems.forEach((d, i) => { if (!usedDb.has(i)) out.push(d); });
+  return out;
 }
 
-function mergeGoogleDb(g: LocationSuggestionWithCount, d: LocationSuggestionWithCount): LocationSuggestionWithCount {
-  return {
-    ...g,
-    name: d.name,
-    type: d.type,
-    secondaryText: d.secondaryText || g.secondaryText,
-    municipio_nombre: d.municipio_nombre ?? g.municipio_nombre,
-    estado_nombre: d.estado_nombre ?? g.estado_nombre,
-    propertyCount: d.propertyCount,
-    centroide: d.centroide,
-  };
+/** "Municipios" de Google que comparten nombre con una colonia de la BD y que la BD no prueba como municipio real:
+ *  son ambiguos (La Perla = colonia; Jesus Maria = municipio). Se le pregunta a la BD si ese municipio tiene propiedades. */
+function ambiguousMunicipios(
+  google: LocationSuggestionWithCount[],
+  dbItems: LocationSuggestionWithCount[],
+  dbRows: DbRow[],
+): LocationSuggestionWithCount[] {
+  const est = (s?: string | null) => normalizeForMatch(s ?? "");
+  return google.filter((g) => {
+    if (g.type !== "municipio" || g.placeId?.startsWith("prop-")) return false;
+    const gCore = coreName(g.name);
+    if (dbRows.some((r) => est(r.estado) === est(g.estado_nombre) && coreName(r.municipio ?? "") === gCore)) return false;
+    return dbItems.some((d) => coreName(d.name) === gCore && est(d.estado_nombre) === est(g.estado_nombre));
+  });
 }
 
 export const useLocationSearchStore = create<LocationSearchState>((set, get) => ({
@@ -667,13 +718,14 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
         (s) => s.estado_nombre?.toLowerCase() === effectiveEstado?.toLowerCase(),
       ).length;
 
-      if (opts?.alwaysIncludeDb || localCountPostNoise < 2) {
+      const dbMerge = opts?.alwaysIncludeDb !== false;
+      if (dbMerge || localCountPostNoise < 2) {
         const { data: propLocations } = await supabase.rpc(
           "buscar_ubicaciones_desde_propiedades",
           {
             q: searchTerm,
             p_estado_usuario: effectiveEstado ?? null,
-            lim: 5,
+            lim: 8,
             p_pais: country ?? null,
           },
         );
@@ -684,7 +736,7 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
             .filter((p: any) => {
               // Evitar duplicados: si ya tenemos un resultado con el mismo nombre
               // y estado, no agregarlo
-              return !combined.some(
+              return dbMerge || !combined.some(
                 (c) =>
                   c.name.toLowerCase() === (p.nombre ?? "").toLowerCase() &&
                   c.estado_nombre?.toLowerCase() === (p.estado ?? "").toLowerCase(),
@@ -712,7 +764,45 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
                   : undefined,
             }));
 
-          combined = [...combined, ...propSuggestions];
+          if (dbMerge) {
+            // Un "municipio" de Google con el mismo nombre que una colonia de la BD es ambiguo (La Perla vs Jesús María):
+            // se pregunta a la BD si ese municipio tiene propiedades. Si tiene, es municipio real y no se toca.
+            const dbRows = propLocations as unknown as DbRow[];
+            const ambiguous = ambiguousMunicipios(combined, propSuggestions, dbRows);
+            // Si la consulta falla se asume "municipio real": no se cambia nada (comportamiento anterior).
+            let realMunis = new Set<string>(
+              ambiguous.map((g) => `${coreName(g.name)}|${normalizeForMatch(g.estado_nombre ?? "")}`),
+            );
+            if (ambiguous.length > 0) {
+              try {
+                const { data: munCounts, error: munErr } = await supabase.rpc("contar_propiedades_zonas", {
+                  p_zonas: ambiguous.map((g) => ({
+                    tipo: "municipio",
+                    nombre: g.name,
+                    municipio: null,
+                    estado: g.estado_nombre ?? null,
+                  })),
+                  p_pais: country,
+                });
+                if (requestId !== get().latestSearchRequestId) return;
+                if (!munErr && Array.isArray(munCounts)) {
+                  realMunis = new Set<string>(
+                    munCounts
+                      .filter((c: { total: number }) => Number(c.total) > 0)
+                      .map(
+                        (c: { nombre: string; estado: string | null }) =>
+                          `${coreName(c.nombre)}|${normalizeForMatch(c.estado ?? "")}`,
+                      ),
+                  );
+                }
+              } catch (e) {
+                log.warn("Error comprobando municipios ambiguos:", e);
+              }
+            }
+            combined = mergeGoogleWithDb(combined, propSuggestions, dbRows, realMunis);
+          } else {
+            combined = [...combined, ...propSuggestions];
+          }
         }
       }
 
@@ -723,31 +813,11 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
       // Google se tragaba a "Tamarindos, Aguascalientes" de la BD.
       const seenRoots = new Map<string, number>(); // root|estado → first index
       const normalized: typeof combined = [];
-      // REV08-02: indice por nombre-nucleo (sin palabras genericas) SOLO para fusionar Google <-> BD.
-      // Entre dos resultados de la misma fuente se sigue usando la clave exacta de siempre.
-      const coreIdx = new Map<string, number>();
       for (let i = 0; i < combined.length; i++) {
         const item = combined[i];
         const root = `${normalizeForMatch(item.name)}|${normalizeForMatch(item.estado_nombre ?? "")}`;
-        const coreKey = `${coreName(item.name)}|${normalizeForMatch(item.estado_nombre ?? "")}`;
         if (!seenRoots.has(root)) {
-          if (opts?.alwaysIncludeDb && coreIdx.has(coreKey)) {
-            const cIdx = coreIdx.get(coreKey)!;
-            const cExisting = normalized[cIdx];
-            const cExistingFromGoogle = !cExisting.placeId.startsWith("prop-");
-            const cItemFromGoogle = !item.placeId.startsWith("prop-");
-            if (cExistingFromGoogle !== cItemFromGoogle) {
-              const g = cItemFromGoogle ? item : cExisting;
-              const d = cItemFromGoogle ? cExisting : item;
-              if (canMergeGoogleDb(g, d)) {
-                normalized[cIdx] = mergeGoogleDb(g, d);
-                seenRoots.set(root, cIdx);
-                continue;
-              }
-            }
-          }
           seenRoots.set(root, normalized.length);
-          if (!coreIdx.has(coreKey)) coreIdx.set(coreKey, normalized.length);
           normalized.push(item);
         } else {
           const existingIdx = seenRoots.get(root)!;
@@ -755,15 +825,10 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
           // Reemplazar si: el nuevo tiene más propertyCount O es de Google (placeId no empieza con "prop-")
           const existingFromGoogle = !existing.placeId.startsWith("prop-");
           const itemFromGoogle = !item.placeId.startsWith("prop-");
-          if (opts?.alwaysIncludeDb && itemFromGoogle !== existingFromGoogle) {
-            // REV08-02/11: misma zona en Google y en la BD -> geometria y placeId de Google, nombre y conteo de la BD.
-            const g = itemFromGoogle ? item : existing;
-            const d = itemFromGoogle ? existing : item;
-            if (canMergeGoogleDb(g, d)) {
-              normalized[existingIdx] = mergeGoogleDb(g, d);
-            } else {
-              normalized.push(item); // no son la misma zona (p. ej. municipio y colonia con igual nombre): se conservan las dos
-            }
+          if (opts?.alwaysIncludeDb !== false && itemFromGoogle !== existingFromGoogle && item.type !== existing.type) {
+            // REV09: la fusion Google <-> BD ya se hizo antes (mergeGoogleWithDb). Si siguen aqui con el mismo nombre
+            // y distinto tipo son zonas distintas (un municipio real y una colonia homonima): se conservan las dos.
+            normalized.push(item);
           } else if (itemFromGoogle && !existingFromGoogle) {
             // El de Google gana sobre el de BD → reemplazar
             normalized[existingIdx] = item;
