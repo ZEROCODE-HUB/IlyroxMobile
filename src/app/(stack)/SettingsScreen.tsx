@@ -20,8 +20,8 @@ import { COLORS } from "@/constants/colors";
 import { AppHeader } from "@/components/AppHeader";
 import { useModal } from "@/context/ModalContext";
 import { supabase } from "@/lib/supabase";
-import * as WebBrowser from "expo-web-browser";
-import { LEGAL_URLS } from "@/constants/legal";
+import { LegalDocumentsModal } from "@/components/legal/LegalDocumentsModal";
+import { legalService, LegalCodigo } from "@/services/legalService";
 import Avatar from "@/components/shared/Avatar";
 import { blockService, BlockedUser } from "@/services/blockService";
 import { ConfirmationModal } from "@/components/modals/ConfirmationModal";
@@ -63,10 +63,43 @@ const SettingsScreen: React.FC = () => {
     });
   };
 
-  const openLegal = (url: string) => {
-    WebBrowser.openBrowserAsync(url).catch((error) => {
-      log.error("openLegal error:", error);
-    });
+  // ── Documentos legales (popup dentro de la app) y autorización de promociones ──
+  // legalDoc: undefined = cerrado; null = lista; código = ese documento.
+  const [legalDoc, setLegalDoc] = React.useState<LegalCodigo | null | undefined>(undefined);
+  const [marketingOn, setMarketingOn] = React.useState(false);
+  const [marketingBusy, setMarketingBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    let mounted = true;
+    legalService
+      .estadoUsuario()
+      .then((e) => mounted && setMarketingOn(e?.marketing?.accion === "aceptado"))
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleToggleMarketing = async (next: boolean) => {
+    setMarketingBusy(true);
+    const prev = marketingOn;
+    setMarketingOn(next);
+    try {
+      await legalService.registrarConsentimientos(
+        [{ tipo: "marketing", accion: next ? "aceptado" : "revocado" }],
+        "configuracion",
+      );
+    } catch (error) {
+      log.error("handleToggleMarketing error:", error);
+      setMarketingOn(prev);
+      showModal({
+        title: "Error",
+        message: "No se pudo guardar tu preferencia. Inténtalo de nuevo.",
+        confirmText: "OK",
+      });
+    } finally {
+      setMarketingBusy(false);
+    }
   };
 
   const performDeleteAccount = async () => {
@@ -282,13 +315,19 @@ const SettingsScreen: React.FC = () => {
       id: "privacy",
       title: "Política de privacidad",
       icon: "shield-checkmark-outline",
-      onPress: () => openLegal(LEGAL_URLS.privacy),
+      onPress: () => setLegalDoc("privacidad"),
     },
     {
       id: "terms",
       title: "Términos y condiciones",
       icon: "document-text-outline",
-      onPress: () => openLegal(LEGAL_URLS.terms),
+      onPress: () => setLegalDoc("terminos"),
+    },
+    {
+      id: "legal_docs",
+      title: "Documentos legales",
+      icon: "library-outline",
+      onPress: () => setLegalDoc(null),
     },
     {
       id: "logout",
@@ -356,6 +395,33 @@ const SettingsScreen: React.FC = () => {
         )}
 
         <View style={styles.section}>
+          <View style={styles.optionItem}>
+            <View style={styles.optionLeft}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="megaphone-outline" size={22} color={COLORS.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optionTitle}>Promociones y novedades</Text>
+                <Text
+                  style={{ fontSize: 12, color: COLORS.primary, marginTop: 2 }}
+                  onPress={() => setLegalDoc("comunicaciones")}
+                >
+                  Ver autorización y preferencias de contacto
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={marketingOn}
+              onValueChange={handleToggleMarketing}
+              disabled={marketingBusy}
+              trackColor={{ false: COLORS.cardBorder, true: COLORS.primary }}
+              thumbColor={COLORS.white}
+              ios_backgroundColor={COLORS.cardBorder}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
           {settingsOptions.map((option) => (
             <SafePressable
               key={option.id}
@@ -408,6 +474,12 @@ const SettingsScreen: React.FC = () => {
         </View>
 
       </ScrollView>
+
+      <LegalDocumentsModal
+        visible={legalDoc !== undefined}
+        initialCodigo={legalDoc ?? null}
+        onClose={() => setLegalDoc(undefined)}
+      />
 
       <Modal
         visible={showBlockedUsers}

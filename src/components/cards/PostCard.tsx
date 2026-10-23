@@ -260,6 +260,8 @@ const PostCard: React.FC<PostCardProps> = ({
         <ReportModal
           visible={showReportModal}
           reportType="post"
+          targetId={item.postDetails?.id ?? item.id}
+          reportedUserId={item.user.id}
           onClose={() => setShowReportModal(false)}
           onReport={handleReport}
         />

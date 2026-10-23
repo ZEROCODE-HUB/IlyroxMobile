@@ -16,7 +16,7 @@ import { FeedItem, User } from "../../types";
 import { useFeedInteractions, useViewTracking } from "@/hooks";
 import { DIMENSIONS, COLORS } from "../../constants";
 import { commonStyles } from "../../../styles";
-import { UserHeader, VideoPlayer, Avatar } from "../shared";
+import { UserHeader, VideoPlayer, Avatar, ReportModal } from "../shared";
 import ActionButtons from "../ActionButtons";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
@@ -55,7 +55,7 @@ const ReelCard: React.FC<ReelCardProps> = ({
   onReelUpdated,
   onReelRemoved,
 }) => {
-  const { showOptions, setShowOptions, setShowReportModal } =
+  const { showOptions, showReportModal, setShowOptions, setShowReportModal } =
     useFeedInteractions();
   const { showToast } = useToast();
 
@@ -250,6 +250,15 @@ const ReelCard: React.FC<ReelCardProps> = ({
         loading={loadingRecommended}
         users={recommendedList}
         totalCount={positiveRecommendations}
+      />
+
+      {/* Modal de reporte */}
+      <ReportModal
+        visible={showReportModal}
+        reportType="reel"
+        targetId={reelId ?? item.id}
+        reportedUserId={item.user.id}
+        onClose={() => setShowReportModal(false)}
       />
 
       {/* Confirmación de borrado (solo dueño) */}

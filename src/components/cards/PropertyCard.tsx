@@ -547,6 +547,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
       <ReportModal
         visible={showReportModal}
         reportType="property"
+        targetId={property.id}
+        reportedUserId={item.user.id}
         onClose={() => setShowReportModal(false)}
         onReport={handleReport}
       />

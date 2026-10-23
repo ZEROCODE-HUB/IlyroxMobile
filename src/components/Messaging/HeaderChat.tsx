@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import SafePressable from "@/design-system/components/SafePressable";
-import { Avatar } from "../shared";
+import { Avatar, ReportModal } from "../shared";
 import { useToast } from "../../context/ToastContext";
 import { COLORS } from "../../constants";
 import { useTags } from "../../hooks/messaging";
@@ -28,6 +28,7 @@ export default function HeaderChat({
   const [conversationTags, setConversationTags] = useState<any[]>([]);
   const [showTagsModal, setShowTagsModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const router = useRouter();
 
   const {
@@ -143,6 +144,16 @@ export default function HeaderChat({
         />
       </TouchableOpacity>
 
+      {conversationId && conversationId !== "new" && (
+        <TouchableOpacity
+          onPress={() => setShowReportModal(true)}
+          style={styles.headerButton}
+          accessibilityLabel="Reportar chat"
+        >
+          <Ionicons name="flag-outline" size={22} color={COLORS.textSecondary} />
+        </TouchableOpacity>
+      )}
+
       {propertyId && (
         <TouchableOpacity
           onPress={() => setShowAppointmentModal(true)}
@@ -151,6 +162,14 @@ export default function HeaderChat({
           <GoogleCalendarIcon size={30} />
         </TouchableOpacity>
       )}
+
+      <ReportModal
+        visible={showReportModal}
+        reportType="chat"
+        reportedUserId={otherUser?.id}
+        conversationId={conversationId}
+        onClose={() => setShowReportModal(false)}
+      />
 
       {showTagsModal && (
         <TagsModal

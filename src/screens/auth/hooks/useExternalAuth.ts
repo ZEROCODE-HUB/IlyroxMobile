@@ -15,6 +15,7 @@ import { useModal } from "@/context/ModalContext";
 import { logger } from "@/utils/logger";
 import { collapseSpaces } from "@/utils/stringNormalizer";
 import { applyStoredAdvisorInvite } from "@/services/communityService";
+import { legalService, ConsentItem } from "@/services/legalService";
 import * as Burnt from "burnt";
 import { isMediaUnavailable, MEDIA_UNAVAILABLE_MESSAGE } from "@/services/uploadService";
 
@@ -279,6 +280,25 @@ export function useExternalAuth() {
           .single();
 
         if (error) throw error;
+
+        // Evidencia legal: qué versión de cada documento aceptó, cuándo y desde dónde.
+        // Un fallo aquí no debe tirar el registro, pero se reintenta una vez.
+        {
+          const consentItems: ConsentItem[] = [
+            { tipo: "terminos" },
+            { tipo: "privacidad_leida" },
+            { tipo: "mayoria_edad" },
+          ];
+          if (formData.acceptedMarketing) consentItems.push({ tipo: "marketing" });
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              await legalService.registrarConsentimientos(consentItems, "registro_google");
+              break;
+            } catch (legalError) {
+              log.error("No se pudo registrar la evidencia legal (intento " + (attempt + 1) + "):", legalError);
+            }
+          }
+        }
 
         await applyStoredAdvisorInvite(pendingUser.id);
 

@@ -39,6 +39,8 @@ export interface ProfileInfoHeaderProps {
   onUpdatePhoto: (url: string) => void;
   onMessage: () => void;
   onToggleBlock?: () => void;
+  /** Abre el reporte de usuario (solo perfiles ajenos). */
+  onReport?: () => void;
   onRecommend?: (recomienda: boolean) => void;
   isBlocked?: boolean;
   blockingUser?: boolean;
@@ -71,6 +73,7 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
   onUpdatePhoto,
   onMessage,
   onToggleBlock,
+  onReport,
   onRecommend,
   isBlocked,
   blockingUser,
@@ -204,6 +207,18 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
                 </SafePressable>
               )}
             </View>
+            {!!onReport && (
+              <SafePressable
+                style={styles.reportLink}
+                onPress={onReport}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Reportar usuario"
+              >
+                <Ionicons name="flag-outline" size={14} color={COLORS.textSecondary} />
+                <Text style={styles.reportLinkText}>Reportar usuario</Text>
+              </SafePressable>
+            )}
             {isBlocked && (
               <Text style={styles.blockedHint}>
                 Dejaste de ver las propiedades de este usuario.
@@ -466,6 +481,18 @@ const styles = StyleSheet.create({
   },
   blockBtnTextActive: {
     color: COLORS.primary,
+  },
+  reportLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 6,
+  },
+  reportLinkText: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: "600",
   },
   blockedHint: {
     color: COLORS.textSecondary,

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { useSaveSearch } from "./filters/useSaveSearch";
 import { COLORS } from "@/constants/colors";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 import { useShallow } from "zustand/react/shallow";
+import { LegalDocumentsModal } from "@/components/legal/LegalDocumentsModal";
 
 interface SaveSearchModalProps {
   visible: boolean;
@@ -44,6 +45,18 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
     isSaving,
     handleSaveSearch,
   } = useSaveSearch(userId);
+
+  // Aviso de privacidad del prospecto: se muestra ANTES de guardar sus datos.
+  // Las dos casillas son opcionales, NO vienen marcadas y NO bloquean el guardado (solo dejan evidencia).
+  const [avisoConfirmado, setAvisoConfirmado] = useState(false);
+  const [compartirAsesores, setCompartirAsesores] = useState(false);
+  const [showAviso, setShowAviso] = useState(false);
+  useEffect(() => {
+    if (!visible) {
+      setAvisoConfirmado(false);
+      setCompartirAsesores(false);
+    }
+  }, [visible]);
 
   // Activar createLead cuando el modal se abre
   useEffect(() => {
@@ -98,7 +111,7 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
   };
 
   const handleSave = async () => {
-    const result = await handleSaveSearch(filters, onClose);
+    const result = await handleSaveSearch(filters, onClose, { avisoConfirmado, compartirAsesores });
     if (result.success) {
       onSaveSuccessWithData(result.metadata);
     }
@@ -231,6 +244,56 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
                 )}
               </View>
             </View>
+
+            <View style={styles.privacyBox}>
+              <Text style={styles.privacyTitle}>Aviso de privacidad del prospecto</Text>
+              <Text style={styles.privacyText}>
+                Los datos del prospecto (nombre, teléfono y email) se usan para dar seguimiento a esta
+                búsqueda dentro de ILYROX. Antes de guardarlos, infórmale cómo se tratan sus datos. No se
+                le agregará a campañas ni listas de promociones sin su autorización específica.
+              </Text>
+              <Text style={styles.privacyLink} onPress={() => setShowAviso(true)}>
+                Ver Política de Privacidad
+              </Text>
+              <TouchableOpacity
+                style={styles.privacyCheckRow}
+                activeOpacity={0.8}
+                onPress={() => setAvisoConfirmado(!avisoConfirmado)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: avisoConfirmado }}
+              >
+                <Ionicons
+                  name={avisoConfirmado ? "checkbox" : "square-outline"}
+                  size={22}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.privacyCheckText}>
+                  (Opcional) Informé al prospecto del aviso de privacidad
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.privacyCheckRow}
+                activeOpacity={0.8}
+                onPress={() => setCompartirAsesores(!compartirAsesores)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: compartirAsesores }}
+              >
+                <Ionicons
+                  name={compartirAsesores ? "checkbox" : "square-outline"}
+                  size={22}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.privacyCheckText}>
+                  (Opcional) El prospecto autoriza que sus datos se compartan con uno o más asesores
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <LegalDocumentsModal
+              visible={showAviso}
+              initialCodigo="privacidad"
+              onClose={() => setShowAviso(false)}
+            />
 
             <View style={styles.warningBox}>
               <Ionicons
@@ -402,6 +465,41 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     marginTop: 4,
     marginLeft: 4,
+  },
+  privacyBox: {
+    margin: 20,
+    marginBottom: 0,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: COLORS.primaryTransparent,
+    gap: 8,
+  },
+  privacyTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+  },
+  privacyText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    lineHeight: 17,
+  },
+  privacyLink: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: "600",
+    textDecorationLine: "underline",
+  },
+  privacyCheckRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  privacyCheckText: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.textPrimary,
+    lineHeight: 17,
   },
   warningBox: {
     flexDirection: "row",

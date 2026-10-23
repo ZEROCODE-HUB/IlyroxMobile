@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../../../lib/supabase";
+import { legalService } from "../../../services/legalService";
 import { useToast } from "../../../context/ToastContext";
 import { useModal } from "../../../context/ModalContext";
 import { DEFAULT_COUNTRY } from "../../../lib/location/registry";
@@ -760,7 +761,11 @@ export const useSaveSearch = (userId?: string) => {
     );
   };
 
-  const handleSaveSearch = async (filters: any, onClose: () => void): Promise<{ success: boolean; metadata?: any }> => {
+  const handleSaveSearch = async (
+    filters: any,
+    onClose: () => void,
+    legal?: { avisoConfirmado: boolean; compartirAsesores: boolean },
+  ): Promise<{ success: boolean; metadata?: any }> => {
     if (!userId) {
       showModal({
         title: "Error",
@@ -788,6 +793,30 @@ export const useSaveSearch = (userId?: string) => {
 
       if (createLead) {
         leadId = await createLeadRecord();
+        if (leadId) {
+          // Evidencia: aviso de privacidad mostrado/confirmado y elección de compartir con asesores.
+          // Si falla no se bloquea el guardado de la búsqueda.
+          try {
+            await legalService.registrarConsentimientos(
+              [
+                {
+                  tipo: "prospecto_aviso",
+                  lead_id: String(leadId),
+                  accion: legal?.avisoConfirmado ? "aceptado" : "rechazado",
+                },
+                {
+                  tipo: "prospecto_compartir_asesores",
+                  lead_id: String(leadId),
+                  accion: legal?.compartirAsesores ? "aceptado" : "rechazado",
+                },
+              ],
+              "formulario_lead",
+              { formulario: "busqueda_guardada" },
+            );
+          } catch {
+            // silencioso a propósito
+          }
+        }
       }
 
       await saveSearchToDatabase(filters, leadId);

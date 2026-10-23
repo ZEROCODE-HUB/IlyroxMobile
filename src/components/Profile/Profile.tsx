@@ -48,6 +48,7 @@ import {
 } from "./profileFormatters";
 import { mapPostToFeedItem, mapProfileToUser, mapReelToFeedItem } from "./profileMappers";
 import { ProfileInfoHeader } from "./ProfileInfoHeader";
+import ReportModal from "../shared/ReportModal";
 import { ProfileEditModals } from "./ProfileEditModals";
 import ProfileSkeleton from "./ProfileSkeleton";
 import { patchFeedItem } from "@/hooks/useFeed";
@@ -155,6 +156,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
   // Confirmación tras recomendar / no recomendar a otro asesor.
   const [showThanksModal, setShowThanksModal] = useState(false);
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
+  const [showReportUser, setShowReportUser] = useState(false);
   const [showRecommendedByModal, setShowRecommendedByModal] = useState(false);
   const [showNotRecommendedByModal, setShowNotRecommendedByModal] =
     useState(false);
@@ -470,6 +472,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
 
   const handleSupport = useCallback(() => router.push("/support"), []);
   const handleSettings = useCallback(() => router.push("/settings"), []);
+  const handleReportUser = useCallback(() => setShowReportUser(true), []);
 
   const headerStateRef = useRef<{
     showRatingDetails: boolean;
@@ -505,6 +508,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
           onUpdatePhoto={updateProfilePhoto}
           onMessage={handleMessage}
           onToggleBlock={handleToggleBlock}
+          onReport={isMe ? undefined : handleReportUser}
           isBlocked={isBlocked}
           blockingUser={blockingUser}
           onRecommend={handleRecommendWithThanks}
@@ -777,6 +781,13 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
         onCancel={() => setShowBlockConfirm(false)}
         danger
         loading={blockingUser}
+      />
+
+      <ReportModal
+        visible={showReportUser}
+        reportType="user"
+        reportedUserId={targetUserId}
+        onClose={() => setShowReportUser(false)}
       />
 
       {/* Confirmación tras recomendar / no recomendar (solo botón Aceptar) */}
