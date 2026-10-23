@@ -42,6 +42,13 @@ export const HistorySearches: React.FC<HistorySearchesProps> = ({
 // Dos búsquedas son "iguales" si tienen el mismo nombre, tipo y los mismos
 // filtros que afectan el resultado (precio, tipo, operación, amenidades,
 // locationChips, polygons, filtros especializados).
+// REV08-12: etiquetas de las zonas elegidas (chips) de una busqueda guardada.
+const chipLabels = (b: HistorialBusqueda): string[] => {
+  const chips = (b.filtros_completos as any)?.locationChips;
+  if (!Array.isArray(chips)) return [];
+  return chips.map((c: any) => String(c?.label ?? "").trim()).filter(Boolean);
+};
+
 const buildSignature = (b: HistorialBusqueda): string => {
   // Firma SIMPLE: solo los campos clave que identifican la búsqueda.
   // No usamos filtros_completos porque contiene objetos con coordenadas
@@ -57,6 +64,8 @@ const buildSignature = (b: HistorialBusqueda): string => {
     estado: normalize(b.estado),
     municipio: normalize(b.municipio),
     colonia: normalize(typeof b.colonia === "string" ? b.colonia : ""),
+    // REV08-12: dos busquedas que empiezan en la misma zona pero tienen otras zonas distintas no se fusionan.
+    chips: chipLabels(b).map((s) => s.toLowerCase()).sort().join("|"),
   });
 };
 
@@ -146,6 +155,13 @@ for (const busqueda of historial) {
     // es mucho más útil. Siempre priorizar query_original para reels.
     if (item.tipo_busqueda === 'reel' && item.query_original) {
       return item.query_original;
+    }
+    // REV08-12: con 2 o mas zonas el titulo se arma al mostrar (las 2 primeras y +N). No se guarda en la BD.
+    if (item.tipo_busqueda === 'ubicacion') {
+      const labels = chipLabels(item);
+      if (labels.length >= 2) {
+        return labels.slice(0, 2).join(', ') + (labels.length > 2 ? ` +${labels.length - 2}` : '');
+      }
     }
     if (item.resultado_titulo) return item.resultado_titulo;
     if (item.place_name) return item.place_name;

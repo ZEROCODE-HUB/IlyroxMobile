@@ -588,6 +588,9 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     const latToSave = isFromDbFallback && loc.centroide ? loc.centroide.lat : selectedLocation?.lat;
     const lngToSave = isFromDbFallback && loc.centroide ? loc.centroide.lng : selectedLocation?.lng;
     const placeIdToSave = isFromDbFallback ? undefined : selectedLocation?.placeId;
+    // REV08-12: solo la PRIMERA zona crea la fila del historial; las siguientes se guardan en esa misma fila
+    // con la actualizacion de filtros (espera de 1 s) que ya existe.
+    if (!userId || useSearchStore.getState().currentSearchId) return;
     createSearchFromMap(currentFilters, {
       estado: loc.estado_nombre || (loc.type === "estado" ? loc.name : undefined),
       municipio: loc.municipio_nombre || (loc.type === "municipio" ? loc.name : undefined),
