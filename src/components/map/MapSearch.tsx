@@ -509,7 +509,9 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     clearSuggestions();
   };
 
-  const handleAddLocationChip = async (loc: LocationSuggestionWithCount) => {
+  const handleAddLocationChip = async (suggestion: LocationSuggestionWithCount) => {
+    // REV08-11: una "localidad" de Google que en realidad es colonia se guarda como colonia.
+    const loc = withColoniaType(suggestion);
     if (!mountedRef.current) return;
     if (Platform.OS !== "web") Haptics.selectionAsync();
     closeZoneSearch();
