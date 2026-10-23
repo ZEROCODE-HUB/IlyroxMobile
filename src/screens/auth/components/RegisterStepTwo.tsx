@@ -17,8 +17,8 @@ import { AppInput } from "../../../design-system/components/AppInput";
 import { Avatar } from "../../../components/shared";
 import { SubmitButton } from "./SubmitButton";
 import { BackButton } from "./BackButton";
-import { LegalAcceptanceText } from "./LegalAcceptanceText";
 import { CareerStartDateField } from "./CareerStartDateField";
+import { LegalAcceptanceSection } from "./LegalAcceptanceSection";
 import SelectionModal from "../../../components/modals/SelectionModal";
 import { AuthFormState } from "../hooks/useAuthForm";
 import { COLORS } from "../../../constants/colors";
@@ -64,7 +64,6 @@ export function RegisterStepTwo({
   const [showOcupacionModal, setShowOcupacionModal] = useState(false);
   const [showModalidadModal, setShowModalidadModal] = useState(false);
   const [photoTouched, setPhotoTouched] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const { ensurePermission } = useGalleryPermission();
 
   const handleSubmit = () => {
@@ -205,13 +204,25 @@ export function RegisterStepTwo({
         showCounter
       />
 
-      <LegalAcceptanceText accepted={acceptedTerms} onChange={setAcceptedTerms} />
+      <LegalAcceptanceSection
+        formState={{
+          acceptedTerms: formState.acceptedTerms,
+          acceptedPrivacy: formState.acceptedPrivacy,
+          acceptedAge: formState.acceptedAge,
+          acceptedMarketing: formState.acceptedMarketing,
+        }}
+        onUpdateField={onUpdateField}
+      />
 
       <SubmitButton
         loading={loading}
         onPress={handleSubmit}
         text="Finalizar Registro"
-        disabled={!acceptedTerms}
+        disabled={
+          !formState.acceptedTerms ||
+          !formState.acceptedPrivacy ||
+          !formState.acceptedAge
+        }
       />
 
       <BackButton onPress={onBack} text="Volver al paso 1" />

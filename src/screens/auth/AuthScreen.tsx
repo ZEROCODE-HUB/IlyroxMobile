@@ -55,6 +55,10 @@ export default function AuthScreen() {
       modalidad: "",
       nombreInmobiliaria: "",
       fechaInicioCarrera: "",
+      acceptedTerms: false,
+      acceptedPrivacy: false,
+      acceptedAge: false,
+      acceptedMarketing: false,
     });
 
   const { top, bottom } = useStableSafeInsets();
@@ -133,6 +137,10 @@ export default function AuthScreen() {
             modalidad: "",
             nombreInmobiliaria: "",
             fechaInicioCarrera: "",
+            acceptedTerms: false,
+            acceptedPrivacy: false,
+            acceptedAge: false,
+            acceptedMarketing: false,
           });
           setAuthMethod("external");
         },

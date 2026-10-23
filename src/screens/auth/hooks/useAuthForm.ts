@@ -35,6 +35,11 @@ export interface AuthFormState {
   nombreInmobiliaria: string;
   fechaInicioCarrera: string;
   biografia: string;
+  // Aceptaciones legales
+  acceptedTerms: boolean;
+  acceptedPrivacy: boolean;
+  acceptedAge: boolean;
+  acceptedMarketing: boolean;
 }
 
 const initialFormState: AuthFormState = {
@@ -53,6 +58,10 @@ const initialFormState: AuthFormState = {
   nombreInmobiliaria: "",
   fechaInicioCarrera: "",
   biografia: "",
+  acceptedTerms: false,
+  acceptedPrivacy: false,
+  acceptedAge: false,
+  acceptedMarketing: false,
 };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -196,6 +205,9 @@ export function useAuthForm() {
         nombreInmobiliaria,
         fechaInicioCarrera,
         biografia,
+        acceptedTerms,
+        acceptedPrivacy,
+        acceptedAge,
       } = formState;
 
       if (requireEstado && !estado) {
@@ -244,6 +256,31 @@ export function useAuthForm() {
         showModal({
           title: "Error",
           message: "Ingrese su biografía",
+          confirmText: "OK",
+        });
+        return false;
+      }
+      // Validaciones legales obligatorias
+      if (!acceptedTerms) {
+        showModal({
+          title: "Aceptación requerida",
+          message: "Debes aceptar los Términos y Condiciones de ILYROX para continuar",
+          confirmText: "OK",
+        });
+        return false;
+      }
+      if (!acceptedPrivacy) {
+        showModal({
+          title: "Aceptación requerida",
+          message: "Debes confirmar que has leído la Política de Privacidad",
+          confirmText: "OK",
+        });
+        return false;
+      }
+      if (!acceptedAge) {
+        showModal({
+          title: "Aceptación requerida",
+          message: "Debes confirmar que tienes 18 años o más",
           confirmText: "OK",
         });
         return false;
@@ -343,6 +380,10 @@ export function useAuthForm() {
         nombre_inmobiliaria: formState.nombreInmobiliaria || null,
         fecha_inicio_carrera: formState.fechaInicioCarrera || null,
         biografia: formState.biografia || null,
+        accepted_terms: formState.acceptedTerms,
+        accepted_privacy: formState.acceptedPrivacy,
+        accepted_age: formState.acceptedAge,
+        accepted_marketing: formState.acceptedMarketing,
       };
 
       log.info("handleRegister: Iniciando registro", { email: formState.email, name: formState.name });

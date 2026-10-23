@@ -40,6 +40,10 @@ export interface ExternalAuthFormData {
   modalidad: string;
   nombreInmobiliaria: string;
   fechaInicioCarrera: string;
+  acceptedTerms: boolean;
+  acceptedPrivacy: boolean;
+  acceptedAge: boolean;
+  acceptedMarketing: boolean;
 }
 
 export function useExternalAuth() {
@@ -143,6 +147,10 @@ export function useExternalAuth() {
           onNeedProfileCompletion(pendingUserData, {
             name: extractedName,
             lastNamePaterno: extractedLastName,
+            acceptedTerms: false,
+            acceptedPrivacy: false,
+            acceptedAge: false,
+            acceptedMarketing: false,
           });
         }
       } catch (error: any) {
@@ -154,7 +162,7 @@ export function useExternalAuth() {
     [signInWithGoogle, setCurrentUser],
   );
 
-  // Finalizar registro externo
+// Finalizar registro externo
   const finalizeExternalRegistration = useCallback(
     async (
       formData: ExternalAuthFormData,
@@ -189,6 +197,19 @@ export function useExternalAuth() {
         showModal({ title: "Error", message: "Selecciona la fecha en que iniciaste tu carrera", confirmText: "OK" });
         return false;
       }
+      // Validaciones legales obligatorias
+      if (!formData.acceptedTerms) {
+        showModal({ title: "Aceptación requerida", message: "Debes aceptar los Términos y Condiciones de ILYROX para continuar", confirmText: "OK" });
+        return false;
+      }
+      if (!formData.acceptedPrivacy) {
+        showModal({ title: "Aceptación requerida", message: "Debes confirmar que has leído la Política de Privacidad", confirmText: "OK" });
+        return false;
+      }
+      if (!formData.acceptedAge) {
+        showModal({ title: "Aceptación requerida", message: "Debes confirmar que tienes 18 años o más", confirmText: "OK" });
+        return false;
+      }
 
       setLoading(true);
       try {
@@ -217,8 +238,8 @@ export function useExternalAuth() {
           nombre: collapseSpaces(formData.name || pendingUser.fullName || "Usuario"),
           apellido_paterno: collapseSpaces(formData.lastNamePaterno),
           apellido_materno: collapseSpaces(formData.lastNameMaterno),
-          celular: formData.phone && formData.phone.replace(/\D/g, "").slice(2).length >= 10 
-          ? formData.phone.replace(/\D/g, "").slice(2) 
+          celular: formData.phone && formData.phone.replace(/\D/g, "").slice(2).length >= 10
+          ? formData.phone.replace(/\D/g, "").slice(2)
           : undefined,
           prefijo_celular: undefined,
           rol: "cliente",
@@ -245,6 +266,10 @@ export function useExternalAuth() {
           total_calificaciones: undefined,
           total_recomendaciones_positivas: undefined,
           total_recomendaciones_negativas: undefined,
+          accepted_terms: formData.acceptedTerms,
+          accepted_privacy: formData.acceptedPrivacy,
+          accepted_age: formData.acceptedAge,
+          accepted_marketing: formData.acceptedMarketing,
         };
 
         const { data, error } = await supabase
@@ -256,7 +281,7 @@ export function useExternalAuth() {
         if (error) throw error;
 
         await applyStoredAdvisorInvite(pendingUser.id);
- 
+
         if (Platform.OS !== "web") OneSignal.login(pendingUser.id);
         setCurrentUser(data);
         setPendingUser(null);

@@ -18,8 +18,8 @@ import { AppInput } from "../../../design-system/components/AppInput";
 import { Avatar } from "../../../components/shared";
 import { SubmitButton } from "./SubmitButton";
 import { BackButton } from "./BackButton";
-import { LegalAcceptanceText } from "./LegalAcceptanceText";
 import { CareerStartDateField } from "./CareerStartDateField";
+import { LegalAcceptanceSection } from "./LegalAcceptanceSection";
 import SelectionModal from "../../../components/modals/SelectionModal";
 import { PendingExternalUser, ExternalAuthFormData } from "../hooks/useExternalAuth";
 import { ESTADOS_MEXICO } from "../../../constants/estadosMexico";
@@ -217,12 +217,25 @@ export function ExternalAuthForm({
         buttonStyle={styles.selectButton}
       />
 
-      <LegalAcceptanceText />
+      <LegalAcceptanceSection
+        formState={{
+          acceptedTerms: formData.acceptedTerms,
+          acceptedPrivacy: formData.acceptedPrivacy,
+          acceptedAge: formData.acceptedAge,
+          acceptedMarketing: formData.acceptedMarketing,
+        }}
+        onUpdateField={onUpdateField}
+      />
 
       <SubmitButton
         loading={loading}
         onPress={onSubmit}
         text="Guardar y Continuar"
+        disabled={
+          !formData.acceptedTerms ||
+          !formData.acceptedPrivacy ||
+          !formData.acceptedAge
+        }
       />
       <BackButton onPress={onCancel} text="Cancelar registro" />
     </ScrollView>

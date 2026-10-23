@@ -296,6 +296,10 @@ export type perfiles = {
   total_calificaciones?: string;
   total_recomendaciones_positivas?: string;
   total_recomendaciones_negativas?: string;
+  accepted_terms?: boolean;
+  accepted_privacy?: boolean;
+  accepted_age?: boolean;
+  accepted_marketing?: boolean;
 };
 
 export type EstadisticasResenas = {
