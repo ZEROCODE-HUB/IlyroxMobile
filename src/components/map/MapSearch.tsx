@@ -36,6 +36,7 @@ import {
 import {
   useLocationSearchStore,
   LocationSuggestionWithCount,
+  withColoniaType,
 } from "@/store/locationSearchStore";
 import { COLORS } from "@/constants/colors";
 import { logger } from "@/utils/logger";
@@ -487,6 +488,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
           restrictToRegions: false,
           withCounts: false,
           estado: profile?.estado,
+          alwaysIncludeDb: true,
         });
       } else {
         clearSuggestions();

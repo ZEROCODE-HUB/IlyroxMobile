@@ -397,7 +397,7 @@ interface LocationSearchState {
   searchLocations: (
     searchTerm: string,
     country?: CountryCode,
-    opts?: { restrictToRegions?: boolean; withCounts?: boolean; estado?: string },
+    opts?: { restrictToRegions?: boolean; withCounts?: boolean; estado?: string; alwaysIncludeDb?: boolean },
   ) => Promise<void>;
   clearSuggestions: () => void;
   refreshSessionToken: () => void;
@@ -498,6 +498,60 @@ function normalizeForMatch(name: string): string {
   return n;
 }
 
+// ---- REV08-02 / REV08-11: fusion de zonas de Google con las de la BD ----
+// Palabras genericas que Google y la BD ponen o quitan al nombrar la MISMA zona.
+// Solo sirven para fusionar sugerencias del buscador; NO entran al matching de propiedades.
+const GENERIC_ZONE_WORDS = new Set([
+  "fraccionamiento", "fracc", "residencial", "colonia", "col", "privada", "coto",
+  "condominio", "barrio", "unidad", "habitacional", "conjunto", "urbanizacion",
+  "de", "del", "la", "el", "los", "las",
+]);
+
+function coreName(name: string): string {
+  const words = normalizeForMatch(name).replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(Boolean);
+  const core = words.filter((w) => !GENERIC_ZONE_WORDS.has(w));
+  return (core.length > 0 ? core : words).join(" ");
+}
+
+function namesRelated(a: string, b: string): boolean {
+  const x = coreName(a);
+  const y = coreName(b);
+  return !!x && !!y && (x === y || x.includes(y) || y.includes(x));
+}
+
+/** Google dice "localidad" (la app la volvia municipio) pero su nombre no es el de su municipio: es colonia. */
+export function isLocalityInsideMunicipio(s: LocationSuggestionWithCount): boolean {
+  if (s.type !== "municipio") return false;
+  if (s.placeId?.startsWith("prop-")) return false;
+  const t = s.types ?? [];
+  if (!t.includes("locality") || t.includes("administrative_area_level_2")) return false;
+  if (!s.municipio_nombre) return false;
+  return !namesRelated(s.name, s.municipio_nombre);
+}
+
+export function withColoniaType<T extends LocationSuggestionWithCount>(s: T): T {
+  return isLocalityInsideMunicipio(s) ? { ...s, type: "colonia" } : s;
+}
+
+function canMergeGoogleDb(g: LocationSuggestionWithCount, d: LocationSuggestionWithCount): boolean {
+  if (g.type === "estado" || d.type === "estado") return false;
+  if (d.type === "municipio") return g.type === "municipio" && !isLocalityInsideMunicipio(g);
+  return g.type === "colonia" || isLocalityInsideMunicipio(g);
+}
+
+function mergeGoogleDb(g: LocationSuggestionWithCount, d: LocationSuggestionWithCount): LocationSuggestionWithCount {
+  return {
+    ...g,
+    name: d.name,
+    type: d.type,
+    secondaryText: d.secondaryText || g.secondaryText,
+    municipio_nombre: d.municipio_nombre ?? g.municipio_nombre,
+    estado_nombre: d.estado_nombre ?? g.estado_nombre,
+    propertyCount: d.propertyCount,
+    centroide: d.centroide,
+  };
+}
+
 export const useLocationSearchStore = create<LocationSearchState>((set, get) => ({
   suggestions: [],
   isLoading: false,
@@ -511,7 +565,7 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
   searchLocations: async (
     searchTerm: string,
     country: CountryCode = DEFAULT_COUNTRY,
-    opts?: { restrictToRegions?: boolean; withCounts?: boolean; estado?: string },
+    opts?: { restrictToRegions?: boolean; withCounts?: boolean; estado?: string; alwaysIncludeDb?: boolean },
   ) => {
     // Se toma ANTES de cualquier await: una búsqueda nueva deja obsoleta a la
     // anterior en el acto (aunque su respuesta llegue después).
@@ -613,7 +667,7 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
         (s) => s.estado_nombre?.toLowerCase() === effectiveEstado?.toLowerCase(),
       ).length;
 
-      if (localCountPostNoise < 2) {
+      if (opts?.alwaysIncludeDb || localCountPostNoise < 2) {
         const { data: propLocations } = await supabase.rpc(
           "buscar_ubicaciones_desde_propiedades",
           {
@@ -669,11 +723,31 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
       // Google se tragaba a "Tamarindos, Aguascalientes" de la BD.
       const seenRoots = new Map<string, number>(); // root|estado → first index
       const normalized: typeof combined = [];
+      // REV08-02: indice por nombre-nucleo (sin palabras genericas) SOLO para fusionar Google <-> BD.
+      // Entre dos resultados de la misma fuente se sigue usando la clave exacta de siempre.
+      const coreIdx = new Map<string, number>();
       for (let i = 0; i < combined.length; i++) {
         const item = combined[i];
         const root = `${normalizeForMatch(item.name)}|${normalizeForMatch(item.estado_nombre ?? "")}`;
+        const coreKey = `${coreName(item.name)}|${normalizeForMatch(item.estado_nombre ?? "")}`;
         if (!seenRoots.has(root)) {
+          if (opts?.alwaysIncludeDb && coreIdx.has(coreKey)) {
+            const cIdx = coreIdx.get(coreKey)!;
+            const cExisting = normalized[cIdx];
+            const cExistingFromGoogle = !cExisting.placeId.startsWith("prop-");
+            const cItemFromGoogle = !item.placeId.startsWith("prop-");
+            if (cExistingFromGoogle !== cItemFromGoogle) {
+              const g = cItemFromGoogle ? item : cExisting;
+              const d = cItemFromGoogle ? cExisting : item;
+              if (canMergeGoogleDb(g, d)) {
+                normalized[cIdx] = mergeGoogleDb(g, d);
+                seenRoots.set(root, cIdx);
+                continue;
+              }
+            }
+          }
           seenRoots.set(root, normalized.length);
+          if (!coreIdx.has(coreKey)) coreIdx.set(coreKey, normalized.length);
           normalized.push(item);
         } else {
           const existingIdx = seenRoots.get(root)!;
@@ -681,7 +755,16 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
           // Reemplazar si: el nuevo tiene más propertyCount O es de Google (placeId no empieza con "prop-")
           const existingFromGoogle = !existing.placeId.startsWith("prop-");
           const itemFromGoogle = !item.placeId.startsWith("prop-");
-          if (itemFromGoogle && !existingFromGoogle) {
+          if (opts?.alwaysIncludeDb && itemFromGoogle !== existingFromGoogle) {
+            // REV08-02/11: misma zona en Google y en la BD -> geometria y placeId de Google, nombre y conteo de la BD.
+            const g = itemFromGoogle ? item : existing;
+            const d = itemFromGoogle ? existing : item;
+            if (canMergeGoogleDb(g, d)) {
+              normalized[existingIdx] = mergeGoogleDb(g, d);
+            } else {
+              normalized.push(item); // no son la misma zona (p. ej. municipio y colonia con igual nombre): se conservan las dos
+            }
+          } else if (itemFromGoogle && !existingFromGoogle) {
             // El de Google gana sobre el de BD → reemplazar
             normalized[existingIdx] = item;
           } else if ((item.propertyCount ?? 0) > (existing.propertyCount ?? 0)) {

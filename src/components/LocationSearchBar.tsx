@@ -67,7 +67,7 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
     const delayDebounceFn = setTimeout(() => {
       // Sin "(regions)", como el resto de buscadores: así aparecen también los
       // fraccionamientos, que Google clasifica como establishment.
-      searchLocations(query, undefined, { estado: profile?.estado, restrictToRegions: false });
+      searchLocations(query, undefined, { estado: profile?.estado, restrictToRegions: false, alwaysIncludeDb: true });
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
