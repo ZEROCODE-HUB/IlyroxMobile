@@ -59,6 +59,7 @@ interface SyncState {
   errors: number;
   errorDetails: Array<{ message: string; property_id?: string }>;
   totalPublished: number;
+  suspended?: number;   // v16 (REV08-14): propiedades que Tokko dejo de mandar y quedaron 'Suspendida'
 }
 
 // TokenBucket and CircuitBreaker removed (not needed for stable API)
@@ -216,7 +217,7 @@ async function sendNotification(
   if (state.errors > 0 && state.new === 0 && state.updated === 0) {
     title = 'Toko Broker: Error';
     message = 'No se pudieron sincronizar las propiedades. Intenta de nuevo.';
-  } else if (state.new === 0 && state.updated === 0) {
+  } else if (state.new === 0 && state.updated === 0 && !(state.suspended && state.suspended > 0)) {
     title = 'Toko Broker: Sincronizado';
     message = 'Todas las propiedades ya estaban actualizadas.';
   } else {
@@ -224,6 +225,7 @@ async function sendNotification(
     const parts = [];
     if (state.new > 0) parts.push(`${state.new} nueva${state.new > 1 ? 's' : ''}`);
     if (state.updated > 0) parts.push(`${state.updated} actualizada${state.updated > 1 ? 's' : ''}`);
+    if (state.suspended && state.suspended > 0) parts.push(`${state.suspended} suspendida${state.suspended > 1 ? 's' : ''} (Tokko ya no la manda)`);
     if (state.errors > 0) parts.push(`${state.errors} error${state.errors > 1 ? 'es' : ''}`);
     message = parts.join(', ') + '.';
   }
@@ -377,6 +379,7 @@ serve(async (req) => {
       errors: 0,
       errorDetails: [],
       totalPublished: 0,
+      suspended: 0,
     };
 
     const headers = {
@@ -546,15 +549,18 @@ serve(async (req) => {
       if (!listingComplete || !bulkOk) {
         console.warn('[Tokko] Listado incompleto o insert fallido: se omite marcar eliminadas',
           { listingComplete, bulkOk });
-        state.errorDetails.push({ message: 'No se marcaron propiedades eliminadas porque el listado de Tokko llego incompleto.' });
+        state.errorDetails.push({ message: 'No se suspendieron propiedades porque el listado de Tokko llego incompleto.' });
         return { data: null };
       }
       try {
-        const { data, error } = await supabaseAdmin.rpc('marcar_propiedades_eliminadas_tokkobroker', {
+        // v16 (REV08-14): lo que Tokko ya no manda NO se borra: queda 'Suspendida' (oculta), con su
+        // comision, coincidencias y chats; vuelve sola cuando Tokko la manda otra vez.
+        const { data, error } = await supabaseAdmin.rpc('marcar_propiedades_no_disponibles_tokkobroker', {
           p_usuario_id: user.id,
           p_tokkobroker_ids: tokkoIds,
         });
         if (error) throw error;
+        state.suspended = typeof data === 'number' ? data : 0;
         return { data };
       } catch (markErr: any) {
         console.error('[Tokko] Error marking eliminated:', markErr.message);
