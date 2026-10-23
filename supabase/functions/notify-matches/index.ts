@@ -193,6 +193,7 @@ serve(async (req) => {
 
       sendPromises.push(
         sendPushNotification(userId, heading, content, {
+          screen: "MatchDetail",
           type: "new_match",
           propiedad_id,
           lead_id: group.leadId,
