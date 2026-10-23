@@ -1369,15 +1369,27 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   const searchedLocationPinMarkers = useMemo(() => {
     if (!mapReady) return [] as React.ReactNode[];
     if (!searchedLocationPins) return [] as React.ReactNode[];
+    // REV08-08: si hay una propiedad a menos de ~60 m del pin, el pin no se dibuja (taparia su marcador).
+    const hasPropertyNear = (lat: number, lng: number) => {
+      const dLat = 60 / 111320;
+      const dLng = 60 / (111320 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
+      return properties.some((p) => {
+        const plat = p.coordinates?.lat ?? p.latitud ?? undefined;
+        const plng = p.coordinates?.lng ?? p.longitud ?? undefined;
+        if (plat === undefined || plng === undefined || isNaN(plat) || isNaN(plng)) return false;
+        return Math.abs(plat - lat) <= dLat && Math.abs(plng - lng) <= dLng;
+      });
+    };
     const result = searchedLocationPins
       .filter((pin) => isValidCoord(pin.latitude, pin.longitude))
+      .filter((pin) => !hasPropertyNear(pin.latitude, pin.longitude))
       .map((pin) => (
         <Marker
           key={`searched-pin-${pin.key}`}
           coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
           pinColor={COLORS.error}
           title="Ubicación buscada"
-          zIndex={9999}
+          zIndex={0}
           tracksViewChanges={false}
         />
       ));
@@ -1387,7 +1399,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       );
     }
     return result;
-  }, [searchedLocationPins, mapReady]);
+  }, [searchedLocationPins, mapReady, properties]);
 
   // ── LOG TEMPORAL DE DIAGNÓSTICO — resumen de TODO lo que se renderiza como
   // hijo del <MapView>. Cada cambio aquí equivale a un commit de Fabric que
