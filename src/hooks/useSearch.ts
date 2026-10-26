@@ -259,10 +259,11 @@ async function fetchProperties(
   // REV06-01: solo se ofrecen fichas DISPONIBLES (activo = true), igual que el
   // mapa, mas las propias del usuario aunque no esten disponibles (Suspendida,
   // Vendida, Rentada...). Un segundo .or() se combina con Y con el .or() de texto.
+  // REV10-04: ademas, de otros asesores solo las que comparten comision (el creador ve siempre las suyas).
   if (currentUserId && /^[0-9a-f-]{36}$/i.test(currentUserId)) {
-    query = query.or(`activo.eq.true,created_by.eq.${currentUserId}`);
+    query = query.or(`and(activo.eq.true,comparte_comision.eq.true,or(sin_comision.is.null,sin_comision.eq.false)),created_by.eq.${currentUserId}`);
   } else {
-    query = query.eq("activo", true);
+    query = query.eq("activo", true).eq("comparte_comision", true).or("sin_comision.is.null,sin_comision.eq.false");
   }
 
   if (blockedUserIds.length > 0) {

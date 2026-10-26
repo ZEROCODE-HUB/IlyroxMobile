@@ -231,12 +231,13 @@ async function fetchMapProperties(
 
   // Las propiedades sin comisión se guardan con activo=false y quedan ocultas a
   // todos. Excepción: su creador SÍ debe verlas en el mapa y el buscador.
+  // REV10-04: ademas, otros asesores solo ven las que comparten comision (misma regla que el perfil y el feed).
   if (currentUserId) {
     query = query.or(
-      `activo.eq.true,and(sin_comision.eq.true,created_by.eq.${currentUserId})`,
+      `and(activo.eq.true,comparte_comision.eq.true,or(sin_comision.is.null,sin_comision.eq.false)),and(created_by.eq.${currentUserId},or(activo.eq.true,sin_comision.eq.true))`,
     );
   } else {
-    query = query.eq("activo", true);
+    query = query.eq("activo", true).eq("comparte_comision", true).or("sin_comision.is.null,sin_comision.eq.false");
   }
 
   query = query.is("deleted_at", null);

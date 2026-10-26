@@ -15,4 +15,5 @@ export const LEGAL_URLS = {
   dataProcessing: "https://www.ilyrox.com/data-processing-agreement",
   ip: "https://www.ilyrox.com/intellectual-property",
   privacySimplified: "https://www.ilyrox.com/privacy-simplified",
+  professionalDataAgreement: "https://www.ilyrox.com/legal/acuerdo-tratamiento-datos",
 };

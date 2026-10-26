@@ -207,18 +207,6 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
                 </SafePressable>
               )}
             </View>
-            {!!onReport && (
-              <SafePressable
-                style={styles.reportLink}
-                onPress={onReport}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Reportar usuario"
-              >
-                <Ionicons name="flag-outline" size={14} color={COLORS.textSecondary} />
-                <Text style={styles.reportLinkText}>Reportar usuario</Text>
-              </SafePressable>
-            )}
             {isBlocked && (
               <Text style={styles.blockedHint}>
                 Dejaste de ver las propiedades de este usuario.
@@ -281,6 +269,18 @@ export const ProfileInfoHeader: React.FC<ProfileInfoHeaderProps> = React.memo(({
                   </Text>
                 </SafePressable>
               </View>
+            )}
+            {!!onReport && (
+              <SafePressable
+                style={styles.reportLink}
+                onPress={onReport}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Reportar usuario"
+              >
+                <Ionicons name="flag-outline" size={14} color={COLORS.textSecondary} />
+                <Text style={styles.reportLinkText}>Reportar usuario</Text>
+              </SafePressable>
             )}
           </View>
         )}

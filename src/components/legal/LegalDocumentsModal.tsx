@@ -21,6 +21,7 @@ const DOC_INFO: { codigo: LegalCodigo; titulo: string; url: string; icon: React.
   { codigo: "comunidad", titulo: "Normas de la Comunidad", url: LEGAL_URLS.community, icon: "people-outline" },
   { codigo: "seguridad_infantil", titulo: "Estándares de Seguridad Infantil", url: LEGAL_URLS.childSafety, icon: "happy-outline" },
   { codigo: "comunicaciones", titulo: "Autorización y Preferencias de Contacto", url: LEGAL_URLS.communications, icon: "mail-outline" },
+  { codigo: "acuerdo_datos_profesionales", titulo: "Acuerdo de Tratamiento de Datos", url: LEGAL_URLS.professionalDataAgreement, icon: "briefcase-outline" },
 ];
 
 interface Props {
@@ -81,7 +82,15 @@ export function LegalDocumentsModal({ visible, onClose, initialCodigo = null }: 
       headerRight={backButton}
       contentStyle={{ maxHeight: "80%", width: "90%", maxWidth: 500 }}
     >
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={true}>
+      {/* REV10-08: la tarjeta del Modal es un Pressable que captura el toque; esta vista reclama el gesto
+          primero para que el ScrollView arranque desde el primer arrastre. Las filas tocables siguen funcionando. */}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={true}
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.scrollInner} onStartShouldSetResponder={() => true}>
         {loading && <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 24 }} />}
 
         {!loading && failed && (
@@ -137,6 +146,7 @@ export function LegalDocumentsModal({ visible, onClose, initialCodigo = null }: 
             )}
           </View>
         )}
+        </View>
       </ScrollView>
     </Modal>
   );
@@ -144,6 +154,7 @@ export function LegalDocumentsModal({ visible, onClose, initialCodigo = null }: 
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: 4, paddingBottom: 16, gap: 10 },
+  scrollInner: { gap: 10 },
   center: { alignItems: "center", gap: 12, paddingVertical: 16 },
   row: {
     flexDirection: "row",

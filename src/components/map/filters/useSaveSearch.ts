@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../../../lib/supabase";
-import { legalService } from "../../../services/legalService";
+import { legalService, ConsentItem, TEXTO_DECLARACION_PROSPECTO } from "../../../services/legalService";
 import { useToast } from "../../../context/ToastContext";
 import { useModal } from "../../../context/ModalContext";
 import { DEFAULT_COUNTRY } from "../../../lib/location/registry";
@@ -188,6 +188,45 @@ export const useSaveSearch = (userId?: string) => {
 
     setErrors({});
     return true;
+  };
+
+  // REV10-07: el mismo prospecto del mismo asesor (por telefono o email) se reutiliza; no se duplica en cada guardado.
+  const buscarProspectoExistente = async (): Promise<string | null> => {
+    if (!userId) return null;
+    const telefonos = Array.from(new Set([leadPhone.trim(), leadPhone.replace(/\D/g, "")].filter(Boolean)));
+    if (telefonos.length > 0) {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("usuario_id", userId)
+        .eq("activo", true)
+        .in("telefono", telefonos)
+        .limit(1);
+      if (error) throw error;
+      if (data && data.length > 0) return String(data[0].id);
+    }
+    if (leadEmail.trim()) {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("usuario_id", userId)
+        .eq("activo", true)
+        .eq("email", leadEmail.trim())
+        .limit(1);
+      if (error) throw error;
+      if (data && data.length > 0) return String(data[0].id);
+    }
+    return null;
+  };
+
+  /** Fecha en que ya se declaro haber informado a este prospecto (si su telefono / email coincide con uno existente). */
+  const declaracionPrevia = async (version: string): Promise<string | null> => {
+    try {
+      const existente = await buscarProspectoExistente();
+      return existente ? await legalService.declaracionFecha(existente, version) : null;
+    } catch {
+      return null;
+    }
   };
 
   const createLeadRecord = async () => {
@@ -764,7 +803,7 @@ export const useSaveSearch = (userId?: string) => {
   const handleSaveSearch = async (
     filters: any,
     onClose: () => void,
-    legal?: { avisoConfirmado: boolean; compartirAsesores: boolean },
+    legal?: { aceptaAcuerdo: boolean; declaraProspecto: boolean },
   ): Promise<{ success: boolean; metadata?: any }> => {
     if (!userId) {
       showModal({
@@ -792,29 +831,46 @@ export const useSaveSearch = (userId?: string) => {
       let leadId = null;
 
       if (createLead) {
-        leadId = await createLeadRecord();
-        if (leadId) {
-          // Evidencia: aviso de privacidad mostrado/confirmado y elección de compartir con asesores.
-          // Si falla no se bloquea el guardado de la búsqueda.
-          try {
-            await legalService.registrarConsentimientos(
-              [
-                {
-                  tipo: "prospecto_aviso",
-                  lead_id: String(leadId),
-                  accion: legal?.avisoConfirmado ? "aceptado" : "rechazado",
-                },
-                {
-                  tipo: "prospecto_compartir_asesores",
-                  lead_id: String(leadId),
-                  accion: legal?.compartirAsesores ? "aceptado" : "rechazado",
-                },
-              ],
-              "formulario_lead",
-              { formulario: "busqueda_guardada" },
-            );
-          } catch {
-            // silencioso a propósito
+        // REV10-07: el prospecto lo carga el asesor, que es el responsable de esos datos (Acuerdo de Tratamiento de
+        // Datos, doc 08). Se exige UNA vez la aceptacion del Acuerdo y UNA vez por prospecto la declaracion de que lo
+        // informo; ambas quedan como evidencia. Si la BD aun no tiene el Acuerdo publicado, no se exige nada.
+        const asesor = await legalService.estadoAsesor();
+        const existente = await buscarProspectoExistente();
+        const acuerdoPendiente = asesor.requerido && !asesor.aceptado;
+        const declaracionPendiente =
+          asesor.requerido && !(existente && (await legalService.declaracionRegistrada(existente, asesor.version)));
+
+        const legalErrors: { [key: string]: string } = {};
+        if (acuerdoPendiente && !legal?.aceptaAcuerdo) {
+          legalErrors.legalAcuerdo = "Debes aceptar el Acuerdo de Tratamiento de Datos para guardar un prospecto";
+        }
+        if (declaracionPendiente && !legal?.declaraProspecto) {
+          legalErrors.legalDeclaracion = "Debes confirmar que informaste a tu prospecto";
+        }
+        if (Object.keys(legalErrors).length > 0) {
+          setErrors((prev: { [key: string]: string }) => ({ ...prev, ...legalErrors }));
+          return { success: false };
+        }
+
+        leadId = existente ?? (await createLeadRecord());
+
+        if (leadId && asesor.requerido) {
+          const items: ConsentItem[] = [];
+          if (acuerdoPendiente) items.push({ tipo: "acuerdo_datos_profesionales" });
+          if (declaracionPendiente) {
+            items.push({
+              tipo: "asesor_informo_prospecto",
+              lead_id: String(leadId),
+              contexto: { texto_declaracion: TEXTO_DECLARACION_PROSPECTO, prospecto_reutilizado: !!existente },
+            });
+          }
+          if (items.length > 0) {
+            try {
+              await legalService.registrarConsentimientos(items, "guardar_busqueda", { formulario: "busqueda_guardada" });
+            } catch {
+              showToast("No pudimos registrar tu declaración. Revisa tu conexión e inténtalo de nuevo.", "error");
+              return { success: false };
+            }
           }
         }
       }
@@ -854,5 +910,6 @@ export const useSaveSearch = (userId?: string) => {
     isSaving,
     handleSaveSearch,
     updateSearchInDatabase,
+    declaracionPrevia,
   };
 };

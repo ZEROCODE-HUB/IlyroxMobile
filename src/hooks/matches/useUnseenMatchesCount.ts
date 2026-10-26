@@ -27,15 +27,20 @@ export const matchesCountKeys = {
 };
 
 async function fetchUnseenCount(userId: string): Promise<number> {
-  const { count, error } = await supabase
+  // REV10-04: igual que la pantalla de Matches, no cuentan las coincidencias de propiedades que no comparten comision.
+  const { data, error } = await supabase
     .from("matches")
-    .select("id", { count: "exact", head: true })
+    .select("id, propiedad:propiedades(created_by, comparte_comision, sin_comision)")
     .eq("usuario_id", userId)
     .eq("activo", true)
     .neq("estado", "descartado")
     .is("visto_en", null);
   if (error) throw error;
-  return count ?? 0;
+  return (data ?? []).filter((m: any) => {
+    const p = Array.isArray(m.propiedad) ? m.propiedad[0] : m.propiedad;
+    if (!p || p.created_by === userId) return true;
+    return p.comparte_comision === true && !p.sin_comision;
+  }).length;
 }
 
 export function useUnseenMatchesCount(userId?: string) {

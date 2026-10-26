@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -160,6 +160,19 @@ const Matches: React.FC = () => {
   );
   const { data: feedItemsRecord = {} } = usePropertyFeedItems(propertyIds);
 
+  // REV10-03: el push de una coincidencia trae busquedaId. Se abre directamente esa busqueda guardada (la misma
+  // ventana que al tocar su tarjeta). Una sola vez por busqueda, para no reabrirla despues de cerrarla.
+  const { busquedaId: busquedaParam } = useLocalSearchParams<{ busquedaId?: string }>();
+  const busquedaAbierta = useRef<string | null>(null);
+  useEffect(() => {
+    if (!busquedaParam || loading) return;
+    if (busquedaAbierta.current === busquedaParam) return;
+    if (savedSearches.some((s: any) => s.id === busquedaParam)) {
+      busquedaAbierta.current = busquedaParam;
+      setSelectedLeadId(busquedaParam);
+    }
+  }, [busquedaParam, loading, savedSearches]);
+
   const fetchMatches = async () => {
     if (!user) return;
     setLoading(true);
@@ -205,6 +218,16 @@ const Matches: React.FC = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+
+      // REV10-04: una coincidencia de una propiedad que no comparte comision (o es "sin comision") no se muestra.
+      // La BD ya no las genera ni las deja activas; esto cubre cualquier resto o cambio reciente.
+      if (data) {
+        data = data.filter((m: any) => {
+          const p = m.propiedad;
+          if (!p || p.created_by === user.id) return true;
+          return p.comparte_comision === true && !p.sin_comision;
+        });
+      }
 
       // Si tenemos datos, obtener perfiles por separado
       if (data && data.length > 0) {
@@ -374,7 +397,9 @@ const Matches: React.FC = () => {
     allSearches.forEach((search) => {
       const lead = search.lead;
       if (lead && lead.id) {
-        grouped.set(lead.id, {
+        // REV10-07: el prospecto se reutiliza; la tarjeta es de la BUSQUEDA (si no, dos busquedas del mismo
+        // prospecto se fundirian en una y una desapareceria).
+        grouped.set(search.id, {
           leadId: lead.id,
           leadName: lead.nombre || "Lead sin nombre",
           leadPhone: lead.telefono || "Sin teléfono",
@@ -420,10 +445,11 @@ const Matches: React.FC = () => {
       const leadId = lead?.id;
 
       if (!leadId) return;
+      const groupKey = match.busqueda_id ?? leadId;
 
-      // Si el lead no estaba en las búsquedas (raro pero posible), lo agregamos
-      if (!grouped.has(leadId)) {
-        grouped.set(leadId, {
+      // Si la busqueda no estaba en la lista (raro pero posible), la agregamos
+      if (!grouped.has(groupKey)) {
+        grouped.set(groupKey, {
           leadId,
           leadName: lead.nombre || "Lead sin nombre",
           leadPhone: lead.telefono || "Sin teléfono",
@@ -461,7 +487,7 @@ const Matches: React.FC = () => {
         });
       }
 
-      const group = grouped.get(leadId)!;
+      const group = grouped.get(groupKey)!;
       group.matches.push(match);
 
       if (match.tipo_match === "coincidencia") {
@@ -621,7 +647,7 @@ const Matches: React.FC = () => {
   ); // Pass all matches
 
   const selectedLead =
-    leadGroups.find((l) => l.leadId === selectedLeadId) || null;
+    leadGroups.find((l) => l.busquedaId === selectedLeadId) || null;
 
   const renderItem = useCallback(
     ({ item }: { item: LeadGroup }) => (
@@ -634,7 +660,7 @@ const Matches: React.FC = () => {
         matchCount={item.matchCount}
         similarCount={item.similarCount}
         latestMatchDate={item.latestMatchDate}
-        onPress={() => setSelectedLeadId(item.leadId)}
+        onPress={() => setSelectedLeadId(item.busquedaId)}
       />
     ),
     [setSelectedLeadId],
@@ -660,7 +686,7 @@ const Matches: React.FC = () => {
       {/* Content */}
       <FlatList
         data={leadGroups}
-        keyExtractor={(item) => item.leadId}
+        keyExtractor={(item) => item.busquedaId}
         renderItem={renderItem}
         contentContainerStyle={styles.scrollContent}
         ListHeaderComponent={

@@ -125,10 +125,21 @@ const PROPERTY_SELECT = `
  * PostgREST no soporta .or() anidado, por eso usamos .and() con las condiciones
  * de visibilidad agrupadas dentro.
  */
-function applyPropertiesVisibility(query: any, currentUserId?: string, blockedUserIds: string[] = []): any {
-  // Temporalmente sin filtro de comparte_comision para probar
-  log.info(`[applyPropertiesVisibility] currentUserId=${currentUserId}, blockedUserIds=${blockedUserIds.length} - SIN FILTRO DE COMISION`);
-  return query.eq("activo", true);
+function applyPropertiesVisibility(query: any, currentUserId?: string, blockedUserIds: string[] = [], permitirNoCompartida = false): any {
+  // REV10-04: abrir UNA propiedad por enlace o notificacion (permitirNoCompartida) sigue funcionando aunque ya no comparta
+  // comision: la ficha la muestra con la etiqueta "No disponible". Los listados siempre usan la regla.
+  if (permitirNoCompartida) return query.eq("activo", true);
+  // REV10-04: misma regla que el perfil, el mapa y el buscador. Otros asesores solo ven la propiedad si comparte
+  // comision (y no es "sin comision"); su creador siempre la ve. Un solo .or() agrupa las dos ramas.
+  let q = query.eq("activo", true);
+  if (currentUserId && /^[0-9a-f-]{36}$/i.test(currentUserId)) {
+    q = q.or(
+      `and(comparte_comision.eq.true,or(sin_comision.is.null,sin_comision.eq.false)),created_by.eq.${currentUserId}`,
+    );
+  } else {
+    q = q.eq("comparte_comision", true).or("sin_comision.is.null,sin_comision.eq.false");
+  }
+  return q;
 }
 
 /**
@@ -665,6 +676,7 @@ export const feedService = {
           .is("deleted_at", null),
         currentUserId,
         blockedUserIds,
+        true,
       ).maybeSingle();
       return data ? mapPropertyToFeedItem(feedData, data, user) : null;
     }

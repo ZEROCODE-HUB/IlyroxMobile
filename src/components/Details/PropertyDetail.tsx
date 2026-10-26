@@ -196,6 +196,14 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
     !!user?.id && user.id === propertyDetails.created_by;
   const showStatusBadge =
     isClosedProperty || propertyStatus === "Reservada";
+  // REV10-04: la ficha sigue abriendo por enlace o notificacion, pero si el dueno dejo de compartir comision
+  // se avisa con una etiqueta. Solo se evalua si el dato llego (los datos en cache pueden no traerlo).
+  const showNoDisponible =
+    !isPropertyOwner &&
+    !isClosedProperty &&
+    propertyDetails.comparte_comision !== undefined &&
+    (propertyDetails.comparte_comision !== true ||
+      propertyDetails.sin_comision === true);
   const profile = propertyDetails.perfil;
   const amenities =
     propertyDetails.amenidades?.map((a: any) => a.amenidad.nombre) || [];
@@ -343,6 +351,20 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                     ]}
                   >
                     {propertyStatus}
+                  </Text>
+                </View>
+              )}
+              {showNoDisponible && (
+                <View
+                  style={[
+                    styles.typeTag,
+                    { backgroundColor: COLORS.errorLight },
+                  ]}
+                >
+                  <Text
+                    style={[styles.typeTagText, { color: COLORS.errorDark }]}
+                  >
+                    No disponible
                   </Text>
                 </View>
               )}

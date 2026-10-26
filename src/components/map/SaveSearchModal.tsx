@@ -18,6 +18,13 @@ import { COLORS } from "@/constants/colors";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 import { useShallow } from "zustand/react/shallow";
 import { LegalDocumentsModal } from "@/components/legal/LegalDocumentsModal";
+import {
+  legalService,
+  LegalCodigo,
+  EstadoAsesor,
+  TEXTO_ACEPTA_ACUERDO,
+  TEXTO_DECLARACION_PROSPECTO,
+} from "@/services/legalService";
 
 interface SaveSearchModalProps {
   visible: boolean;
@@ -44,19 +51,34 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
     errors,
     isSaving,
     handleSaveSearch,
+    declaracionPrevia,
   } = useSaveSearch(userId);
 
-  // Aviso de privacidad del prospecto: se muestra ANTES de guardar sus datos.
-  // Las dos casillas son opcionales, NO vienen marcadas y NO bloquean el guardado (solo dejan evidencia).
-  const [avisoConfirmado, setAvisoConfirmado] = useState(false);
-  const [compartirAsesores, setCompartirAsesores] = useState(false);
-  const [showAviso, setShowAviso] = useState(false);
+  // REV10-07: el prospecto lo carga el asesor (responsable de esos datos). Se pide UNA vez el Acuerdo de Tratamiento de
+  // Datos y, por prospecto, la declaracion de que lo informo. Las casillas NO vienen marcadas.
+  const [aceptaAcuerdo, setAceptaAcuerdo] = useState(false);
+  const [declaraProspecto, setDeclaraProspecto] = useState(false);
+  const [asesor, setAsesor] = useState<EstadoAsesor | null>(null);
+  const [asesorFallo, setAsesorFallo] = useState(false);
+  const [docVisible, setDocVisible] = useState<LegalCodigo | null>(null);
+  const cargarAsesor = React.useCallback(() => {
+    setAsesorFallo(false);
+    legalService
+      .estadoAsesor()
+      .then((e) => setAsesor(e))
+      .catch(() => {
+        setAsesor(null);
+        setAsesorFallo(true);
+      });
+  }, []);
   useEffect(() => {
     if (!visible) {
-      setAvisoConfirmado(false);
-      setCompartirAsesores(false);
+      setAceptaAcuerdo(false);
+      setDeclaraProspecto(false);
+      return;
     }
-  }, [visible]);
+    cargarAsesor();
+  }, [visible, cargarAsesor]);
 
   // Activar createLead cuando el modal se abre
   useEffect(() => {
@@ -64,6 +86,24 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
       setCreateLead(true);
     }
   }, [visible, setCreateLead]);
+
+  // Si el prospecto ya fue informado (mismo telefono / email), se muestra "Aviso informado el <fecha>" y no se pide de nuevo.
+  const [avisoFecha, setAvisoFecha] = useState<string | null>(null);
+  useEffect(() => {
+    setAvisoFecha(null);
+    if (!visible || !asesor?.requerido) return;
+    if (leadPhone.replace(/\D/g, "").length < 8 && !leadEmail.includes("@")) return;
+    let activo = true;
+    const t = setTimeout(() => {
+      declaracionPrevia(asesor.version).then((f) => {
+        if (activo) setAvisoFecha(f);
+      });
+    }, 600);
+    return () => {
+      activo = false;
+      clearTimeout(t);
+    };
+  }, [visible, asesor?.requerido, asesor?.version, leadPhone, leadEmail]);
 
   const getFilterSummary = () => {
     const parts: string[] = [];
@@ -111,7 +151,7 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
   };
 
   const handleSave = async () => {
-    const result = await handleSaveSearch(filters, onClose, { avisoConfirmado, compartirAsesores });
+    const result = await handleSaveSearch(filters, onClose, { aceptaAcuerdo, declaraProspecto });
     if (result.success) {
       onSaveSuccessWithData(result.metadata);
     }
@@ -246,53 +286,88 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
             </View>
 
             <View style={styles.privacyBox}>
-              <Text style={styles.privacyTitle}>Aviso de privacidad del prospecto</Text>
+              <Text style={styles.privacyTitle}>Datos del prospecto</Text>
               <Text style={styles.privacyText}>
-                Los datos del prospecto (nombre, teléfono y email) se usan para dar seguimiento a esta
-                búsqueda dentro de ILYROX. Antes de guardarlos, infórmale cómo se tratan sus datos. No se
-                le agregará a campañas ni listas de promociones sin su autorización específica.
+                Cuando un Profesional utilice el CRM para administrar datos de sus propios clientes, deberá haber
+                cumplido sus obligaciones de información y contar con base jurídica suficiente.
               </Text>
-              <Text style={styles.privacyLink} onPress={() => setShowAviso(true)}>
+              <Text style={styles.privacyLink} onPress={() => setDocVisible("privacidad")}>
                 Ver Política de Privacidad
               </Text>
-              <TouchableOpacity
-                style={styles.privacyCheckRow}
-                activeOpacity={0.8}
-                onPress={() => setAvisoConfirmado(!avisoConfirmado)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: avisoConfirmado }}
-              >
-                <Ionicons
-                  name={avisoConfirmado ? "checkbox" : "square-outline"}
-                  size={22}
-                  color={COLORS.primary}
-                />
-                <Text style={styles.privacyCheckText}>
-                  (Opcional) Informé al prospecto del aviso de privacidad
+
+              {asesorFallo && (
+                <Text style={styles.privacyLink} onPress={cargarAsesor}>
+                  No pudimos verificar tu Acuerdo de Tratamiento de Datos. Toca para reintentar.
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.privacyCheckRow}
-                activeOpacity={0.8}
-                onPress={() => setCompartirAsesores(!compartirAsesores)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: compartirAsesores }}
-              >
-                <Ionicons
-                  name={compartirAsesores ? "checkbox" : "square-outline"}
-                  size={22}
-                  color={COLORS.primary}
-                />
-                <Text style={styles.privacyCheckText}>
-                  (Opcional) El prospecto autoriza que sus datos se compartan con uno o más asesores
-                </Text>
-              </TouchableOpacity>
+              )}
+
+              {asesor?.requerido && (
+                <>
+                  {asesor.aceptado ? (
+                    <Text style={styles.privacyText}>
+                      Acuerdo de Tratamiento de Datos aceptado (v{asesor.version}).{" "}
+                      <Text style={styles.privacyLink} onPress={() => setDocVisible("acuerdo_datos_profesionales")}>
+                        Ver Acuerdo
+                      </Text>
+                    </Text>
+                  ) : (
+                    <>
+                      <TouchableOpacity
+                        style={styles.privacyCheckRow}
+                        activeOpacity={0.8}
+                        onPress={() => setAceptaAcuerdo(!aceptaAcuerdo)}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: aceptaAcuerdo }}
+                      >
+                        <Ionicons
+                          name={aceptaAcuerdo ? "checkbox" : "square-outline"}
+                          size={22}
+                          color={COLORS.primary}
+                        />
+                        <Text style={styles.privacyCheckText}>{TEXTO_ACEPTA_ACUERDO} *</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.privacyLink} onPress={() => setDocVisible("acuerdo_datos_profesionales")}>
+                        Ver Acuerdo de Tratamiento de Datos
+                      </Text>
+                      {errors.legalAcuerdo && <Text style={styles.errorText}>{errors.legalAcuerdo}</Text>}
+                    </>
+                  )}
+
+                  {avisoFecha ? (
+                    <Text style={styles.privacyText}>
+                      Aviso informado el {new Date(avisoFecha).toLocaleDateString("es-MX")}. No hace falta declararlo de nuevo
+                      para este prospecto.
+                    </Text>
+                  ) : (
+                    <>
+                      <TouchableOpacity
+                        style={styles.privacyCheckRow}
+                        activeOpacity={0.8}
+                        onPress={() => setDeclaraProspecto(!declaraProspecto)}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: declaraProspecto }}
+                      >
+                        <Ionicons
+                          name={declaraProspecto ? "checkbox" : "square-outline"}
+                          size={22}
+                          color={COLORS.primary}
+                        />
+                        <Text style={styles.privacyCheckText}>{TEXTO_DECLARACION_PROSPECTO} *</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.privacyText}>
+                        Se pide una sola vez por prospecto: si ya la registraste para este prospecto, no hace falta marcarla de nuevo.
+                      </Text>
+                      {errors.legalDeclaracion && <Text style={styles.errorText}>{errors.legalDeclaracion}</Text>}
+                    </>
+                  )}
+                </>
+              )}
             </View>
 
             <LegalDocumentsModal
-              visible={showAviso}
-              initialCodigo="privacidad"
-              onClose={() => setShowAviso(false)}
+              visible={docVisible !== null}
+              initialCodigo={docVisible}
+              onClose={() => setDocVisible(null)}
             />
 
             <View style={styles.warningBox}>

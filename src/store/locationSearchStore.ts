@@ -520,6 +520,20 @@ function namesRelated(a: string, b: string): boolean {
   return !!x && !!y && (x === y || x.includes(y) || y.includes(x));
 }
 
+// REV10-05: Google da el nombre general ("Villas de la Cantera") y la BD lo tiene por secciones
+// ("Villas de La Cantera 1a Seccion"). Solo cuenta como seccion lo que sobra si es un numero / ordinal / romano y
+// las palabras seccion, etapa, fase o sector: asi "La Perla" NO se funde con "La Perla Sur".
+const SECCION_NUM = /^(\d+(a|ra|da|era|ta|va|o|er)?|primera|segunda|tercera|cuarta|quinta|sexta|septima|octava|novena|decima|[ivx]+)$/;
+const SECCION_PALABRA = /^(seccion|sec|etapa|fase|sector)$/;
+
+export function isSectionOf(dbName: string, googleName: string): boolean {
+  const g = coreName(googleName);
+  const d = coreName(dbName);
+  if (!g || !d || d === g || !d.startsWith(g + " ")) return false;
+  const resto = d.slice(g.length + 1).split(" ").filter(Boolean);
+  return resto.length > 0 && resto.every((w) => SECCION_NUM.test(w) || SECCION_PALABRA.test(w));
+}
+
 /** Google dice "localidad" (la app la volvia municipio) pero su nombre no es el de su municipio: es colonia. */
 export function isLocalityInsideMunicipio(s: LocationSuggestionWithCount): boolean {
   if (s.type !== "municipio") return false;
@@ -556,9 +570,21 @@ function mergeGoogleWithDb(
         dbRows.some((r) => est(r.estado) === est(g.estado_nombre) && coreName(r.municipio ?? "") === gCore));
     if (isRealMunicipio) { out.push(g); continue; }
     // Candidatas: colonias de la BD con el mismo nucleo y estado.
-    const idxs = dbItems
+    // Las candidatas "prop-canon-" (nombre real de la BD, REV10-01) solo sirven para colonias; nunca para un municipio.
+    const usable = (d: LocationSuggestionWithCount) =>
+      !(d.placeId.startsWith("prop-canon-") && g.type === "municipio" && !isLocalityInsideMunicipio(g));
+    let idxs = dbItems
       .map((d, i) => ({ d, i }))
-      .filter(({ d }) => coreName(d.name) === gCore && est(d.estado_nombre) === est(g.estado_nombre));
+      .filter(({ d }) => usable(d) && coreName(d.name) === gCore && est(d.estado_nombre) === est(g.estado_nombre));
+    if (idxs.length === 0) {
+      // REV10-05: la BD la tiene por secciones. Con una sola se fusiona; con varias se muestran las de la BD
+      // (cada una con sus propiedades) y se omite el nombre general, que daria 0.
+      const secciones = dbItems
+        .map((d, i) => ({ d, i }))
+        .filter(({ d }) => usable(d) && isSectionOf(d.name, g.name) && est(d.estado_nombre) === est(g.estado_nombre));
+      if (secciones.length === 1) idxs = secciones;
+      else if (secciones.length > 1) continue;
+    }
     if (idxs.length === 0) { out.push(g); continue; }
     // Si hay varias (misma colonia en varios municipios) gana la del municipio que Google indica; si no, la de mas propiedades.
     const byMun = idxs.find(({ d }) => g.municipio_nombre && coreName(d.municipio_nombre ?? "") === coreName(g.municipio_nombre));
@@ -584,6 +610,74 @@ function mergeGoogleWithDb(
     idxs.forEach(({ d, i }) => { if (i !== best.i) usedDb.delete(i); });
   }
   dbItems.forEach((d, i) => { if (!usedDb.has(i)) out.push(d); });
+  return out;
+}
+
+/**
+ * REV10-01: colonias de Google que la consulta principal no pudo relacionar con la BD (Google las nombra distinto del
+ * texto escrito, p. ej. "Terranza Residence" vs "Terranza", o la colonia no tiene propiedades visibles hoy, p. ej.
+ * "La Soledad" vs "Fraccionamiento La Soledad"). Se consulta el nombre REAL de la colonia con el nucleo del nombre
+ * de Google. Son candidatas para fusionar: las que no se usen se descartan (nunca se agregan como sugerencia propia).
+ * Si la funcion SQL aun no existe, devuelve [] y todo sigue como antes.
+ */
+async function fetchCanonicalZones(
+  google: LocationSuggestionWithCount[],
+  propSuggestions: LocationSuggestionWithCount[],
+  country: CountryCode,
+  estadoUsuario?: string,
+): Promise<LocationSuggestionWithCount[]> {
+  const est = (s?: string | null) => normalizeForMatch(s ?? "");
+  const sinRelacion = google
+    .filter((g) => {
+      if (g.placeId?.startsWith("prop-")) return false;
+      if (!(g.type === "colonia" || isLocalityInsideMunicipio(g))) return false;
+      const gCore = coreName(g.name);
+      return !propSuggestions.some(
+        (d) => est(d.estado_nombre) === est(g.estado_nombre) && (coreName(d.name) === gCore || isSectionOf(d.name, g.name)),
+      );
+    })
+    .slice(0, 4);
+  if (sinRelacion.length === 0) return [];
+
+  const respuestas = await Promise.all(
+    sinRelacion.map(async (g) => {
+      try {
+        const { data, error } = await supabase.rpc("buscar_zonas_canonicas", {
+          q: coreName(g.name),
+          p_estado_usuario: g.estado_nombre ?? estadoUsuario ?? null,
+          lim: 6,
+          p_pais: country ?? null,
+        });
+        return !error && Array.isArray(data) ? data : [];
+      } catch {
+        return [];
+      }
+    }),
+  );
+
+  const key = (n?: string | null, m?: string | null, e?: string | null) => `${coreName(n ?? "")}|${est(m)}|${est(e)}`;
+  const vistos = new Set(propSuggestions.map((d) => key(d.name, d.municipio_nombre, d.estado_nombre)));
+  const out: LocationSuggestionWithCount[] = [];
+  for (const p of respuestas.flat() as any[]) {
+    const k = key(p.nombre, p.municipio, p.estado);
+    if (vistos.has(k)) continue;
+    vistos.add(k);
+    out.push({
+      placeId: `prop-canon-${p.nombre}-${p.municipio}-${p.estado}`,
+      name: p.nombre ?? "",
+      secondaryText: [p.municipio, p.estado].filter(Boolean).join(", "),
+      fullDescription: [p.nombre, p.municipio, p.estado].filter(Boolean).join(", "),
+      type: "colonia",
+      types: ["colonia"],
+      municipio_nombre: p.municipio ?? undefined,
+      estado_nombre: p.estado ?? undefined,
+      propertyCount: Number(p.total_visibles) || 0,
+      centroide:
+        p.lat_centroide != null && p.lng_centroide != null
+          ? { lat: Number(p.lat_centroide), lng: Number(p.lng_centroide) }
+          : undefined,
+    });
+  }
   return out;
 }
 
@@ -799,9 +893,24 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
                 log.warn("Error comprobando municipios ambiguos:", e);
               }
             }
-            combined = mergeGoogleWithDb(combined, propSuggestions, dbRows, realMunis);
+            // REV10-01: nombre real de las colonias que arriba no se pudieron relacionar (ver fetchCanonicalZones).
+            const canonItems = await fetchCanonicalZones(combined, propSuggestions, country, effectiveEstado);
+            if (requestId !== get().latestSearchRequestId) return;
+            combined = mergeGoogleWithDb(combined, [...propSuggestions, ...canonItems], dbRows, realMunis).filter(
+              (s) => !s.placeId.startsWith("prop-canon-"),
+            );
           } else {
             combined = [...combined, ...propSuggestions];
+          }
+        } else if (dbMerge) {
+          // REV10-01: la consulta de arriba no devolvio nada (p. ej. se escribio "Terranza Residence" y la BD solo
+          // tiene "Terranza"). Igual se busca el nombre real de las colonias de Google (ver fetchCanonicalZones).
+          const canonItems = await fetchCanonicalZones(combined, [], country, effectiveEstado);
+          if (requestId !== get().latestSearchRequestId) return;
+          if (canonItems.length > 0) {
+            combined = mergeGoogleWithDb(combined, canonItems, [], new Set<string>()).filter(
+              (s) => !s.placeId.startsWith("prop-canon-"),
+            );
           }
         }
       }

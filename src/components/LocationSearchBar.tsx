@@ -55,7 +55,7 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [propertySuggestions, setPropertySuggestions] = useState<PropertyCodeSuggestion[]>([]);
   const [preloadedSuggestions] = useState<LocationSuggestionWithCount[]>([]);
-  const { profile } = useAuth();
+  const { profile, user: authUser } = useAuth();
   const { selectedLocation } = useApp();
 
   const router = useRouter();
@@ -81,11 +81,21 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
     }
 
     const fetchPropertyByCode = async () => {
-      const { data, error } = await supabase
+      // REV10-04: misma regla que el resto de vistas (antes aqui no se filtraba nada: salian propiedades
+      // eliminadas, inactivas o que no comparten comision).
+      let codeQuery = supabase
         .from("propiedades")
         .select("id, codigo_propiedad, subtipo, municipio, fotos")
         .ilike("codigo_propiedad", `%${query}%`)
+        .is("deleted_at", null)
         .limit(3);
+      const uid = authUser?.id;
+      if (uid && /^[0-9a-f-]{36}$/i.test(uid)) {
+        codeQuery = codeQuery.or(`and(activo.eq.true,comparte_comision.eq.true,or(sin_comision.is.null,sin_comision.eq.false)),created_by.eq.${uid}`);
+      } else {
+        codeQuery = codeQuery.eq("activo", true).eq("comparte_comision", true).or("sin_comision.is.null,sin_comision.eq.false");
+      }
+      const { data, error } = await codeQuery;
 
       if (!error && data) {
         setPropertySuggestions(
@@ -105,7 +115,7 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
 
     const timer = setTimeout(fetchPropertyByCode, 400);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, authUser?.id]);
 
   useEffect(() => {
     onSearchingChange?.(showSuggestions);

@@ -15,7 +15,8 @@ export type LegalCodigo =
   | "privacidad"
   | "comunidad"
   | "seguridad_infantil"
-  | "comunicaciones";
+  | "comunicaciones"
+  | "acuerdo_datos_profesionales";
 
 export type LegalBloqueTipo = "h1" | "sub" | "kv" | "h2" | "p";
 export type LegalBloque = [LegalBloqueTipo, string];
@@ -47,7 +48,9 @@ export type ConsentTipo =
   | "comunidad"
   | "seguridad_infantil"
   | "prospecto_aviso"
-  | "prospecto_compartir_asesores";
+  | "prospecto_compartir_asesores"
+  | "acuerdo_datos_profesionales"
+  | "asesor_informo_prospecto";
 
 export interface ConsentItem {
   tipo: ConsentTipo;
@@ -57,6 +60,19 @@ export interface ConsentItem {
 }
 
 export type ReporteTipo = "usuario" | "publicacion" | "reel" | "propiedad" | "chat";
+
+/** Textos de la casilla del asesor en "Guardar busqueda" (tambien se guardan en la evidencia). */
+export const TEXTO_ACEPTA_ACUERDO = "Acepto el Acuerdo de Tratamiento de Datos para Profesionales e Instructores";
+export const TEXTO_DECLARACION_PROSPECTO =
+  "Declaro que ya informé a mi prospecto sobre el tratamiento de sus datos personales y su aviso de privacidad, y entiendo que soy responsable de ello conforme al Acuerdo de Tratamiento de Datos.";
+
+export interface EstadoAsesor {
+  /** false si la BD aun no tiene el Acuerdo publicado (SQL 13): entonces no se exige nada. */
+  requerido: boolean;
+  version: string;
+  aceptado: boolean;
+  fecha: string | null;
+}
 
 const cacheDocs = new Map<string, LegalDocumento>();
 let versionesMostradas: Record<string, string> = {};
@@ -118,6 +134,50 @@ export const legalService = {
     const { data, error } = await supabase.rpc("legal_estado_usuario");
     if (error) throw error;
     return (data ?? {}) as Record<string, { accion: string; version: string; documento: string; fecha: string }>;
+  },
+
+  /** Estado del Acuerdo de Tratamiento de Datos (doc 08) para el asesor autenticado. */
+  async estadoAsesor(): Promise<EstadoAsesor> {
+    const lista = await legalService.listarDocumentos();
+    const ac = lista.find((d) => d.codigo === "acuerdo_datos_profesionales");
+    if (!ac) return { requerido: false, version: "", aceptado: false, fecha: null };
+    const estado = await legalService.estadoUsuario();
+    const e = estado["acuerdo_datos_profesionales"];
+    return {
+      requerido: true,
+      version: ac.version,
+      aceptado: !!e && e.accion === "aceptado" && e.version === ac.version,
+      fecha: e?.fecha ?? null,
+    };
+  },
+
+  /** true si el asesor ya declaro haber informado a ese prospecto (version vigente del Acuerdo). */
+  async declaracionRegistrada(leadId: string, version: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from("legal_consentimientos")
+      .select("id")
+      .eq("tipo", "asesor_informo_prospecto")
+      .eq("lead_id", String(leadId))
+      .eq("accion", "aceptado")
+      .eq("documento_version", version)
+      .limit(1);
+    if (error) throw error;
+    return !!data && data.length > 0;
+  },
+
+  /** Fecha en que el asesor declaro haber informado a ese prospecto (version vigente del Acuerdo), o null. */
+  async declaracionFecha(leadId: string, version: string): Promise<string | null> {
+    const { data, error } = await supabase
+      .from("legal_consentimientos")
+      .select("creado_en")
+      .eq("tipo", "asesor_informo_prospecto")
+      .eq("lead_id", String(leadId))
+      .eq("accion", "aceptado")
+      .eq("documento_version", version)
+      .order("creado_en", { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    return data && data.length > 0 ? String(data[0].creado_en) : null;
   },
 
   /** Reporta un usuario, publicacion, reel, propiedad o chat. */

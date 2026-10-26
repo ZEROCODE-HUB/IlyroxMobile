@@ -153,7 +153,12 @@ function buildNotificationNavigation(
 
     case "matches":
     case "MatchDetail":
-      return () => router.push("/(stack)/matches");
+      // REV10-03: si el aviso trae la busqueda, la pantalla abre esa busqueda guardada.
+      return () =>
+        router.push({
+          pathname: "/(stack)/matches",
+          params: data.busqueda_id ? { busquedaId: String(data.busqueda_id) } : {},
+        });
 
     case "AppointmentDetail":
       return () => router.push("/(stack)/appointments");

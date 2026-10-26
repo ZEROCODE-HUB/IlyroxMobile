@@ -506,7 +506,8 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
     set({ isUpdating: true });
 
     const estado = resultData.estado || '';
-    const municipio = resultData.municipio || '';
+    // REV10-02: una sugerencia de tipo municipio trae el nombre en `name`, no en `municipio`.
+    const municipio = resultData.municipio || (resultData.type === 'municipio' ? (resultData.name || '') : '');
     const colonia = resultData.type === 'colonia' ? (resultData.name || '') : '';
     const placeName = resultData.name || '';
     const now = new Date().toISOString();
@@ -616,6 +617,12 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
     );
 
     queryClient.invalidateQueries({ queryKey: ['searchHistory', userId] });
+
+    // REV10-02: para una zona, esta fila ES la entrada del historial. Se deja como busqueda actual para que el mapa
+    // la complete con el chip (actualizacion de filtros) en lugar de insertar una segunda fila.
+    if (resultData.tipo === TIPO_BUSQUEDA.UBICACION) {
+      set({ currentSearchId: data.id });
+    }
 
     set({ isUpdating: false });
   },
