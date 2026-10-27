@@ -291,7 +291,10 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
         }
       }
 
-      if (userId && (resultData?.name || resultData?.resultadoTitulo)) {
+      // REV10-02 / REV11-01: una zona elegida desde el feed la registra el MAPA (createSearchFromMap, con su chip y sus
+      // coordenadas). Guardarla tambien aqui dejaba dos filas en el historial. Los demas tipos (usuario, ficha, post,
+      // reel) se siguen guardando aqui, igual que antes.
+      if (tipo !== TIPO_BUSQUEDA.UBICACION && userId && (resultData?.name || resultData?.resultadoTitulo)) {
         await createSearchFromResult({ ...resultData, tipo }, userId);
       }
 
