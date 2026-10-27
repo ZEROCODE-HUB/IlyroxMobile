@@ -111,7 +111,9 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
     }
   }, [unblockUserToConfirm, userId, showToast]);
 
-  const { startSearch, createSearchFromResult, touchTimestamp, setCurrentSearchId } = useSearchStore();
+  const { startSearch, createSearchFromResult, touchTimestamp, setCurrentSearchId, discardDraft } = useSearchStore();
+  // REV11-02: borradores que esta visita al buscador creo al pulsar Buscar (se retiran si luego se elige un resultado).
+  const borradoresRef = useRef<Promise<string | undefined>[]>([]);
 
   // Search history from database (only for listing and deleting)
   const {
@@ -234,6 +236,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
       setQuery(initialQuery);
       setExpandedSections(new Set());
       setActiveTab("todos");
+      borradoresRef.current = [];
     }
   }, [visible]);
 
@@ -249,6 +252,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
     setActiveTab("todos");
     setExpandedSections(new Set());
     setCurrentSearchId(null);
+    borradoresRef.current = [];
     onClose();
   };
 
@@ -268,7 +272,9 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
     console.log('🔍 [SearchOverlay] handleSubmitSearch called, query:', q);
 
     // Fire & forget - no esperamos resultado
-    startSearch(q, userId).catch((e) => {
+    const creando = startSearch(q, userId);
+    borradoresRef.current.push(creando.then((id: string) => id, () => undefined));
+    creando.catch((e) => {
       console.error('🔍 [SearchOverlay] Error creating search:', e);
     });
   };
@@ -288,6 +294,20 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
         if (isBlocked) {
           showToast("No puedes visitar perfiles bloqueados", "info");
           return;
+        }
+      }
+
+      // REV11-02: una busqueda debe quedar UNA sola vez en el historial. Si se escribio y se pulso Buscar en el teclado,
+      // esa visita creo un borrador con el texto; al elegir un resultado (zona, usuario, ficha, post o reel) el resultado
+      // lo reemplaza. Solo se retiran los borradores creados en esta visita; los de visitas anteriores no se tocan.
+      if (userId && borradoresRef.current.length > 0) {
+        const pendientes = borradoresRef.current;
+        borradoresRef.current = [];
+        try {
+          const ids = await Promise.all(pendientes);
+          await Promise.all(ids.map((id: string | undefined) => (id ? discardDraft(id, userId) : undefined)));
+        } catch (e) {
+          console.error('[SearchOverlay] Error discarding draft:', e);
         }
       }
 

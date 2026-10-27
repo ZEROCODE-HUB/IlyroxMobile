@@ -40,6 +40,7 @@ interface SearchStore {
   completeSearch: (id: string, userId: string) => Promise<void>;
   clearSearch: () => void;
   setCurrentSearchId: (id: string | null) => void;
+  discardDraft: (id: string, userId: string) => Promise<void>;
 }
 
 const extractPreview = (filtros: PropertyFilters) => ({
@@ -695,6 +696,31 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
 
   clearSearch: () => {
     set({ currentSearchId: null, currentQuery: '', isUpdating: false });
+  },
+
+  // REV11-02: al elegir un resultado despues de escribir + Buscar, el borrador con el texto escrito se retira del historial
+  // (queda solo el resultado). Solo toca filas de tipo "draft" del propio usuario; es un borrado suave (deleted_at).
+  // No recarga el historial: se quita de la cache y asi no pisa la fila de la zona que el mapa esta guardando.
+  discardDraft: async (id: string, userId: string): Promise<void> => {
+    queryClient.setQueryData<HistorialBusqueda[]>(
+      ['searchHistory', userId],
+      (old: HistorialBusqueda[] | undefined) => old?.filter((item: HistorialBusqueda) => item.id !== id)
+    );
+    const { error } = await supabase
+      .from('historial_busquedas')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('usuario_id', userId)
+      .eq('tipo_busqueda', TIPO_BUSQUEDA.DRAFT);
+    if (error) {
+      console.error('[SearchStore] Error discarding draft:', error);
+      queryClient.invalidateQueries({ queryKey: ['searchHistory', userId] });
+    }
+    // Que la busqueda actual no siga apuntando a una fila ya retirada (el mapa actualizaria una fila oculta y no
+    // registraria la siguiente busqueda).
+    if (get().currentSearchId === id) {
+      set({ currentSearchId: null, currentQuery: '' });
+    }
   },
 
   setCurrentSearchId: (id: string | null) => {
