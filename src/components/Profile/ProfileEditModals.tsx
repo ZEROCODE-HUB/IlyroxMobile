@@ -27,6 +27,8 @@ export interface ProfileEditModalsProps {
   showOpenHouseModal: boolean;
   openHousePost: Post | null;
   onCloseOpenHouseModal: () => void;
+  /** Se dispara al GUARDAR el Open House (no al cancelar). */
+  onOpenHouseSaved?: () => void;
 
   /**
    * Refresca SOLO ese contenido en la cache del feed tras una edición exitosa.
@@ -53,6 +55,7 @@ export const ProfileEditModals: React.FC<ProfileEditModalsProps> = ({
   showOpenHouseModal,
   openHousePost,
   onCloseOpenHouseModal,
+  onOpenHouseSaved,
   onFeedContentUpdated,
 }) => {
   return (
@@ -102,6 +105,7 @@ export const ProfileEditModals: React.FC<ProfileEditModalsProps> = ({
           <CreatePost
             post={openHousePost}
             onBack={onCloseOpenHouseModal}
+            onUpdated={() => onOpenHouseSaved?.()}
           />
         </Modal>
       )}

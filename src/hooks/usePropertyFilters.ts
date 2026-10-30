@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useRef } from "react";
+import { sanitizeFiltersByTipo } from "@/utils/filterVisibility";
 import { Property } from "@/types";
 import { useExchangeRate } from "./useExchangeRate";
 import {
@@ -106,7 +107,9 @@ export const usePropertyFilters = (
   const { convertPrice } = useExchangeRate();
   const { user } = useAuth();
 
-  const filters = usePropertyFiltersStore(useShallow((s) => s.filters));
+  const rawFilters = usePropertyFiltersStore(useShallow((s) => s.filters));
+  // REV13-01: los campos que el tipo/subtipo no muestra no filtran (un terreno no tiene recamaras).
+  const filters = useMemo(() => sanitizeFiltersByTipo(rawFilters), [rawFilters]);
   const updateFilter = usePropertyFiltersStore((s) => s.updateFilter);
   const updateLocationFilter = usePropertyFiltersStore(
     (s) => s.updateLocationFilter,

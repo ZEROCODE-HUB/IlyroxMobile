@@ -305,7 +305,8 @@ const Matches: React.FC = () => {
 
   useEffect(() => {
     fetchMatches();
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // Al abrir la pantalla, marcar los matches sin ver como vistos: limpia el
   // badge del header (useMatchesStore) espejo del contador useUnseenMatchesCount.
@@ -321,7 +322,7 @@ const Matches: React.FC = () => {
       .then(({ error }) => {
         if (error) log.error("No se pudieron marcar los matches como vistos:", error);
       });
-  }, [user]);
+  }, [user?.id]);
 
   const handleDeleteSearch = async (busquedaId: string) => {
     try {
@@ -680,7 +681,7 @@ const Matches: React.FC = () => {
       <AppHeader
         title="Matches"
         showBackButton
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))}
       />
 
       {/* Content */}

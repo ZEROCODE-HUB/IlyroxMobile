@@ -478,12 +478,11 @@ export function usePropertyForm(
 
   const filteredStatusOptions = useMemo(() => {
     return PROPERTY_STATUS.filter((option) => {
-      if (state.sinComision && option === "Publicada") return false;
       if (state.tipoOperacion === "venta") return option !== "Rentada";
       if (state.tipoOperacion === "renta") return option !== "Vendida";
       return true;
     });
-  }, [state.tipoOperacion, state.sinComision]);
+  }, [state.tipoOperacion]);
 
   const isColoniaMode = useMemo(() => {
     return (
@@ -735,7 +734,13 @@ export function usePropertyForm(
 
       // 2. Info Básica
       payload.descripcion = data.descripcion || "";
-      payload.status = data.status || "Publicada";
+      // REV13-04: una propiedad sin comision ya no se "suspende": queda Publicada y oculta para los demas
+      // (activo = false) hasta que se configure la comision. Las que quedaron Suspendidas automaticamente por ese
+      // motivo (importadas de EasyBroker) se muestran como Publicada al editar; al guardar con comision se publican.
+      // Las que Tokko dejo de mandar (tienen tokkobroker_id) conservan su estado.
+      const suspendidaPorComision =
+        data.sin_comision === true && data.status === "Suspendida" && !data.tokkobroker_id;
+      payload.status = suspendidaPorComision ? "Publicada" : (data.status || "Publicada");
       payload.sinComision = data.sin_comision ?? false;
       payload.originalStatus = data.status || "Publicada";
 
@@ -795,7 +800,9 @@ export function usePropertyForm(
       payload.costoMantenimiento = data.costo_mantenimiento != null
         ? formatThousands(data.costo_mantenimiento.toString())
         : '';
-      payload.niveles = data.pisos?.toString() || "1";
+      // REV13-03: si la propiedad no tiene niveles guardados, el campo se muestra vacio (antes mostraba "1" aunque la BD
+      // no tuviera nada).
+      payload.niveles = data.pisos?.toString() || "";
       payload.antiguedad = data.antiguedad || "";
       payload.amueblado = (data.amueblado || "No") as AmuebladoType;
       payload.petFriendly = (data.pet_friendly || "No") as SiNo;

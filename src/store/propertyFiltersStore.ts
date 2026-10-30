@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { GeoBounds, busquedas_guardadas } from "@/types";
 import type { CountryCode } from "@/lib/location/types";
+import { sanitizeFiltersByTipo } from "@/utils/filterVisibility";
 
 export interface PolygonCoord {
   latitude: number;
@@ -216,14 +217,15 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
   (set, get) => ({
     filters: initialFilters,
 
+    // REV13-01: al cambiar tipo/subtipo se vacian los campos que ya no aplican (ver utils/filterVisibility.ts).
     updateFilter: (key, value) =>
       set((state) => ({
-        filters: { ...state.filters, [key]: value },
+        filters: sanitizeFiltersByTipo({ ...state.filters, [key]: value } as PropertyFilters),
       })),
 
     updateFilters: (partial) =>
       set((state) => ({
-        filters: { ...state.filters, ...partial },
+        filters: sanitizeFiltersByTipo({ ...state.filters, ...partial } as PropertyFilters),
       })),
 
     updateLocationFilter: (location) =>

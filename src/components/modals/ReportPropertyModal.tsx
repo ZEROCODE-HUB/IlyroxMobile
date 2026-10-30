@@ -69,7 +69,7 @@ export default function ReportPropertyModal({
   const [reports, setReports] = useState<any[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
 
-  const { reportProperty, getReportsByProperty, loading } = useReportProperty();
+  const { reportProperty, getReportsByProperty, deleteMyReport, loading } = useReportProperty();
 
   React.useEffect(() => {
     if (visible && propiedadId) {
@@ -113,6 +113,15 @@ export default function ReportPropertyModal({
       setDescripcion("");
       await loadReports();
       setView("list");
+    }
+  };
+
+  // REV13-09: quitar mi propio reporte.
+  const handleDeleteMyReport = async () => {
+    const ok = await deleteMyReport(propiedadId, reportadoPorId);
+    if (ok) {
+      await loadReports();
+      if (onSuccess) onSuccess();
     }
   };
 
@@ -209,6 +218,7 @@ export default function ReportPropertyModal({
         style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}
       >
         {hasUserReported ? (
+          <>
           <View style={styles.alreadyReportedBanner}>
             <Ionicons
               name="checkmark-circle"
@@ -219,6 +229,15 @@ export default function ReportPropertyModal({
               Ya enviaste un reporte para esta propiedad
             </Text>
           </View>
+          <TouchableOpacity
+            onPress={handleDeleteMyReport}
+            disabled={loading}
+            activeOpacity={0.7}
+            style={{ marginTop: 10, alignItems: "center", paddingVertical: 10 }}
+          >
+            <Text style={{ color: COLORS.error, fontWeight: "600" }}>Eliminar mi reporte</Text>
+          </TouchableOpacity>
+          </>
         ) : (
           <TouchableOpacity
             style={styles.primaryButton}

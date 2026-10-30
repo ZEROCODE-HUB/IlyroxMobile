@@ -6,6 +6,7 @@ import { useModal } from "../../../context/ModalContext";
 import { DEFAULT_COUNTRY } from "../../../lib/location/registry";
 import { geocodeAddress, boundsCenter } from "../../../lib/geocodingService";
 import { buildLocationCriteria } from "@/utils/locationMatch";
+import { sanitizeFiltersByTipo } from "@/utils/filterVisibility";
 
 /**
  * Normaliza los filtros comerciales para persistencia/matching. `tipoUbicacion`
@@ -274,7 +275,8 @@ export const useSaveSearch = (userId?: string) => {
     return leadData?.id || null;
   };
 
-  const buildSearchPostMetadata = (filters: any) => {
+  const buildSearchPostMetadata = (filtersRaw: any) => {
+    const filters = sanitizeFiltersByTipo(filtersRaw);
     // Zonas de interés: SOLO los polígonos dibujados en el mapa.
     const zonas_interes = Array.isArray(filters.polygons)
       ? filters.polygons.map((_poly: any, i: number) => ({
@@ -394,7 +396,8 @@ export const useSaveSearch = (userId?: string) => {
     };
   };
 
-  const saveSearchToDatabase = async (filters: any, leadId: string | null) => {
+  const saveSearchToDatabase = async (filtersRaw: any, leadId: string | null) => {
+    const filters = sanitizeFiltersByTipo(filtersRaw);
     if (!userId) return;
 
     const criterios_busqueda: any = {
@@ -607,12 +610,14 @@ export const useSaveSearch = (userId?: string) => {
     }
 
     if (filters.moneda) {
+      // REV13-02: se busca por CODIGO (MXN/USD). Por simbolo, "$" tambien lo usa el dolar y una busqueda en pesos se
+      // guardaba como USD (el matching comparaba 4.5-6.1 M como dolares y casi nada coincidia).
       const { data: monedaData, error: monedaError } = await supabase
         .from("configuracion_monedas")
         .select("codigo")
-        .eq("simbolo", filters.moneda === "MXN" ? "$" : "USD")
+        .eq("codigo", filters.moneda)
         .eq("activa", true)
-        .single();
+        .maybeSingle();
 
       if (monedaData && !monedaError) {
         insertData.moneda = monedaData.codigo;
@@ -642,7 +647,8 @@ export const useSaveSearch = (userId?: string) => {
    * Actualiza una búsqueda guardada existente con los filtros actuales.
    * Reutiliza la misma lógica de normalización de saveSearchToDatabase pero hace UPDATE.
    */
-  const updateSearchInDatabase = async (busquedaId: string, filters: any): Promise<boolean> => {
+  const updateSearchInDatabase = async (busquedaId: string, filtersRaw: any): Promise<boolean> => {
+    const filters = sanitizeFiltersByTipo(filtersRaw);
     if (!userId) throw new Error("No autenticado");
 
     // Construir objeto con la misma lógica que saveSearchToDatabase
@@ -731,9 +737,9 @@ export const useSaveSearch = (userId?: string) => {
       const { data: monedaData } = await supabase
         .from("configuracion_monedas")
         .select("codigo")
-        .eq("simbolo", filters.moneda === "MXN" ? "$" : "USD")
+        .eq("codigo", filters.moneda)
         .eq("activa", true)
-        .single();
+        .maybeSingle();
       updateData.moneda = monedaData?.codigo || filters.moneda;
     }
 

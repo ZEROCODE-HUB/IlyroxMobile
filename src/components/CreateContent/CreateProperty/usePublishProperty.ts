@@ -380,7 +380,8 @@ export function usePublishProperty(
               ? form.petFriendly
               : "No",
           antiguedad: camposVisibles.antiguedad ? form.antiguedad : null,
-          status: sinComision ? "Suspendida" : form.status,
+          // REV13-04: sin comision NO suspende: queda Publicada pero oculta (activo = false) hasta que haya comision.
+          status: form.status,
           activo: form.status === "Publicada" && tieneComision,
           sin_comision: sinComision,
           created_by: user.id,

@@ -100,6 +100,22 @@ export default function AuthScreen() {
   const authForm = useAuthForm();
   const externalAuth = useExternalAuth();
 
+  // REV13-07: si la app se cerro o reinicio mientras se llenaba el registro (p. ej. al ir a la camara), al volver se
+  // reabre el formulario con lo que ya estaba escrito (sin contrasenas).
+  useEffect(() => {
+    let vivo = true;
+    authForm.restoreDraft().then((hay) => {
+      if (vivo && hay) {
+        setAuthMethod("none");
+        setModalVisible(true);
+      }
+    });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Abrir modal
   const handleOpenModal = useCallback(
     (mode: "login" | "register") => {
@@ -108,6 +124,7 @@ export default function AuthScreen() {
       authForm.resetForm();
       setAuthMethod("none");
       setModalVisible(true);
+      if (mode === "register") void authForm.restoreDraft();
     },
     [authForm],
   );

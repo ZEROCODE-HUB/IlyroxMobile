@@ -57,8 +57,24 @@ export const useReportProperty = () => {
     }
   };
 
+  const deleteMyReport = async (property_id: string, user_id: string) => {
+    try {
+      setLoading(true);
+      await reportService.deleteMyReport(property_id, user_id);
+      Burnt.toast({ title: "Reporte eliminado", preset: "done", duration: 2 });
+      return true;
+    } catch (error) {
+      log.error("Error deleting report:", error);
+      Burnt.toast({ title: "No se pudo eliminar el reporte", preset: "error", duration: 2 });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     loading,
+    deleteMyReport,
     getCounterReportsProperty,
     getReportsByProperty,
     reportProperty,

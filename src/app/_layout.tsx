@@ -507,6 +507,9 @@ function RootLayoutNav() {
           // Perfil inexistente: `refreshProfile` propaga ProfileNotFoundError y
           // el listener ya cerró sesión. No se insiste.
           logger.warn("[auth] el perfil no existe; se detiene el reintento", e);
+          // REV13-08: sin perfil no hay nada que cargar: se cierra la sesion local para volver al inicio de sesion en
+          // lugar de quedarse en la pantalla de carga.
+          supabase.auth.signOut({ scope: "local" }).catch(() => {});
           return;
         }
         // Si el perfil llegó, el efecto se limpia solo por el cambio de deps.

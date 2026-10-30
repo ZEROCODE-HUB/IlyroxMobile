@@ -66,6 +66,8 @@ const SettingsScreen: React.FC = () => {
   // ── Documentos legales (popup dentro de la app) y autorización de promociones ──
   // legalDoc: undefined = cerrado; null = lista; código = ese documento.
   const [legalDoc, setLegalDoc] = React.useState<LegalCodigo | null | undefined>(undefined);
+  // REV13-11: la fila "Promociones y novedades" queda oculta (cambiar a true para volver a mostrarla).
+  const SHOW_PROMOS = false;
   const [marketingOn, setMarketingOn] = React.useState(false);
   const [marketingBusy, setMarketingBusy] = React.useState(false);
 
@@ -394,6 +396,7 @@ const SettingsScreen: React.FC = () => {
           </View>
         )}
 
+        {SHOW_PROMOS && (
         <View style={styles.section}>
           <View style={styles.optionItem}>
             <View style={styles.optionLeft}>
@@ -420,6 +423,7 @@ const SettingsScreen: React.FC = () => {
             />
           </View>
         </View>
+        )}
 
         <View style={styles.section}>
           {settingsOptions.map((option) => (

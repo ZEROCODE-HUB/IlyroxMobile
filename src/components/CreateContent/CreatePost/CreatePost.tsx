@@ -27,6 +27,7 @@ import { COLORS } from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ReordenableImages from "../ReordenableImages";
 import { Post } from "@/types";
+import { getCamposVisibles, TipoPrincipal } from "@/constants/propertyData";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Burnt from "burnt";
 import { supabase } from "@/lib/supabase";
@@ -419,6 +420,13 @@ export default function CreatePost({ post, onBack, onUpdated }: CreatePostProps)
           const anchoParsed = parseNum(anchoTerreno);
           const largoParsed = parseNum(largoTerreno);
 
+          // REV13-11: un campo que el tipo/subtipo no muestra no conserva el valor guardado antes.
+          const cv = getCamposVisibles(
+            subtipo.length > 0 ? subtipo : (currentFiltros.subtipo ?? []),
+            (tipoPropiedad || currentFiltros.tipo_propiedad || undefined) as TipoPrincipal | undefined,
+          );
+          const verNiveles = cv.niveles && (tipoPropiedad || currentFiltros.tipo_propiedad) !== "industrial";
+
           updatedData.busquedas_json = {
             ...currentJson,
             filtros: {
@@ -433,23 +441,29 @@ export default function CreatePost({ post, onBack, onUpdated }: CreatePostProps)
               ubicaciones,
               caracteristicas: {
                 ...currentCaracteristicas,
-                habitaciones:
-                  habitacionesParsed !== null
+                habitaciones: !cv.recamaras
+                  ? undefined
+                  : habitacionesParsed !== null
                     ? habitacionesParsed
                     : currentCaracteristicas.habitaciones,
-                banos:
-                  banosParsed !== null
+                banos: !cv.banos
+                  ? undefined
+                  : banosParsed !== null
                     ? banosParsed
                     : currentCaracteristicas.banos,
-                estacionamientos:
-                  estacionamientosParsed !== null
+                estacionamientos: !cv.estacionamientos
+                  ? undefined
+                  : estacionamientosParsed !== null
                     ? estacionamientosParsed
                     : currentCaracteristicas.estacionamientos,
-                niveles:
-                  nivelesParsed !== null
+                niveles: !verNiveles
+                  ? undefined
+                  : nivelesParsed !== null
                     ? nivelesParsed
                     : currentCaracteristicas.niveles,
-                antiguedad: antiguedad || currentCaracteristicas.antiguedad,
+                antiguedad: !cv.antiguedad
+                  ? undefined
+                  : antiguedad || currentCaracteristicas.antiguedad,
               },
               superficies: {
                 ...currentSuperficies,

@@ -95,10 +95,12 @@ interface ProfilePropertyItemProps {
   /** true = la propiedad ya tiene un Open House activo → mostrar "Editar Open House" */
   hasOpenHouse?: boolean;
   isLastInRow?: boolean;
+  /** REV13-09: reportes que recibio esta propiedad (solo se muestra al dueno). */
+  reportInfo?: { motivo: string; total: number };
 }
 
 const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
-  ({ item, onPress, isOwnProfile, onEdit, onDelete, onPublishOpenHouse, hasOpenHouse, isLastInRow }) => {
+  ({ item, onPress, isOwnProfile, onEdit, onDelete, onPublishOpenHouse, hasOpenHouse, isLastInRow, reportInfo }) => {
     const commissionText = formatCommission(item.commission);
     const priceLines = getPriceLines(item);
 
@@ -140,7 +142,7 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
             <Ionicons name="checkmark-circle" size={10} color="#fff" />
             <Text style={styles.statusText}> Vendida</Text>
           </View>
-        ) : item.status === "Suspendida" ? (
+        ) : item.status === "Suspendida" && !item.sin_comision ? (
           <View style={[styles.statusBadge, styles.suspendedBadge]}>
             <Ionicons name="pause-circle" size={10} color="#fff" />
             <Text style={styles.statusText}> Suspendida</Text>
@@ -178,6 +180,25 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
               <Text style={styles.statusText}> Solo tú</Text>
             </View>
           )}
+
+        {isOwnProfile && !!reportInfo && (
+          <View
+            style={{
+              position: "absolute",
+              top: 30,
+              left: 6,
+              right: 6,
+              backgroundColor: "#F5C518",
+              borderRadius: 4,
+              paddingHorizontal: 4,
+              paddingVertical: 2,
+            }}
+          >
+            <Text style={{ fontSize: 9, fontWeight: "700", color: "#3b2f00" }} numberOfLines={2}>
+              Tu aviso ha sido reportado: {reportInfo.motivo}
+            </Text>
+          </View>
+        )}
 
         {isOwnProfile && (
           <View style={styles.menuContainer}>

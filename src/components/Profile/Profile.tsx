@@ -35,6 +35,7 @@ import { router } from "expo-router";
 import ProfileReelItem from "./ProfileReelItem";
 import ProfilePostItem from "./ProfilePostItem";
 import ProfilePropertyItem from "./ProfilePropertyItem";
+import { reportService } from "@/services/reportService";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import { ConfirmationModal } from "../modals/ConfirmationModal";
 import { supabase } from "../../lib/supabase";
@@ -147,6 +148,8 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
   const [showEditReelModal, setShowEditReelModal] = useState(false);
   const [showOpenHouseModal, setShowOpenHouseModal] = useState(false);
   const [openHousePost, setOpenHousePost] = useState<Post | null>(null);
+  // REV13-05: borrador de Open House que ESTA sesion creo al abrir el editor; si se sale sin guardar se elimina.
+  const openHouseBorradorRef = useRef<{ postId: string; propertyId: string } | null>(null);
 
   // Set de propiedad_id que ya tienen un Open House activo — para saber si mostrar
   // "Publicar" o "Editar" en el menú de cada propiedad sin hacer una query por card.
@@ -171,6 +174,36 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
   const [deleting, setDeleting] = useState(false);
 
   const targetUserId = userId || authUser?.id;
+
+  // REV13-09: reportes que recibieron MIS propiedades (aviso amarillo con el motivo; desaparece al quitarse el reporte).
+  const [reportesPorPropiedad, setReportesPorPropiedad] = useState<
+    Record<string, { motivo: string; total: number }>
+  >({});
+  React.useEffect(() => {
+    if (!isMe || !authUser?.id) {
+      setReportesPorPropiedad({});
+      return;
+    }
+    let vivo = true;
+    reportService
+      .getReportsForOwner(authUser.id)
+      .then((rows) => {
+        if (!vivo) return;
+        const mapa: Record<string, { motivo: string; total: number }> = {};
+        for (const r of rows as any[]) {
+          const previo = mapa[r.propiedad_id];
+          mapa[r.propiedad_id] = {
+            motivo: previo ? previo.motivo : r.motivo,
+            total: (previo?.total ?? 0) + 1,
+          };
+        }
+        setReportesPorPropiedad(mapa);
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [isMe, authUser?.id, properties]);
 
 
 
@@ -240,12 +273,12 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
   const filteredProperties = useMemo(() => {
     if (activeFilter === "Todas") {
       const INACTIVE_STATUSES = ["Vendida", "Suspendida", "Reservada", "Rentada"];
-      const active = properties.filter(
-        (p) => !INACTIVE_STATUSES.includes(p.status),
-      );
-      const inactive = properties.filter((p) =>
-        INACTIVE_STATUSES.includes(p.status),
-      );
+      // REV13-04: una propiedad sin comision no se hunde al final de la lista (no esta suspendida).
+      const esInactiva = (p: Property) =>
+        INACTIVE_STATUSES.includes(p.status) &&
+        !(p.status === "Suspendida" && p.sin_comision);
+      const active = properties.filter((p) => !esInactiva(p));
+      const inactive = properties.filter((p) => esInactiva(p));
       return [...active, ...inactive];
     }
     return properties.filter((p) => p.status === activeFilter);
@@ -353,6 +386,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
           .single();
         if (error) throw error;
         setOpenHousePost(newPost as Post);
+        openHouseBorradorRef.current = { postId: (newPost as Post).id, propertyId: property.id };
         // Marcar esta propiedad como que ya tiene Open House para reflejar en el menú
         setOpenHousePropertyIds((prev) => new Set([...prev, property.id]));
       }
@@ -572,6 +606,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
               onDelete={handleDeleteProperty}
               onPublishOpenHouse={handlePublishOpenHouse}
               hasOpenHouse={openHousePropertyIds.has(item.id)}
+              reportInfo={reportesPorPropiedad[item.id]}
               isLastInRow={(index + 1) % 3 === 0}
             />
           );
@@ -608,6 +643,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
       handleDeleteProperty,
       handlePublishOpenHouse,
       openHousePropertyIds,
+      reportesPorPropiedad,
       userProfileMapped,
       handlePostPress,
       handleEditPost,
@@ -742,10 +778,36 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
         }}
         showOpenHouseModal={showOpenHouseModal}
         openHousePost={openHousePost}
+        onOpenHouseSaved={() => {
+          // Se guardo: el borrador ya es un Open House real.
+          openHouseBorradorRef.current = null;
+        }}
         onCloseOpenHouseModal={() => {
           setShowOpenHouseModal(false);
           setOpenHousePost(null);
-          handleRefresh();
+          const borrador = openHouseBorradorRef.current;
+          openHouseBorradorRef.current = null;
+          if (!borrador || !authUser?.id) {
+            handleRefresh();
+            return;
+          }
+          // REV13-05: se salio sin guardar un Open House recien creado: el borrador no debe aparecer en Posts.
+          void (async () => {
+            const { error } = await supabase
+              .from("posts")
+              .update({ deleted_at: new Date().toISOString() })
+              .eq("id", borrador.postId)
+              .eq("publicado_por", authUser.id)
+              .eq("status", "oculto");
+            if (!error) {
+              setOpenHousePropertyIds((prev) => {
+                const next = new Set(prev);
+                next.delete(borrador.propertyId);
+                return next;
+              });
+            }
+            handleRefresh();
+          })();
         }}
         showEditReelModal={showEditReelModal}
         editReel={editReel}

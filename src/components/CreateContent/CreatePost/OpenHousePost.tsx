@@ -218,6 +218,12 @@ export const OpenHousePost = ({
             selectedDate.getDate(),
           );
           setFechaHora(newDate);
+          // REV13-06: si el nuevo inicio alcanza o pasa al termino, el termino se recorre conservando la duracion.
+          if (fechaFinalizacion && fechaFinalizacion.getTime() <= newDate.getTime()) {
+            setFechaFinalizacion(
+              new Date(newDate.getTime() + Math.max(fechaFinalizacion.getTime() - fechaHora.getTime(), 3600000)),
+            );
+          }
         }}
       />
 
@@ -230,17 +236,29 @@ export const OpenHousePost = ({
           const newDate = new Date(fechaHora);
           newDate.setHours(selectedDate.getHours(), selectedDate.getMinutes());
           setFechaHora(newDate);
+          if (fechaFinalizacion && fechaFinalizacion.getTime() <= newDate.getTime()) {
+            setFechaFinalizacion(
+              new Date(newDate.getTime() + Math.max(fechaFinalizacion.getTime() - fechaHora.getTime(), 3600000)),
+            );
+          }
         }}
       />
 
       <DateTimeField
         visible={showEndDatePicker}
-        value={fechaFinalizacion || new Date()}
+        value={
+          fechaFinalizacion && fechaFinalizacion.getTime() > fechaHora.getTime()
+            ? fechaFinalizacion
+            : new Date(fechaHora.getTime() + 3600000)
+        }
         mode="date"
         minimumDate={fechaHora}
         onClose={() => setShowEndDatePicker(false)}
         onPicked={(selectedDate) => {
-          const baseDate = fechaFinalizacion || new Date();
+          const baseDate =
+            fechaFinalizacion && fechaFinalizacion.getTime() > fechaHora.getTime()
+              ? fechaFinalizacion
+              : new Date(fechaHora.getTime() + 3600000);
           const newDate = new Date(baseDate);
           newDate.setFullYear(
             selectedDate.getFullYear(),
@@ -253,11 +271,18 @@ export const OpenHousePost = ({
 
       <DateTimeField
         visible={showEndTimePicker}
-        value={fechaFinalizacion || new Date()}
+        value={
+          fechaFinalizacion && fechaFinalizacion.getTime() > fechaHora.getTime()
+            ? fechaFinalizacion
+            : new Date(fechaHora.getTime() + 3600000)
+        }
         mode="time"
         onClose={() => setShowEndTimePicker(false)}
         onPicked={(selectedDate) => {
-          const baseDate = fechaFinalizacion || new Date();
+          const baseDate =
+            fechaFinalizacion && fechaFinalizacion.getTime() > fechaHora.getTime()
+              ? fechaFinalizacion
+              : new Date(fechaHora.getTime() + 3600000);
           const newDate = new Date(baseDate);
           newDate.setHours(selectedDate.getHours(), selectedDate.getMinutes());
           setFechaFinalizacion(newDate);

@@ -3,7 +3,10 @@
  * Hook para manejar el estado y validación de formularios de autenticación
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth } from "@/context/AuthContext";
+import { Platform } from "react-native";
 import { supabase } from "@/lib/supabase";
 import { collapseSpaces } from "@/utils/stringNormalizer";
 import { logger } from "@/utils/logger";
@@ -64,7 +67,31 @@ const initialFormState: AuthFormState = {
   acceptedMarketing: false,
 };
 
+// REV13-07: borrador del registro. Si el usuario sale a la camara/galeria y el sistema cierra o reinicia la app, el
+// formulario se recupera (SIN contrasenas: esas nunca se guardan). Caduca a la hora.
+const DRAFT_KEY = "ilyrox:registro_borrador:v1";
+const DRAFT_MAX_AGE_MS = 60 * 60 * 1000;
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// REV13-10: traza del inicio de sesion en debug_logs (SIN correo ni contrasena). Si la app se cierra al fallar un inicio
+// de sesion, el ultimo evento guardado dice si cerro ANTES de la respuesta del servidor o DESPUES (al mostrar el error).
+function trazaLogin(evento: string, extra?: Record<string, unknown>) {
+  try {
+    supabase
+      .from("debug_logs")
+      .insert({
+        contexto: "login_trace",
+        payload: { evento, plataforma: Platform.OS, version: String(Platform.Version), ts: new Date().toISOString(), ...(extra ?? {}) },
+      })
+      .then(
+        () => {},
+        () => {},
+      );
+  } catch {
+    // diagnostico: nunca debe afectar al inicio de sesion
+  }
+}
 
 const PASSWORD_RULES = [
   { test: (p: string) => p.length >= 8,          label: "mínimo 8 caracteres" },
@@ -91,6 +118,11 @@ export function useAuthForm() {
   const [mode, setMode] = useState<"login" | "register">("login");
 
   const { uploadImage } = useImageUpload();
+
+  // Referencia al refreshProfile MAS RECIENTE (handleRegister se creo cuando aun no habia usuario).
+  const { refreshProfile } = useAuth();
+  const refreshProfileRef = useRef(refreshProfile);
+  refreshProfileRef.current = refreshProfile;
 
   // Los errores de auth se muestran como banner INLINE dentro del bottom sheet:
   // en iOS no se puede presentar el ConfirmationModal (Modal nativo) sobre el
@@ -132,6 +164,37 @@ export function useAuthForm() {
     },
     [formState.password],
   );
+
+  // Guardar borrador del registro (con debounce) mientras se llena el formulario.
+  useEffect(() => {
+    if (mode !== "register") return;
+    const { password: _p, confirmPassword: _c, ...resto } = formState;
+    const { password: _p0, confirmPassword: _c0, ...restoInicial } = initialFormState;
+    if (JSON.stringify(resto) === JSON.stringify(restoInicial)) return;
+    const t = setTimeout(() => {
+      AsyncStorage.setItem(DRAFT_KEY, JSON.stringify({ form: resto, ts: Date.now() })).catch(() => {});
+    }, 400);
+    return () => clearTimeout(t);
+  }, [formState, mode]);
+
+  // Recuperar el borrador (si existe y no caduco). Devuelve true si habia uno.
+  const restoreDraft = useCallback(async (): Promise<boolean> => {
+    try {
+      const raw = await AsyncStorage.getItem(DRAFT_KEY);
+      if (!raw) return false;
+      const d = JSON.parse(raw);
+      if (!d?.form || !d?.ts || Date.now() - d.ts > DRAFT_MAX_AGE_MS) {
+        await AsyncStorage.removeItem(DRAFT_KEY);
+        return false;
+      }
+      setFormState({ ...initialFormState, ...d.form, password: "", confirmPassword: "" });
+      setStep(1);
+      setMode("register");
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
 
   // Resetear formulario
   const resetForm = useCallback(() => {
@@ -311,21 +374,28 @@ export function useAuthForm() {
 
     setLoading(true);
     try {
+      trazaLogin("intento");
+      // REV13-10: un espacio al final o una mayuscula del teclado hacian fallar un correo valido.
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: formState.email,
+        email: formState.email.trim().toLowerCase(),
         password: formState.password,
       });
 
       if (error) throw error;
 
+      trazaLogin("respuesta_ok");
       if (data?.user) {
         OneSignal.login(data.user.id);
       }
       return true;
     } catch (error: any) {
+      trazaLogin("respuesta_error", { status: error?.status ?? null, codigo: error?.code ?? null, mensaje: String(error?.message ?? "").slice(0, 120) });
+      const sinRed = /network|fetch|timeout|offline/i.test(String(error?.message ?? "")) || error?.status === 0;
       showModal({
         title: "Error",
-        message: "Credenciales incorrectas",
+        message: sinRed
+          ? "No se pudo conectar. Revisa tu conexión a internet e intenta de nuevo."
+          : "Correo o contraseña incorrectos. Si aún no tienes cuenta, usa \"Crear cuenta\".",
         confirmText: "OK",
       });
       return false;
@@ -389,7 +459,7 @@ export function useAuthForm() {
       log.info("handleRegister: Iniciando registro", { email: formState.email, name: formState.name });
 
       const { data, error } = await supabase.auth.signUp({
-        email: formState.email,
+        email: formState.email.trim().toLowerCase(),
         password: formState.password,
         options: {
           data: userMetadata,
@@ -477,6 +547,14 @@ export function useAuthForm() {
         log.info("handleRegister: Procesando invitacion");
         await applyStoredAdvisorInvite(data.user.id);
         log.info("handleRegister: Registro completado exitosamente", { userId: data.user.id });
+        AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
+        // REV13-07: el perfil se cargo al iniciar sesion, ANTES de guardar foto/ocupacion/aprobaciones. Se vuelve a
+        // pedir el perfil final para que la app no se quede en la pantalla de carga con un perfil viejo o vacio.
+        try {
+          await refreshProfileRef.current?.();
+        } catch (e) {
+          log.warn("handleRegister: no se pudo refrescar el perfil", e);
+        }
       }
 
       return true;
@@ -512,6 +590,7 @@ export function useAuthForm() {
     setStep,
     setMode,
     resetForm,
+    restoreDraft,
     setFormState,
     // Validaciones
     validateField,

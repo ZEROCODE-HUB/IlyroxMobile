@@ -71,7 +71,7 @@ export const chartService = {
                     moneda,
                     tipo_operacion
                 )
-            `),
+            `).eq("activo", true),
       supabase.from("busquedas_guardadas").select("*"),
     ]);
 

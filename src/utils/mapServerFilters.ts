@@ -1,4 +1,5 @@
 import { MapServerFilters } from "@/hooks/useMapProperties";
+import { sanitizeFiltersByTipo } from "@/utils/filterVisibility";
 import { usePropertyFiltersStore } from "@/store/propertyFiltersStore";
 
 type StoreFilters = ReturnType<typeof usePropertyFiltersStore.getState>["filters"];
@@ -20,7 +21,9 @@ type StoreFilters = ReturnType<typeof usePropertyFiltersStore.getState>["filters
  * es barato y correcto. Si el catálogo crece a miles, reintroducir un filtro
  * geográfico server-side (PostGIS o índice de colonia normalizada).
  */
-export function extractServerFilters(filters: StoreFilters): MapServerFilters {
+export function extractServerFilters(rawFilters: StoreFilters): MapServerFilters {
+  // REV13-01: lo que el tipo/subtipo no muestra (recamaras en un terreno...) no se manda al servidor.
+  const filters = sanitizeFiltersByTipo(rawFilters);
   const f: MapServerFilters = {};
 
   if (filters.tipoPropiedad) f.tipoPropiedad = filters.tipoPropiedad;

@@ -479,7 +479,7 @@ export default function CreateProperty({
           <View style={styles.commissionBanner}>
             <Ionicons name="warning-outline" size={20} color="#FF6B00" />
             <Text style={styles.commissionBannerText}>
-              Esta propiedad está Suspendida porque no tiene comisión configurada en EasyBroker. Completa la sección de Comisión para publicarla.
+              Esta propiedad no tiene comisión configurada, por eso solo tú la ves. Completa la sección de Comisión y guárdala: se publicará automáticamente.
             </Text>
           </View>
         )}
