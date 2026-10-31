@@ -29,7 +29,7 @@ function FilterSlider({ label, value, onChange, max, step, formatValue, onScroll
   const thumbLeft = (value / max) * usable;
 
   const resolve = (px: number) => {
-    const localX = px - pageXRef.current;
+    const localX = px; // REV14-03: px ya es locationX (relativo a la barra); no depende de una medicion asincrona
     const ratio = Math.max(0, Math.min(1, (localX - THUMB / 2) / usable));
     const raw = ratio * max;
     const snapped = Math.round(raw / step) * step;
@@ -69,18 +69,19 @@ function FilterSlider({ label, value, onChange, max, step, formatValue, onScroll
           viewRef.current?.measure((_x, _y, _w, _h, px) => {
             pageXRef.current = px;
           });
-          resolve(e.nativeEvent.pageX);
+          resolve(e.nativeEvent.locationX);
         }}
-        onResponderMove={(e) => resolve(e.nativeEvent.pageX)}
+        onResponderMove={(e) => resolve(e.nativeEvent.locationX)}
         onResponderRelease={() => onScrollLock?.(true)}
         onResponderTerminate={() => onScrollLock?.(true)}
       >
-        <View style={styles.track} />
+        {/* REV14-03: los hijos ignoran el toque; locationX queda siempre relativo a la barra. */}
+        <View pointerEvents="none" style={styles.track} />
         {trackWidth > 0 && (
-          <View style={[styles.trackFill, { width: Math.max(0, thumbLeft) + THUMB / 2 }]} />
+          <View pointerEvents="none" style={[styles.trackFill, { width: Math.max(0, thumbLeft) + THUMB / 2 }]} />
         )}
         {trackWidth > 0 && (
-          <View style={[styles.thumb, value <= 0 && styles.thumbEmpty, { left: thumbLeft }]} />
+          <View pointerEvents="none" style={[styles.thumb, value <= 0 && styles.thumbEmpty, { left: thumbLeft }]} />
         )}
       </View>
 

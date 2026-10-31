@@ -159,9 +159,10 @@ function CommissionSlider({
           }
         }}
       >
-        <View style={styles.track} />
-        {trackW > 0 && <View style={[styles.trackFill, { width: fillW }]} />}
-        {trackW > 0 && <View style={[styles.thumb, { left: thumbLeft }]} />}
+        {/* REV14-03: los hijos ignoran el toque; si no, locationX se mide desde la bolita y el valor salta atras. */}
+        <View pointerEvents="none" style={styles.track} />
+        {trackW > 0 && <View pointerEvents="none" style={[styles.trackFill, { width: fillW }]} />}
+        {trackW > 0 && <View pointerEvents="none" style={[styles.thumb, { left: thumbLeft }]} />}
       </View>
 
       <View style={styles.sliderEnds}>

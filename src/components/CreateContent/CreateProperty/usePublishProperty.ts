@@ -264,6 +264,7 @@ export function usePublishProperty(
         updateProgress(5, "Subiendo imágenes...");
         const uploadedUrls: string[] = [];
         let failedImages = 0;
+        let imagenRechazada: any = null;
         let completedCount = 0;
 
         // Pool de concurrencia 4: sube hasta 4 imágenes en paralelo para
@@ -296,6 +297,7 @@ export function usePublishProperty(
             } catch (imgError: any) {
               log.warn(`Error subiendo imagen:`, imgError.message);
               failedImages++;
+              if (imgError?.name === "InvalidImageError") imagenRechazada = imgError;
               // Continuar con las demás imágenes en lugar de fallar todo
             } finally {
               completedCount++;
@@ -315,7 +317,7 @@ export function usePublishProperty(
         // sin las fotos fallidas y sin avisar al usuario.
         if (failedImages > 0) {
           log.warn(`${failedImages} de ${totalImages} imágenes no se pudieron subir.`);
-          throw new MediaUnavailableError();
+          throw imagenRechazada ?? new MediaUnavailableError();
         }
 
         if (cancelledRef.current) throw new Error("CANCELLED");
@@ -368,7 +370,8 @@ export function usePublishProperty(
           ancho_terreno: parseFloat(form.anchoTerreno?.replace(/,/g, "") || "") || null,
           largo_terreno: parseFloat(form.largoTerreno?.replace(/,/g, "") || "") || null,
           costo_mantenimiento: parseFloat(form.costoMantenimiento?.replace(/,/g, "") || "") || null,
-          pisos: camposVisibles.niveles ? parseInt(form.niveles) || 1 : null,
+          // REV14-01: un valor invalido ya no se guarda como 1 nivel (parseInt(...) || 1); queda sin dato (null).
+          pisos: camposVisibles.niveles ? parseInt(form.niveles) || null : null,
           amueblado: camposVisibles.amueblado ? form.amueblado : null,
           // pet_friendly solo aplica/se muestra en renta o ambas; en venta el
           // campo nunca se renderiza y form.petFriendly queda "" (violaría el
@@ -598,9 +601,12 @@ export function usePublishProperty(
 
         log.error("Error publishing property:", error);
 
-        const errorMessage = isMediaUnavailable(error)
-          ? MEDIA_UNAVAILABLE_MESSAGE
-          : error.message || "No se pudo publicar la propiedad";
+        const errorMessage =
+          (error as any)?.name === "InvalidImageError"
+            ? error.message
+            : isMediaUnavailable(error)
+              ? MEDIA_UNAVAILABLE_MESSAGE
+              : error.message || "No se pudo publicar la propiedad";
 
         setPublishState({
           uploading: false,

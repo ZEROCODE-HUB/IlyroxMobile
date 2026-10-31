@@ -855,10 +855,26 @@ export const useSaveSearch = (userId?: string) => {
         }
         if (Object.keys(legalErrors).length > 0) {
           setErrors((prev: { [key: string]: string }) => ({ ...prev, ...legalErrors }));
+          // REV14-04: antes solo aparecia un texto al final del formulario y el boton parecia no responder.
+          showToast("Para guardar al prospecto marca las casillas de autorización al final del formulario.", "error");
           return { success: false };
         }
 
         leadId = existente ?? (await createLeadRecord());
+
+        // REV14-05: si el prospecto ya existia (mismo telefono o correo) se reutiliza, pero antes su nombre nunca se
+        // actualizaba y Matches mostraba el nombre de la busqueda anterior. Ahora gana el ultimo nombre capturado.
+        if (existente && leadName.trim() && userId) {
+          try {
+            await supabase
+              .from("leads")
+              .update({ nombre: leadName.trim() })
+              .eq("id", existente)
+              .eq("usuario_id", userId);
+          } catch {
+            // el nombre es secundario: nunca debe impedir guardar la busqueda
+          }
+        }
 
         if (leadId && asesor.requerido) {
           const items: ConsentItem[] = [];

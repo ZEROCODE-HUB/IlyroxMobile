@@ -802,7 +802,8 @@ export function usePropertyForm(
         : '';
       // REV13-03: si la propiedad no tiene niveles guardados, el campo se muestra vacio (antes mostraba "1" aunque la BD
       // no tuviera nada).
-      payload.niveles = data.pisos?.toString() || "";
+      // REV14-01: null o 0 = sin dato (campo vacio, antes mostraba "0"); cualquier numero real se conserva tal cual.
+      payload.niveles = data.pisos && data.pisos > 0 ? String(data.pisos) : "";
       payload.antiguedad = data.antiguedad || "";
       payload.amueblado = (data.amueblado || "No") as AmuebladoType;
       payload.petFriendly = (data.pet_friendly || "No") as SiNo;

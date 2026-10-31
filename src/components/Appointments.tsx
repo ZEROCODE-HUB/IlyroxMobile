@@ -45,6 +45,7 @@ const Appointments: React.FC = () => {
     handleMarkCancel,
     handleAcceptAppointment,
     handleOpenRating,
+    handleMarkDone,
     handleEditAppointment,
     handleSyncCalendar,
     handleSubmitRating,
@@ -135,6 +136,7 @@ const Appointments: React.FC = () => {
           onMarkCancel={handleMarkCancel}
           onAcceptAppointment={handleAcceptAppointment}
           onOpenRating={handleOpenRating}
+          onMarkDone={handleMarkDone}
           onSyncCalendar={handleSyncCalendar}
           onContact={handleContactPress}
           onEdit={handleEditAppointment}

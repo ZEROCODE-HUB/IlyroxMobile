@@ -2,6 +2,7 @@ export type AppointmentStatus =
     | "pendiente"
     | "confirmada"
     | "cancelada"
+    | "realizada"
     | "pending"
     | "cancelled"
     | "rated";

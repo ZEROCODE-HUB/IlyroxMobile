@@ -15,12 +15,14 @@ import { COLORS } from "../constants/colors";
 import { AppointmentItem } from "./Appointments/appointmentTypes";
 import { AppBottomSheet } from "@/design-system/components/AppBottomSheet";
 import { EMPTY_APPOINTMENT_TIME, formatAppointmentTimeLabel } from "@/utils/timeZone";
+import { citaYaInicio } from "@/utils/appointmentTime";
 
 interface AppointmentCardProps {
   appointment: AppointmentItem;
   onMarkCancel: (id: string) => void;
   onAcceptAppointment: (id: string) => void | Promise<void>;
   onOpenRating: (id: string) => void;
+  onMarkDone?: (id: string) => void;
   onSyncCalendar: (id: string) => void;
   onContact?: (id: string) => void;
   onEdit?: (id: string) => void;
@@ -34,6 +36,8 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   appointment,
   onMarkCancel,
   onAcceptAppointment,
+  onOpenRating,
+  onMarkDone,
   onContact,
   onEdit,
   activeTab,
@@ -63,6 +67,11 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   const isConfirmed = appointment.estado === "confirmada";
   const isCancelled = appointment.estado === "cancelada";
   const showGuestActions = isInvited && isPending;
+  // REV15: "realizada" la marca quien creo la cita (solo si esta confirmada y ya empezo); despues se puede calificar.
+  const isDone = appointment.estado === "realizada";
+  const puedeMarcarRealizada =
+    isConfirmed && isRequester && citaYaInicio(appointment.fecha, appointment.hora);
+  const puedeCalificar = isDone && !appointment.hasUserRated;
 
   const getOtherUserPhone = () => {
     if (appointment.agente?.celular) {
@@ -171,6 +180,11 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
                 <Text style={styles.confirmedBadgeText}>Cita confirmada</Text>
               </View>
             )}
+            {isDone && (
+              <View style={styles.confirmedBadge}>
+                <Text style={styles.confirmedBadgeText}>Cita realizada</Text>
+              </View>
+            )}
             {isCancelled && (
               <View style={styles.cancelledBadge}>
                 <Text style={styles.cancelledBadgeText}>Cita cancelada</Text>
@@ -244,6 +258,26 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
+
+        {(puedeMarcarRealizada || puedeCalificar) && (
+          <View style={styles.doneRow}>
+            {puedeMarcarRealizada && (
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.confirmBtn]}
+                onPress={() => onMarkDone?.(appointment.id)}
+              >
+                <Ionicons name="checkmark-done" size={18} color={COLORS.white} />
+                <Text style={[styles.actionBtnText, styles.confirmBtnText]}>La cita se realizó</Text>
+              </TouchableOpacity>
+            )}
+            {puedeCalificar && (
+              <TouchableOpacity style={styles.actionBtn} onPress={() => onOpenRating?.(appointment.id)}>
+                <Ionicons name="star-outline" size={18} color={COLORS.primary} />
+                <Text style={styles.actionBtnText}>Calificar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </View>
 
       <Modal
@@ -254,13 +288,13 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
       >
         <Pressable style={styles.menuOverlay} onPress={() => setShowMenu(false)}>
           <View style={styles.menuContainer}>
-            {!isCancelled && (
+            {!isCancelled && !isDone && (
               <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
                 <Ionicons name="create-outline" size={20} color={COLORS.textPrimary} />
                 <Text style={styles.menuItemText}>Editar cita</Text>
               </TouchableOpacity>
             )}
-            {!isCancelled && (
+            {!isCancelled && !isDone && (
               <TouchableOpacity style={styles.menuItem} onPress={handleCancel}>
                 <Ionicons name="close-circle-outline" size={20} color={COLORS.error} />
                 <Text style={[styles.menuItemText, { color: COLORS.error }]}>Cancelar cita</Text>
@@ -270,6 +304,12 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
               <View style={styles.menuItem}>
                 <Ionicons name="close-circle" size={20} color={COLORS.textTertiary} />
                 <Text style={[styles.menuItemText, { color: COLORS.textTertiary }]}>Cita cancelada</Text>
+              </View>
+            )}
+            {isDone && (
+              <View style={styles.menuItem}>
+                <Ionicons name="checkmark-done-circle" size={20} color={COLORS.textTertiary} />
+                <Text style={[styles.menuItemText, { color: COLORS.textTertiary }]}>Cita realizada</Text>
               </View>
             )}
           </View>
@@ -453,6 +493,12 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
+    gap: 8,
+  },
+  doneRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
     gap: 8,
   },
   actionBtn: {

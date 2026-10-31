@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Platform } from "react-native";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
@@ -19,6 +19,7 @@ import { googleCalendarService } from "@/services/googleCalendarService";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { logger } from "@/utils/logger";
 import { formatAppointmentDateTime } from "@/utils/timeZone";
+import { citaTerminada, citaYaInicio, fechaLocalISO } from "@/utils/appointmentTime";
 
 const log = logger.scoped("useAppointments");
 
@@ -39,6 +40,25 @@ export const useAppointments = () => {
     const [rateApptId, setRateApptId] = useState<string | null>(null);
     const [editingAppointment, setEditingAppointment] =
         useState<AppointmentItem | null>(null);
+
+    // REV15: "proximas" y "anteriores" se separan por fecha Y hora (inicio + duracion), no solo por fecha. `ahora` se
+    // refresca cada minuto para que una cita pase sola a "anteriores" sin recargar la pantalla.
+    const [ahora, setAhora] = useState(() => Date.now());
+    useEffect(() => {
+        const t = setInterval(() => setAhora(Date.now()), 60000);
+        return () => clearInterval(t);
+    }, []);
+    const visibleAppointments = useMemo(
+        () =>
+            appointments.filter((a) => {
+                const finalizada =
+                    a.estado === "cancelada" ||
+                    a.estado === "realizada" ||
+                    citaTerminada(a.fecha, a.hora, ahora);
+                return activeTab === "upcoming" ? !finalizada : finalizada;
+            }),
+        [appointments, activeTab, ahora],
+    );
 
     useEffect(() => {
         if (profile?.id) {
@@ -209,14 +229,15 @@ export const useAppointments = () => {
                 .or(`agente_id.eq.${profile.id},cliente_id.eq.${profile.id}`)
                 .is("deleted_at", null);
 
+            // REV15: se trae un rango amplio por fecha LOCAL (ayer incluido, por citas que cruzan la medianoche) y la
+            // separacion fina por hora se hace en visibleAppointments.
             if (activeTab === "upcoming") {
                 query = query
                     .in("estado", ["pendiente", "confirmada"])
-                    .gte("fecha", new Date().toISOString().split("T")[0]);
+                    .gte("fecha", fechaLocalISO(-1));
             } else {
                 query = query.or(
-                    `estado.eq.cancelada,fecha.lt.${new Date().toISOString().split("T")[0]
-                    }`,
+                    `estado.in.(cancelada,realizada),fecha.lte.${fechaLocalISO(0)}`,
                 );
             }
 
@@ -523,7 +544,70 @@ export const useAppointments = () => {
         }
     };
 
+    // REV15: el agente que creo la cita confirma que se realizo. Pasa a "realizada" y a "Anteriores"; desde ahi se puede
+    // calificar.
+    const handleMarkDone = (id: string) => {
+        const appointment = appointments.find((a) => a.id === id);
+        if (!appointment || !profile?.id) return;
+
+        if (appointment.created_by !== profile.id) {
+            showToast("Solo quien creó la cita puede marcarla como realizada", "info");
+            return;
+        }
+        if (appointment.estado !== "confirmada") {
+            showToast("Solo una cita confirmada puede marcarse como realizada", "info");
+            return;
+        }
+        if (!citaYaInicio(appointment.fecha, appointment.hora)) {
+            showToast("La cita aún no ha comenzado", "info");
+            return;
+        }
+
+        showModal({
+            title: "Cita realizada",
+            message: "¿Confirmas que la cita se realizó? Después podrás calificarla.",
+            confirmText: "Sí, se realizó",
+            cancelText: "Volver",
+            onCancel: () => {},
+            onConfirm: async () => {
+                const previo = { estado: appointment.estado, status: appointment.status };
+                setAppointments((current) =>
+                    current.map((item) =>
+                        item.id === id
+                            ? { ...item, estado: "realizada", status: "realizada" as AppointmentStatus }
+                            : item,
+                    ),
+                );
+
+                const { data, error } = await supabase
+                    .from("citas")
+                    .update({ estado: "realizada", updated_at: new Date().toISOString() })
+                    .eq("id", id)
+                    .eq("created_by", profile.id)
+                    .eq("estado", "confirmada")
+                    .select("id");
+
+                if (error || !data || data.length === 0) {
+                    log.error("No se pudo marcar la cita como realizada:", error);
+                    setAppointments((current) =>
+                        current.map((item) =>
+                            item.id === id ? { ...item, estado: previo.estado, status: previo.status } : item,
+                        ),
+                    );
+                    showToast("No se pudo marcar la cita como realizada", "error");
+                    return;
+                }
+                showToast("Cita marcada como realizada", "success");
+            },
+        });
+    };
+
     const handleOpenRating = (id: string) => {
+        const appointment = appointments.find((a) => a.id === id);
+        if (appointment && appointment.estado !== "realizada") {
+            showToast("Solo puedes calificar una cita realizada", "info");
+            return;
+        }
         setRateApptId(id);
         setShowRateModal(true);
     };
@@ -560,6 +644,9 @@ export const useAppointments = () => {
         try {
             const appointment = appointments.find((a) => a.id === rateApptId);
             if (!appointment) return;
+            if (appointment.estado !== "realizada") {
+                throw new Error("Solo puedes calificar una cita realizada");
+            }
 
             const profesionalId =
                 appointment.agente_id === profile.id
@@ -688,7 +775,7 @@ export const useAppointments = () => {
     return {
         activeTab,
         setActiveTab,
-        appointments,
+        appointments: visibleAppointments,
         loading,
         showRateModal,
         editingAppointment,
@@ -696,6 +783,7 @@ export const useAppointments = () => {
         handleMarkCancel,
         handleAcceptAppointment,
         handleOpenRating,
+        handleMarkDone,
         handleEditAppointment,
         handleSyncCalendar,
         handleSubmitRating,

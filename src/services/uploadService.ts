@@ -1,4 +1,5 @@
-import { Image as RNImage } from "react-native";
+import { Image as RNImage, Platform } from "react-native";
+import { supabase } from "@/lib/supabase";
 import * as ImageManipulator from "expo-image-manipulator";
 import { logger } from "@/utils/logger";
 
@@ -28,6 +29,47 @@ export const isMediaUnavailable = (err: unknown): err is MediaUnavailableError =
 
 /** Tiempo máximo por intento de subida de una foto. Sin esto, un servidor que no responde deja la subida colgada. */
 const IMAGE_UPLOAD_TIMEOUT_MS = 30000;
+
+/**
+ * REV14-06: el servidor de fotos rechazo el archivo (error 4xx: formato o tamano no valido). Es un problema de ESA foto,
+ * no una falla del servicio, asi que no se reintenta ni se muestra el aviso generico de "fallas con archivos multimedia".
+ * Hereda de MediaUnavailableError para que el resto de pantallas se comporten igual que antes.
+ */
+export class InvalidImageError extends MediaUnavailableError {
+  constructor(readonly status: number, cause?: unknown) {
+    super(cause);
+    this.name = "InvalidImageError";
+    this.message =
+      "Una de las fotos no fue aceptada (formato o tamaño no válido). Cámbiala por otra o vuelve a tomarla e inténtalo de nuevo.";
+  }
+}
+
+/** Deja constancia (tabla debug_logs, contexto upload_imagen) de por que fallo una subida; sin datos personales. */
+function registrarFalloSubida(uri: string, error: unknown) {
+  try {
+    const ext = (uri.split("?")[0].split(".").pop() || "").toLowerCase().slice(0, 6);
+    const e = error as { message?: string; status?: number; cause?: any } | null;
+    supabase
+      .from("debug_logs")
+      .insert({
+        contexto: "upload_imagen",
+        payload: {
+          mensaje: String(e?.cause?.message ?? e?.message ?? error).slice(0, 300),
+          estado: e?.status ?? null,
+          ext,
+          plataforma: Platform.OS,
+          version: String(Platform.Version),
+          ts: new Date().toISOString(),
+        },
+      })
+      .then(
+        () => {},
+        () => {},
+      );
+  } catch {
+    // diagnostico: nunca debe afectar la subida
+  }
+}
 
 /** Ancho máximo de una foto subida. Ver `compressForUpload`. */
 const MAX_IMAGE_WIDTH = 1920;
@@ -121,6 +163,11 @@ export async function uploadImage(
           await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
           continue;
         }
+        // REV14-06: 400 / 413 / 415 / 422 significan que el servidor no acepto ESE archivo (formato o tamano). Otros
+        // errores (401, 403, 404, 5xx...) siguen siendo falla del servicio y conservan el aviso generico.
+        if ([400, 413, 415, 422].includes(response.status)) {
+          throw new InvalidImageError(response.status);
+        }
         throw new Error(`Upload failed: ${response.status}`);
       }
 
@@ -134,7 +181,13 @@ export async function uploadImage(
         error,
       );
 
+      if (error?.name === "InvalidImageError") {
+        registrarFalloSubida(uri, error);
+        throw error;
+      }
+
       if (attempt >= retries - 1) {
+        registrarFalloSubida(uri, error);
         throw new MediaUnavailableError(error);
       }
 

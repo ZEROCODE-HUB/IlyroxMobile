@@ -180,6 +180,21 @@ export const initialAgricolaFilters: AgricolaFilters = {
  */
 export const MAX_LOCATION_CHIPS = 5;
 
+/**
+ * REV14-02: al cambiar el tipo de propiedad, los filtros propios de comercial / industrial / agricola vuelven a su valor
+ * inicial. Antes quedaban guardados (p. ej. "Fuera de plaza" de una busqueda de local comercial) y seguian excluyendo
+ * propiedades de la siguiente busqueda aunque el usuario ya no los viera.
+ */
+function conTipoNuevo(prev: PropertyFilters, next: PropertyFilters): PropertyFilters {
+  if (prev.tipoPropiedad === next.tipoPropiedad) return next;
+  return {
+    ...next,
+    comercialFilters: initialComercialFilters,
+    industrialFilters: initialIndustrialFilters,
+    agricolaFilters: initialAgricolaFilters,
+  };
+}
+
 const initialFilters: PropertyFilters = {
   tipoPropiedad: "",
   subtipo: [],
@@ -220,12 +235,12 @@ export const usePropertyFiltersStore = create<PropertyFiltersState>(
     // REV13-01: al cambiar tipo/subtipo se vacian los campos que ya no aplican (ver utils/filterVisibility.ts).
     updateFilter: (key, value) =>
       set((state) => ({
-        filters: sanitizeFiltersByTipo({ ...state.filters, [key]: value } as PropertyFilters),
+        filters: conTipoNuevo(state.filters, sanitizeFiltersByTipo({ ...state.filters, [key]: value } as PropertyFilters)),
       })),
 
     updateFilters: (partial) =>
       set((state) => ({
-        filters: sanitizeFiltersByTipo({ ...state.filters, ...partial } as PropertyFilters),
+        filters: conTipoNuevo(state.filters, sanitizeFiltersByTipo({ ...state.filters, ...partial } as PropertyFilters)),
       })),
 
     updateLocationFilter: (location) =>

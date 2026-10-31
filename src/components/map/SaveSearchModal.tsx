@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -79,6 +79,15 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
     }
     cargarAsesor();
   }, [visible, cargarAsesor]);
+
+  // REV14-04: si falta una casilla legal, baja al final del formulario donde estan.
+  const scrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    if (errors.legalAcuerdo || errors.legalDeclaracion) {
+      const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
+      return () => clearTimeout(t);
+    }
+  }, [errors.legalAcuerdo, errors.legalDeclaracion]);
 
   // Activar createLead cuando el modal se abre
   useEffect(() => {
@@ -183,6 +192,7 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
           </View>
 
           <ScrollView
+            ref={scrollRef}
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 20 }}
