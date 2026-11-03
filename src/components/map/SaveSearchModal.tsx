@@ -60,6 +60,11 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
   const [declaraProspecto, setDeclaraProspecto] = useState(false);
   const [asesor, setAsesor] = useState<EstadoAsesor | null>(null);
   const [asesorFallo, setAsesorFallo] = useState(false);
+  // REV19: aviso local (dentro del formulario) cuando aun no se pueden verificar las politicas.
+  const [avisoLocal, setAvisoLocal] = useState("");
+  useEffect(() => {
+    if (asesor) setAvisoLocal("");
+  }, [asesor]);
   const [docVisible, setDocVisible] = useState<LegalCodigo | null>(null);
   const cargarAsesor = React.useCallback(() => {
     setAsesorFallo(false);
@@ -160,6 +165,18 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
   };
 
   const handleSave = async () => {
+    // REV19: sin el estado de las politicas no se sabe si hay que pedir las casillas. Antes se intentaba guardar igual y
+    // el error quedaba oculto (el toast va detras de esta ventana). Ahora se avisa aqui y se reintenta la carga.
+    if (!asesor) {
+      setAvisoLocal(
+        asesorFallo
+          ? "No pudimos verificar las políticas. Revisa tu conexión y vuelve a tocar Notifícame."
+          : "Verificando las políticas… vuelve a tocar Notifícame en un momento.",
+      );
+      cargarAsesor();
+      return;
+    }
+    setAvisoLocal("");
     const result = await handleSaveSearch(filters, onClose, { aceptaAcuerdo, declaraProspecto });
     if (result.success) {
       onSaveSuccessWithData(result.metadata);
@@ -392,6 +409,17 @@ export const SaveSearchModal: React.FC<SaveSearchModalProps> = ({
             </View>
           </ScrollView>
 
+          {/* REV16: el mensaje flotante (toast) queda DETRAS de esta ventana; el aviso va aqui, siempre visible. */}
+          {(errors.legalAcuerdo || errors.legalDeclaracion || !!avisoLocal) && (
+            <View style={styles.legalBanner}>
+              <Ionicons name="alert-circle" size={18} color={COLORS.error} />
+              <Text style={styles.legalBannerText}>
+                {avisoLocal ||
+                  "Para guardar al prospecto marca las casillas de autorización (Acuerdo y declaración) y vuelve a tocar Notifícame."}
+              </Text>
+            </View>
+          )}
+
           {/* Footer */}
           <View style={styles.footer}>
             <SafePressable style={styles.cancelButton} onPress={onClose}>
@@ -544,6 +572,21 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: COLORS.error,
     borderWidth: 1,
+  },
+  legalBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: "#FDECEC",
+  },
+  legalBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.error,
   },
   errorText: {
     fontSize: 11,

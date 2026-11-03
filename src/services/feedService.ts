@@ -142,6 +142,10 @@ function applyPropertiesVisibility(query: any, currentUserId?: string, blockedUs
   return q;
 }
 
+// REV18: feed_items.visible_feed (SQL 22) deja fuera las propiedades inactivas / sin comision. Si la columna aun no
+// existe en la base, se detecta el error una vez y se vuelve al comportamiento anterior.
+let feedVisibleSupported = true;
+
 /**
  * Filtra feed_items excluyendo autores bloqueados. feed_items NO tiene columna 'activo'.
  */
@@ -410,7 +414,28 @@ export const feedService = {
     });
   },
 
+  // REV17: feed_items trae tambien las propiedades ocultas (sin comision / inactivas), que se descartan DESPUES de
+  // leer la pagina. Si una pagina entera eran ocultas (p. ej. 178 propiedades de una importacion), el feed quedaba
+  // vacio. Aqui se siguen leyendo paginas hasta juntar contenido visible (tope de seguridad).
   async getFeedPage(
+    pageNum: number,
+    pageSize: number,
+    currentUserId?: string,
+  ): Promise<FeedPage> {
+    const MAX_PAGINAS = 20;
+    const MINIMO = Math.max(1, Math.ceil(pageSize / 2));
+    let acumulados: FeedItem[] = [];
+    let siguiente: number | null = pageNum;
+    for (let i = 0; i < MAX_PAGINAS && siguiente !== null; i++) {
+      const r: FeedPage = await feedService.getFeedPageOnce(siguiente, pageSize, currentUserId);
+      acumulados = acumulados.concat(r.items);
+      siguiente = r.nextPage;
+      if (acumulados.length >= MINIMO) break;
+    }
+    return { items: acumulados, nextPage: siguiente };
+  },
+
+  async getFeedPageOnce(
     pageNum: number,
     pageSize: number,
     currentUserId?: string,
@@ -423,6 +448,7 @@ export const feedService = {
       .select(FEED_SELECT)
       .eq("estado_moderacion", "activo")
       .is("deleted_at", null)
+      .or(feedVisibleSupported ? "visible_feed.eq.true" : "id.not.is.null")
       // Orden cronológico estricto: lo más reciente primero. `engagement_score`
       // queda como desempate secundario para que dos publicaciones del mismo
       // segundo no queden en orden arbitrario entre reloads, y `id` como
@@ -434,6 +460,10 @@ export const feedService = {
       blockedUserIds,
     );
 
+    if (feedError && feedVisibleSupported && /visible_feed/i.test(String((feedError as any).message ?? ""))) {
+      feedVisibleSupported = false;
+      return feedService.getFeedPageOnce(pageNum, pageSize, currentUserId);
+    }
     if (feedError) throw feedError;
     if (!feedData || feedData.length === 0) {
       return { items: [], nextPage: null };

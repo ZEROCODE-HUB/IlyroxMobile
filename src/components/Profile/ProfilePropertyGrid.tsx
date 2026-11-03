@@ -21,6 +21,7 @@ import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import { supabase } from "../../lib/supabase";
 import { Bath } from "lucide-react-native";
+import { datosFaltantes } from "@/utils/datosFaltantes";
 import { logger } from "@/utils/logger";
 
 const log = logger.scoped("ProfilePropertyGrid");
@@ -113,6 +114,12 @@ const ProfilePropertyGrid: React.FC<ProfilePropertyGridProps> = ({
 
         {/* Status Badge */}
         {statusBadge}
+
+        {isOwnProfile && datosFaltantes(item).length > 0 && (
+          <View style={[styles.statusBadge, { top: 28, backgroundColor: "#D97706" }]}>
+            <Text style={[styles.statusText, { color: "#fff" }]}>Faltan datos: {datosFaltantes(item).join(", ")}</Text>
+          </View>
+        )}
 
         {/* 3-Dot Menu (solo si es perfil propio) */}
         {isOwnProfile && (

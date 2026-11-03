@@ -7,6 +7,7 @@ import { formatPriceShort } from "../../utils/priceFormatter";
 import { Property, operaciones_propiedad } from "../../types";
 import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import { Bath } from "lucide-react-native";
+import { datosFaltantes } from "@/utils/datosFaltantes";
 import { SafePressable } from "@/design-system";
 
 const { width } = Dimensions.get("window");
@@ -181,6 +182,13 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
             </View>
           )}
 
+        {isOwnProfile && datosFaltantes(item).length > 0 && (
+          <View style={[styles.statusBadge, { top: ITEM_SIZE - 46, backgroundColor: "#D97706" }]}>
+            <Ionicons name="create-outline" size={10} color="#fff" />
+            <Text style={styles.statusText}> Faltan datos: {datosFaltantes(item).join(", ")}</Text>
+          </View>
+        )}
+
         {isOwnProfile && !!reportInfo && (
           <View
             style={{
@@ -197,6 +205,24 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
             <Text style={{ fontSize: 9, fontWeight: "700", color: "#3b2f00" }} numberOfLines={2}>
               Tu aviso ha sido reportado: {reportInfo.motivo}
             </Text>
+          </View>
+        )}
+
+        {isOwnProfile && !!reportInfo && (
+          <View
+            style={{
+              position: "absolute",
+              top: 6,
+              right: 36,
+              width: 24,
+              height: 24,
+              borderRadius: 12,
+              backgroundColor: "#F5C518",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="warning" size={15} color="#3b2f00" />
           </View>
         )}
 

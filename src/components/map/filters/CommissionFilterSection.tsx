@@ -22,6 +22,8 @@ function FilterSlider({ label, value, onChange, max, step, formatValue, onScroll
   const [trackWidth, setTrackWidth] = useState(0);
   const viewRef = useRef<View>(null);
   const pageXRef = useRef(0);
+  const anchorPageRef = useRef(0);
+  const anchorCenterRef = useRef(0);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -66,12 +68,14 @@ function FilterSlider({ label, value, onChange, max, step, formatValue, onScroll
         onResponderTerminationRequest={() => false}
         onResponderGrant={(e) => {
           onScrollLock?.(false);
-          viewRef.current?.measure((_x, _y, _w, _h, px) => {
-            pageXRef.current = px;
-          });
-          resolve(e.nativeEvent.locationX);
+          // REV16: se arrastra por DESPLAZAMIENTO del dedo (pageX) desde donde esta la bolita. locationX en movimiento
+          // no es confiable en Android (devolvia ~0 y la bolita "rebotaba" al minimo).
+          anchorPageRef.current = e.nativeEvent.pageX;
+          anchorCenterRef.current = thumbLeft + THUMB / 2;
         }}
-        onResponderMove={(e) => resolve(e.nativeEvent.locationX)}
+        onResponderMove={(e) =>
+          resolve(anchorCenterRef.current + (e.nativeEvent.pageX - anchorPageRef.current))
+        }
         onResponderRelease={() => onScrollLock?.(true)}
         onResponderTerminate={() => onScrollLock?.(true)}
       >

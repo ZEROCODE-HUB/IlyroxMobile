@@ -32,6 +32,7 @@ import { formatPropertyAge } from "@/utils/propertyAge";
 import { router } from "expo-router";
 import { CachedPropertyData } from "@/store/propertyCacheStore";
 import { closeThenNavigate } from "@/utils/closeThenNavigate";
+import { reportService } from "@/services/reportService";
 
 import { PropertyDetailImages } from "./PropertyDetailImages";
 import { PropertyFinancialSection } from "./PropertyFinancialSection";
@@ -116,6 +117,26 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   const [, setHasChanges] = useState(false);
 
   const { handleContact } = useChatInitiator();
+
+  // REV19: el dueno ve en la ficha el aviso amarillo con el detalle de los reportes de su propiedad.
+  const [reportesDueno, setReportesDueno] = useState<any[]>([]);
+  const duenoId = (propertyDetails as any)?.created_by;
+  useEffect(() => {
+    if (!user?.id || !propertyId || !duenoId || user.id !== duenoId) {
+      setReportesDueno([]);
+      return;
+    }
+    let vivo = true;
+    reportService
+      .getReports(propertyId)
+      .then((r) => {
+        if (vivo) setReportesDueno(r ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [user?.id, propertyId, duenoId]);
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -369,6 +390,33 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                 </View>
               )}
             </View>
+
+            {isPropertyOwner && reportesDueno.length > 0 && (
+              <View
+                style={{
+                  backgroundColor: "#FFF4C2",
+                  borderColor: "#F5C518",
+                  borderWidth: 1,
+                  borderRadius: 10,
+                  padding: 12,
+                  marginBottom: 12,
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Ionicons name="warning" size={20} color="#B7791F" />
+                  <Text style={{ marginLeft: 6, fontWeight: "700", color: "#3b2f00" }}>
+                    Tu aviso ha sido reportado ({reportesDueno.length})
+                  </Text>
+                </View>
+                {reportesDueno.map((r: any, i: number) => (
+                  <Text key={i} style={{ marginTop: 6, color: "#3b2f00" }}>
+                    {"- "}
+                    {r.motivo}
+                    {r.descripcion ? `: ${r.descripcion}` : ""}
+                  </Text>
+                ))}
+              </View>
+            )}
 
             <Text style={styles.title}>
               {propertyDetails.subtipo} en {propertyDetails.municipio || propertyDetails.ciudad || 'Sin ubicación'}

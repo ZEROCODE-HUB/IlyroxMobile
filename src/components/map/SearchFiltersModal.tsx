@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Dimensions,
   Platform,
+  Keyboard,
   ActivityIndicator,
 } from "react-native";
 import {
@@ -148,6 +149,24 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
     amenidades: camposVisiblesBase.amenidades && filters.tipoPropiedad === "habitacional",
   };
 
+  // REV19: con el teclado abierto la hoja (altura fija de 85%) quedaba tapada o desplazada, con un hueco enorme, y el boton
+  // inferior no se veia. Ahora la hoja se ajusta a la altura disponible y el boton queda justo encima del teclado.
+  const [kb, setKb] = useState(0);
+  React.useEffect(() => {
+    const evShow = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const evHide = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const s = Keyboard.addListener(evShow as any, (e: any) => setKb(e?.endCoordinates?.height ?? 0));
+    const h = Keyboard.addListener(evHide as any, () => setKb(0));
+    return () => {
+      s.remove();
+      h.remove();
+    };
+  }, []);
+  const sheetKb =
+    kb > 0
+      ? { height: Math.min(height * 0.85, height - kb - 40), marginBottom: Platform.OS === "ios" ? kb : 0 }
+      : null;
+
   const handleCurrencyChange = (
     text: string,
     setter: (val: string) => void,
@@ -168,7 +187,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
 
   return (
     <AppBottomSheet visible={visible} onClose={onClose}>
-      <View style={styles.modalContent}>
+      <View style={[styles.modalContent, sheetKb]}>
         {/* Header */}
         <View style={styles.modalHeader}>
           <View>
@@ -189,7 +208,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
         <KeyboardAwareScrollView
           showsVerticalScrollIndicator={false}
           style={styles.modalScroll}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, kb > 0 && { paddingBottom: 24 }]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           bottomOffset={100}
@@ -316,7 +335,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
           </KeyboardAwareScrollView>
 
           {/* Footer */}
-          <View style={styles.modalFooter}>
+          <View style={[styles.modalFooter, kb > 0 && { paddingBottom: 12 }]}>
             {isEditMode ? (
               <TouchableOpacity
                 style={[styles.applyBtn, isSaving && { opacity: 0.7 }]}

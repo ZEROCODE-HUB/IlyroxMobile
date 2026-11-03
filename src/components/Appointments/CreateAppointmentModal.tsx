@@ -25,6 +25,7 @@ import { googleCalendarService } from "@/services/googleCalendarService";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { logger } from "@/utils/logger";
 import { getDeviceTimeZone } from "@/utils/timeZone";
+import { inicioCitaMs } from "@/utils/appointmentTime";
 import DatePickerField from "./DatePickerField";
 import TimePickerField from "./TimePickerField";
 import AppointmentTypeSelector from "./AppointmentTypeSelector";
@@ -97,7 +98,9 @@ export default function CreateAppointmentModal({
     const regex = /^\d{4}-\d{2}-\d{2}$/;
     if (!regex.test(dateStr)) return false;
 
-    const date = new Date(dateStr);
+    // REV16: fecha LOCAL (new Date("YYYY-MM-DD") es UTC y en Peru/Mexico caia el dia anterior: hoy se rechazaba).
+    const [yy, mm, dd] = dateStr.split("-").map(Number);
+    const date = new Date(yy, mm - 1, dd);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -178,6 +181,23 @@ export default function CreateAppointmentModal({
       showModal({
         title: "Error",
         message: "Hora inválida. Usa formato HH:MM (24 horas)",
+        confirmText: "OK",
+      });
+      return;
+    }
+
+    // REV16: una cita de hoy debe ser a una hora posterior a la actual (al editar, solo si cambiaron fecha u hora).
+    const cambioFechaHora =
+      !isEditMode ||
+      !appointment ||
+      String(appointment.fecha) !== fechaText ||
+      String(appointment.hora ?? "").slice(0, 5) !== horaText;
+    const inicioCita = inicioCitaMs(fechaText, horaText);
+    if (cambioFechaHora && inicioCita !== null && inicioCita <= Date.now()) {
+      savingRef.current = false;
+      showModal({
+        title: "Hora inválida",
+        message: "Para una cita de hoy elige una hora posterior a la actual.",
         confirmText: "OK",
       });
       return;

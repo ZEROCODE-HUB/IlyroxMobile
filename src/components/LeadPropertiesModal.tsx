@@ -301,6 +301,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                 <View style={styles.headerActions}>
                   <TouchableOpacity
                     onPress={() => setShowSuspendConfirm(true)}
+                    hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
                     style={styles.headerBtn}
                   >
                     <Ionicons
@@ -312,6 +313,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                   {onEditSearch && (
                     <TouchableOpacity
                       onPress={onEditSearch}
+                      hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
                       style={styles.headerBtn}
                     >
                       <Ionicons
@@ -323,6 +325,7 @@ export const LeadPropertiesModal: React.FC<LeadPropertiesModalProps> = ({
                   )}
                   <TouchableOpacity
                     onPress={() => setShowDeleteConfirm(true)}
+                    hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
                     style={styles.headerBtn}
                   >
                     <Ionicons
@@ -474,7 +477,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   headerBtn: {
-    padding: 4,
+    padding: 8,
   },
   searchInfoSection: {
     paddingHorizontal: 16,

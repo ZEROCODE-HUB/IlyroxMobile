@@ -67,9 +67,9 @@ const DatePickerField: React.FC<DatePickerFieldProps> = ({
     // Solo iOS: fecha en curso mientras se gira la rueda, sin confirmar aún.
     const [draftDate, setDraftDate] = useState<Date | null>(null);
 
-    // Mínimo: mañana. Estable entre renders para no reiniciar la rueda.
+    // REV16: mínimo HOY (se permiten citas el mismo día). Estable entre renders para no reiniciar la rueda.
     const minimumDate = useMemo(() => {
-        const t = tomorrow();
+        const t = new Date();
         t.setHours(0, 0, 0, 0);
         return t;
     }, []);

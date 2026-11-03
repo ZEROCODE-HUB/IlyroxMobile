@@ -77,6 +77,9 @@ function CommissionSlider({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const dragging = useRef(false);
+  const anchorPageRef = useRef(0);
+  const anchorCenterRef = useRef(0);
+  const lastXRef = useRef(0);
 
   // Valor que se mandará al form cuando el timer expire.
   const pendingVal = useRef("");
@@ -148,10 +151,21 @@ function CommissionSlider({
         onResponderGrant={(e) => {
           dragging.current = true;
           onScrollLock?.(false);
-          onMove(e.nativeEvent.locationX);
+          // REV16: sobre la bolita se arrastra desde donde esta; en la barra, salta al toque. Despues se sigue el
+          // DESPLAZAMIENTO del dedo (pageX): locationX en movimiento/al soltar no es confiable en Android y mandaba el valor al minimo.
+          const lx = e.nativeEvent.locationX;
+          const centro = thumbLeft + THUMB / 2;
+          anchorCenterRef.current = Math.abs(lx - centro) <= THUMB + 16 ? centro : lx;
+          anchorPageRef.current = e.nativeEvent.pageX;
+          lastXRef.current = anchorCenterRef.current;
+          onMove(anchorCenterRef.current);
         }}
-        onResponderMove={(e) => onMove(e.nativeEvent.locationX)}
-        onResponderRelease={(e) => onRelease(e.nativeEvent.locationX)}
+        onResponderMove={(e) => {
+          const x = anchorCenterRef.current + (e.nativeEvent.pageX - anchorPageRef.current);
+          lastXRef.current = x;
+          onMove(x);
+        }}
+        onResponderRelease={() => onRelease(lastXRef.current)}
         onResponderTerminate={() => {
           if (dragging.current) {
             dragging.current = false;

@@ -86,8 +86,13 @@ export const LeadMatchCard: React.FC<LeadMatchCardProps> = ({
         </View>
 
         <Text style={styles.priceRange}>
-          {formatCompactPrice(minPrice)} - {formatCompactPrice(maxPrice)}{" "}
-          {currencyDisplay}
+          {minPrice > 0 && maxPrice > 0
+            ? `${formatCompactPrice(minPrice)} - ${formatCompactPrice(maxPrice)} ${currencyDisplay}`
+            : minPrice > 0
+              ? `Desde ${formatCompactPrice(minPrice)} ${currencyDisplay}`
+              : maxPrice > 0
+                ? `Hasta ${formatCompactPrice(maxPrice)} ${currencyDisplay}`
+                : "Sin rango de precio"}
         </Text>
 
         <View style={styles.statusRow}>

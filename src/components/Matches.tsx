@@ -410,8 +410,8 @@ const Matches: React.FC = () => {
           matches: [],
           properties: [],
           latestMatchDate: search.created_at, // Usar fecha de creación de búsqueda por defecto
-          minPrice: search.precio_min || 0,
-          maxPrice: search.precio_max || 0,
+          minPrice: Number(search.precio_min || (search as any).criterios_busqueda?.precio_min || 0) || 0,
+          maxPrice: Number(search.precio_max || (search as any).criterios_busqueda?.precio_max || 0) || 0,
           currency: search.moneda || search.monera || "MXN",
           matchCount: 0,
           similarCount: 0,
@@ -459,8 +459,8 @@ const Matches: React.FC = () => {
           matches: [],
           properties: [],
           latestMatchDate: match.created_at,
-          minPrice: match.busqueda?.precio_min || 0,
-          maxPrice: match.busqueda?.precio_max || 0,
+          minPrice: Number(match.busqueda?.precio_min || match.busqueda?.criterios_busqueda?.precio_min || 0) || 0,
+          maxPrice: Number(match.busqueda?.precio_max || match.busqueda?.criterios_busqueda?.precio_max || 0) || 0,
           currency: match.busqueda?.moneda || match.busqueda?.monera || "MXN",
           matchCount: 0,
           similarCount: 0,
@@ -620,14 +620,8 @@ const Matches: React.FC = () => {
 
     // Convertir a array y ordenar por fecha más reciente
     const result = Array.from(grouped.values()).sort((a, b) => {
-      const aHasMatches = a.matches.length > 0;
-      const bHasMatches = b.matches.length > 0;
-
-      // 1. Primero: Los que tienen matches
-      if (aHasMatches && !bHasMatches) return -1;
-      if (!aHasMatches && bHasMatches) return 1;
-
-      // 2. Dentro de cada grupo, ordenar por fecha más reciente
+      // REV16: lo mas reciente arriba. Antes las busquedas sin coincidencias iban siempre al final, por eso una
+      // busqueda nueva (aun sin matches) aparecia de ultima.
       const aDate = new Date(a.latestMatchDate).getTime();
       const bDate = new Date(b.latestMatchDate).getTime();
 

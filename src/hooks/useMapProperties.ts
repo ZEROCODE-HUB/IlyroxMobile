@@ -342,7 +342,8 @@ async function fetchMapProperties(
     if (serverFilters.accesoCarretera) query = query.eq("acceso_carretera", true);
     if (serverFilters.accesoCamiones) query = query.eq("acceso_camiones", true);
 
-    query = query.limit(3000);
+    // REV16: con orden definido, cuando hay mas filas de las que devuelve el servidor se conservan las mas recientes.
+    query = query.order("created_at", { ascending: false }).limit(3000);
   } else {
     // Sin filtros: 500 más recientes para rendimiento de browsing
     query = query.limit(500).order("created_at", { ascending: false });
@@ -377,6 +378,10 @@ export function useMapProperties(serverFilters?: MapServerFilters) {
     staleTime: filterKey === "default" ? 5 * 60 * 1000 : 60 * 1000,
     gcTime: 10 * 60 * 1000,
     placeholderData: keepPreviousData,
+    // REV16: un fallo momentaneo de red/servidor se reintenta (antes 1 vez) en lugar de mostrar 0 resultados.
+    retry: 3,
+    retryDelay: (n: number) => Math.min(1000 * 2 ** n, 8000),
+    refetchOnReconnect: true,
   });
 }
 
