@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Dimensions } from "react-native";
+import { View, Text, StyleSheet, Dimensions, Alert, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
@@ -190,30 +190,18 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
         )}
 
         {isOwnProfile && !!reportInfo && (
-          <View
+          <Pressable
+            onPress={() =>
+              Alert.alert(
+                "Tu aviso ha sido reportado",
+                `Motivo: ${reportInfo.motivo}${reportInfo.total > 1 ? `\n(${reportInfo.total} reportes)` : ""}\n\nAbre la propiedad para ver el detalle.`,
+              )
+            }
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={{
               position: "absolute",
-              top: 30,
+              top: 32,
               left: 6,
-              right: 6,
-              backgroundColor: "#F5C518",
-              borderRadius: 4,
-              paddingHorizontal: 4,
-              paddingVertical: 2,
-            }}
-          >
-            <Text style={{ fontSize: 9, fontWeight: "700", color: "#3b2f00" }} numberOfLines={2}>
-              Tu aviso ha sido reportado: {reportInfo.motivo}
-            </Text>
-          </View>
-        )}
-
-        {isOwnProfile && !!reportInfo && (
-          <View
-            style={{
-              position: "absolute",
-              top: 6,
-              right: 36,
               width: 24,
               height: 24,
               borderRadius: 12,
@@ -223,7 +211,7 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
             }}
           >
             <Ionicons name="warning" size={15} color="#3b2f00" />
-          </View>
+          </Pressable>
         )}
 
         {isOwnProfile && (

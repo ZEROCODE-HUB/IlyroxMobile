@@ -981,7 +981,39 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
 
       // Mostrar las sugerencias de inmediato (y quitar el spinner); el conteo
       // se rellena después sin bloquear la UI.
-      set({ suggestions: ranked });
+      // REV21: cuando el municipio (la capital) se llama igual que su estado ("Aguascalientes, Aguascalientes") solo se
+      // ofrecia el municipio y las propiedades de otros municipios del estado (p. ej. Jesus Maria) no se podian buscar.
+      // Se agrega, justo debajo, la opcion del estado completo (si Google no la trajo ya). No toca el resto de la lista.
+      let visibles = ranked;
+      try {
+        const capitalIdx = ranked.findIndex(
+          (s) =>
+            s.type === "municipio" &&
+            !!s.estado_nombre &&
+            normalizeForMatch(s.name) === normalizeForMatch(s.estado_nombre),
+        );
+        if (capitalIdx >= 0) {
+          const cap = ranked[capitalIdx];
+          const key = normalizeForMatch(cap.name);
+          const yaHayEstado = ranked.some((s) => s.type === "estado" && normalizeForMatch(s.name) === key);
+          if (!yaHayEstado) {
+            const estadoItem: LocationSuggestionWithCount = {
+              placeId: `estado-${key}`,
+              name: cap.name,
+              secondaryText: "",
+              fullDescription: `Todo el estado de ${cap.name}`,
+              type: "estado",
+              types: ["administrative_area_level_1"],
+              estado_id: 0,
+            };
+            visibles = [...ranked.slice(0, capitalIdx + 1), estadoItem, ...ranked.slice(capitalIdx + 1)];
+          }
+        }
+      } catch (e) {
+        log.warn("No se pudo agregar la opcion de estado completo:", e);
+        visibles = ranked;
+      }
+      set({ suggestions: visibles });
 
       // Conteo de propiedades por zona (diferido, no bloquea la UI).
       // Se cuenta usando la JERARQUÍA de la sugerencia (nombre + municipio +

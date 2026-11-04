@@ -53,6 +53,7 @@ export const propertyService = {
           habitaciones,
           banos,
           medios_banos,
+          pisos,
           metros_cuadrados_construccion,
           metros_cuadrados_terreno,
           activo,
@@ -150,6 +151,7 @@ export const propertyService = {
           halfBaths: p.medios_banos || 0,
           constructionSqft: p.metros_cuadrados_construccion || 0,
           landSqft: p.metros_cuadrados_terreno || 0,
+          floors: p.pisos || undefined,
         },
         amenities: (p.amenidades?.map((a: any) => a.amenidad.nombre) || []) as Property["amenities"],
         // Mantener estructura de BD para PropertyDetail (que espera amenidades.map(a => a.amenidad.nombre))
