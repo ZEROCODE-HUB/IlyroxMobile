@@ -112,6 +112,8 @@ export default React.forwardRef<TextInput, MessageInputProps>(
                 : ImagePicker.MediaTypeOptions.Images,
           allowsEditing: false,
           quality: 0.8,
+          // REV22: videos del iPhone (HEVC/HDR) a H.264 720p: pesan mucho menos y se ven en cualquier telefono.
+          videoExportPreset: ImagePicker.VideoExportPreset.H264_1280x720,
         });
 
         if (!result.canceled && result.assets[0]) {

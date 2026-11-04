@@ -210,6 +210,9 @@ export default function CreateReel({ onBack, reelId, onUpdated }: CreateReelProp
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
       allowsEditing: true,
       quality: 0.8,
+      // REV22: el iPhone graba en HEVC/HDR y pesa mucho (la subida se agotaba y el video salia negro). En iOS se convierte
+      // a H.264 720p al elegirlo, igual que el servidor lo deja. En Android esta opcion se ignora.
+      videoExportPreset: ImagePicker.VideoExportPreset.H264_1280x720,
       videoMaxDuration: 60, // Máximo 60 segundos
     });
 
@@ -371,6 +374,10 @@ export default function CreateReel({ onBack, reelId, onUpdated }: CreateReelProp
             multiline
             maxLength={2500}
             numberOfLines={6}
+            // REV22: alto acotado con scroll interno. Antes, en iPhone, un texto largo pegado hacia crecer el campo hasta
+            // salirse de la pantalla y el cursor quedaba detras del teclado.
+            scrollEnabled
+            inputStyle={{ minHeight: 110, maxHeight: 180, textAlignVertical: "top" }}
             helperText={`${description.length}/2500`}
           />
         </View>
