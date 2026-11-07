@@ -125,6 +125,7 @@ export const GravamenFinancingSection = React.memo(
                   label={`Monto — ${inst} (opcional)`}
                   placeholder="0.00"
                   keyboardType="numeric"
+                  miles
                   value={montosGravamen[inst] || ""}
                   onChangeText={(text) =>
                     handleCurrencyChange(text, (val) =>

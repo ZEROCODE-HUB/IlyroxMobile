@@ -69,6 +69,7 @@ const ERROR_ANCHOR: Record<string, string> = {
   tipoOperacion: "tipoOperacion",
   precioVenta: "precioVenta",
   precioRenta: "precioRenta",
+  tipoUbicacionComercial: "tipoUbicacionComercial",
   estado: "estado",
   municipio: "estado",
   m2: "m2",

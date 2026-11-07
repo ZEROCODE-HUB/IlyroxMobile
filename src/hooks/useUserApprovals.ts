@@ -15,6 +15,19 @@ import { User } from "../types";
 import { useToast } from "../context/ToastContext";
 import { logger } from "@/utils/logger";const log = logger.scoped("useUserApprovals");
 
+// REV23: evita doble envio (doble toque) y registra el error real cuando falla una aprobacion/rechazo.
+const enVuelo = new Set<string>();
+async function registrarFalloAprobacion(accion: string, aprobador: string, solicitante: string, e: any) {
+  try {
+    await supabase.from("debug_logs").insert({
+      contexto: "aprobar_usuario",
+      payload: { accion, aprobador, solicitante, code: e?.code, message: e?.message, details: e?.details, hint: e?.hint },
+    });
+  } catch {
+    /* sin efecto */
+  }
+}
+
 interface PendingUser extends User {
   aprobaciones_recibidas: number;
   aprobaciones_requeridas: number;
@@ -113,6 +126,8 @@ export function useUserApprovals(
   const approveUser = useCallback(
     async (userId: string): Promise<boolean> => {
       if (!currentUserId) return false;
+      if (enVuelo.has(`${currentUserId}:${userId}`)) return true;
+      enVuelo.add(`${currentUserId}:${userId}`);
 
       // 1. Guardar estado anterior para rollback
       const previousUsers = [...pendingUsers];
@@ -131,10 +146,12 @@ export function useUserApprovals(
           tipo_aprobacion: "aprobado",
         });
 
-        if (error) throw error;
+        // 23505 = ya habias aprobado a esta persona: es exito, no error.
+        if (error && (error as any).code !== "23505") throw error;
 
         return true;
       } catch (error) {
+        registrarFalloAprobacion("aprobar", currentUserId, userId, error);
         // 5. Rollback: Restaurar usuario en la lista
         setPendingUsers(previousUsers);
 
@@ -142,6 +159,8 @@ export function useUserApprovals(
         showToast("Error al enviar aprobación", "error");
 
         return false;
+      } finally {
+        enVuelo.delete(`${currentUserId}:${userId}`);
       }
     },
     [currentUserId, pendingUsers, showToast],
@@ -171,10 +190,11 @@ export function useUserApprovals(
           tipo_aprobacion: "rechazado",
         });
 
-        if (error) throw error;
+        if (error && (error as any).code !== "23505") throw error;
 
         return true;
       } catch (error) {
+        registrarFalloAprobacion("rechazar", currentUserId, userId, error);
         // 5. Rollback: Restaurar usuario en la lista
         setPendingUsers(previousUsers);
 

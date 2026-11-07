@@ -168,7 +168,7 @@ function buildNotificationNavigation(
       return () =>
         router.push({
           pathname: "/(stack)/property/[id]",
-          params: { id: data.propiedad_id },
+          params: { id: data.propiedad_id, ...(data.motivo ? { motivo: String(data.motivo) } : {}) },
         });
 
     case "ProfileReviews":

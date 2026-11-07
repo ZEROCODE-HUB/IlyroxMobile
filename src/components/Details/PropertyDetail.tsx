@@ -66,6 +66,8 @@ interface PropertyDetailProps {
   highlightCommentIds?: string[];
   /** Auto-abrir el sheet de comentarios (desde notificación). */
   autoOpenComments?: boolean;
+  /** REV24: motivo del reporte que llega en la notificacion, para mostrarlo al instante mientras carga el detalle. */
+  motivoReporte?: string;
 }
 
 
@@ -81,6 +83,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
   highlightUserIds,
   highlightCommentIds,
   autoOpenComments,
+  motivoReporte,
 }) => {
   const handleClose = onClose ?? (() => router.back());
 
@@ -120,19 +123,26 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
 
   // REV19: el dueno ve en la ficha el aviso amarillo con el detalle de los reportes de su propiedad.
   const [reportesDueno, setReportesDueno] = useState<any[]>([]);
+  const [reportesListos, setReportesListos] = useState(false);
   const duenoId = (propertyDetails as any)?.created_by;
   useEffect(() => {
-    if (!user?.id || !propertyId || !duenoId || user.id !== duenoId) {
+    // REV24: los reportes los ve cualquier asesor y se piden en cuanto se abre la ficha (sin esperar los datos de la propiedad).
+    if (!propertyId) {
       setReportesDueno([]);
       return;
     }
     let vivo = true;
     reportService
-      .getReports(propertyId)
+      .getReportsDetailed(propertyId)
       .then((r) => {
-        if (vivo) setReportesDueno(r ?? []);
+        if (vivo) {
+          setReportesDueno(r ?? []);
+          setReportesListos(true);
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (vivo) setReportesListos(true);
+      });
     return () => {
       vivo = false;
     };
@@ -391,7 +401,7 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
               )}
             </View>
 
-            {isPropertyOwner && reportesDueno.length > 0 && (
+            {(reportesDueno.length > 0 || (!!motivoReporte && !reportesListos)) && (
               <View
                 style={{
                   backgroundColor: "#FFF4C2",
@@ -405,14 +415,21 @@ const PropertyDetail: React.FC<PropertyDetailProps> = ({
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Ionicons name="warning" size={20} color="#B7791F" />
                   <Text style={{ marginLeft: 6, fontWeight: "700", color: "#3b2f00" }}>
-                    Tu aviso ha sido reportado ({reportesDueno.length})
+                    {isPropertyOwner ? "Tu aviso ha sido reportado" : "Esta propiedad ha sido reportada"} ({Math.max(reportesDueno.length, 1)})
                   </Text>
                 </View>
+                {reportesDueno.length === 0 && !reportesListos && !!motivoReporte && (
+                  <Text style={{ marginTop: 6, color: "#3b2f00" }}>
+                    {"- "}
+                    {motivoReporte}
+                  </Text>
+                )}
                 {reportesDueno.map((r: any, i: number) => (
                   <Text key={i} style={{ marginTop: 6, color: "#3b2f00" }}>
                     {"- "}
                     {r.motivo}
                     {r.descripcion ? `: ${r.descripcion}` : ""}
+                    {r.reportante ? ` (reportó: ${r.reportante})` : ""}
                   </Text>
                 ))}
               </View>

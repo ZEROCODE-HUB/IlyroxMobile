@@ -85,6 +85,7 @@ export const IndustrialSection = React.memo(function IndustrialSection() {
             label="Área Operativa (m²)"
             placeholder="Opcional"
             keyboardType="decimal-pad"
+            miles
             value={areaOficinas}
             onChangeText={setAreaOficinas}
           />
@@ -94,6 +95,7 @@ export const IndustrialSection = React.memo(function IndustrialSection() {
             label="Patio de Maniobras (m²)"
             placeholder="Opcional"
             keyboardType="decimal-pad"
+            miles
             value={patioManiobras}
             onChangeText={setPatioManiobras}
           />

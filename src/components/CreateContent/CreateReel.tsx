@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Modal,
   Image,
+  Platform,
 } from "react-native";
 import {
   KeyboardProvider,
@@ -147,6 +148,8 @@ export default function CreateReel({ onBack, reelId, onUpdated }: CreateReelProp
   const [thumbnailUri, setThumbnailUri] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [, setLoadingReel] = useState(false);
+  // REV24: mientras el telefono reduce el peso del video antes de subirlo (Android).
+  const [preparando, setPreparando] = useState(false);
 
   const uploading = uploadingVideo || creatingReel;
 
@@ -213,10 +216,16 @@ export default function CreateReel({ onBack, reelId, onUpdated }: CreateReelProp
       // REV22: el iPhone graba en HEVC/HDR y pesa mucho (la subida se agotaba y el video salia negro). En iOS se convierte
       // a H.264 720p al elegirlo, igual que el servidor lo deja. En Android esta opcion se ignora.
       videoExportPreset: ImagePicker.VideoExportPreset.H264_1280x720,
-      videoMaxDuration: 60, // Máximo 60 segundos
+      videoMaxDuration: 180, // REV23: máximo 3 minutos
     });
 
     if (!result.canceled && result.assets[0]) {
+      // REV24: tope de 3 minutos, tambien en Android (el selector del sistema no siempre lo aplica).
+      const durMs = Number((result.assets[0] as any).duration) || 0;
+      if (durMs > 180000 + 500) {
+        showToast("El video dura más de 3 minutos. Elige uno más corto.", "error", 4000);
+        return;
+      }
       const videoUri = result.assets[0].uri;
       setVideoUri(videoUri);
 
@@ -258,7 +267,27 @@ export default function CreateReel({ onBack, reelId, onUpdated }: CreateReelProp
 
     try {
       // 1. Subir video al servicio (ahora nos devuelve videoUrl y thumbnailUrl)
-      const uploadResult = await uploadVideo(videoUri);
+      // REV24: en Android el video se comprime en el telefono (720p, ~1.5 Mbps) antes de subirlo: pesa mucho menos,
+      // sube mas rapido y carga mas ligero en el feed. En iPhone ya se convierte al elegirlo. Si falla, se sube el original.
+      let uriParaSubir = videoUri;
+      if (Platform.OS === "android" && !videoUri.startsWith("http")) {
+        setPreparando(true);
+        try {
+          const { Video } = require("react-native-compressor");
+          const comprimido = await Video.compress(videoUri, {
+            compressionMethod: "manual",
+            maxSize: 1280,
+            bitrate: 1500000,
+            minimumFileSizeForCompress: 5,
+          });
+          if (comprimido) uriParaSubir = comprimido;
+        } catch (e) {
+          log.warn("No se pudo comprimir el video, se sube el original:", e);
+        } finally {
+          setPreparando(false);
+        }
+      }
+      const uploadResult = await uploadVideo(uriParaSubir);
 
       if (!uploadResult) {
         showToast("No se pudo subir el video. Intenta de nuevo.", "error");
@@ -400,7 +429,7 @@ export default function CreateReel({ onBack, reelId, onUpdated }: CreateReelProp
       </View>
 
       {/* Modal de Progreso */}
-      <Modal visible={uploading} transparent>
+      <Modal visible={uploading || preparando} transparent>
         <View style={styles.uploadModalOverlay}>
           <View style={styles.uploadModalContent}>
             {Math.min(uploadProgress, 100) >= 100 ? (
@@ -413,14 +442,18 @@ export default function CreateReel({ onBack, reelId, onUpdated }: CreateReelProp
               <ActivityIndicator size="large" color={COLORS.primary} />
             )}
             <Text style={styles.uploadModalTitle}>
-              {Math.min(uploadProgress, 100) >= 100
+              {preparando
+                ? "Preparando video..."
+                : Math.min(uploadProgress, 100) >= 100
                 ? "¡Completado!"
                 : uploadProgress >= 99
                   ? "Procesando Video..."
                   : "Subiendo Video..."}
             </Text>
             <Text style={styles.uploadModalSubtitle}>
-              {uploadProgress >= 99 && uploadProgress < 100
+              {preparando
+                ? "Reduciendo el peso del video, puede tardar un poco"
+                : uploadProgress >= 99 && uploadProgress < 100
                 ? "Esto puede tardar unos segundos"
                 : `${Math.min(uploadProgress, 100)}%`}
             </Text>

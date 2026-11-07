@@ -525,6 +525,10 @@ export function usePropertyForm(
     if (state.precioRenta.trim()) clearError("precioRenta");
   }, [state.precioRenta, clearError]);
 
+  useEffect(() => {
+    if (state.tipoUbicacionComercial) clearError("tipoUbicacionComercial");
+  }, [state.tipoUbicacionComercial, clearError]);
+
   // PIN del mapa: limpia el error si entra en la zona escrita; lo marca en vivo
   // si queda fuera (sin esperar al submit). Si no hay PIN aún, el caso lo cubre
   // validate(). Sin bounds, pinDentroDeZona devuelve true (no se valida).
@@ -1064,6 +1068,14 @@ export function usePropertyForm(
       !state.petFriendly
     )
       newErrors.petFriendly = "Indica si se permiten mascotas";
+
+    // REV24: en locales y terrenos comerciales, "dentro / fuera de plaza" es obligatorio; sin el dato el filtro de plaza no encuentra la propiedad.
+    if (
+      state.tipoPrincipal === "comercial" &&
+      (esTerreno(state.subtipo) || ([] as any[]).concat(state.subtipo as any).some((s) => /^local/i.test(String(s).trim()))) &&
+      !state.tipoUbicacionComercial
+    )
+      newErrors.tipoUbicacionComercial = "Indica si está dentro o fuera de plaza";
 
     // 5) Comisión: no tiene sentido compartir 0% (venta) ni 0 meses (renta).
     const comisionVentaNum = parseFloat(state.comisionValor) || 0;

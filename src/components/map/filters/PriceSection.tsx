@@ -64,6 +64,7 @@ export const PriceSection: React.FC<PriceSectionProps> = ({
               }
             }}
             keyboardType="numeric"
+            miles
             placeholder="0"
           />
         </View>
@@ -81,6 +82,7 @@ export const PriceSection: React.FC<PriceSectionProps> = ({
               }
             }}
             keyboardType="numeric"
+            miles
             placeholder="Sin límite"
           />
         </View>

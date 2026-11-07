@@ -5,6 +5,7 @@ import { COLORS } from "../../../constants/colors";
 import { TIPOS_UBICACION_COMERCIAL, esTerreno } from "../../../constants/propertyData";
 import { AppInput } from "../../../design-system/components/AppInput";
 import RadioGroupSelector from "../../common/RadioGroupSelector";
+import { FieldAnchor } from "./fieldAnchors";
 import { usePropertyFormContext } from "./PropertyFormContext";
 
 export const ComercialSection = React.memo(function ComercialSection() {
@@ -12,6 +13,7 @@ export const ComercialSection = React.memo(function ComercialSection() {
     subtipo,
     tipoUbicacionComercial,
     setTipoUbicacionComercial,
+    errors,
     nivelPiso,
     setNivelPiso,
     sobreAvenidaPrincipal,
@@ -36,12 +38,15 @@ export const ComercialSection = React.memo(function ComercialSection() {
       </View>
 
       {/* TIPO DE UBICACIÓN */}
-      <RadioGroupSelector
-        label="Tipo de Ubicación"
-        options={[...TIPOS_UBICACION_COMERCIAL]}
-        selectedValue={tipoUbicacionComercial}
-        onSelect={setTipoUbicacionComercial}
-      />
+      <FieldAnchor name="tipoUbicacionComercial">
+        <RadioGroupSelector
+          label={`Tipo de Ubicación${isTerreno || ([] as any[]).concat(subtipo as any).some((x) => /^local/i.test(String(x).trim())) ? " *" : ""}`}
+          options={[...TIPOS_UBICACION_COMERCIAL]}
+          selectedValue={tipoUbicacionComercial}
+          onSelect={setTipoUbicacionComercial}
+          error={errors.tipoUbicacionComercial}
+        />
+      </FieldAnchor>
 
       {/* NIVEL DE PISO — no aplica a terrenos (el frente/fondo va en Características Físicas) */}
       {!isTerreno && (

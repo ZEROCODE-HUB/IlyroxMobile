@@ -540,6 +540,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
                       label="Mínimo"
                       placeholder="Ej. 1,000,000"
                       keyboardType="numeric"
+                      miles
                       value={precioMin}
                       onChangeText={(t) => handleCurrencyChange(t, setPrecioMin)}
                     />
@@ -549,6 +550,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
                       label="Máximo"
                       placeholder="Sin límite"
                       keyboardType="numeric"
+                      miles
                       value={precioMax}
                       onChangeText={(t) => handleCurrencyChange(t, setPrecioMax)}
                     />
@@ -565,6 +567,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
                       label="Mínimo"
                       placeholder="Ej. 8,000"
                       keyboardType="numeric"
+                      miles
                       value={precioRentaMin}
                       onChangeText={(t) => handleCurrencyChange(t, setPrecioRentaMin)}
                     />
@@ -574,6 +577,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
                       label="Máximo"
                       placeholder="Sin límite"
                       keyboardType="numeric"
+                      miles
                       value={precioRentaMax}
                       onChangeText={(t) => handleCurrencyChange(t, setPrecioRentaMax)}
                     />
@@ -717,6 +721,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
                       label="m² terreno mín."
                       placeholder="Ej. 200"
                       keyboardType="numeric"
+                      miles
                       value={m2Terreno}
                       onChangeText={(t) => handleCurrencyChange(t, setM2Terreno)}
                     />
@@ -728,6 +733,7 @@ export const PublishSearchPostModal: React.FC<PublishSearchPostModalProps> = ({
                       label="m² construcción mín."
                       placeholder="Ej. 150"
                       keyboardType="numeric"
+                      miles
                       value={m2Construccion}
                       onChangeText={(t) => handleCurrencyChange(t, setM2Construccion)}
                     />

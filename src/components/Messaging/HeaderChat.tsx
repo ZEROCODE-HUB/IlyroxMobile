@@ -10,6 +10,7 @@ import TagsModal from "./TagsModal";
 import CreateAppointmentModal from "../Appointments/CreateAppointmentModal";
 import { useRouter } from "expo-router";
 import { GoogleCalendarIcon } from "../shared/GoogleCalendarIcon";
+import { supabase } from "../../lib/supabase";
 
 export default function HeaderChat({
   onBack,
@@ -30,6 +31,25 @@ export default function HeaderChat({
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const router = useRouter();
+
+  // REV23: solo quien publico la propiedad puede enviar invitaciones (citas); el resto no ve el calendario.
+  const [esDueno, setEsDueno] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    setEsDueno(false);
+    if (!propertyId || !userId) return;
+    supabase
+      .from("propiedades")
+      .select("created_by")
+      .eq("id", propertyId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (vivo) setEsDueno(!!data && data.created_by === userId);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [propertyId, userId]);
 
   const {
     tags,
@@ -154,7 +174,7 @@ export default function HeaderChat({
         </TouchableOpacity>
       )}
 
-      {propertyId && (
+      {propertyId && esDueno && (
         <TouchableOpacity
           onPress={() => setShowAppointmentModal(true)}
           style={styles.headerButton}
@@ -184,7 +204,7 @@ export default function HeaderChat({
         />
       )}
 
-      {showAppointmentModal && propertyId && (
+      {showAppointmentModal && propertyId && esDueno && (
         <CreateAppointmentModal
           visible={showAppointmentModal}
           onClose={() => setShowAppointmentModal(false)}

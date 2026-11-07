@@ -68,6 +68,7 @@ export const ComercialFiltersSection: React.FC<ComercialFiltersSectionProps> = (
             label="Frente mínimo (m)"
             placeholder="ej. 10"
             keyboardType="decimal-pad"
+            miles
             value={cf.frenteMin}
             onChangeText={(v) => updateComercialFilter("frenteMin", v)}
           />

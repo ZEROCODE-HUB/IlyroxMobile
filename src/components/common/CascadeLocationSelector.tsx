@@ -26,6 +26,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/colors";
 import { searchPlaces, getPlaceDetails, reverseGeocode, derivePlaceType, type PlaceSuggestion, type GeoBounds } from "../../lib/geocodingService";
 import { getCountryConfig, DEFAULT_COUNTRY } from "../../lib/location/registry";
+import { priorizarEstado } from "../../lib/location/estadoFirst";
 import type { CountryCode } from "../../lib/location/types";
 
 export interface LocationData {
@@ -114,10 +115,13 @@ export default function CascadeLocationSelector({
 
   // Debounce para el autocompletado
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // REV24: numero de la busqueda vigente; una respuesta lenta de una busqueda anterior no pisa a la nueva.
+  const busquedaRef = useRef(0);
 
   const handleQueryChange = useCallback((text: string) => {
     setQuery(text);
     setIsSelected(false);
+    busquedaRef.current += 1;
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (text.trim().length < 2) {
@@ -128,8 +132,12 @@ export default function CascadeLocationSelector({
     debounceRef.current = setTimeout(async () => {
       setIsLoading(true);
       try {
+        const miBusqueda = busquedaRef.current;
         const results = await searchPlaces(text, sessionTokenRef.current);
-        setSuggestions(results.slice(0, 8));
+        // REV24: estado primero, igual que el buscador general.
+        const ordenados = await priorizarEstado(text, results, sessionTokenRef.current);
+        if (miBusqueda !== busquedaRef.current) return;
+        setSuggestions(ordenados.slice(0, 8));
       } catch {
         setSuggestions([]);
       } finally {

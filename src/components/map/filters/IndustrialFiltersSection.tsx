@@ -112,6 +112,7 @@ export const IndustrialFiltersSection: React.FC<IndustrialFiltersSectionProps> =
             label="Área Ofic. mín. (m²)"
             placeholder="Opcional"
             keyboardType="decimal-pad"
+            miles
             value={inf.areaOficinasMin}
             onChangeText={(v) => updateIndustrialFilter("areaOficinasMin", v)}
           />
@@ -121,6 +122,7 @@ export const IndustrialFiltersSection: React.FC<IndustrialFiltersSectionProps> =
             label="Patio Maniob. mín. (m²)"
             placeholder="Opcional"
             keyboardType="decimal-pad"
+            miles
             value={inf.patioManiobrasMin}
             onChangeText={(v) => updateIndustrialFilter("patioManiobrasMin", v)}
           />

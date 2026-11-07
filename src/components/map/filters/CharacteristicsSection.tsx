@@ -278,6 +278,7 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
                   value={filters.m2TerrenoMin}
                   onChangeText={(val) => onUpdateFilter("m2TerrenoMin", val)}
                   keyboardType="numeric"
+                  miles
                   placeholder="Mínimo"
                 />
               </View>
@@ -289,6 +290,7 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
                   value={filters.m2ConstruccionMin}
                   onChangeText={(val) => onUpdateFilter("m2ConstruccionMin", val)}
                   keyboardType="numeric"
+                  miles
                   placeholder="Mínimo"
                 />
               </View>
@@ -304,6 +306,7 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
                   value={filters.anchoTerrenoMin}
                   onChangeText={(val) => onUpdateFilter("anchoTerrenoMin", val)}
                   keyboardType="numeric"
+                  miles
                   placeholder="Mínimo"
                 />
               </View>
@@ -313,6 +316,7 @@ export const CharacteristicsSection: React.FC<CharacteristicsSectionProps> = ({
                   value={filters.largoTerrenoMin}
                   onChangeText={(val) => onUpdateFilter("largoTerrenoMin", val)}
                   keyboardType="numeric"
+                  miles
                   placeholder="Mínimo"
                 />
               </View>

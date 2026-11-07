@@ -341,6 +341,7 @@ export const PhysicalFeaturesSection = React.memo(
                   label="m² Construidos *"
                   placeholder="m²"
                   keyboardType="numeric"
+                  miles
                   value={m2Construccion || ""}
                   onChangeText={(text) => {
                     setM2Construccion(formatThousands(text));
@@ -359,6 +360,7 @@ export const PhysicalFeaturesSection = React.memo(
                   label={`m² Terreno ${esTerreno(subtipo) ? "*" : ""}`}
                   placeholder="m²"
                   keyboardType="numeric"
+                  miles
                   value={m2Terreno || ""}
                   onChangeText={(text) => {
                     setM2Terreno(formatThousands(text));
@@ -384,6 +386,7 @@ export const PhysicalFeaturesSection = React.memo(
                 label="Frente (m)"
                 placeholder="Opcional"
                 keyboardType="numeric"
+                miles
                 value={anchoTerreno || ""}
                 onChangeText={(text) => setAnchoTerreno(formatThousands(text))}
               />
@@ -393,6 +396,7 @@ export const PhysicalFeaturesSection = React.memo(
                 label="Fondo (m)"
                 placeholder="Opcional"
                 keyboardType="numeric"
+                miles
                 value={largoTerreno || ""}
                 onChangeText={(text) => setLargoTerreno(formatThousands(text))}
               />
@@ -406,6 +410,7 @@ export const PhysicalFeaturesSection = React.memo(
             label="Mantenimiento mensual (opcional)"
             placeholder="ej. 1,500"
             keyboardType="numeric"
+            miles
             value={costoMantenimiento || ""}
             onChangeText={(text) => setCostoMantenimiento(formatThousands(text))}
           />

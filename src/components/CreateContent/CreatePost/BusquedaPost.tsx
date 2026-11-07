@@ -236,6 +236,7 @@ export const BusquedaPost = ({
                 label="Precio Mínimo"
                 placeholder="Ej. 1,000,000"
                 keyboardType="numeric"
+                miles
                 value={precioMin}
                 onChangeText={(t) => handleCurrencyChange(t, setPrecioMin)}
               />
@@ -245,6 +246,7 @@ export const BusquedaPost = ({
                 label="Precio Máximo"
                 placeholder="Ej. 5,000,000"
                 keyboardType="numeric"
+                miles
                 value={precioMax}
                 onChangeText={(t) => handleCurrencyChange(t, setPrecioMax)}
               />
@@ -349,6 +351,7 @@ export const BusquedaPost = ({
                   label="m² Terreno (mín.)"
                   placeholder="Ej. 120"
                   keyboardType="numeric"
+                  miles
                   value={m2Terreno}
                   onChangeText={setM2Terreno}
                 />
@@ -360,6 +363,7 @@ export const BusquedaPost = ({
                   label="m² Construcción (mín.)"
                   placeholder="Ej. 80"
                   keyboardType="numeric"
+                  miles
                   value={m2Construccion}
                   onChangeText={setM2Construccion}
                 />

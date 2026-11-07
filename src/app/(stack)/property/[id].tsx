@@ -8,7 +8,7 @@ import {
 import { normalizePropertyData } from "@/utils/normalizePropertyData";
 
 export default function PropertyDetailScreen() {
-  const { id, imageIndex, highlightUserId, highlightUserIds, highlightCommentIds } =
+  const { id, imageIndex, highlightUserId, highlightUserIds, highlightCommentIds, motivo } =
     useLocalSearchParams();
   const cache = usePropertyCacheStore((state) => state.cache);
 
@@ -46,6 +46,7 @@ export default function PropertyDetailScreen() {
       highlightUserIds={highlightUserIdsFinal}
       highlightCommentIds={parsedHighlightCommentIds}
       autoOpenComments={shouldAutoOpenComments}
+      motivoReporte={typeof motivo === "string" ? motivo : undefined}
     />
   );
 }

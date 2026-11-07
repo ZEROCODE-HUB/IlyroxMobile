@@ -208,6 +208,40 @@ export async function uploadMultipleImages(
   return await Promise.all(uploadPromises);
 }
 
+/** Deja constancia (tabla debug_logs, contexto upload_video) de por que fallo la subida de un VIDEO; sin datos personales. */
+function registrarFalloVideo(
+  uri: string,
+  error: unknown,
+  extra: { fase: string; status?: number; bytes?: number; segundos?: number },
+) {
+  try {
+    const ext = (uri.split("?")[0].split(".").pop() || "").toLowerCase().slice(0, 6);
+    const e = error as { message?: string } | null;
+    supabase
+      .from("debug_logs")
+      .insert({
+        contexto: "upload_video",
+        payload: {
+          mensaje: String(e?.message ?? error).slice(0, 300),
+          fase: extra.fase,
+          estado: extra.status ?? null,
+          mb: extra.bytes ? Math.round((extra.bytes / 1048576) * 10) / 10 : null,
+          segundos: extra.segundos ?? null,
+          ext,
+          plataforma: Platform.OS,
+          version: String(Platform.Version),
+          ts: new Date().toISOString(),
+        },
+      })
+      .then(
+        () => {},
+        () => {},
+      );
+  } catch {
+    // diagnostico: nunca debe afectar la subida
+  }
+}
+
 export async function uploadVideo(
   uri: string,
   onProgress?: (progress: number) => void,
@@ -227,9 +261,20 @@ export async function uploadVideo(
     return new Promise((resolve, reject) => {
       const startTime = Date.now();
       const xhr = new XMLHttpRequest();
+      let totalBytes = 0;
+      const fallar = (fase: string, e: unknown, status?: number) => {
+        registrarFalloVideo(uri, e, {
+          fase,
+          status,
+          bytes: totalBytes,
+          segundos: Math.round((Date.now() - startTime) / 1000),
+        });
+        reject(new MediaUnavailableError(e));
+      };
       log.debug(`🚀 Starting video upload and processing...`);
 
       xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) totalBytes = event.total;
         if (event.lengthComputable && onProgress) {
           const percentComplete = (event.loaded / event.total) * 100;
           onProgress(percentComplete);
@@ -242,7 +287,7 @@ export async function uploadVideo(
             log.debug(`✅ Video processed successfully in ${duration}s`);
             const response = JSON.parse(xhr.responseText);
             if (!(response.videoUrl || response.video_url)) {
-              reject(new MediaUnavailableError(new Error("Response without videoUrl")));
+              fallar("sin_url", new Error("Response without videoUrl"), xhr.status);
               return;
             }
             resolve({
@@ -253,22 +298,22 @@ export async function uploadVideo(
             log.error(
               `❌ Upload failed after ${duration}s with status ${xhr.status}: ${xhr.responseText}`,
             );
-            reject(new MediaUnavailableError(new Error(`HTTP ${xhr.status}`)));
+            fallar("http", new Error(`HTTP ${xhr.status}: ${String(xhr.responseText).slice(0, 120)}`), xhr.status);
           }
         } catch (e: any) {
           log.error(`❌ Error parsing server response after ${duration}s:`, e);
-          reject(new MediaUnavailableError(e));
+          fallar("respuesta", e, xhr.status);
         }
       });
       xhr.addEventListener("error", () => {
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
         log.error(`❌ Network error after ${duration}s`);
-        reject(new MediaUnavailableError(new Error("network")));
+        fallar("red", new Error("network"));
       });
       xhr.addEventListener("timeout", () => {
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
         log.error(`❌ Timeout after ${duration}s`);
-        reject(new MediaUnavailableError(new Error("timeout")));
+        fallar("timeout", new Error("timeout"));
       });
       xhr.addEventListener("abort", () => {
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -276,7 +321,7 @@ export async function uploadVideo(
         reject(new Error("La subida fue cancelada"));
       });
       xhr.open("POST", `${VIDEO_API_URL}/process-video`);
-      xhr.timeout = 180000; // Increased to 3 minutes for slow processing
+      xhr.timeout = 600000; // REV23: 10 min (videos de hasta 3 min se comprimen en el servidor)
       xhr.send(formData);
     });
   } catch (error) {

@@ -1013,6 +1013,55 @@ export const useLocationSearchStore = create<LocationSearchState>((set, get) => 
         log.warn("No se pudo agregar la opcion de estado completo:", e);
         visibles = ranked;
       }
+      // REV23: si lo escrito es (o empieza como) el nombre de UN estado ("aguas calientes", "jalis"), el estado va
+      // siempre primero; despues las colonias de ese estado (la colonia homonima queda arriba), luego sus municipios,
+      // y al final el resto con el orden de siempre.
+      try {
+        const compacto = (s: string) =>
+          s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+        const q = compacto(searchTerm);
+        const nombres = Object.keys(config.level1Coords);
+        // Abreviaturas escritas tal cual ("ags", "jal.", "cdmx", "nl"); "col" se ignora porque tambien es "colonia".
+        const claveAbrev = searchTerm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\.$/, "").trim();
+        const porAbrev = claveAbrev !== "col" ? config.stateAbbreviations?.[claveAbrev] : undefined;
+        let candidatos: string[] = [];
+        if (porAbrev) {
+          candidatos = nombres.filter((n) => compacto(n) === compacto(porAbrev));
+        } else if (q.length >= 4) {
+          const exacto = nombres.filter((n) => compacto(n) === q);
+          candidatos = exacto.length ? exacto : nombres.filter((n) => compacto(n).startsWith(q));
+        }
+        {
+          if (candidatos.length === 1) {
+            const est = candidatos[0];
+            const key = compacto(est);
+            // "Ciudad de México" y "Ciudad de México (CDMX)" cuentan como el mismo estado.
+            const mismo = (x: string, y: string) => x.length >= 4 && y.length >= 4 && (x === y || x.startsWith(y) || y.startsWith(x));
+            const delEstado = (s: LocationSuggestionWithCount) =>
+              !!s.estado_nombre && mismo(compacto(s.estado_nombre), key);
+            const esEstado = (s: LocationSuggestionWithCount) => s.type === "estado" && mismo(compacto(s.name), key);
+            const estadoItem: LocationSuggestionWithCount = visibles.find(esEstado) ?? {
+              placeId: `estado-${key}`,
+              name: est,
+              secondaryText: "",
+              fullDescription: `Todo el estado de ${est}`,
+              type: "estado",
+              types: ["administrative_area_level_1"],
+              estado_id: 0,
+            };
+            const resto = visibles.filter((s) => !esEstado(s));
+            const homonima = (s: LocationSuggestionWithCount) => mismo(compacto(s.name), key);
+            const colonias = resto
+              .filter((s) => delEstado(s) && s.type === "colonia")
+              .sort((x, y) => Number(homonima(y)) - Number(homonima(x)));
+            const munis = resto.filter((s) => delEstado(s) && s.type !== "colonia");
+            const otros = resto.filter((s) => !delEstado(s));
+            visibles = [estadoItem, ...colonias, ...munis, ...otros];
+          }
+        }
+      } catch (e) {
+        log.warn("No se pudo priorizar el estado:", e);
+      }
       set({ suggestions: visibles });
 
       // Conteo de propiedades por zona (diferido, no bloquea la UI).

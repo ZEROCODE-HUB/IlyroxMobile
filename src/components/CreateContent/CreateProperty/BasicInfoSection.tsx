@@ -272,6 +272,7 @@ export const BasicInfoSection = React.memo(function BasicInfoSection({
             label="Precio de Venta *"
             placeholder="0.00"
             keyboardType="numeric"
+            miles
             value={precioVenta}
             onChangeText={(text) => handleCurrencyChange(text, setPrecioVenta)}
             error={errors.precioVenta}
@@ -298,6 +299,7 @@ export const BasicInfoSection = React.memo(function BasicInfoSection({
             label="Precio de Renta Mensual *"
             placeholder="0.00"
             keyboardType="numeric"
+            miles
             value={precioRenta}
             onChangeText={(text) => handleCurrencyChange(text, setPrecioRenta)}
             error={errors.precioRenta}

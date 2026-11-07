@@ -10,7 +10,26 @@ import {
 import { useAppTheme } from "../theme";
 import { COLORS } from "../../constants/colors";
 
+// REV24: separador de miles al escribir y al mostrar. El campo muestra "1,500,000" pero entrega al formulario el numero
+// sin comas ("1500000"), asi no cambia ninguna cuenta ni guardado.
+const conMiles = (v: unknown): string => {
+  const s = String(v ?? "").replace(/,/g, "");
+  if (s === "") return "";
+  if (!/^\d*\.?\d*$/.test(s)) return String(v ?? "");
+  const [ent, dec] = s.split(".");
+  const e = ent.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return dec !== undefined ? `${e}.${dec}` : e;
+};
+const sinMiles = (t: string): string => {
+  let s = t.replace(/,/g, "").replace(/[^0-9.]/g, "");
+  const i = s.indexOf(".");
+  if (i >= 0) s = s.slice(0, i + 1) + s.slice(i + 1).replace(/\./g, "");
+  return s;
+};
+
 interface AppInputProps extends TextInputProps {
+  /** Muestra separador de miles mientras se escribe (para precios, m2, montos). */
+  miles?: boolean;
   label?: string;
   error?: string;
   helperText?: string;
@@ -35,6 +54,7 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(
       style,
       inputStyle,
       showCounter,
+      miles,
       ...props
     },
     ref,
@@ -137,6 +157,12 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(
             placeholderTextColor={COLORS.textTertiary}
             selectionColor={theme.colors.primary}
             {...props}
+            {...(miles
+              ? {
+                  value: conMiles(props.value),
+                  onChangeText: (t: string) => props.onChangeText?.(sinMiles(t)),
+                }
+              : {})}
           />
           {rightIcon && (
             <View

@@ -7,6 +7,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/context/AuthContext";
 import { Platform } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/lib/supabase";
 import { collapseSpaces } from "@/utils/stringNormalizer";
 import { logger } from "@/utils/logger";
@@ -70,6 +71,42 @@ const initialFormState: AuthFormState = {
 // REV13-07: borrador del registro. Si el usuario sale a la camara/galeria y el sistema cierra o reinicia la app, el
 // formulario se recupera (SIN contrasenas: esas nunca se guardan). Caduca a la hora.
 const DRAFT_KEY = "ilyrox:registro_borrador:v1";
+// REV24: las contrasenas NO van al borrador normal; se guardan cifradas (Keystore/Keychain) solo mientras dura el registro,
+// para poder volver al paso 2 si Android cierra la app al elegir la foto. Si el modulo no esta, se pide la contrasena de nuevo.
+const PW_KEY = "ilyrox_registro_pw_v1";
+async function guardarClaves(p: string, c: string) {
+  try {
+    const SS = require("expo-secure-store");
+    if (p) await SS.setItemAsync(PW_KEY, JSON.stringify({ p, c, ts: Date.now() }));
+    else await SS.deleteItemAsync(PW_KEY);
+  } catch {
+    /* sin modulo seguro: no se guarda */
+  }
+}
+async function leerClaves(): Promise<{ p: string; c: string } | null> {
+  try {
+    const SS = require("expo-secure-store");
+    const raw = await SS.getItemAsync(PW_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    // Caduca a las 2 horas: pasado ese tiempo se borra y se pide la contrasena de nuevo.
+    if (!d?.ts || Date.now() - d.ts > 2 * 60 * 60 * 1000) {
+      await SS.deleteItemAsync(PW_KEY);
+      return null;
+    }
+    return d;
+  } catch {
+    return null;
+  }
+}
+async function borrarClaves() {
+  try {
+    const SS = require("expo-secure-store");
+    await SS.deleteItemAsync(PW_KEY);
+  } catch {
+    /* nada */
+  }
+}
 const DRAFT_MAX_AGE_MS = 60 * 60 * 1000;
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -172,10 +209,11 @@ export function useAuthForm() {
     const { password: _p0, confirmPassword: _c0, ...restoInicial } = initialFormState;
     if (JSON.stringify(resto) === JSON.stringify(restoInicial)) return;
     const t = setTimeout(() => {
-      AsyncStorage.setItem(DRAFT_KEY, JSON.stringify({ form: resto, ts: Date.now() })).catch(() => {});
+      AsyncStorage.setItem(DRAFT_KEY, JSON.stringify({ form: resto, step, ts: Date.now() })).catch(() => {});
+      guardarClaves(formState.password, formState.confirmPassword);
     }, 400);
     return () => clearTimeout(t);
-  }, [formState, mode]);
+  }, [formState, mode, step]);
 
   // Recuperar el borrador (si existe y no caduco). Devuelve true si habia uno.
   const restoreDraft = useCallback(async (): Promise<boolean> => {
@@ -185,10 +223,36 @@ export function useAuthForm() {
       const d = JSON.parse(raw);
       if (!d?.form || !d?.ts || Date.now() - d.ts > DRAFT_MAX_AGE_MS) {
         await AsyncStorage.removeItem(DRAFT_KEY);
+        await borrarClaves();
         return false;
       }
-      setFormState({ ...initialFormState, ...d.form, password: "", confirmPassword: "" });
-      setStep(1);
+      let avatarUri = d.form?.avatarUri;
+      // REV23: en Android, al abrir la galeria el sistema puede cerrar la app; la foto elegida queda "pendiente" y se recupera aqui.
+      if (Platform.OS === "android") {
+        try {
+          const pend: any = await ImagePicker.getPendingResultAsync();
+          const primero: any = Array.isArray(pend) ? pend[0] : pend;
+          const asset = primero?.assets?.[0];
+          if (asset?.uri) avatarUri = asset.uri;
+        } catch {
+          /* sin foto pendiente */
+        }
+      }
+      // REV24: si habia contrasena guardada de forma segura y estabas en el paso 2, regresas al paso 2 tal cual.
+      const claves = await leerClaves();
+      if (claves?.p && d.step === 2) {
+        setFormState({ ...initialFormState, ...d.form, avatarUri, password: claves.p, confirmPassword: claves.c || claves.p });
+        setStep(2);
+      } else {
+        setFormState({ ...initialFormState, ...d.form, avatarUri, password: "", confirmPassword: "" });
+        setStep(1);
+        Burnt.toast({
+          title: "Retomamos tu registro",
+          message: "Tu foto y tus datos se guardaron. Solo vuelve a escribir tu contraseña.",
+          preset: "none",
+          duration: 5,
+        });
+      }
       setMode("register");
       return true;
     } catch {
@@ -548,6 +612,7 @@ export function useAuthForm() {
         await applyStoredAdvisorInvite(data.user.id);
         log.info("handleRegister: Registro completado exitosamente", { userId: data.user.id });
         AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
+        borrarClaves();
         // REV13-07: el perfil se cargo al iniciar sesion, ANTES de guardar foto/ocupacion/aprobaciones. Se vuelve a
         // pedir el perfil final para que la app no se quede en la pantalla de carga con un perfil viejo o vacio.
         try {

@@ -27,6 +27,7 @@ import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import ConfirmDialog from "../shared/ConfirmDialog";
 import CreateProperty from "../CreateContent/CreateProperty";
 import { supabase } from "../../lib/supabase";
+import { ReportBadge } from "../shared/ReportBadge";
 import { logger } from "@/utils/logger";
 import { buildPropertyShareTitle } from "@/utils/propertyShareTitle";
 import ActionButtons, { ACTIONS_COLUMN_MIN_HEIGHT } from "../ActionButtons";
@@ -336,6 +337,8 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
             feedItemType="property"
           />
         </SafePressable>
+        {/* REV24: aviso de reportes visible para todos */}
+        <ReportBadge propertyId={property.id} />
         {isOwner && (
           <View style={styles.headerMenuWrapper}>
             <ThreeDotsMenu
