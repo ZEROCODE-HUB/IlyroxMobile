@@ -45,6 +45,8 @@ import { VersionUpdateModal } from "@/components/modals/VersionUpdateModal";
 import { supabase } from "@/lib/supabase";
 import { storeInviteCodeFromUrl, captureInviteFromDeviceMatch, captureInviteFromFingerprint } from "@/services/communityService";
 import { logger } from "@/utils/logger";
+import BackgroundPublisher from "@/components/CreateContent/BackgroundPublisher";
+import PublishProgressBanner from "@/components/shared/PublishProgressBanner";
 import { buildFeedItemNavigation } from "@/utils/notificationNavigation";
 
 if (Platform.OS !== "web") {
@@ -616,6 +618,8 @@ function RootLayoutNav() {
   // Main Stack incorporating all groups
   return (
     <View style={{ flex: 1 }}>
+      <BackgroundPublisher />
+      <PublishProgressBanner />
       <NotificationProvider userId={profile?.id || null}>
         <Stack
           screenOptions={{ headerShown: false }}

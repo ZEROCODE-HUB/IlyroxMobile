@@ -242,7 +242,7 @@ function registrarFalloVideo(
   }
 }
 
-export async function uploadVideo(
+async function uploadVideoClasico(
   uri: string,
   onProgress?: (progress: number) => void,
 ): Promise<{ videoUrl: string; thumbnailUrl?: string }> {
@@ -254,7 +254,7 @@ export async function uploadVideo(
       type: "video/mp4",
       name: `reel-${Date.now()}.mp4`,
     } as any);
-    formData.append("quality", "low"); // Changed to low for faster processing
+    formData.append("quality", "high"); // REV26: antes "low" (CRF 32, 800 kbps) => video pixelado
     formData.append("maxWidth", "720"); // Changed to 720 for mobile optimization
     formData.append("type", "reels");
 
@@ -328,4 +328,214 @@ export async function uploadVideo(
     log.error("Error uploading video to R2:", error);
     throw error;
   }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// REV26: subida por partes REANUDABLE. El video se manda en trozos de 4 MB; si la red se corta, solo se repite el trozo
+// (el progreso NUNCA vuelve a 0). Despues el servidor procesa en segundo plano y la app consulta el avance.
+// Si el servidor es antiguo (sin /uploads) o este metodo no puede arrancar, se usa el metodo clasico de siempre.
+// ---------------------------------------------------------------------------------------------------------------
+class SubidaNoSoportada extends Error {}
+class SubidaReiniciar extends Error {}
+const sleepMs = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function jsonFetch(url: string, init: any, timeoutMs = 20000): Promise<{ status: number; body: any }> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { ...init, signal: ctrl.signal });
+    let body: any = null;
+    try {
+      body = await r.json();
+    } catch {
+      /* sin cuerpo */
+    }
+    return { status: r.status, body };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function putParte(url: string, parte: any, onLoaded: (n: number) => void): Promise<{ status: number; body: any }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) onLoaded(e.loaded);
+    });
+    xhr.addEventListener("load", () => {
+      let body: any = null;
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        /* sin cuerpo */
+      }
+      resolve({ status: xhr.status, body });
+    });
+    xhr.addEventListener("error", () => reject(new Error("red")));
+    xhr.addEventListener("timeout", () => reject(new Error("timeout")));
+    xhr.open("PUT", url);
+    xhr.timeout = 90000;
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.send(parte);
+  });
+}
+
+async function conReintentos<T>(fn: () => Promise<T>, veces = 4): Promise<T> {
+  let ultimo: any;
+  for (let i = 0; i < veces; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      ultimo = e;
+      await sleepMs(Math.min(8000, 1000 * 2 ** i));
+    }
+  }
+  throw ultimo;
+}
+
+async function uploadVideoPorPartes(
+  uri: string,
+  onProgress: ((p: number) => void) | undefined,
+  estado: { bytesOk: number },
+): Promise<{ videoUrl: string; thumbnailUrl?: string }> {
+  let maxPct = 0;
+  const reportar = (p: number) => {
+    if (p > maxPct) {
+      maxPct = p;
+      onProgress?.(p);
+    }
+  };
+
+  let blob: any;
+  try {
+    blob = await (await fetch(uri)).blob();
+  } catch {
+    throw new SubidaNoSoportada("blob");
+  }
+  const total: number = blob?.size || 0;
+  if (!total || typeof blob.slice !== "function") throw new SubidaNoSoportada("sin_blob");
+
+  const init = await conReintentos(() =>
+    jsonFetch(`${VIDEO_API_URL}/uploads`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ size: total, name: `reel-${Date.now()}.mp4` }),
+    }),
+  );
+  if (init.status === 404 || init.status === 405) throw new SubidaNoSoportada(`init ${init.status}`);
+  if (init.status !== 200 || !init.body?.uploadId) throw new Error(`init ${init.status}`);
+
+  const uploadId: string = init.body.uploadId;
+  const parte: number = Number(init.body.chunkSize) || 4 * 1024 * 1024;
+  let offset: number = Number(init.body.received) || 0;
+
+  let vueltasMax = Math.ceil(total / parte) * 4 + 20; // tope de seguridad contra ciclos
+  while (offset < total) {
+    if (vueltasMax-- <= 0) throw new Error("demasiados_reintentos");
+    const fin = Math.min(offset + parte, total);
+    const trozo = blob.slice(offset, fin);
+    const desde = offset;
+    let avanzo = false;
+    for (let intento = 0; intento < 6 && !avanzo; intento++) {
+      try {
+        const r = await putParte(`${VIDEO_API_URL}/uploads/${uploadId}?offset=${desde}`, trozo, (l) =>
+          reportar(((desde + l) / total) * 90),
+        );
+        if (r.status === 200) {
+          const recibido = Number(r.body?.received ?? fin);
+          if (!(recibido > desde)) throw new Error("sin_avance"); // la parte llego vacia o el servidor no avanzo
+          offset = recibido;
+          avanzo = true;
+        } else if (r.status === 409) {
+          offset = Number(r.body?.received ?? desde); // el servidor dice desde donde seguir
+          avanzo = true;
+        } else if (r.status === 404) {
+          throw new SubidaReiniciar("perdida");
+        } else {
+          throw new Error(`HTTP ${r.status}`);
+        }
+      } catch (e) {
+        if (e instanceof SubidaReiniciar) throw e;
+        await sleepMs(Math.min(8000, 1000 * 2 ** intento));
+        try {
+          const st = await jsonFetch(`${VIDEO_API_URL}/uploads/${uploadId}`, { method: "GET" }, 10000);
+          if (st.status === 404) throw new SubidaReiniciar("perdida");
+          if (st.status === 200 && typeof st.body?.received === "number" && st.body.received !== desde) {
+            offset = st.body.received; // el trozo si llego: seguimos sin repetirlo
+            avanzo = true;
+          }
+        } catch (e2) {
+          if (e2 instanceof SubidaReiniciar) throw e2;
+        }
+      }
+    }
+    if (!avanzo) throw new Error("sin_red");
+    estado.bytesOk = Math.max(estado.bytesOk, offset);
+    reportar((offset / total) * 90);
+  }
+
+  const proc = await conReintentos(() =>
+    jsonFetch(
+      `${VIDEO_API_URL}/uploads/${uploadId}/process`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quality: "high", maxWidth: "720", type: "reels" }),
+      },
+      30000,
+    ),
+  );
+  if (proc.status === 404) throw new SubidaReiniciar("perdida");
+  if (proc.status !== 202 || !proc.body?.jobId) throw new Error(`process ${proc.status}`);
+  const jobId: string = proc.body.jobId;
+
+  // El servidor comprime/guarda sin tener la conexion abierta; aqui solo se consulta (tolera cortes de red).
+  const limite = Date.now() + 15 * 60 * 1000;
+  let fallosSeguidos = 0;
+  let vueltas = 0;
+  while (Date.now() < limite) {
+    await sleepMs(2000);
+    vueltas++;
+    reportar(Math.min(98, 90 + vueltas * 0.5));
+    try {
+      const j = await jsonFetch(`${VIDEO_API_URL}/jobs/${jobId}`, { method: "GET" }, 10000);
+      fallosSeguidos = 0;
+      if (j.status === 404) throw new SubidaReiniciar("trabajo_perdido");
+      if (j.body?.status === "done") {
+        const url = j.body.video_url || j.body.url;
+        if (!url) throw new Error("sin_url");
+        return { videoUrl: url, thumbnailUrl: j.body.thumbnailUrl || undefined };
+      }
+      if (j.body?.status === "error") throw new Error(`proceso: ${String(j.body.error).slice(0, 100)}`);
+    } catch (e) {
+      if (e instanceof SubidaReiniciar) throw e;
+      if (String((e as any)?.message || "").startsWith("proceso") || (e as any)?.message === "sin_url") throw e;
+      fallosSeguidos++;
+      if (fallosSeguidos > 25) throw e;
+    }
+  }
+  throw new Error("timeout_proceso");
+}
+
+export async function uploadVideo(
+  uri: string,
+  onProgress?: (progress: number) => void,
+): Promise<{ videoUrl: string; thumbnailUrl?: string }> {
+  const estado = { bytesOk: 0 };
+  let ultimoError: any = null;
+  for (let ronda = 0; ronda < 2; ronda++) {
+    try {
+      return await uploadVideoPorPartes(uri, onProgress, estado);
+    } catch (e: any) {
+      ultimoError = e;
+      if (e instanceof SubidaReiniciar) continue; // el servidor perdio la subida: se arranca una vez mas
+      break;
+    }
+  }
+  // Metodo clasico (servidor antiguo, o el metodo por partes no pudo ni arrancar): siempre como red de seguridad.
+  if (ultimoError instanceof SubidaNoSoportada || estado.bytesOk === 0) {
+    return uploadVideoClasico(uri, onProgress);
+  }
+  registrarFalloVideo(uri, ultimoError, { fase: "partes", bytes: estado.bytesOk });
+  throw new MediaUnavailableError(ultimoError);
 }

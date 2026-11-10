@@ -9,6 +9,7 @@ import ThreeDotsMenu, { MenuOption } from "../shared/ThreeDotsMenu";
 import { Bath } from "lucide-react-native";
 import { datosFaltantes } from "@/utils/datosFaltantes";
 import { SafePressable } from "@/design-system";
+import { ReportBadge } from "../shared/ReportBadge";
 
 const { width } = Dimensions.get("window");
 const GAP = 8;
@@ -137,6 +138,11 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
           transition={0}
           cachePolicy="memory-disk"
         />
+
+        {/* REV26 (#1): aviso de reportes tambien en la grilla del perfil */}
+        <View style={{ position: "absolute", top: 4, right: 4 }}>
+          <ReportBadge propertyId={item.id} />
+        </View>
 
         {item.status === "Vendida" ? (
           <View style={[styles.statusBadge, styles.vendidaBadge]}>

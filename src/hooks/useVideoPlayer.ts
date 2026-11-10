@@ -10,6 +10,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useVideoPlayer as useExpoVideoPlayer } from "expo-video";
+import { usePauseWhenAway } from "@/hooks/usePauseWhenAway";
 
 export interface UseVideoPlayerOptions {
   videoSource: string;
@@ -51,6 +52,8 @@ export const useVideoPlayer = (
       p.play();
     }
   });
+
+  usePauseWhenAway(player);
 
   const togglePlayPause = useCallback(() => {
     try {

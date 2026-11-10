@@ -9,7 +9,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { MultiSelectionModal } from "../modals";
 import { COLORS } from "../../constants/colors";
-import { PROPERTY_TYPES, TipoPrincipal } from "../../constants/propertyData";
+import { subtiposParaFiltro } from "../../constants/propertyData";
 
 interface PropertyTypeSelectorProps {
   tipoPropiedad: string;
@@ -115,9 +115,7 @@ export const PropertyTypeSelector: React.FC<PropertyTypeSelectorProps> = ({
             onClose={() => setShowSubtipoModal(false)}
             onSelect={(vals) => onChangeSubtipo(vals)}
             title={`Subtipos de ${tipoPropiedad}`}
-            options={[
-              ...(PROPERTY_TYPES[tipoPropiedad as TipoPrincipal] || []),
-            ]}
+            options={subtiposParaFiltro(tipoPropiedad)}
             currentValues={subtipo}
           />
         </>

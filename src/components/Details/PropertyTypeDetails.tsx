@@ -82,6 +82,12 @@ export const PropertyTypeDetails: React.FC<PropertyTypeDetailsProps> = ({
         label: "Ubicación",
         value: property.tipo_ubicacion_comercial,
       });
+    else if (/local|terreno/i.test(String((property as any).subtipo ?? "")))
+      stats.push({
+        icon: "storefront-outline",
+        label: "Ubicación",
+        value: "Pendiente de clasificar (dentro / fuera de plaza)",
+      });
     if (property.ancho_terreno)
       stats.push({
         icon: "resize-outline",

@@ -3,6 +3,7 @@ import { PAGINATION } from "@/constants";
 import { reelService, ReelFeedRow } from "@/services/reelService";
 import { FeedItem } from "../../types";
 import { useAuth } from "@/context/AuthContext";
+import { blockService } from "@/services/blockService";
 
 const mapRowToFeedItem = (r: ReelFeedRow): FeedItem => ({
   id: r.feed_item_id,
@@ -57,7 +58,10 @@ export const useReelFeed = (initialItem?: any) => {
 
     if (rows.length < pageSize) setHasMore(false);
 
+    // REV25 (#10): no mostrar reels de usuarios bloqueados.
+    const bloqueados = await blockService.getBlockedUserIds(user?.id);
     const fresh = rows
+      .filter((r) => !bloqueados.includes(r.autor_id))
       .filter((r) => !seenIdsRef.current.has(r.feed_item_id))
       .map(mapRowToFeedItem);
 

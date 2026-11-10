@@ -22,6 +22,7 @@ import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import ActionButtons from "../ActionButtons";
 import { Avatar } from "../shared";
 import SafePressable from "@/design-system/components/SafePressable";
+import { usePauseWhenAway } from "@/hooks/usePauseWhenAway";
 
 interface ReelDetailProps {
   item: FeedItem;
@@ -63,6 +64,7 @@ const ReelDetail: React.FC<ReelDetailProps> = ({
     p.muted = false;
     p.play();
   });
+  usePauseWhenAway(player);
 
   const togglePlayPause = useCallback(() => {
     try {

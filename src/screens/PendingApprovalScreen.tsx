@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useAuth } from '../context/AuthContext';
 import { useModal } from '../context/ModalContext';
 import { supabase } from '../lib/supabase';
@@ -118,13 +119,28 @@ export default function PendingApprovalScreen() {
       >
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Ionicons name="hourglass-outline" size={60} color={COLORS.primary} />
+          {profile?.foto ? (
+            <Image
+              source={{ uri: profile.foto }}
+              style={{ width: 120, height: 120, borderRadius: 60 }}
+              contentFit="cover"
+              cachePolicy="none"
+            />
+          ) : (
+            <Ionicons name="hourglass-outline" size={60} color={COLORS.primary} />
+          )}
         </View>
 
         <Text style={styles.title}>Aprobación Pendiente</Text>
         <Text style={styles.description}>
           Tu cuenta está siendo revisada por la comunidad. Necesitas completar las aprobaciones para acceder a todas las funciones.
         </Text>
+
+        <View style={{ alignSelf: 'stretch', marginBottom: theme.spacing.xl }}>
+          <Text style={styles.description}>1. Pide a 3 miembros de la comunidad que aprueben tu cuenta.</Text>
+          <Text style={styles.description}>2. Cada aprobación se suma aquí automáticamente.</Text>
+          <Text style={styles.description}>3. Con las 3 aprobaciones se activa tu acceso completo a la app.</Text>
+        </View>
 
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>

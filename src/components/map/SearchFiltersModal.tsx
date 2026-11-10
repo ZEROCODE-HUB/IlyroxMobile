@@ -8,6 +8,7 @@ import {
   Platform,
   Keyboard,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import {
   KeyboardAwareScrollView,
@@ -152,20 +153,52 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
   // REV19: con el teclado abierto la hoja (altura fija de 85%) quedaba tapada o desplazada, con un hueco enorme, y el boton
   // inferior no se veia. Ahora la hoja se ajusta a la altura disponible y el boton queda justo encima del teclado.
   const [kb, setKb] = useState(0);
+  // REV26 (#3): en Android (pantalla completa sin redimensionar) el teclado tapaba el campo de precio en telefonos
+  // chicos. Se mide cuanto se solapa la hoja con el teclado y se sube justo esa cantidad.
+  const [subirAndroid, setSubirAndroid] = useState(0);
+  const hojaRef = React.useRef<View>(null);
   React.useEffect(() => {
     const evShow = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const evHide = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const s = Keyboard.addListener(evShow as any, (e: any) => setKb(e?.endCoordinates?.height ?? 0));
-    const h = Keyboard.addListener(evHide as any, () => setKb(0));
+    let t: any;
+    const s = Keyboard.addListener(evShow as any, (e: any) => {
+      const alto = e?.endCoordinates?.height ?? 0;
+      setKb(alto);
+      if (Platform.OS === "android" && alto > 0) {
+        clearTimeout(t);
+        t = setTimeout(() => {
+          try {
+            hojaRef.current?.measureInWindow((_x, y, _w, h) => {
+              const tecladoArriba = Dimensions.get("screen").height - alto;
+              // +28: margen por la barra de estado (la ventana del modal puede empezar mas abajo que la pantalla)
+              const solape = y + h - tecladoArriba + 28;
+              setSubirAndroid(solape > 0 ? Math.ceil(solape) : 0);
+            });
+          } catch {
+            /* sin medida: se queda como estaba */
+          }
+        }, 120);
+      }
+    });
+    const h = Keyboard.addListener(evHide as any, () => {
+      clearTimeout(t);
+      setKb(0);
+      setSubirAndroid(0);
+    });
     return () => {
+      clearTimeout(t);
       s.remove();
       h.remove();
     };
   }, []);
   const sheetKb =
     kb > 0
-      ? { height: Math.min(height * 0.85, height - kb - 40), marginBottom: Platform.OS === "ios" ? kb : 0 }
+      ? {
+          height: Math.min(height * 0.85, height - kb - 40),
+          marginBottom: Platform.OS === "ios" ? kb : subirAndroid,
+        }
       : null;
+  const ScrollComp: any = Platform.OS === "android" ? ScrollView : KeyboardAwareScrollView;
 
   const handleCurrencyChange = (
     text: string,
@@ -187,7 +220,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
 
   return (
     <AppBottomSheet visible={visible} onClose={onClose}>
-      <View style={[styles.modalContent, sheetKb]}>
+      <View ref={hojaRef} collapsable={false} style={[styles.modalContent, sheetKb]}>
         {/* Header */}
         <View style={styles.modalHeader}>
           <View>
@@ -205,7 +238,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        <KeyboardAwareScrollView
+        <ScrollComp
           showsVerticalScrollIndicator={false}
           style={styles.modalScroll}
           contentContainerStyle={[styles.scrollContent, kb > 0 && { paddingBottom: 24 }]}
@@ -332,7 +365,7 @@ export const SearchFiltersModal: React.FC<SearchFiltersModalProps> = ({
             )}
 
             <View style={styles.divider} />
-          </KeyboardAwareScrollView>
+          </ScrollComp>
 
           {/* Footer */}
           <View style={[styles.modalFooter, kb > 0 && { paddingBottom: 12 }]}>

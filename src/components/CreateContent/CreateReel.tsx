@@ -23,6 +23,7 @@ import { useVideoPlayer, VideoView } from "expo-video"; // Asegúrate de tener e
 import { useAuth } from "../../context/AuthContext";
 import { useLocalModal } from "@/hooks/useLocalModal";
 import { useToast } from "@/context/ToastContext";
+import { usePublishQueueStore } from "@/store/publishQueueStore";
 import { COLORS } from "../../constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
@@ -262,6 +263,22 @@ export default function CreateReel({ onBack, reelId, onUpdated }: CreateReelProp
   const handlePublish = async () => {
     if (!validate()) {
       showModal({ title: "Error", message: "Por favor completa todos los campos", confirmText: "OK" });
+      return;
+    }
+
+    // REV26 (#5): un reel NUEVO con video local se sube y publica en segundo plano; el usuario sigue navegando.
+    if (!isEditing && videoUri && !videoUri.startsWith("http")) {
+      const enCurso = usePublishQueueStore.getState().status;
+      if (enCurso === "preparando" || enCurso === "subiendo" || enCurso === "publicando") {
+        showToast("Ya hay un reel publicándose. Espera a que termine para subir otro.", "info", 4000);
+        return;
+      }
+      usePublishQueueStore.getState().enqueue({ videoUri, thumbnailUri, description });
+      showToast("Tu reel se está publicando. Puedes seguir usando la app.", "info", 4000);
+      setDescription("");
+      setVideoUri("");
+      setThumbnailUri("");
+      router.replace({ pathname: "/(tabs)", params: { refresh: String(Date.now()) } });
       return;
     }
 

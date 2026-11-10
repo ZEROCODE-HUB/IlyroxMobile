@@ -9,6 +9,7 @@ import {
   matchesLocationCriteria,
 } from "@/utils/locationMatch";
 import { pickOperacion } from "@/utils/operaciones";
+import { subtipoCanonico } from "@/constants/propertyData";
 import { normalizeStr } from "@/utils/stringNormalizer";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -266,7 +267,7 @@ export const usePropertyFilters = (
       // esto no debería pasar, pero si por algún error de flujo subtipo queda
       // con valores sin tipo padre, no se filtra incorrectamente.
       if (filters.tipoPropiedad && filters.subtipo && filters.subtipo.length > 0) {
-        const propSubtipo = p.subtipo?.toString().toLowerCase();
+        const propSubtipo = subtipoCanonico(p.type?.toString(), p.subtipo?.toString()).toLowerCase();
         if (!filters.subtipo.some((s) => s.toLowerCase() === propSubtipo)) return false;
       }
 
@@ -437,7 +438,13 @@ export const usePropertyFilters = (
       if (filters.tipoPropiedad === 'comercial') {
         const cf = filters.comercialFilters;
         // Solo filtra cuando se eligió exactamente una opción; ambas (o ninguna) = sin filtro
-        if (cf.tipoUbicacion.length === 1 && rawP.tipo_ubicacion_comercial !== cf.tipoUbicacion[0]) return false;
+        // REV26 (#9): "Sin clasificar" = propiedad sin dentro/fuera de plaza. Dentro+Fuera juntos (sin la tercera) = sin filtro, como antes.
+        const selUbic = cf.tipoUbicacion as string[];
+        const soloDentroFuera = selUbic.length === 2 && !selUbic.includes('Sin clasificar');
+        if (selUbic.length > 0 && !soloDentroFuera) {
+          const valorUbic = rawP.tipo_ubicacion_comercial || 'Sin clasificar';
+          if (!selUbic.includes(valorUbic)) return false;
+        }
         if (cf.frenteMin && (rawP.frente_metros ?? 0) < parseFloat(cf.frenteMin)) return false;
         if (cf.nivel && String(rawP.nivel_piso ?? '') !== cf.nivel) return false;
         if (cf.sobreAvenidaPrincipal && !rawP.sobre_avenida_principal) return false;

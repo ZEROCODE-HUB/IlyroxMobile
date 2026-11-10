@@ -17,6 +17,7 @@ import CommentsBottomSheet from "../modals/CommentsBottomSheet";
 import ActionButtons from "../ActionButtons";
 import { Avatar } from "../shared";
 import SafePressable from "@/design-system/components/SafePressable";
+import { usePauseWhenAway } from "@/hooks/usePauseWhenAway";
 
 // ─── Sub-component: owns the native player lifecycle ─────────────────────────
 // Mounting this component creates the player; unmounting releases it cleanly.
@@ -54,6 +55,7 @@ const ReelVideoPlayer: React.FC<ReelVideoPlayerProps> = ({
     p.timeUpdateEventInterval = 0.1;
     if (isActive) p.play();
   });
+  usePauseWhenAway(player);
 
   // Sync play/pause with visibility
   React.useEffect(() => {

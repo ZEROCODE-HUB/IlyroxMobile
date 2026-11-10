@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, Switch, TouchableOpacity, StyleSheet } from "react-native";
 import { COLORS } from "@/constants/colors";
-import { TIPOS_UBICACION_COMERCIAL } from "@/constants/propertyData";
+import { TIPOS_UBICACION_COMERCIAL, TIPO_UBICACION_SIN_CLASIFICAR } from "@/constants/propertyData";
 import { AppInput } from "@/design-system/components/AppInput";
 import {
   usePropertyFiltersStore,
@@ -37,7 +37,7 @@ export const ComercialFiltersSection: React.FC<ComercialFiltersSectionProps> = (
       {/* TIPO DE UBICACIÓN (selección múltiple) */}
       <Text style={styles.label}>Tipo de Ubicación</Text>
       <View style={styles.chipsRow}>
-        {TIPOS_UBICACION_COMERCIAL.map((op) => {
+        {[...TIPOS_UBICACION_COMERCIAL, TIPO_UBICACION_SIN_CLASIFICAR].map((op) => {
           const active = cf.tipoUbicacion.includes(op);
           return (
             <TouchableOpacity

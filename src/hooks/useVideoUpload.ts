@@ -38,10 +38,11 @@ export const useVideoUpload = () => {
     for (let attempt = 1; attempt <= MAX_UPLOAD_RETRIES; attempt++) {
       try {
         log.debug(`📤 Upload attempt ${attempt}/${MAX_UPLOAD_RETRIES}...`);
-        setUploadProgress(0);
+        // REV26: en un reintento NO se vuelve a 0% (la subida por partes retoma donde iba).
+        if (attempt === 1) setUploadProgress(0);
 
         const result = await uploadVideoService(videoUri, (progress) => {
-          setUploadProgress(Math.min(Math.round(progress), 99));
+          setUploadProgress((prev) => Math.max(prev, Math.min(Math.round(progress), 99)));
         });
 
         setUploadProgress(100);

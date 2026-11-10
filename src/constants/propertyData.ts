@@ -32,6 +32,30 @@ export const PROPERTY_TYPES = {
 
 export type TipoPrincipal = keyof typeof PROPERTY_TYPES;
 
+// REV25 (#11): la BD (importaciones) trae subtipos que no estan en PROPERTY_TYPES ("Local comercial", "Casa",
+// "Terreno", "Nave industrial"...). Para que la suma de subtipos = total del tipo, cada subtipo de la BD se asigna a
+// uno de la lista (alias) o a "Otros". Solo se usa en FILTROS; al publicar se sigue usando PROPERTY_TYPES.
+export const SUBTIPO_OTROS = "Otros";
+const SUBTIPO_ALIAS: Record<string, Record<string, string>> = {
+  comercial: { "local comercial": "Local", "nave industrial": "Bodega", "nave": "Bodega" },
+  habitacional: { "casa": "Casa (Fracc. Abierto)", "casa en condominio": "Casa en Condominio" },
+  agricola: { "terreno": "Terreno Rural" },
+};
+export function subtipoCanonico(tipo?: string | null, subtipo?: string | null): string {
+  const t = (tipo || "").toString().toLowerCase();
+  const s = (subtipo || "").toString().trim().toLowerCase();
+  const lista = ((PROPERTY_TYPES as Record<string, readonly string[]>)[t] || []) as readonly string[];
+  const directo = lista.find((x) => x.toLowerCase() === s);
+  if (directo) return directo;
+  const alias = SUBTIPO_ALIAS[t]?.[s];
+  if (alias) return alias;
+  return SUBTIPO_OTROS;
+}
+export function subtiposParaFiltro(tipo?: string | null): string[] {
+  const lista = (PROPERTY_TYPES as Record<string, readonly string[]>)[(tipo || "").toLowerCase()] || [];
+  return [...lista, SUBTIPO_OTROS];
+}
+
 // ============================================
 // CARACTERÍSTICAS NUMÉRICAS
 // ============================================
@@ -204,6 +228,8 @@ export const TIPOS_AGUA = ['Pozo', 'Presa', 'Canal', 'Otro'] as const;
 export const USOS_TERRENO = ['Agrícola', 'Ganadero'] as const;
 export const TIPOS_RIEGO = ['Temporal', 'Sistema de riego'] as const;
 export const TIPOS_UBICACION_COMERCIAL = ['Dentro de plaza', 'Fuera de plaza'] as const;
+// REV26 (#9): propiedades importadas/antiguas sin dentro/fuera de plaza. Se pueden filtrar y se avisa en la ficha.
+export const TIPO_UBICACION_SIN_CLASIFICAR = 'Sin clasificar';
 export const TIPOS_UBICACION_INDUSTRIAL = ['Dentro de parque', 'Fuera de parque'] as const;
 export const ALTURAS_LIBRES = ['4-6m', '6-8m', '8-10m', '10-12m', '+12m'] as const;
 export const TIPOS_ENERGIA_KVA = ['Monofásica: hasta 25 kVA', 'Trifásica: 25 a 45 kVA', 'Industrial: 45 a 150 kVA', 'Alta capacidad: más de 150 kVA'] as const;
