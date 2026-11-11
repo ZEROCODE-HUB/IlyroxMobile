@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, useDeferredValue } from "react";
 import {
   View,
   StyleSheet,
@@ -183,6 +183,10 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
     hasActiveFilters,
     filters,
   } = usePropertyFilters(properties, null);
+
+  // REV28 (#9): el mapa (marcadores) se actualiza con prioridad baja; asi el chip y el conteo del modal de filtros
+  // responden al instante y ya no esperan a que se redibuje todo el mapa.
+  const propiedadesMapa = useDeferredValue(filteredProperties);
 
   // PINs de las ubicaciones seleccionadas: un marcador en el centro de cada chip
   // (tanto la del buscador de inicio como las agregadas dentro del mapa).
@@ -739,7 +743,7 @@ const MapSearch: React.FC<MapSearchProps> = ({ properties, onSaveSearch }) => {
       {/* ── Mapa — renderizado PRIMERO, llena TODO el contenedor ── */}
       <View style={styles.mapContainer}>
         <MemoizedPropertyMap
-          properties={filteredProperties}
+          properties={propiedadesMapa}
           onMarkerPress={handleMarkerPress}
           onStackPress={handleStackPress}
           googleApiKey={googleApiKey}

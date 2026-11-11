@@ -27,6 +27,8 @@ import { COLORS } from "../../constants/colors";
 import { searchPlaces, getPlaceDetails, reverseGeocode, derivePlaceType, type PlaceSuggestion, type GeoBounds } from "../../lib/geocodingService";
 import { getCountryConfig, DEFAULT_COUNTRY } from "../../lib/location/registry";
 import { priorizarEstado } from "../../lib/location/estadoFirst";
+import { useLocationSearchStore } from "../../store/locationSearchStore";
+import { useAuth } from "../../context/AuthContext";
 import type { CountryCode } from "../../lib/location/types";
 
 export interface LocationData {
@@ -72,6 +74,14 @@ export default function CascadeLocationSelector({
   // Sugerencias de Places Autocomplete
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  // REV27 (#2): se usa el MISMO buscador de ubicaciones que el buscador general (mismo orden: estado primero,
+  // zonas con propiedades, nombres canonicos, ruido filtrado).
+  const { profile: perfilUsuario } = useAuth();
+  const storeSugs = useLocationSearchStore((s) => s.suggestions);
+  const buscarEnStore = useLocationSearchStore((s) => s.searchLocations);
+  const limpiarStore = useLocationSearchStore((s) => s.clearSuggestions);
+  const escribiendoRef = useRef(false);
+  const origenRef = useRef<Map<string, any>>(new Map());
   // Indica que ya hay una selección válida (no mostrar sugerencias)
   const [isSelected, setIsSelected] = useState(!!initialData?.estado);
 
@@ -113,6 +123,34 @@ export default function CascadeLocationSelector({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData?.estado, initialData?.municipio, initialData?.colonia]);
 
+  // REV27 (#2): al abrir/cerrar, no arrastrar sugerencias de otra pantalla (buscador general o del mapa).
+  useEffect(() => {
+    limpiarStore();
+    return () => limpiarStore();
+  }, [limpiarStore]);
+
+  // REV27 (#2): lo que devuelve el buscador general se muestra tal cual, en su mismo orden.
+  useEffect(() => {
+    if (!escribiendoRef.current || storeSugs.length === 0) return;
+    const mapa = new Map<string, any>();
+    const lista: PlaceSuggestion[] = storeSugs.map((s: any) => {
+      mapa.set(s.placeId, s);
+      return {
+        placeId: s.placeId,
+        description: s.fullDescription || [s.name, s.secondaryText].filter(Boolean).join(", "),
+        mainText: s.name,
+        secondaryText: s.secondaryText ?? "",
+        types:
+          s.types && s.types.length > 0
+            ? s.types
+            : [s.type === "estado" ? "administrative_area_level_1" : s.type === "municipio" ? "locality" : "sublocality"],
+      };
+    });
+    origenRef.current = mapa;
+    setSuggestions(lista.slice(0, 8));
+    setIsLoading(false);
+  }, [storeSugs]);
+
   // Debounce para el autocompletado
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // REV24: numero de la busqueda vigente; una respuesta lenta de una busqueda anterior no pisa a la nueva.
@@ -125,34 +163,71 @@ export default function CascadeLocationSelector({
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (text.trim().length < 2) {
+      escribiendoRef.current = false;
       setSuggestions([]);
       return;
     }
 
     debounceRef.current = setTimeout(async () => {
       setIsLoading(true);
+      const miBusqueda = busquedaRef.current;
       try {
-        const miBusqueda = busquedaRef.current;
-        const results = await searchPlaces(text, sessionTokenRef.current);
-        // REV24: estado primero, igual que el buscador general.
-        const ordenados = await priorizarEstado(text, results, sessionTokenRef.current);
+        escribiendoRef.current = true;
+        // Mismos parametros que usa el buscador general (useSearch).
+        await buscarEnStore(text, undefined, {
+          restrictToRegions: false,
+          withCounts: false,
+          estado: perfilUsuario?.estado,
+        });
         if (miBusqueda !== busquedaRef.current) return;
-        setSuggestions(ordenados.slice(0, 8));
+        // Respaldo: si el buscador general no devolvio nada, se usa la busqueda directa de antes.
+        if (useLocationSearchStore.getState().suggestions.length === 0) {
+          const results = await searchPlaces(text, sessionTokenRef.current);
+          const ordenados = await priorizarEstado(text, results, sessionTokenRef.current);
+          if (miBusqueda !== busquedaRef.current) return;
+          origenRef.current = new Map();
+          setSuggestions(ordenados.slice(0, 8));
+        }
       } catch {
-        setSuggestions([]);
+        if (miBusqueda === busquedaRef.current) setSuggestions([]);
       } finally {
-        setIsLoading(false);
+        if (miBusqueda === busquedaRef.current) setIsLoading(false);
       }
     }, 300);
-  }, []);
+  }, [buscarEnStore, perfilUsuario?.estado]);
 
   const handleSelectSuggestion = useCallback(
     async (suggestion: PlaceSuggestion) => {
       setSuggestions([]);
       setIsLoading(true);
       setQuery(suggestion.description);
+      escribiendoRef.current = false;
 
       try {
+        // REV27 (#2): zonas que vienen de las propiedades de la BD (id "prop-...") no existen en Google Places:
+        // se usa su nombre y su centroide directamente.
+        const origen = origenRef.current.get(suggestion.placeId);
+        if (suggestion.placeId.startsWith("prop-") && origen) {
+          const tipoZona = origen.type as "estado" | "municipio" | "colonia";
+          const datos: LocationData = {
+            estado: tipoZona === "estado" ? origen.name : (origen.estado_nombre ?? ""),
+            ciudad: tipoZona === "estado" ? "" : (origen.municipio_nombre ?? (tipoZona === "municipio" ? origen.name : "")),
+            municipio: tipoZona === "estado" ? "" : (tipoZona === "municipio" ? origen.name : (origen.municipio_nombre ?? "")),
+            colonia: tipoZona === "colonia" ? origen.name : "",
+            colonias: tipoZona === "colonia" ? [origen.name] : [],
+            pais: DEFAULT_COUNTRY,
+            latitud: origen.centroide?.lat,
+            longitud: origen.centroide?.lng,
+            placeType: tipoZona,
+          };
+          sessionTokenRef.current = generateToken();
+          limpiarStore();
+          setCurrentData(datos);
+          setIsSelected(true);
+          onChange(datos);
+          return;
+        }
+
         // Obtener geometría exacta del lugar
         const details = await getPlaceDetails(suggestion.placeId, sessionTokenRef.current);
 
@@ -226,6 +301,7 @@ export default function CascadeLocationSelector({
           placeType,
         };
 
+        limpiarStore();
         setCurrentData(newData);
         setIsSelected(true);
         onChange(newData);
@@ -235,10 +311,12 @@ export default function CascadeLocationSelector({
         setIsLoading(false);
       }
     },
-    [onChange],
+    [onChange, limpiarStore],
   );
 
   const handleClear = useCallback(() => {
+    escribiendoRef.current = false;
+    limpiarStore();
     setQuery("");
     setIsSelected(false);
     setSuggestions([]);

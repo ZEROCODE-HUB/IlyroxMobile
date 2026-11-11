@@ -104,6 +104,7 @@ const isNotBlocked = (id: string | null | undefined, blockedIds: string[]) =>
 async function fetchUsers(
   q: string,
   blockedUserIds: string[],
+  yoBloquee: string[] = blockedUserIds,
 ): Promise<SearchUser[]> {
   // RPC `buscar_perfiles`: normaliza acentos/espacios y exige que TODAS las
   // palabras del término estén presentes (AND) sobre el nombre completo armado
@@ -112,14 +113,16 @@ async function fetchUsers(
   // datos que traían dobles espacios. Ver supabase/buscar_perfiles.sql.
   const { data } = await supabase.rpc("buscar_perfiles", { q: normalizeStr(q), lim: 10 });
 
+  // REV27: quien me bloqueo NO aparece (no debe enterarse); a quien yo bloquee solo se le ve el nombre para desbloquear.
   return ((data as any[]) ?? [])
+    .filter((p) => !blockedUserIds.includes(p.id) || yoBloquee.includes(p.id))
     .map((p) => ({
       id: p.id,
       name: p.nombre_completo || [p.nombre, p.apellido_paterno].filter(Boolean).join(" ") || "Usuario",
       avatar: p.foto || undefined,
       ocupacion: p.ocupacion || undefined,
       rating: p.calificacion_promedio ? parseFloat(p.calificacion_promedio) : undefined,
-      is_blocked: blockedUserIds.includes(p.id),
+      is_blocked: yoBloquee.includes(p.id),
     }));
 }
 
@@ -336,8 +339,9 @@ export function useSearch() {
       setLoading(true);
       try {
         const blockedUserIds = await blockService.getBlockedUserIds(user?.id);
+        const yoBloquee = await blockService.getBlockedByMeIds(user?.id);
         const [users, posts, reels, properties] = await Promise.all([
-          fetchUsers(trimmed, blockedUserIds),
+          fetchUsers(trimmed, blockedUserIds, yoBloquee),
           fetchPosts(trimmed, blockedUserIds),
           fetchReels(trimmed, blockedUserIds),
           fetchProperties(trimmed, blockedUserIds, user?.id),

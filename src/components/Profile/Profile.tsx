@@ -97,6 +97,7 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
   const { handleContact } = useChatInitiator();
   const {
     isBlocked,
+    blockedByOther,
     loading: blockingUser,
     block,
     unblock,
@@ -690,6 +691,24 @@ const Profile: React.FC<ProfileProps> = ({ userId, initialProfileData, onBack })
 
   if (loading && !refreshing && !profile) {
     return <ProfileSkeleton />;
+  }
+
+  // REV27: si ese usuario me bloqueo, su perfil y su contenido no existen para mi (sin decir que fue un bloqueo).
+  if (!isMe && blockedByOther) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32, backgroundColor: COLORS.white }}>
+        <Ionicons name="person-remove-outline" size={48} color={COLORS.textSecondary} />
+        <Text style={{ marginTop: 12, fontSize: 16, color: COLORS.textSecondary, textAlign: "center" }}>
+          Este perfil no está disponible
+        </Text>
+        <Text
+          onPress={() => (onBack ? onBack() : router.back())}
+          style={{ marginTop: 20, fontSize: 15, fontWeight: "700", color: COLORS.primary }}
+        >
+          Volver
+        </Text>
+      </View>
+    );
   }
 
   return (

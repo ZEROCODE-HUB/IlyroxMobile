@@ -11,16 +11,25 @@ export function useUserBlock(
 ) {
   const queryClient = useQueryClient();
   const [isBlocked, setIsBlocked] = useState(false);
+  // REV27: el otro usuario me bloqueo a mi (no debo ver su perfil ni su contenido, y no debo enterarme).
+  const [blockedByOther, setBlockedByOther] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!blockerId || !blockedId || blockerId === blockedId) {
       setIsBlocked(false);
+      setBlockedByOther(false);
       return false;
     }
 
     const next = await blockService.isBlocked(blockerId, blockedId);
     setIsBlocked(next);
+    try {
+      const sets = await blockService.getBlockSets(blockerId);
+      setBlockedByOther(!next && sets.todos.includes(blockedId));
+    } catch {
+      setBlockedByOther(false);
+    }
     return next;
   }, [blockerId, blockedId]);
 
@@ -65,6 +74,7 @@ export function useUserBlock(
 
   return {
     isBlocked,
+    blockedByOther,
     loading,
     block,
     unblock,

@@ -33,6 +33,7 @@ import type { usePropertyForm } from "./usePropertyForm";
 import { logger } from "@/utils/logger";
 import { notifyMatchingUsers } from "@/hooks/useMatchNotifier";
 import { warmOgCache } from "@/utils/ogWarmup";
+import { supabase } from "@/lib/supabase";
 
 const log = logger.scoped("usePublishProperty");
 
@@ -600,6 +601,23 @@ export function usePublishProperty(
         }
 
         log.error("Error publishing property:", error);
+        // REV27: se guarda el error real para poder diagnosticar (tabla debug_logs, contexto publicar_propiedad).
+        try {
+          void supabase.from("debug_logs").insert({
+            contexto: "publicar_propiedad",
+            payload: {
+              user: user?.id,
+              editando: !!propertyId,
+              name: error?.name,
+              code: error?.code,
+              message: error?.message,
+              details: error?.details,
+              hint: error?.hint,
+            },
+          });
+        } catch {
+          /* sin efecto */
+        }
 
         const errorMessage =
           (error as any)?.name === "InvalidImageError"
@@ -608,23 +626,27 @@ export function usePublishProperty(
               ? MEDIA_UNAVAILABLE_MESSAGE
               : error.message || "No se pudo publicar la propiedad";
 
+        // REV27: antes se abrian DOS avisos a la vez (el de progreso con "Cerrar" y el de "Error al publicar").
+        // En iPhone eso dejaba la pantalla congelada al cerrar. Ahora se cierra el de progreso y, ya cerrado, se muestra uno solo.
         setPublishState({
           uploading: false,
           uploadProgress: 0,
           uploadStage: "",
-          error: errorMessage,
+          error: null,
           canCancel: true,
         });
 
-        showModal({
-          title: "Error al publicar",
-          message: errorMessage,
-          confirmText: "Reintentar",
-          cancelText: "Cerrar",
-          confirmVariant: "primary",
-          onConfirm: () => void doUpload(resolvedContractData),
-          onCancel: () => {},
-        });
+        setTimeout(() => {
+          showModal({
+            title: "Error al publicar",
+            message: errorMessage,
+            confirmText: "Reintentar",
+            cancelText: "Cerrar",
+            confirmVariant: "primary",
+            onConfirm: () => void doUpload(resolvedContractData),
+            onCancel: () => {},
+          });
+        }, 450);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

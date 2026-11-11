@@ -14,6 +14,8 @@ import { ReportBadge } from "../shared/ReportBadge";
 const { width } = Dimensions.get("window");
 const GAP = 8;
 const ITEM_SIZE = (width - 24 - GAP * 2) / 3;
+// REV27: interruptor del circulo de reporte antiguo (apagado: lo reemplaza ReportBadge).
+const circuloAntiguoActivo = (): boolean => false;
 
 /** Color por operación: azul = venta, verde = renta (se distinguen de un vistazo). */
 const OP_COLOR = {
@@ -140,7 +142,8 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
         />
 
         {/* REV26 (#1): aviso de reportes tambien en la grilla del perfil */}
-        <View style={{ position: "absolute", top: 4, right: 4 }}>
+        {/* REV27: un solo triangulo, abajo a la derecha de la imagen (no tapa la etiqueta de comision ni el menu) */}
+        <View style={{ position: "absolute", top: ITEM_SIZE - 34, right: 6, zIndex: 20 }}>
           <ReportBadge propertyId={item.id} />
         </View>
 
@@ -195,7 +198,8 @@ const ProfilePropertyItem: React.FC<ProfilePropertyItemProps> = React.memo(
           </View>
         )}
 
-        {isOwnProfile && !!reportInfo && (
+        {/* REV27: el circulo antiguo del dueno se retira: ReportBadge ya lo muestra para todos (evita verlo dos veces) */}
+        {circuloAntiguoActivo() && isOwnProfile && !!reportInfo && (
           <Pressable
             onPress={() =>
               Alert.alert(

@@ -28,6 +28,7 @@ interface PropertyCodeSuggestion {
 type SearchSuggestion = LocationSuggestionWithCount | PropertyCodeSuggestion;
 import { useRouter } from "expo-router";
 import { supabase } from "../lib/supabase";
+import { blockService } from "@/services/blockService";
 import { Image } from "expo-image";
 import { useApp } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
@@ -90,6 +91,11 @@ export const LocationSearchBar: React.FC<LocationSearchBarProps> = ({
         .is("deleted_at", null)
         .limit(3);
       const uid = authUser?.id;
+      // REV28: las fichas de usuarios con bloqueo (en cualquier sentido) tampoco salen al buscar por codigo.
+      const bloqueados = await blockService.getBlockedUserIds(uid);
+      if (bloqueados.length > 0) {
+        codeQuery = codeQuery.not("created_by", "in", `(${bloqueados.join(",")})`);
+      }
       if (uid && /^[0-9a-f-]{36}$/i.test(uid)) {
         codeQuery = codeQuery.or(`and(activo.eq.true,comparte_comision.eq.true,or(sin_comision.is.null,sin_comision.eq.false)),created_by.eq.${uid}`);
       } else {
