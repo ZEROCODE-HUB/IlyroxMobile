@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { blockService } from "@/services/blockService";
+import { supabase } from "@/lib/supabase";
 import { logger } from "@/utils/logger";
 
 const log = logger.scoped("useUserBlock");
@@ -54,6 +55,18 @@ export function useUserBlock(
     try {
       await blockService.blockUser(blockerId, blockedId);
       setIsBlocked(true);
+      // REV30: al bloquear, eliminar matches mutuos de inmediato.
+      // Asi el bloqueado no puede detectar el re-bloqueo viendo que sus matches desaparecen con demora.
+      try {
+        await Promise.all([
+          supabase.from("matches").delete()
+            .eq("usuario_id", blockerId).eq("matched_usuario_id", blockedId),
+          supabase.from("matches").delete()
+            .eq("usuario_id", blockedId).eq("matched_usuario_id", blockerId),
+        ]);
+      } catch {
+        /* sin efecto visual; el backend los filtra igual por bloqueo */
+      }
       invalidateBlockedContent();
     } finally {
       setLoading(false);

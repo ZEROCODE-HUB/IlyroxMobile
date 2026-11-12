@@ -720,6 +720,11 @@ export const useSaveSearch = (userId?: string) => {
     if (filters.estacionamientos && filters.estacionamientos !== "No indicado") { const v = parseInt(filters.estacionamientos); if (!isNaN(v)) updateData.estacionamientos = v; }
     if (filters.m2ConstruccionMin) { const v = parseFloat(String(filters.m2ConstruccionMin).replace(/,/g, "")); if (!isNaN(v)) updateData.metros_construccion = v; }
     if (filters.m2TerrenoMin) { const v = parseFloat(String(filters.m2TerrenoMin).replace(/,/g, "")); if (!isNaN(v)) updateData.metros_terreno = v; }
+    // REV29: al editar, los niveles se reescriben (o se limpian). Antes la columna pisos conservaba el valor viejo.
+    {
+      const nivN = filters.niveles && filters.niveles !== "No indicado" ? parseInt(String(filters.niveles)) : NaN;
+      updateData.pisos = !isNaN(nivN) ? nivN : null;
+    }
     if (filters.polygons?.length > 0) updateData.polygon_coords = filters.polygons;
     if (filters.locationChips?.length > 0) {
       const reliableBounds = computeReliableBounds(
