@@ -55,15 +55,16 @@ export function useUserBlock(
     try {
       await blockService.blockUser(blockerId, blockedId);
       setIsBlocked(true);
-      // REV30: al bloquear, eliminar matches mutuos de inmediato.
-      // Asi el bloqueado no puede detectar el re-bloqueo viendo que sus matches desaparecen con demora.
+      // REV30b: eliminar matches mutuos al bloquear.
+      // La tabla matches no tiene matched_usuario_id; el vinculo es:
+      //   busquedas_guardadas.usuario_id  (dueno de la busqueda)
+      //   propiedades.created_by          (dueno de la propiedad)
+      // Se usa una funcion SQL para hacer el delete con join desde el cliente.
       try {
-        await Promise.all([
-          supabase.from("matches").delete()
-            .eq("usuario_id", blockerId).eq("matched_usuario_id", blockedId),
-          supabase.from("matches").delete()
-            .eq("usuario_id", blockedId).eq("matched_usuario_id", blockerId),
-        ]);
+        await supabase.rpc("eliminar_matches_entre", {
+          p_usuario_a: blockerId,
+          p_usuario_b: blockedId,
+        });
       } catch {
         /* sin efecto visual; el backend los filtra igual por bloqueo */
       }

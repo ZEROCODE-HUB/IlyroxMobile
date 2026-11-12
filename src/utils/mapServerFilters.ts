@@ -89,7 +89,16 @@ export function extractServerFilters(rawFilters: StoreFilters): MapServerFilters
   // Comercial
   if (filters.tipoPropiedad === "comercial" && filters.comercialFilters) {
     const cf = filters.comercialFilters;
-    if (cf.tipoUbicacion.length === 1) f.tipoUbicacion = cf.tipoUbicacion[0];
+    // REV31: replica la logica del filtro local (usePropertyFilters REV26).
+    // Dentro+Fuera juntos sin Sin clasificar = sin filtro (igual que seleccionar ninguno).
+    // Sin clasificar solo o combinado = filtrar.
+    const _selUbic = cf.tipoUbicacion as string[];
+    const _soloDentroFuera = _selUbic.length === 2 && !_selUbic.includes("Sin clasificar");
+    if (_selUbic.length > 0 && !_soloDentroFuera) {
+      // El servidor solo acepta un valor; si hay varios incluimos "Sin clasificar" cuando esta presente,
+      // si no, tomamos el primero. Para multiples sin "Sin clasificar" el filtro local ya se encarga.
+      f.tipoUbicacion = _selUbic.includes("Sin clasificar") ? "Sin clasificar" : _selUbic[0];
+    }
     if (cf.frenteMin) {
       const n = parseFloat(cf.frenteMin);
       if (!isNaN(n) && n > 0) f.frenteMin = n;
