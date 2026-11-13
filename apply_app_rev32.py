@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
 apply_app_rev32.py - parche de la APP. Se aplica DESPUES de rev31.
-  R32-01  useUserBlock: al desbloquear, encola las busquedas activas del usuario
+  R32-01  useMapProperties: "Sin clasificar" incluye propiedades con tipo_ubicacion_comercial NULL.
+          Antes .eq(..., "Sin clasificar") excluia los NULL y devolvia 0 propiedades.
+  R32-02  useUserBlock: al desbloquear, encola las busquedas activas del usuario
           para que process_match_jobs (cron cada 1 min) regenere los matches
           con el usuario desbloqueado automaticamente.
 USO:  python apply_app_rev32.py src --dry-run   y luego   python apply_app_rev32.py src
@@ -25,7 +27,10 @@ def norm_hash(txt):
 
 
 PATCHES = [
-('R32-01', 'hooks/useUserBlock.ts',
+('R32-01', 'hooks/useMapProperties.ts',
+ '      query = query.eq("tipo_ubicacion_comercial", serverFilters.tipoUbicacion);',
+ '      // REV32: "Sin clasificar" incluye propiedades con tipo_ubicacion_comercial NULL.\n      // .eq solo no captura NULL; se usa .or para incluir ambos casos.\n      if (serverFilters.tipoUbicacion === "Sin clasificar") {\n        query = query.or("tipo_ubicacion_comercial.eq.Sin clasificar,tipo_ubicacion_comercial.is.null");\n      } else {\n        query = query.eq("tipo_ubicacion_comercial", serverFilters.tipoUbicacion);\n      }'),
+('R32-02', 'hooks/useUserBlock.ts',
  '      await blockService.unblockUser(blockerId, blockedId);\n      setIsBlocked(false);\n      invalidateBlockedContent();',
  '      await blockService.unblockUser(blockerId, blockedId);\n      setIsBlocked(false);\n      // REV32: encolar busquedas activas para regenerar matches con el usuario desbloqueado.\n      // El cron process_match_jobs corre cada minuto y procesa los jobs automaticamente.\n      try {\n        await supabase.rpc("encolar_busquedas_al_desbloquear", {\n          p_otro_usuario: blockedId,\n        });\n      } catch {\n        /* sin efecto visual; el usuario puede guardar la busqueda manualmente si falla */\n      }\n      invalidateBlockedContent();'),
 ]

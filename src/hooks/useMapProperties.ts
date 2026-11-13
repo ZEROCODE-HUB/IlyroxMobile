@@ -302,7 +302,13 @@ async function fetchMapProperties(
 
     // ── Comercial ──
     if (serverFilters.tipoUbicacion) {
-      query = query.eq("tipo_ubicacion_comercial", serverFilters.tipoUbicacion);
+      // REV32: "Sin clasificar" incluye propiedades con tipo_ubicacion_comercial NULL.
+      // .eq solo no captura NULL; se usa .or para incluir ambos casos.
+      if (serverFilters.tipoUbicacion === "Sin clasificar") {
+        query = query.or("tipo_ubicacion_comercial.eq.Sin clasificar,tipo_ubicacion_comercial.is.null");
+      } else {
+        query = query.eq("tipo_ubicacion_comercial", serverFilters.tipoUbicacion);
+      }
     }
     if (serverFilters.frenteMin && serverFilters.frenteMin > 0) {
       query = query.gte("frente_metros", serverFilters.frenteMin);
