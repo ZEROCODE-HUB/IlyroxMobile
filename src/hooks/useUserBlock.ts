@@ -80,6 +80,15 @@ export function useUserBlock(
     try {
       await blockService.unblockUser(blockerId, blockedId);
       setIsBlocked(false);
+      // REV32: encolar busquedas activas para regenerar matches con el usuario desbloqueado.
+      // El cron process_match_jobs corre cada minuto y procesa los jobs automaticamente.
+      try {
+        await supabase.rpc("encolar_busquedas_al_desbloquear", {
+          p_otro_usuario: blockedId,
+        });
+      } catch {
+        /* sin efecto visual; el usuario puede guardar la busqueda manualmente si falla */
+      }
       invalidateBlockedContent();
     } finally {
       setLoading(false);
