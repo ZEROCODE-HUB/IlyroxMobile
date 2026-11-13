@@ -93,8 +93,11 @@ export function extractServerFilters(rawFilters: StoreFilters): MapServerFilters
     // Dentro+Fuera juntos sin Sin clasificar = sin filtro (igual que seleccionar ninguno).
     // Sin clasificar solo o combinado = filtrar.
     const _selUbic = cf.tipoUbicacion as string[];
+    // REV34: las 3 opciones juntas = sin filtro (igual que ninguna).
+    const _todasOpciones = ["Dentro de plaza", "Fuera de plaza", "Sin clasificar"];
     const _soloDentroFuera = _selUbic.length === 2 && !_selUbic.includes("Sin clasificar");
-    if (_selUbic.length > 0 && !_soloDentroFuera) {
+    const _todasSeleccionadas = _todasOpciones.every((o) => _selUbic.includes(o));
+    if (_selUbic.length > 0 && !_soloDentroFuera && !_todasSeleccionadas) {
       // El servidor solo acepta un valor; si hay varios incluimos "Sin clasificar" cuando esta presente,
       // si no, tomamos el primero. Para multiples sin "Sin clasificar" el filtro local ya se encarga.
       f.tipoUbicacion = _selUbic.includes("Sin clasificar") ? "Sin clasificar" : _selUbic[0];
