@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -127,39 +127,46 @@ export default function PendingApprovalScreen() {
               cachePolicy="none"
             />
           ) : (
-            <Ionicons name="hourglass-outline" size={60} color={COLORS.primary} />
+            <Ionicons name="shield-checkmark-outline" size={48} color={COLORS.primary} />
           )}
         </View>
 
-        <Text style={styles.title}>Aprobación Pendiente</Text>
+        <Text style={styles.title}>Solicitud enviada</Text>
         <Text style={styles.description}>
-          Tu cuenta está siendo revisada por la comunidad. Necesitas completar las aprobaciones para acceder a todas las funciones.
+          ILYROX es exclusiva para asesores inmobiliarios.
         </Text>
 
-        <View style={{ alignSelf: 'stretch', marginBottom: theme.spacing.xl }}>
-          <Text style={styles.description}>1. Pide a 3 miembros de la comunidad que aprueben tu cuenta.</Text>
-          <Text style={styles.description}>2. Cada aprobación se suma aquí automáticamente.</Text>
-          <Text style={styles.description}>3. Con las 3 aprobaciones se activa tu acceso completo a la app.</Text>
-        </View>
-
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{recibidas}</Text>
-            <Text style={styles.statLabel}>Recibidas</Text>
-          </View>
-          <View style={[styles.statItem, styles.statItemHighlight]}>
-            <Text style={styles.statValue}>{faltantes}</Text>
-            <Text style={styles.statLabel}>Faltantes</Text>
+        <View style={styles.progressCard}>
+          <Text style={styles.progressTitle}>{recibidas} de {requeridas} aprobaciones</Text>
+          <View style={styles.pillsRow}>
+            {Array.from({ length: requeridas }).map((_, i) => (
+              <View key={i} style={[styles.pill, i < recibidas ? styles.pillActive : styles.pillInactive]} />
+            ))}
           </View>
         </View>
 
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${progress}%` }]} />
-          </View>
-          <Text style={styles.progressText}>
-            {recibidas} de {requeridas} aprobaciones
+        <View style={styles.waitRow}>
+          <Ionicons name="notifications-outline" size={22} color={COLORS.primary} style={{ marginTop: 2 }} />
+          <Text style={styles.waitText}>
+            <Text style={styles.waitBold}>Por ahora, solo queda esperar.</Text>
+            {' '}Te avisaremos cuando tu cuenta esté activa.
           </Text>
+        </View>
+
+        <Text style={styles.whenTitle}>Cuando se active tu cuenta</Text>
+        <View style={styles.featureList}>
+          <View style={styles.featureRow}>
+            <Ionicons name="search-outline" size={22} color={COLORS.primary} />
+            <Text style={styles.featureText}>Busca propiedades por zona.</Text>
+          </View>
+          <View style={styles.featureRow}>
+            <Ionicons name="star-outline" size={22} color={COLORS.primary} />
+            <Text style={styles.featureText}>Recibe matches para tus clientes.</Text>
+          </View>
+          <View style={styles.featureRow}>
+            <Ionicons name="layers-outline" size={22} color={COLORS.primary} />
+            <Text style={styles.featureText}>Sincroniza tu inventario desde plataformas compatibles.</Text>
+          </View>
         </View>
 
         <Text style={styles.refreshHint}>
@@ -170,16 +177,16 @@ export default function PendingApprovalScreen() {
           style={styles.signOutButton}
           onPress={() => {
             showModal({
-              title: "Cerrar Sesión",
+              title: "Cerrar sesión",
               message: "¿Estás seguro de que deseas cerrar sesión?",
-              confirmText: "Cerrar Sesión",
+              confirmText: "Cerrar sesión",
               cancelText: "Cancelar",
               onConfirm: signOut
             });
           }}
         >
           <Ionicons name="log-out-outline" size={24} color={COLORS.textSecondary} />
-          <Text style={styles.signOutText}>Cerrar Sesión</Text>
+          <Text style={styles.signOutText}>Cerrar sesión</Text>
         </TouchableOpacity>
       </View>
       </ScrollView>
@@ -232,23 +239,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: theme.spacing.xxl,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.xxl,
-  },
-  statItem: {
-    backgroundColor: COLORS.white,
-    paddingVertical: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.xl,
-    borderRadius: theme.borderRadius.lg,
-    alignItems: 'center',
-    minWidth: 120,
-    flex: 1,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
   statItemHighlight: {
     borderColor: COLORS.errorTransparent,
     backgroundColor: COLORS.errorTransparent,
@@ -265,25 +255,75 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  progressContainer: {
+  progressCard: {
     width: '100%',
-    marginBottom: theme.spacing.xxl * 1.5,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
   },
-  progressBar: {
-    height: 8,
-    backgroundColor: COLORS.backgroundDark,
-    borderRadius: theme.borderRadius.full,
-    overflow: 'hidden',
+  progressTitle: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: COLORS.textSecondary,
     marginBottom: theme.spacing.sm,
   },
-  progressFill: {
-    height: '100%',
+  pillsRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  pill: {
+    width: 32,
+    height: 8,
+    borderRadius: 4,
+  },
+  pillActive: {
     backgroundColor: COLORS.primary,
   },
-  progressText: {
-    color: COLORS.textSecondary,
+  pillInactive: {
+    backgroundColor: COLORS.backgroundDark,
+  },
+  waitRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  waitText: {
+    flex: 1,
     fontSize: theme.typography.fontSizes.sm,
-    textAlign: 'center',
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+  },
+  waitBold: {
+    fontWeight: theme.typography.fontWeights.semibold,
+    color: COLORS.textPrimary,
+  },
+  whenTitle: {
+    fontSize: theme.typography.fontSizes.xs,
+    fontWeight: theme.typography.fontWeights.semibold,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    alignSelf: 'flex-start',
+    marginBottom: theme.spacing.sm,
+  },
+  featureList: {
+    width: '100%',
+    gap: 12,
+    marginBottom: theme.spacing.xl,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  featureText: {
+    flex: 1,
+    fontSize: theme.typography.fontSizes.sm,
+    color: COLORS.textPrimary,
+    lineHeight: 20,
   },
   signOutButton: {
     flexDirection: 'row',
