@@ -85,9 +85,9 @@ const Feed: React.FC<FeedProps> = ({
   const handleRefresh = useCallback(async () => {
     setIsUserRefreshing(true);
     setCommunityRefreshSignal((value) => value + 1);
-    await refresh();
+    await Promise.all([refresh(), refreshApprovals()]);
     setIsUserRefreshing(false);
-  }, [refresh]);
+  }, [refresh, refreshApprovals]);
 
   // Tras editar una propiedad/post NO se recarga la lista: eso reordena el feed
   // por engagement_score. Se parchea solo ese item (patchFeedItem), que conserva
@@ -132,6 +132,7 @@ const Feed: React.FC<FeedProps> = ({
     pendingUsers,
     approveUser,
     rejectUser,
+    refresh: refreshApprovals,
   } = useUserApprovals(currentUserId, currentUserState);
 
   // Banner de notificación
