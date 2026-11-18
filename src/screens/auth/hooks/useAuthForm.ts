@@ -538,18 +538,6 @@ export function useAuthForm() {
       log.info("handleRegister: signUp exitoso", { userId: data.user?.id, email: data.user?.email });
 
       if (data.user) {
-        log.info("handleRegister: Llamando RPC handle_new_user para crear perfil");
-        const { error: rpcError } = await supabase.rpc('handle_new_user');
-        if (rpcError) {
-          log.error("handleRegister: Error en RPC handle_new_user", {
-            error: rpcError,
-            message: rpcError.message,
-            code: rpcError.code
-          });
-        } else {
-          log.info("handleRegister: RPC handle_new_user exitosa");
-        }
-
         let finalAvatarUrl = "";
         if (formState.avatarUri) {
           log.info("handleRegister: Subiendo foto");
@@ -589,6 +577,10 @@ export function useAuthForm() {
             // "Editar Perfil" tras registrarse.
             celular: celularDigits.length >= 10 ? celularDigits : null,
             prefijo_celular: "+52",
+            // Garantizar que las aprobaciones queden correctas aunque el trigger de BD
+            // no las haya seteado (evita que needsApproval sea falso en _layout.tsx).
+            aprobaciones_recibidas: 0,
+            aprobaciones_requeridas: 3,
           })
           .eq("id", data.user.id);
 

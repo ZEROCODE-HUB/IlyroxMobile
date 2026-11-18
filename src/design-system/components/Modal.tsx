@@ -12,7 +12,6 @@ import {
 } from "react-native";
 import { X } from "lucide-react-native";
 import { COLORS } from "@/constants/colors";
-import { theme } from "@/design-system/theme";
 
 export type ModalVariant = "center" | "bottom" | "fullscreen";
 
@@ -126,7 +125,7 @@ const styles = StyleSheet.create({
   center: {
     justifyContent: "center",
     alignItems: "center",
-    padding: theme.spacing.lg,
+    padding: 24,
   },
   bottom: {
     justifyContent: "flex-end",
@@ -141,12 +140,12 @@ const styles = StyleSheet.create({
   centerContent: {
     width: "100%",
     maxWidth: 480,
-    borderRadius: theme.borderRadius.lg,
+    borderRadius: 12,
   },
   bottomContent: {
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    paddingBottom: theme.spacing.lg,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 24,
   },
   fullscreenContent: {
     flex: 1,
@@ -156,24 +155,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
   },
   title: {
     flex: 1,
-    fontSize: theme.typography.fontSizes.lg,
-    fontWeight: theme.typography.fontWeights.semibold,
+    fontSize: 18,
+    fontWeight: "600",
     color: COLORS.textPrimary,
   },
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.spacing.sm,
+    gap: 8,
   },
   closeButton: {
-    padding: theme.spacing.xs,
-    borderRadius: theme.borderRadius.full,
+    padding: 4,
+    borderRadius: 9999,
   },
 });
