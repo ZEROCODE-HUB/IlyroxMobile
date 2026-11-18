@@ -1,4 +1,4 @@
-{
+﻿{
   "expo": {
     "name": "ilyrox",
     "slug": "ilyrox",
@@ -37,7 +37,7 @@
           "remote-notification"
         ],
         "ITSAppUsesNonExemptEncryption": false,
-        "NSPhotoLibraryUsageDescription": "Ilyrox necesita acceder a tu galería para que puedas seleccionar fotos y videos al crear publicaciones, reels y propiedades, elegir tu foto de perfil y adjuntar archivos en mensajes."
+        "NSPhotoLibraryUsageDescription": "Ilyrox necesita acceder a tu galerÃ­a para que puedas seleccionar fotos y videos al crear publicaciones, reels y propiedades, elegir tu foto de perfil y adjuntar archivos en mensajes."
       },
       "entitlements": {
         "aps-environment": "production",
@@ -158,6 +158,6 @@
       },
       "router": {}
     },
-    "owner": "nocodehero"
+    "owner": "joseandresmobile"
   }
 }
