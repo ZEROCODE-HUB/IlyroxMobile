@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -92,6 +92,8 @@ export default function PendingApprovalScreen() {
         }
       >
         <View style={styles.content}>
+
+          {/* Avatar */}
           <View style={styles.iconContainer}>
             {profile?.foto ? (
               <Image
@@ -105,11 +107,18 @@ export default function PendingApprovalScreen() {
             )}
           </View>
 
+          {/* Título */}
           <Text style={styles.title}>Solicitud enviada</Text>
           <Text style={styles.description}>
             ILYROX es exclusiva para asesores inmobiliarios.
           </Text>
 
+          {/* Texto de asesores notificados */}
+          <Text style={styles.advisorsNotified}>
+            Ya avisamos a los asesores de tu estado. Tu cuenta se activará cuando {requeridas} confirmen que eres asesor inmobiliario.
+          </Text>
+
+          {/* Progreso */}
           <View style={styles.progressCard}>
             <Text style={styles.progressTitle}>{recibidas} de {requeridas} aprobaciones</Text>
             <View style={styles.pillsRow}>
@@ -119,6 +128,7 @@ export default function PendingApprovalScreen() {
             </View>
           </View>
 
+          {/* Esperar */}
           <View style={styles.waitRow}>
             <Ionicons name="notifications-outline" size={22} color={COLORS.primary} style={{ marginTop: 2 }} />
             <Text style={styles.waitText}>
@@ -127,6 +137,7 @@ export default function PendingApprovalScreen() {
             </Text>
           </View>
 
+          {/* Cuando se active */}
           <Text style={styles.whenTitle}>Cuando se active tu cuenta</Text>
           <View style={styles.featureList}>
             <View style={styles.featureRow}>
@@ -147,6 +158,7 @@ export default function PendingApprovalScreen() {
             Esta pantalla se actualiza sola. Desliza hacia abajo para comprobarlo ahora.
           </Text>
 
+          {/* Cerrar sesión */}
           <TouchableOpacity
             style={styles.signOutButton}
             onPress={() => {
@@ -162,6 +174,7 @@ export default function PendingApprovalScreen() {
             <Ionicons name="log-out-outline" size={24} color={COLORS.textSecondary} />
             <Text style={styles.signOutText}>Cerrar sesión</Text>
           </TouchableOpacity>
+
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -177,18 +190,10 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   content: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
-  },
-  refreshHint: {
-    color: COLORS.textTertiary,
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: -32,
-    marginBottom: 32,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingBottom: 24,
   },
   iconContainer: {
     width: 120,
@@ -211,7 +216,15 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
+    marginBottom: 16,
+  },
+  advisorsNotified: {
+    fontSize: 15,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
     marginBottom: 32,
+    paddingHorizontal: 8,
   },
   progressCard: {
     width: '100%',
@@ -219,7 +232,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
   },
   progressTitle: {
     fontSize: 14,
@@ -245,8 +258,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    marginBottom: 24,
+    marginBottom: 32,
     paddingHorizontal: 8,
+    width: '100%',
   },
   waitText: {
     flex: 1,
@@ -265,30 +279,37 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     alignSelf: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   featureList: {
     width: '100%',
-    gap: 12,
-    marginBottom: 24,
+    gap: 16,
+    marginBottom: 32,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   featureText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     color: COLORS.textPrimary,
-    lineHeight: 20,
+    lineHeight: 22,
+  },
+  refreshHint: {
+    color: COLORS.textTertiary,
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 32,
+    paddingHorizontal: 16,
+    lineHeight: 18,
   },
   signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     padding: 16,
-    marginBottom: 24,
   },
   signOutText: {
     color: COLORS.textSecondary,
