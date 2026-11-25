@@ -1,6 +1,6 @@
 /**
  * useAuthForm.ts
- * Hook para manejar el estado y validación de formularios de autenticación
+ * Hook para manejar el estado y validaciÃ³n de formularios de autenticaciÃ³n
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
@@ -131,11 +131,11 @@ function trazaLogin(evento: string, extra?: Record<string, unknown>) {
 }
 
 const PASSWORD_RULES = [
-  { test: (p: string) => p.length >= 8,          label: "mínimo 8 caracteres" },
-  { test: (p: string) => /[A-Z]/.test(p),        label: "una mayúscula" },
-  { test: (p: string) => /[a-z]/.test(p),        label: "una minúscula" },
-  { test: (p: string) => /\d/.test(p),            label: "un número" },
-  { test: (p: string) => /[!@#$%^&*()_+\-=\[\]{}|;':",.<>?/\\]/.test(p), label: "un carácter especial (!@#...)" },
+  { test: (p: string) => p.length >= 8,          label: "mÃ­nimo 8 caracteres" },
+  { test: (p: string) => /[A-Z]/.test(p),        label: "una mayÃºscula" },
+  { test: (p: string) => /[a-z]/.test(p),        label: "una minÃºscula" },
+  { test: (p: string) => /\d/.test(p),            label: "un nÃºmero" },
+  { test: (p: string) => /[!@#$%^&*()_+\-=\[\]{}|;':",.<>?/\\]/.test(p), label: "un carÃ¡cter especial (!@#...)" },
 ];
 
 function getPasswordError(password: string): string {
@@ -163,7 +163,7 @@ export function useAuthForm() {
 
   // Los errores de auth se muestran como banner INLINE dentro del bottom sheet:
   // en iOS no se puede presentar el ConfirmationModal (Modal nativo) sobre el
-  // AppBottomSheet (otro Modal nativo), así que no aparecería. Reutilizamos la
+  // AppBottomSheet (otro Modal nativo), asÃ­ que no aparecerÃ­a. Reutilizamos la
   // firma de showModal pero escribimos en este estado en vez de abrir el modal.
   const [error, setError] = useState<string | null>(null);
   const showModal = useCallback(
@@ -183,19 +183,19 @@ export function useAuthForm() {
     [],
   );
 
-  // Validación inline por campo (llamar en onBlur)
+  // ValidaciÃ³n inline por campo (llamar en onBlur)
   const validateField = useCallback(
     (field: keyof AuthFormState, value: string) => {
       let error = "";
       if (field === "email" && value && !EMAIL_REGEX.test(value))
-        error = "Email inválido";
+        error = "Email invÃ¡lido";
       if (field === "password" && value)
         error = getPasswordError(value);
       if (field === "confirmPassword" && value && value !== formState.password)
-        error = "Las contraseñas no coinciden";
+        error = "Las contraseÃ±as no coinciden";
       if (field === "phone" && value) {
         const digits = value.replace(/\D/g, "");
-        if (digits.length < 10) error = "Teléfono debe tener 10 dígitos";
+        if (digits.length < 10) error = "TelÃ©fono debe tener 10 dÃ­gitos";
       }
       setFieldErrors((prev) => ({ ...prev, [field]: error }));
     },
@@ -248,7 +248,7 @@ export function useAuthForm() {
         setStep(1);
         Burnt.toast({
           title: "Retomamos tu registro",
-          message: "Tu foto y tus datos se guardaron. Solo vuelve a escribir tu contraseña.",
+          message: "Tu foto y tus datos se guardaron. Solo vuelve a escribir tu contraseÃ±a.",
           preset: "none",
           duration: 5,
         });
@@ -267,7 +267,7 @@ export function useAuthForm() {
     setError(null);
   }, []);
 
-  // Validación Paso 1 (datos básicos)
+  // ValidaciÃ³n Paso 1 (datos bÃ¡sicos)
   const validateStep1 = useCallback((): boolean => {
     const {
       name,
@@ -297,7 +297,7 @@ export function useAuthForm() {
     if (!EMAIL_REGEX.test(email)) {
       showModal({
         title: "Error",
-        message: "Email inválido",
+        message: "Email invÃ¡lido",
         confirmText: "OK",
       });
       return false;
@@ -305,7 +305,7 @@ export function useAuthForm() {
     const pwdError = getPasswordError(password);
     if (pwdError) {
       showModal({
-        title: "Contraseña insegura",
+        title: "ContraseÃ±a insegura",
         message: pwdError,
         confirmText: "OK",
       });
@@ -314,7 +314,7 @@ export function useAuthForm() {
     if (password !== confirmPassword) {
       showModal({
         title: "Error",
-        message: "Las contraseñas no coinciden",
+        message: "Las contraseÃ±as no coinciden",
         confirmText: "OK",
       });
       return false;
@@ -322,7 +322,7 @@ export function useAuthForm() {
     return true;
   }, [formState]);
 
-  // Validación datos profesionales
+  // ValidaciÃ³n datos profesionales
   const validateProfessionalData = useCallback(
     (requireEstado = false): boolean => {
       const {
@@ -348,7 +348,7 @@ export function useAuthForm() {
       if (!ocupacion) {
         showModal({
           title: "Error",
-          message: "Selecciona tu ocupación",
+          message: "Selecciona tu ocupaciÃ³n",
           confirmText: "OK",
         });
         return false;
@@ -382,7 +382,7 @@ export function useAuthForm() {
       if (!biografia) {
         showModal({
           title: "Error",
-          message: "Ingrese su biografía",
+          message: "Ingrese su biografÃ­a",
           confirmText: "OK",
         });
         return false;
@@ -390,24 +390,24 @@ export function useAuthForm() {
       // Validaciones legales obligatorias
       if (!acceptedTerms) {
         showModal({
-          title: "Aceptación requerida",
-          message: "Debes aceptar los Términos y Condiciones de ILYROX para continuar",
+          title: "AceptaciÃ³n requerida",
+          message: "Debes aceptar los TÃ©rminos y Condiciones de ILYROX para continuar",
           confirmText: "OK",
         });
         return false;
       }
       if (!acceptedPrivacy) {
         showModal({
-          title: "Aceptación requerida",
-          message: "Debes confirmar que has leído la Política de Privacidad",
+          title: "AceptaciÃ³n requerida",
+          message: "Debes confirmar que has leÃ­do la PolÃ­tica de Privacidad",
           confirmText: "OK",
         });
         return false;
       }
       if (!acceptedAge) {
         showModal({
-          title: "Aceptación requerida",
-          message: "Debes confirmar que tienes 18 años o más",
+          title: "AceptaciÃ³n requerida",
+          message: "Debes confirmar que tienes 18 aÃ±os o mÃ¡s",
           confirmText: "OK",
         });
         return false;
@@ -417,13 +417,13 @@ export function useAuthForm() {
     [formState],
   );
 
-  // Validación login
+  // ValidaciÃ³n login
   const validateLogin = useCallback((): boolean => {
     const { email, password } = formState;
     if (!email || !password) {
       showModal({
         title: "Error",
-        message: "Por favor ingresa email y contraseña",
+        message: "Por favor ingresa email y contraseÃ±a",
         confirmText: "OK",
       });
       return false;
@@ -458,8 +458,8 @@ export function useAuthForm() {
       showModal({
         title: "Error",
         message: sinRed
-          ? "No se pudo conectar. Revisa tu conexión a internet e intenta de nuevo."
-          : "Correo o contraseña incorrectos. Si aún no tienes cuenta, usa \"Crear cuenta\".",
+          ? "No se pudo conectar. Revisa tu conexiÃ³n a internet e intenta de nuevo."
+          : "Correo o contraseÃ±a incorrectos. Si aÃºn no tienes cuenta, usa \"Crear cuenta\".",
         confirmText: "OK",
       });
       return false;
@@ -476,7 +476,7 @@ export function useAuthForm() {
 
     setLoading(true);
     try {
-      // Verificar teléfono duplicado solo si se proporcionó
+      // Verificar telÃ©fono duplicado solo si se proporcionÃ³
       const celularDigits = formState.phone.replace(/\D/g, "").slice(2);
       if (celularDigits.length >= 10) {
         const { data: existingPhone } = await supabase
@@ -487,8 +487,8 @@ export function useAuthForm() {
 
         if (existingPhone) {
           showModal({
-            title: "Número ya registrado",
-            message: "Ya existe una cuenta registrada con este número de teléfono.",
+            title: "NÃºmero ya registrado",
+            message: "Ya existe una cuenta registrada con este nÃºmero de telÃ©fono.",
             confirmText: "OK",
           });
           setLoading(false);
@@ -538,10 +538,22 @@ export function useAuthForm() {
       log.info("handleRegister: signUp exitoso", { userId: data.user?.id, email: data.user?.email });
 
       if (data.user) {
+        log.info("handleRegister: Llamando RPC handle_new_user para crear perfil");
+        const { error: rpcError } = await supabase.rpc('handle_new_user');
+        if (rpcError) {
+          log.error("handleRegister: Error en RPC handle_new_user", {
+            error: rpcError,
+            message: rpcError.message,
+            code: rpcError.code
+          });
+        } else {
+          log.info("handleRegister: RPC handle_new_user exitosa");
+        }
+
         let finalAvatarUrl = "";
         if (formState.avatarUri) {
           log.info("handleRegister: Subiendo foto");
-          // La cuenta ya está creada: si el servidor de archivos falla, se
+          // La cuenta ya estÃ¡ creada: si el servidor de archivos falla, se
           // termina el registro sin foto y se avisa.
           let url: string | null = null;
           try {
@@ -550,7 +562,7 @@ export function useAuthForm() {
             log.warn("handleRegister: no se pudo subir la foto", err);
             if (isMediaUnavailable(err)) {
               Burnt.toast({
-                title: `${MEDIA_UNAVAILABLE_MESSAGE} Podrás agregar tu foto desde tu perfil.`,
+                title: `${MEDIA_UNAVAILABLE_MESSAGE} PodrÃ¡s agregar tu foto desde tu perfil.`,
                 preset: "error",
                 duration: 5,
               });
@@ -572,8 +584,8 @@ export function useAuthForm() {
             fecha_inicio_carrera: formState.fechaInicioCarrera || null,
             biografia: formState.biografia || null,
             foto: finalAvatarUrl || null,
-            // El teléfono se guarda aquí porque el trigger de la BD no persiste
-            // `celular` (solo el id). Sin esto, el campo queda vacío en
+            // El telÃ©fono se guarda aquÃ­ porque el trigger de la BD no persiste
+            // `celular` (solo el id). Sin esto, el campo queda vacÃ­o en
             // "Editar Perfil" tras registrarse.
             celular: celularDigits.length >= 10 ? celularDigits : null,
             prefijo_celular: "+52",
@@ -624,8 +636,8 @@ export function useAuthForm() {
       showModal({
         title: "Error",
         message: isEmailDup
-          ? "Ya existe una cuenta registrada con este correo electrónico."
-          : msg || "Ocurrió un error al registrarse",
+          ? "Ya existe una cuenta registrada con este correo electrÃ³nico."
+          : msg || "OcurriÃ³ un error al registrarse",
         confirmText: "OK",
       });
       return false;
