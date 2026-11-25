@@ -128,6 +128,7 @@ import { useMatchesStore } from "../store/matchesStore";
 import { logger } from "@/utils/logger";
 import { feedService } from "@/services/feedService";
 import { profileService } from "@/services/profileService";
+import { blockService } from "@/services/blockService";
 
 const log = logger.scoped("Matches");
 
@@ -227,6 +228,18 @@ const Matches: React.FC = () => {
           if (!p || p.created_by === user.id) return true;
           return p.comparte_comision === true && !p.sin_comision;
         });
+      }
+
+      // REV-BLOCK: ocultar matches de propiedades de usuarios bloqueados (en ambos sentidos).
+      if (data && data.length > 0) {
+        const blockedIds = await blockService.getBlockedUserIds(user.id);
+        if (blockedIds.length > 0) {
+          data = data.filter((m: any) => {
+            const createdBy = m.propiedad?.created_by;
+            if (!createdBy) return true;
+            return !blockedIds.includes(createdBy);
+          });
+        }
       }
 
       // Si tenemos datos, obtener perfiles por separado
