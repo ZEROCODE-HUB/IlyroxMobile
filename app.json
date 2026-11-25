@@ -2,7 +2,7 @@
   "expo": {
     "name": "ilyrox",
     "slug": "ilyrox",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "runtimeVersion": {
       "policy": "fingerprint"
     },
@@ -158,6 +158,6 @@
       },
       "router": {}
     },
-    "owner": "joseandresmobile"
+    "owner": "zc-labs"
   }
 }
