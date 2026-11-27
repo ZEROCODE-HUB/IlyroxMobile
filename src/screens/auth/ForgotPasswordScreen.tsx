@@ -45,9 +45,10 @@ const ForgotPasswordScreen: React.FC = () => {
     setError("");
 
     try {
-      // Enviar código OTP al correo (sin redirectTo)
+      // REV-FORGOT: agregar redirectTo para que Supabase envíe el correo correctamente en app móvil
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        email
+        email,
+        { redirectTo: "com.ilyrox.app://reset-password" }
       );
 
       if (resetError) {
