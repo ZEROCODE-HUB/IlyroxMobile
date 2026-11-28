@@ -601,7 +601,7 @@ export default function SearchOverlay({ visible, onClose, initialQuery = "" }: S
 
         {/* â”€â”€ Contenido â”€â”€ */}
         <View style={[styles.content, { paddingBottom: insets.bottom }]}>
-          {/* Historial de bÃºsquedas (de BD) */}
+          {/* Historial de búsquedas (de BD) */}
           {query.length === 0 && (
             <HistorySearches
               historial={historial}
@@ -867,7 +867,7 @@ function PostGrid({ items, onPress }: { items: SearchPost[]; onPress: (feedItemI
               </View>
             );
           })}
-          {/* Celdas vacÃ­as para completar la fila si quedan menos de 3 items */}
+          {/* Celdas vacías para completar la fila si quedan menos de 3 items */}
           {Array.from({ length: 3 - row.length }).map((_, idx) => (
             <View key={`empty-${idx}`} style={[gridStyles.postCell, { backgroundColor: "transparent" }]} />
           ))}
